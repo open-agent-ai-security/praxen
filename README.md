@@ -135,6 +135,3 @@ deckard/
   examples/                   ← Example scans against real vulnerable agents
 ```
 
----
-
-*The Deckard Scanner is built on the RAISE framework from* ***The Developer's Playbook for Large Language Model Security*** *by Steve Wilson — O'Reilly Media*
