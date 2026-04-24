@@ -5,7 +5,7 @@
 
 # The RAISE Framework
 
-The Exabeam Deckard Agent Security Scanner evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, introduced in *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)* by Steve Wilson (O'Reilly Media).
+The Exabeam Deckard Agent Security Scanner evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, covered in depth at *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
 
 It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
 
@@ -126,7 +126,7 @@ A score is one signal. The Findings Register, Remit Coverage table, and Scan Sum
 
 ## Further Reading
 
-- **The Developer's Playbook for Large Language Model Security** — Steve Wilson, O'Reilly Media. The full RAISE framework, including threat models, case studies, and the category-level guidance the scanner operationalizes. [Publisher page](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/).
+- **The Developer's Playbook for Large Language Model Security** — the full RAISE framework, including threat models, case studies, and the category-level guidance the scanner operationalizes. [Book page](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/).
 - **OWASP Top 10 for LLM Applications 2025** — LLM-specific vulnerabilities the scanner cross-references.
 - **OWASP Top 10 for Agentic AI Applications 2026** — agentic-specific attack patterns the scanner uses to classify findings.
 - **OWASP Secure MCP Server Development Guide 2026** — applied when the scanner finds MCP server configuration in the workspace.
