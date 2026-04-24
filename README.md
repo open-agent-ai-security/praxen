@@ -12,13 +12,28 @@
 
 ## What It Detects
 
+Every scan classifies findings against **four industry-standard frameworks simultaneously**:
+
+- **RAISE Framework** — the six-category maturity model from *The Developer's Playbook for Large Language Model Security* (O'Reilly). Every scan produces a 0–5 score per category plus a weighted overall posture.
+- **OWASP Top 10 for LLM Applications 2025** — every finding applicable to LLM-level risks is tagged with the correct `LLM0X` category and full name (e.g., `LLM01 — Prompt Injection`, `LLM02 — Sensitive Information Disclosure`).
+- **OWASP Top 10 for Agentic AI Applications 2026** — agentic-specific patterns are tagged with the correct `ASI0X` category (e.g., `ASI01 — Agent Goal Hijack`, `ASI06 — Memory and Context Poisoning`).
+- **OWASP Secure MCP Server Development Guide 2026** — when the scanner finds MCP server configuration in the workspace, it applies the full MCP minimum-bar checklist from the OWASP guide.
+
+See [`docs/RAISE.md`](docs/RAISE.md) for the RAISE framework reference and maturity scale.
+
+### The detection patterns themselves
+
+On top of the framework coverage above, every scan runs these named detections:
+
 - **Policy-implementation divergence** — the code doesn't do what the policy document says
 - **Credential exposure** — secrets in unexpected locations across the workspace
 - **Configuration gaps** — auto-approved exec, disabled loop detection, missing rate limits
 - **Capability drift** — new tools or outbound destinations not in the authorized baseline
 - **Supply chain risk** — unpinned dependencies, unreviewed plugins, unknown provenance
-- **MCP server security posture** — evaluated against the OWASP Secure MCP Server guide
-- **Planned-but-not-deployed controls** — security plans that haven't made it into production code
+- **Declared-but-never-consulted config / secret** — half-wired controls (`WEBHOOK_SECRET` defined, never checked; `ADMIN_TOKEN` declared, never enforced)
+- **Empty stub files in security-relevant paths** — planned-but-not-implemented sandboxes, approval gates, redactors
+- **Secondary prompt discovery** — session-loaded identity files (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, etc.) audited as system prompts, with compound escalation when a writable session file meets a confirmed injection path (ASI06 memory-poisoning chain)
+- **Compound signal reasoning** — individual findings chained together when they combine into a high-severity attack path
 
 All findings are evaluated against a single source of truth: the **Worker Remit** — a markdown document that defines what the agent is authorized to be and do.
 
@@ -26,9 +41,8 @@ All findings are evaluated against a single source of truth: the **Worker Remit*
 
 ## What You Need
 
-- **Claude Code CLI**, installed and authenticated
-- **An Anthropic API key**
-- **A Worker Remit** for the agent you're scanning (or Claude Code can help you write one)
+- **A coding agent** (tested against Claude Code). The scanner is distributed as a skill file the agent reads and executes — any coding agent capable of tool use and multi-step instruction-following should work.
+- **A Worker Remit** for the agent you're scanning (or your coding agent can help you write one).
 
 ---
 
@@ -93,16 +107,14 @@ The test suite exists so that every Deckard release can be validated against the
 
 ---
 
-## Security Foundations
+## Security Foundations — Attribution
 
-Deckard's knowledge base is built from:
+The scanner's knowledge base is built on, and every finding is classified against, the four frameworks above. Source material:
 
-- **RAISE Framework** — six-category AI security framework from *The Developer's Playbook for Large Language Model Security* by Steve Wilson (O'Reilly Media). See [`docs/RAISE.md`](docs/RAISE.md) for the framework reference, the maturity scoring scale, and how to interpret Deckard scores.
-- **OWASP Top 10 for LLM Applications 2025**
-- **OWASP Top 10 for Agentic Applications 2026**
-- **OWASP Secure MCP Server Development Guide 2026**
-
-Findings are classified against all applicable frameworks simultaneously.
+- **RAISE Framework** — *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)* by Steve Wilson (O'Reilly Media). See [`docs/RAISE.md`](docs/RAISE.md) for the RAISE reference inside this distribution.
+- **OWASP Top 10 for LLM Applications 2025** — [genai.owasp.org](https://genai.owasp.org/)
+- **OWASP Top 10 for Agentic Applications 2026** — [genai.owasp.org](https://genai.owasp.org/)
+- **OWASP Secure MCP Server Development Guide 2026** — [genai.owasp.org](https://genai.owasp.org/)
 
 ---
 
