@@ -5,9 +5,9 @@
 
 # The RAISE Framework
 
-The Exabeam Deckard Agent Security Scanner evaluates every AI agent against the **RAISE framework** — a six-category methodology for assessing AI system security, introduced in *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)* by Steve Wilson (O'Reilly Media).
+The Exabeam Deckard Agent Security Scanner evaluates every AI agent against the **RAISE framework** (**R**esponsible **AI** **S**oftware **E**ngineering) — a six-category methodology for assessing AI system security, introduced in *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)* by Steve Wilson (O'Reilly Media).
 
-RAISE stands for **R**esponsible **A**rtificial **I**ntelligence **S**ecurity **E**ngineering. It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
+It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
 
 ---
 
