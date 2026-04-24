@@ -14,12 +14,10 @@
 
 Every scan classifies findings against **four industry-standard frameworks simultaneously**:
 
-- **RAISE Framework** — the six-category maturity model from *The Developer's Playbook for Large Language Model Security* (O'Reilly). Every scan produces a 0–5 score per category plus a weighted overall posture.
 - **OWASP Top 10 for LLM Applications 2025** — every finding applicable to LLM-level risks is tagged with the correct `LLM0X` category and full name (e.g., `LLM01 — Prompt Injection`, `LLM02 — Sensitive Information Disclosure`).
 - **OWASP Top 10 for Agentic AI Applications 2026** — agentic-specific patterns are tagged with the correct `ASI0X` category (e.g., `ASI01 — Agent Goal Hijack`, `ASI06 — Memory and Context Poisoning`).
 - **OWASP Secure MCP Server Development Guide 2026** — when the scanner finds MCP server configuration in the workspace, it applies the full MCP minimum-bar checklist from the OWASP guide.
-
-See [`docs/RAISE.md`](docs/RAISE.md) for the RAISE framework reference and maturity scale.
+- **RAISE Framework** — a six-category AI security maturity model. Every scan produces a 0–5 score per category plus a weighted overall posture. See [`docs/RAISE.md`](docs/RAISE.md) for the reference and maturity scale.
 
 ### The detection patterns themselves
 
