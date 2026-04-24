@@ -109,7 +109,7 @@ The test suite exists so that every Deckard release can be validated against the
 
 ## Security Foundations — Attribution
 
-The scanner's knowledge base is built on, and every finding is classified against, the four frameworks above. Source material:
+The scanner's [knowledge base](knowledge/) is built on, and every finding is classified against, the four frameworks above. Source material:
 
 - **OWASP Top 10 for LLM Applications 2025** — [genai.owasp.org](https://genai.owasp.org/)
 - **OWASP Top 10 for Agentic Applications 2026** — [genai.owasp.org](https://genai.owasp.org/)
