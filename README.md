@@ -46,21 +46,21 @@ All findings are evaluated against a single source of truth: the **Worker Remit*
 
 ## Running a Scan
 
-**There is no install step.** Unzip the release and open a Claude Code session in the unzipped directory — that's the whole setup.
+**There is no install step.** Unzip the release and open your coding agent in the unzipped directory — that's the whole setup.
 
-**1. Drop the Deckard directory somewhere Claude Code can see it.**
+**1. Drop the Deckard directory somewhere your coding agent can see it.**
 
-**2. Optionally, place a `WORKER_REMIT.md` in the same directory.**
+**2. Write a Worker Remit for the agent you're scanning.**
 
-The Worker Remit describes what the monitored agent is authorized to do — its tools, channels, counterparties, and behavioral norms. If you include one, Deckard picks it up automatically. If you don't, Claude Code will help you write one before scanning.
+Use [`WORKER_REMIT_template.md`](WORKER_REMIT_template.md) as the starting point. Describe what the target agent is authorized to do — its tools, channels, counterparties, and behavioral norms. Save the file as `WORKER_REMIT.md` (or `WORKER_REMIT_<agent>.md`) anywhere your coding agent can read it — typically alongside the agent workspace you're scanning, or in the directory you run the scan from. If you skip this step, your coding agent can help you draft one before the scan.
 
-**3. Open a Claude Code session and read the scanner skill:**
+**3. Open your coding agent and read the scanner skill:**
 
 ```
 Please read and run skills/environment_scanner.md to scan [agent workspace path].
 ```
 
-Claude Code reads the workspace, evaluates it against the RAISE framework and Worker Remit, and writes the results to `./reports/`.
+Your coding agent reads the workspace, evaluates it against the RAISE framework and Worker Remit, and writes the results to `./reports/`.
 
 **4. Open the report.**
 
@@ -111,8 +111,7 @@ The test suite exists so that every Deckard release can be validated against the
 deckard/
   README.md                   ← You are here
   DECKARD_SPEC.md             ← Full specification
-  WORKER_REMIT.md             ← (optional) drop your pre-built remit here
-  WORKER_REMIT_template.md    ← Remit template
+  WORKER_REMIT_template.md    ← Starting point for writing your own remit
   knowledge/                  ← RAISE + OWASP knowledge base
   skills/
     environment_scanner.md    ← The scanner skill prompt
