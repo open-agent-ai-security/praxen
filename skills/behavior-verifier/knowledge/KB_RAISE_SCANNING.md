@@ -7,7 +7,7 @@
 *Distilled for Praxa calibration*
 
 Source: RAISE Security Review Skill (RUBRIC.md, HEURISTICS.md, INTAKE_PATTERNS.md)
-Built on: *The Developer's Playbook for Large Language Model Security* by Steve Wilson — O'Reilly Media
+RAISE framework: developed by Steve Wilson. To learn more: *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
 
 This file gives the Praxa its calibration: how to read different artifact types, what signals map to which risks, how to score with confidence, and what mistakes to avoid. It is the RAISE framework's analytical methodology adapted for continuous agent scanning rather than one-time review.
 
@@ -449,5 +449,5 @@ Recognition of positive posture belongs in every scanner report. It gives operat
 ---
 
 *Source: RAISE Security Review Skill — RUBRIC.md, HEURISTICS.md, INTAKE_PATTERNS.md*
-*Built on: The Developer's Playbook for Large Language Model Security by Steve Wilson — O'Reilly Media*
+*RAISE framework developed by Steve Wilson. Learn more: [The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/).*
 *Distilled for the Praxa knowledge base*

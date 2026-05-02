@@ -438,4 +438,4 @@ The key design decisions in Praxa's synthesis:
 
 ---
 
-*The Praxa is built on the RAISE framework from* ***The Developer's Playbook for Large Language Model Security*** *by Steve Wilson — O'Reilly Media*
+*Praxa is built on the RAISE framework, developed by Steve Wilson. To learn more, see his book [The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/).*

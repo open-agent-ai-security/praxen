@@ -5,7 +5,7 @@
 
 # The RAISE Framework
 
-The Praxa evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, covered in depth at *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
+Praxa evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, developed by Steve Wilson. To learn more about RAISE, see his book *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
 
 It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
 
