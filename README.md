@@ -18,6 +18,19 @@ Praxa is **not just a source-code scanner.** Any artifact that reveals what the 
 
 ---
 
+## Documentation
+
+Full docs live in [`docs/`](docs/index.md). Quick links:
+
+- [Installation](docs/installation.md) — plugin marketplace install or unzipped release
+- [Usage](docs/usage.md) — running an analysis end-to-end
+- [Writing Worker Remits](docs/writing-remits.md) — authoring the policy document
+- [Interpreting Reports](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
+- [Challenging and Revising Findings](docs/challenging-findings.md) — what to do when you disagree with the analysis
+- [The RAISE Framework](docs/RAISE.md) — the maturity rubric in depth
+
+---
+
 ## How Praxa Works
 
 Praxa reduces agent security to a single comparison:
