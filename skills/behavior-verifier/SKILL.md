@@ -63,19 +63,18 @@ If in doubt, redact. The operator can always open the source file to see the act
 4. Any file matching `WORKER_REMIT*.md` in the skill file directory
 
 If a match is found, that is your policy baseline — read it in Step 2. If none is found, ask the operator:
-> "I need a Worker Remit to run this scan — a policy document describing what this agent is authorized to do, what it's forbidden to do, and who it can communicate with. Do you have one, or should I help you create one from a description of the agent?"
+> "I need a Worker Remit to run this analysis — a policy document describing what this agent is authorized to do, what it's forbidden to do, and who it can communicate with. Do you have one, or should I help you create one from a description of the agent?"
 
 If they want to create one, read `WORKER_REMIT_template.md` from the same directory as this file and walk them through it before proceeding.
 
 **Workspace path.** Resolve in this priority order:
-1. If the operator supplied a workspace path in the invocation message (e.g., "scan the lobot archive at /path/..."), use that.
-2. If a `deckard_config.json` exists in the current directory and declares `workspace_path`, use that.
-3. Otherwise, ask the operator:
+1. If the operator supplied a workspace path in the invocation message (e.g., "analyze the lobot archive at /path/..."), use that.
+2. Otherwise, ask the operator:
 > "What is the path to the agent's workspace — the directory where its code, skill files, and configuration live?"
 
-If the scanner was invoked non-interactively (e.g., `claude -p`) and none of (1) or (2) apply, halt with a clear error rather than stalling on a prompt that will never be answered.
+If Praxa was invoked non-interactively (e.g., `claude -p`) and (1) does not apply, halt with a clear error rather than stalling on a prompt that will never be answered.
 
-**Agent name.** Same priority order: invocation message > `deckard_config.json` > infer from workspace directory name > ask. If the name contains spaces or capitals, compute a slug: lowercase, replace whitespace and punctuation with hyphens, strip anything not `[a-z0-9-]`. This slug is used in output filenames.
+**Agent name.** Same priority: invocation message > infer from workspace directory name > ask. If the name contains spaces or capitals, compute a slug: lowercase, replace whitespace and punctuation with hyphens, strip anything not `[a-z0-9-]`. This slug is used in output filenames.
 
 **Output directory.** Use `./reports/` relative to the current working directory. Create it if it doesn't exist:
 ```bash
@@ -484,7 +483,7 @@ Confidence: Medium
 Summary: Input validation is absent from the primary skill file. External email content
          enters the LLM context without sanitization. Exec capability is present with no
          documented approval policy.
-Key findings: DKRD-2026-04-12-003, DKRD-2026-04-12-007
+Key findings: PRAX-2026-04-12-003, PRAX-2026-04-12-007
 ```
 
 ### Print an interim overview to stdout now
@@ -519,13 +518,13 @@ This is a partial output — Step 12 will print the final summary once all files
 
 ## Step 10 — Assemble Findings
 
-Generate a unique ID for each finding using the format: `DKRD-YYYY-MM-DD-NNN` (today's date, zero-padded sequence starting at 001).
+Generate a unique ID for each finding using the format: `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence starting at 001).
 
 Use this schema for every finding:
 
 ```json
 {
-  "id": "DKRD-2026-04-12-001",
+  "id": "PRAX-2026-04-12-001",
   "timestamp": "<ISO 8601 UTC>",
   "source": "scanner",
   "detector_id": "<snake_case detector name>",
@@ -560,7 +559,7 @@ In addition to the individual findings, include exactly one **posture summary en
 
 ```json
 {
-  "id": "DKRD-YYYY-MM-DD-POSTURE",
+  "id": "PRAX-YYYY-MM-DD-POSTURE",
   "timestamp": "<ISO 8601 UTC>",
   "source": "scanner",
   "detector_id": "raise_posture_summary",
@@ -663,15 +662,17 @@ The template uses three markup conventions. Learn them once; they appear through
 
    For scores near a boundary (e.g., 2.9), render as the lower label with a transition note: `Partial → Established`. Use the two-label form only when the score is within 0.2 of the next threshold.
 
-7. **Finding anchors must match.** The `id` attribute on each `.finding-card` (e.g., `id="DKRD-2026-04-21-001"`) must match the anchor href used in the Remit Coverage table (`<a href="#DKRD-2026-04-21-001">`). Multiple remit rows may link to the same finding — one finding can remediate several rules.
+7. **Finding anchors must match.** The `id` attribute on each `.finding-card` (e.g., `id="PRAX-2026-04-21-001"`) must match the anchor href used in the Remit Coverage table (`<a href="#PRAX-2026-04-21-001">`). Multiple remit rows may link to the same finding — one finding can remediate several rules.
 
 8. **Empty-finding remit rows.** Rules with status Verified or Enforcement Not Possible have no linked finding. Render the Finding cell as empty: `<td></td>`. Do not emit an empty `<a>` tag.
 
-9. **Scan Summary narrative.** `{{SCAN_SUMMARY_NARRATIVE}}` takes the narrative from Step 9. The wrapping `.body` supports paragraph breaks — if the narrative is more than one paragraph, wrap each in `<p>...</p>` tags. A single-paragraph narrative can be plain text with no tags.
+9. **Behavior Summary narrative.** `{{SCAN_SUMMARY_NARRATIVE}}` takes the narrative from Step 9. The wrapping `.body` supports paragraph breaks — if the narrative is more than one paragraph, wrap each in `<p>...</p>` tags. A single-paragraph narrative can be plain text with no tags.
 
 10. **Intro band summaries.** `{{AGENT_REMIT_SUMMARY}}` and `{{AGENT_STRUCTURE_SUMMARY}}` take the two short narratives from Step 9. Each is plain prose (2–4 sentences), may include `<code>` tags for filenames or identifiers, but should not contain lists or headings.
 
 11. **OWASP tags must render with the full category name, not just the code.** Finding tag classes `tag-owasp` (LLM0X) and `tag-agentic` (ASI0X) must always show the full name so readers unfamiliar with the shorthand can understand the tag. Use the canonical names from `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md`.
+
+12. **`{{PRAXA_VERSION}}` is a required placeholder.** Substitute the current Praxa version (matching the `version` in `.claude-plugin/plugin.json`, e.g., `0.1.0`) into the report footer's `Praxa v{{PRAXA_VERSION}}` line. This must be filled like any other scalar placeholder.
 
    - ✓ `<span class="tag tag-owasp">LLM01 — Prompt Injection</span>`
    - ✗ `<span class="tag tag-owasp">LLM01</span>`
@@ -680,11 +681,11 @@ The template uses three markup conventions. Learn them once; they appear through
 
    The finding JSON keeps the short code (`"owasp_llm": "LLM06"`) — only the HTML tag rendering expands it.
 
-12. **Rubric table is static content.** The RAISE Maturity Posture section in the template includes a static rubric table (6 rows, scores 0–5 with labels and meanings). Do not edit its content, do not substitute placeholders into it, and do not expand or remove rows. The table is intentionally fixed so every report renders the scale identically.
+13. **Rubric table is static content.** The RAISE Maturity Posture section in the template includes a static rubric table (6 rows, scores 0–5 with labels and meanings). Do not edit its content, do not substitute placeholders into it, and do not expand or remove rows. The table is intentionally fixed so every report renders the scale identically.
 
-7. **Do not introduce new sections, new colors, new fonts, or new component types.** If scan results include something the template doesn't cover, file it as a finding or a positive — do not invent a new section.
+14. **Do not introduce new sections, new colors, new fonts, or new component types.** If analysis results include something the template doesn't cover, file it as a finding or a positive — do not invent a new section.
 
-8. **Self-contained output.** All CSS stays inline as in the template. No external scripts. No external fonts beyond the Lausanne/Arial stack already declared. The HTML must render correctly when opened as `file://`.
+15. **Self-contained output.** All CSS stays inline as in the template. No external scripts. No external fonts beyond the Lausanne/Arial stack already declared. The HTML must render correctly when opened as `file://`.
 
 ### If a section is empty
 

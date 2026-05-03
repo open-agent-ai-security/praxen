@@ -59,7 +59,7 @@ A high **Gap** count means the agent's policy is more aspirational than enforced
 
 The detailed findings, ordered Critical → High → Medium → Low → Informational. Each finding card contains:
 
-- **Severity badge + finding ID** (e.g., `DKRD-2026-04-28-001`)
+- **Severity badge + finding ID** (e.g., `PRAX-2026-04-28-001`)
 - **One-line summary**
 - **Tags** — RAISE category, OWASP LLM, OWASP Agentic, MCP (when applicable). Each tag includes the full category name.
 - **Policy Rule** — the exact quoted text from the Worker Remit that the finding violates

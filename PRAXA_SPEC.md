@@ -251,7 +251,7 @@ All findings use a single JSON schema. The HTML report is a pretty-print of the 
 
 ```json
 {
-  "id": "DKRD-YYYY-MM-DD-NNN",
+  "id": "PRAX-YYYY-MM-DD-NNN",
   "timestamp": "<ISO 8601 UTC>",
   "source": "scanner",
   "detector_id": "<snake_case detector name>",
@@ -287,7 +287,7 @@ Every analysis emits exactly one posture summary entry as the first item in the 
 
 ```json
 {
-  "id": "DKRD-YYYY-MM-DD-POSTURE",
+  "id": "PRAX-YYYY-MM-DD-POSTURE",
   "detector_id": "raise_posture_summary",
   "severity": "Informational",
   "scan_summary": "The dominant finding pattern for this analysis, 2–4 sentences of verifier synthesis.",
