@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Exabeam/deckard/blob/main/skills/behavior-verifier/findings.schema.json",
+  "title": "Praxa canonical findings JSON — v2.0",
+  "description": "Published contract for the Praxa canonical findings JSON (one object per analysis). Praxa's renderer ships with a hand-written runtime validator (`schema.py`) that enforces this shape *plus* cross-field invariants (counts match the arrays, anchors resolve, the six RAISE keys are present, weighted_overall = Σ(score × weight)). This file is the machine-readable contract for downstream tooling. Praxa 0.3.0+.",
+
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "praxa_version", "scan", "intro_band", "behavior_summary",
+    "remit_coverage", "findings", "positives", "log_files", "raise_posture", "footer"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "2.0", "description": "Schema version. The renderer accepts 2.x and rejects everything else." },
+    "praxa_version":  { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+", "description": "Praxa version that produced this file (mirrors .claude-plugin/plugin.json)." },
+
+    "scan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agent", "agent_slug", "scan_date", "scan_timestamp", "workspace", "artifact_count"],
+      "properties": {
+        "agent":           { "type": "string", "minLength": 1 },
+        "agent_slug":      { "type": "string", "minLength": 1, "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "scan_date":       { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "scan_timestamp":  { "type": "string", "minLength": 1, "description": "ISO 8601 UTC, e.g. 2026-05-03T04:39:06Z." },
+        "workspace":       { "type": "string", "minLength": 1, "description": "Absolute path to the analyzed workspace." },
+        "artifact_count":  { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "intro_band": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agent_remit_summary", "agent_structure_summary"],
+      "properties": {
+        "agent_remit_summary":     { "type": "string", "minLength": 1, "description": "2–4 sentences restating the agent's intended scope; may contain inline <code>/<strong>/<em>." },
+        "agent_structure_summary": { "type": "string", "minLength": 1, "description": "2–4 sentences describing what was observed in the workspace; may contain inline <code>/<strong>/<em>." }
+      }
+    },
+
+    "behavior_summary": { "type": "string", "minLength": 1, "description": "2–4 sentence dominant-pattern narrative; may contain <p>/<code>/<strong>/<em>." },
+
+    "remit_coverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stat_counts", "rules"],
+      "properties": {
+        "stat_counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["verified", "gap", "partial", "vague", "enp", "total"],
+          "properties": {
+            "verified": { "type": "integer", "minimum": 0 },
+            "gap":      { "type": "integer", "minimum": 0 },
+            "partial":  { "type": "integer", "minimum": 0 },
+            "vague":    { "type": "integer", "minimum": 0 },
+            "enp":      { "type": "integer", "minimum": 0 },
+            "total":    { "type": "integer", "minimum": 0, "description": "Must equal len(rules); the runtime validator enforces this." }
+          }
+        },
+        "rules": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["rule_id", "section", "rule_text", "status", "finding_id"],
+            "properties": {
+              "rule_id":    { "type": "string", "minLength": 1, "description": "R-NN style id; unique within rules[]." },
+              "section":    { "type": "string", "minLength": 1 },
+              "rule_text":  { "type": "string", "minLength": 1, "description": "Exact quoted text from the Worker Remit." },
+              "status":     { "type": "string", "enum": ["verified", "gap", "partial", "vague", "enp"] },
+              "finding_id": { "type": ["string", "null"], "description": "PRAX-... id of the linked finding, or null. The runtime validator asserts every non-null id exists in findings[]." }
+            }
+          }
+        }
+      }
+    },
+
+    "findings": {
+      "type": "array",
+      "description": "May be empty for a genuinely clean agent. Renderer sorts by severity (Critical first) preserving input order within a tier.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": [
+          "id", "severity", "summary", "tags",
+          "policy_rule_ids", "policy_rule_text", "evidence", "recommended_actions",
+          "raise_category", "owasp_llm", "owasp_agentic",
+          "confidence", "related_findings", "escalation"
+        ],
+        "properties": {
+          "id":          { "type": "string", "pattern": "^PRAX-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{3}$", "description": "PRAX-YYYY-MM-DD-NNN; unique." },
+          "severity":    { "type": "string", "enum": ["Critical", "High", "Medium", "Low", "Informational"] },
+          "summary":     { "type": "string", "minLength": 1, "description": "One-sentence card header; specific, not generic." },
+          "description": { "type": "string", "description": "Optional longer-form body; carried in the JSON, surfaced in the report when the deferred L&F work lands (see design/DEFERRED.md). May contain inline <code>/<strong>/<em>." },
+          "tags": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["kind", "label"],
+              "properties": {
+                "kind":  { "type": "string", "enum": ["raise", "owasp_llm", "owasp_agentic", "mcp"] },
+                "label": { "type": "string", "minLength": 1, "description": "Full display name, e.g. 'LLM01 — Prompt Injection' (not just 'LLM01')." }
+              }
+            }
+          },
+          "policy_rule_ids":  { "type": "string", "minLength": 1, "description": "R-NN id(s), e.g. 'R-03' or 'R-03, R-04'." },
+          "policy_rule_text": { "type": "string", "minLength": 1, "description": "Exact quoted remit text the finding violates. Multiple rules joined with ' / '." },
+          "evidence": {
+            "type": "array", "minItems": 1,
+            "description": "Structured evidence items. The renderer formats each as 'file:line — snippet'.",
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["file", "snippet"],
+              "properties": {
+                "file":    { "type": "string", "minLength": 1, "description": "Path relative to the workspace, or a workspace-relative identifier." },
+                "line":    { "type": ["integer", "null"], "minimum": 1, "description": "Line number (1-indexed) or null for file-level evidence." },
+                "snippet": { "type": "string", "minLength": 1, "description": "Short observation or quoted context. Never reprint secrets — see SKILL.md." }
+              }
+            }
+          },
+          "recommended_actions": {
+            "type": "array", "minItems": 1,
+            "description": "One or more concrete actions. Renderer renders a single-item array as text, multi-item as a list.",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "raise_category":  { "type": "string", "enum": ["limit_your_domain", "balance_your_knowledge_base", "implement_zero_trust", "manage_your_supply_chain", "build_an_ai_red_team", "monitor_continuously"] },
+          "owasp_llm":       { "type": ["string", "null"], "description": "LLM01–LLM10 or null." },
+          "owasp_agentic":   { "type": ["string", "null"], "description": "ASI01–ASI10 or null." },
+          "confidence":      { "type": "string", "enum": ["High", "Medium", "Low"] },
+          "related_findings":{ "type": "array", "items": { "type": "string" }, "description": "PRAX-... ids of related findings; may be empty." },
+          "escalation":      { "type": "string", "minLength": 1, "description": "alert for Critical/High; log_only for Medium/Low/Informational." }
+        }
+      }
+    },
+
+    "positives": {
+      "type": "array",
+      "description": "Verified positive controls. May be empty.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["title", "description", "evidence_path"],
+        "properties": {
+          "title":         { "type": "string", "minLength": 1 },
+          "description":   { "type": "string", "minLength": 1 },
+          "evidence_path": { "type": "string", "minLength": 1, "description": "file:line, config key, or similar pointer." }
+        }
+      }
+    },
+
+    "log_files": {
+      "type": "object", "additionalProperties": false,
+      "required": ["present", "no_logs_note", "rows"],
+      "properties": {
+        "present":      { "type": "boolean" },
+        "no_logs_note": { "type": "string", "description": "Required non-empty when present=false; may be empty otherwise." },
+        "rows": {
+          "type": "array",
+          "description": "Empty exactly when present=false (the runtime validator enforces this).",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "source", "content_type", "purpose", "mtime", "status"],
+            "properties": {
+              "path":         { "type": "string", "minLength": 1 },
+              "source":       { "type": "string", "minLength": 1 },
+              "content_type": { "type": "string", "minLength": 1 },
+              "purpose":      { "type": "string", "minLength": 1 },
+              "mtime":        { "type": "string", "minLength": 1, "description": "Date or 'unknown'." },
+              "status":       { "type": "string", "enum": ["active", "new"] }
+            }
+          }
+        }
+      }
+    },
+
+    "raise_posture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["weighted_overall", "weighted_rationale", "categories"],
+      "properties": {
+        "weighted_overall":   { "type": "number", "minimum": 0.0, "maximum": 5.0, "description": "Σ(score × weight). The runtime validator asserts this matches the per-category sum within rounding." },
+        "weighted_rationale": { "type": "string", "minLength": 1, "description": "2–4 sentence prose explaining the weighted overall in posture terms." },
+        "categories": {
+          "type": "array", "minItems": 6, "maxItems": 6,
+          "description": "Exactly the six RAISE categories, in any order. Runtime validator enforces canonical render order, exact key/name pairs, and exact standard weights (Zero Trust 0.25; the other five 0.15).",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["key", "name", "score", "confidence", "weight", "rationale"],
+            "properties": {
+              "key":        { "type": "string", "enum": ["limit_your_domain", "balance_your_knowledge_base", "implement_zero_trust", "manage_your_supply_chain", "build_an_ai_red_team", "monitor_continuously"] },
+              "name":       { "type": "string", "minLength": 1, "description": "Display name, e.g. 'Limit Your Domain'. Must match the canonical name for the key." },
+              "score":      { "type": "integer", "minimum": 0, "maximum": 5 },
+              "confidence": { "type": "string", "enum": ["High", "Medium", "Low"] },
+              "weight":     { "type": "number", "enum": [0.15, 0.25], "description": "0.25 for Zero Trust; 0.15 for the other five. The validator enforces the per-key mapping." },
+              "rationale":  { "type": "string", "minLength": 1, "description": "1–2 sentence prose grounded in specific evidence." }
+            }
+          }
+        }
+      }
+    },
+
+    "footer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["severity_counts"],
+      "properties": {
+        "severity_counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["critical", "high", "medium", "low", "info"],
+          "description": "Must match Counter(f.severity for f in findings) after mapping Informational→info; the runtime validator enforces this.",
+          "properties": {
+            "critical": { "type": "integer", "minimum": 0 },
+            "high":     { "type": "integer", "minimum": 0 },
+            "medium":   { "type": "integer", "minimum": 0 },
+            "low":      { "type": "integer", "minimum": 0 },
+            "info":     { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

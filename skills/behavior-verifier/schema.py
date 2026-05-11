@@ -13,7 +13,12 @@ The validator is strict and fails loudly. A missing or malformed field is a
 skill bug, never something the renderer should paper over — so it stops the
 pipeline here with a message naming the offending JSON path.
 
-Python 3.8+ stdlib only. No third-party dependencies.
+Python 3.9+ stdlib only. No third-party dependencies.
+
+The matching JSON-Schema document at `findings.schema.json` (alongside this
+file) is the published machine-readable contract for downstream tooling;
+`schema.py` stays the runtime validator. A test in `tests/render/test_render.py`
+asserts the enums declared here and in the JSON-Schema doc agree.
 """
 from __future__ import annotations
 
@@ -23,7 +28,7 @@ import re
 # ── version ──────────────────────────────────────────────────────────────────
 # The schema major version this validator (and the bundled renderer) understands.
 # A JSON with a different MAJOR is rejected; a newer MINOR is accepted.
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder
@@ -233,8 +238,24 @@ def _validate_findings(data):
         _nonempty_str(f, "policy_rule_ids", p)
         _nonempty_str(f, "policy_rule_text", p)
         ev = _list(f, "evidence", p, min_len=1)
-        _str_list(ev, f"{p}.evidence")
-        _nonempty_str(f, "recommended_action", p)
+        for j, item in enumerate(ev):
+            ip = f"{p}.evidence[{j}]"
+            _obj(item, ip)
+            _nonempty_str(item, "file", ip)
+            line_val = _get(item, "line", ip)
+            if line_val is not None:
+                if isinstance(line_val, bool) or not isinstance(line_val, int):
+                    _err(f"{ip}.line", f"expected integer or null, got {type(line_val).__name__}")
+                if line_val < 1:
+                    _err(f"{ip}.line", f"must be >= 1 (1-indexed) or null; got {line_val}")
+            _nonempty_str(item, "snippet", ip)
+        actions = _list(f, "recommended_actions", p, min_len=1)
+        _str_list(actions, f"{p}.recommended_actions")
+        # `description` is optional — if present, must be a non-empty string.
+        if "description" in f:
+            val = f["description"]
+            if not isinstance(val, str) or not val.strip():
+                _err(f"{p}.description", "if present, must be a non-empty string")
         _enum(f, "raise_category", p, RAISE_KEYS)
         _str(f, "owasp_llm", p, allow_none=True)
         _str(f, "owasp_agentic", p, allow_none=True)

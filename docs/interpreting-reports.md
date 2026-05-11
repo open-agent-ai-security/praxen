@@ -126,12 +126,12 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 
 | Key | What's in it |
 |---|---|
-| `schema_version`, `praxa_version` | `"1.0"` and the Praxa version that produced the file |
+| `schema_version`, `praxa_version` | `"2.0"` and the Praxa version that produced the file |
 | `scan` | agent name and slug, scan date and timestamp, the analyzed workspace path, artifact count |
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |
 | `remit_coverage` | `stat_counts` plus `rules[]` — every actionable remit rule with `rule_id`, `section`, quoted `rule_text`, `status` (`verified`/`gap`/`partial`/`vague`/`enp`), and the linked `finding_id` (or `null`) |
-| `findings[]` | each finding: `id`, `severity`, `summary`, `tags[]` (kind + full label), `policy_rule_ids` / `policy_rule_text`, `evidence[]`, `recommended_action`, `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
+| `findings[]` | each finding: `id`, `severity`, `summary`, optional `description`, `tags[]` (kind + full label), `policy_rule_ids` / `policy_rule_text`, **structured `evidence[]` of `{ file, line, snippet }`**, **`recommended_actions[]`** (array of one or more concrete actions), `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
 | `positives[]` | verified positive controls — `title`, `description`, `evidence_path` |
 | `log_files` | `present`, `no_logs_note`, and `rows[]` (path / source / content type / purpose / mtime / status) |
 | `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |
@@ -148,7 +148,9 @@ Use the JSON for:
 
 The full schema, with field types and the validator's invariants, is documented in [`PRAXA_SPEC.md`](../PRAXA_SPEC.md) §6 (and codified in `skills/behavior-verifier/schema.py`).
 
-> **Schema change in v0.2.** The v1.0 object schema replaces the pre-0.2 bare-list-of-findings format (which had a trailing `-POSTURE` summary entry carrying the posture score). Tooling built against the old format needs updating; the new format is strictly richer (it carries every prose field the report shows).
+> **Schema change in v0.3 (this release).** v2.0: `evidence[]` is now an array of `{ file, line, snippet }` objects (was `[string]`); `recommended_actions[]` is an array (was a single `recommended_action` string); a new optional `description` field carries a longer-form body for downstream consumers (the report card currently shows `summary` only). Tooling reading evidence/actions needs updating. A published JSON-Schema document at `skills/behavior-verifier/findings.schema.json` (in the Praxa distribution) is the machine-readable contract.
+>
+> **Schema change in v0.2.** The v1.0 object schema replaced the pre-0.2 bare-list-of-findings format (which had a trailing `-POSTURE` summary entry carrying the posture score). Both are legacy; the v0.3 renderer does not read either.
 
 ---
 

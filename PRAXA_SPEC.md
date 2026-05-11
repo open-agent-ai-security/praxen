@@ -5,7 +5,7 @@
 
 # Praxa — Specification
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -67,7 +67,7 @@ Praxa is not part of the agent it scans. It runs as a separate Claude Code invoc
 
 ### 2.6 No external dependencies required
 
-Praxa's hard dependencies are Claude Code (with its API connection to the LLM) and a Python 3 interpreter — version 3.8 or newer, standard library only, **no third-party packages to install** — used by the bundled report renderer. Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
+Praxa's hard dependencies are Claude Code (with its API connection to the LLM) and a Python 3 interpreter — **version 3.9 or newer**, standard library only, **no third-party packages to install** — used by the bundled report renderer. (3.9 is the macOS Command Line Tools system Python; 3.8 was dropped at v0.3.0, EOL since 2024-10-07.) Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
 
 ### 2.7 LLM-native logic
 
@@ -257,8 +257,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 ```json
 {
-  "schema_version": "1.0",
-  "praxa_version": "0.2.0",
+  "schema_version": "2.0",
+  "praxa_version": "0.3.0",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -283,7 +283,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     {
       "id": "PRAX-YYYY-MM-DD-NNN",
       "severity": "Critical | High | Medium | Low | Informational",
-      "summary": "<one sentence, specific>",
+      "summary": "<one sentence, specific — drives the finding-card header>",
+      "description": "<OPTIONAL — short paragraph of longer-form context; may contain inline <code>/<strong>/<em>. Carried in the JSON; the report card currently shows summary only — the deferred L&F revisit surfaces description (design/DEFERRED.md). Omit the field entirely if you have nothing to add beyond summary.>",
       "tags": [
         { "kind": "raise",         "label": "Implement Zero Trust" },
         { "kind": "owasp_llm",     "label": "LLM01 — Prompt Injection" },
@@ -291,8 +292,13 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
       ],
       "policy_rule_ids": "<the R-NN id(s) violated, e.g. \"R-03\" or \"R-03, R-04\">",
       "policy_rule_text": "<the exact quoted remit text; multiple rules joined with \" / \">",
-      "evidence": ["<file:line — exact observation>", "..."],
-      "recommended_action": "<specific change: file to edit, config to change, control to add; may contain <code>>",
+      "evidence": [
+        { "file": "<workspace-relative path>", "line": "<int or null>", "snippet": "<exact observation; never reprint secrets>" }
+      ],
+      "recommended_actions": [
+        "<concrete action: file to edit, config to change, control to add; may contain inline <code>>",
+        "<additional action if there are several; one-action findings get a single-item array>"
+      ],
       "raise_category": "<one of the six RAISE keys>",
       "owasp_llm": "<LLM01–LLM10 or null>",
       "owasp_agentic": "<ASI01–ASI10 or null>",
@@ -342,7 +348,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 - `behavior_summary` carries the same narrative as the HTML report's Behavior Summary section; `weighted_overall` is the 0.0–5.0 RAISE posture scalar. Downstream consumers that want a human-readable synthesis or a single posture number read those fields directly — no HTML parsing needed.
 - `escalation` is `alert` for Critical/High, `log_only` for Medium/Low/Informational. `related_findings` lists the ids of findings that combine with this one (compound signal). Every finding that maps to a remit rule carries the exact quoted text in `policy_rule_text`, not just a section name.
 - `findings` may be empty (a genuinely clean agent); `positives` may be empty; `log_files.rows` is empty exactly when `present` is false.
-- This is the **v1.0** schema, introduced with Praxa 0.2.0. The pre-0.2 bare-list-of-findings format (with a trailing `-POSTURE` summary entry) is **not** read by the renderer — it is legacy.
+- **`evidence` is structured.** Each item is `{ file, line, snippet }`: `file` is a workspace-relative path (or workspace-relative identifier); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context. The renderer formats each item as `file:line — snippet` (or `file — snippet` when `line` is `null`). **`recommended_actions` is an array** of one or more concrete actions — the renderer renders single-item arrays as inline text and multi-item arrays as a bulleted list.
+- This is the **v2.0** schema, introduced with Praxa 0.3.0. Differences from v1.0: structured `evidence: [{file, line, snippet}]` (was `[string]`); `recommended_actions: [string]` (was a single `recommended_action` string); new optional `description` field. The v1.0 schema (Praxa 0.2.0) and the pre-0.2 bare-list-of-findings format (with a trailing `-POSTURE` summary entry) are both legacy — neither is read by the renderer.
 
 ### Severity model
 
@@ -386,7 +393,7 @@ The page renders correctly as `file://` — all CSS is inline, no external scrip
 
 - Claude Code CLI installed and authenticated
 - An Anthropic API key (used by Claude Code)
-- Python 3.8+ on the PATH (used by `render.py`; standard library only — nothing to `pip install`)
+- Python 3.9+ on the PATH (used by `render.py`; standard library only — nothing to `pip install`)
 - The Praxa package in a directory Claude Code can see
 - A Worker Remit for the agent being analyzed (or willingness to write one through Claude Code)
 
