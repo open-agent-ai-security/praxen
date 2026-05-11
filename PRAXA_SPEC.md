@@ -5,8 +5,8 @@
 
 # Praxa — Specification
 
-**Version:** 0.1.0
-**Status:** First internal release
+**Version:** 0.2.0
+**Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
 ---
@@ -67,7 +67,7 @@ Praxa is not part of the agent it scans. It runs as a separate Claude Code invoc
 
 ### 2.6 No external dependencies required
 
-Praxa's only hard dependency is Claude Code and its API connection to the LLM. Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
+Praxa's hard dependencies are Claude Code (with its API connection to the LLM) and a Python 3 interpreter — version 3.8 or newer, standard library only, **no third-party packages to install** — used by the bundled report renderer. Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
 
 ### 2.7 LLM-native logic
 
@@ -102,13 +102,18 @@ The skill file gives Claude a calibrated framework for these judgments — what 
 │   signal reasoning, OWASP classification)│
 │              │                          │
 │              ▼                          │
-│         Report Output                   │
-│  ./reports/<agent>-analysis-<timestamp>.html│
+│      Canonical findings JSON            │
 │  ./reports/<agent>-findings-<date>.json │
+│   (the complete record — Step 10)       │
+│              │                          │
+│              ▼                          │
+│  render.py  (deterministic, stdlib)     │
+│   <agent>-analysis-<timestamp>.html     │
+│   <agent>-analysis-<timestamp>.txt      │
 └─────────────────────────────────────────┘
 ```
 
-Praxa runs once per invocation. It reads, analyzes, writes two files, and exits. No daemon, no scheduler, no persistent state between runs. If continuous analysis is desired, wrap the invocation in whatever scheduler the operator already uses (cron, launchd, CI, GitHub Action).
+Praxa runs once per invocation: the skill reads, analyzes, and writes one canonical findings JSON, then a bundled deterministic Python renderer (`render.py`, standard library only) turns that JSON into the HTML report and a plain-text summary. No daemon, no scheduler, no persistent state between runs. If continuous analysis is desired, wrap the invocation in whatever scheduler the operator already uses (cron, launchd, CI, GitHub Action).
 
 ---
 
@@ -125,18 +130,19 @@ Praxa is a Claude Code skill. The operator runs it by opening a Claude Code sess
 | Worker Remit | `WORKER_REMIT.md` in the current directory or alongside the skill file |
 | Agent workspace | Path supplied by the operator at invocation time |
 | Knowledge base | `knowledge/` directory alongside the skill file |
-| Report template | `report_template.html` alongside the skill file in `skills/behavior-verifier/` |
+| Report template + renderer | `report_template.html`, `render.py`, `schema.py` alongside the skill file in `skills/behavior-verifier/` |
 
 ### Outputs
 
-Both written to `./reports/` relative to the current working directory. The directory is created if it does not exist.
+All written to `./reports/` relative to the current working directory. The directory is created if it does not exist.
 
-| Output | Filename |
-|--------|----------|
-| HTML report | `<agent-slug>-analysis-<YYYY-MM-DD-HHMMSS>.html` |
-| Findings JSON | `<agent-slug>-findings-<YYYY-MM-DD>.json` |
+| Output | Filename | Produced by |
+|--------|----------|-------------|
+| Findings JSON | `<agent-slug>-findings-<YYYY-MM-DD>.json` | the skill, Step 10 — the canonical record |
+| HTML report | `<agent-slug>-analysis-<YYYY-MM-DD-HHMMSS>.html` | `render.py`, Step 11 — rendered from the JSON |
+| Plain-text summary | `<agent-slug>-analysis-<YYYY-MM-DD-HHMMSS>.txt` | `render.py`, Step 11 — rendered from the JSON |
 
-The HTML is a self-contained, static page with inline CSS — it renders correctly when opened as `file://` with no server. The JSON is the machine-readable findings data; use it for ingestion into ticketing, dashboards, or diffing across runs.
+The **findings JSON is the canonical, complete record** of the analysis — everything the HTML shows is derived from it (§6). The HTML is a self-contained static page with inline CSS that renders correctly when opened as `file://` with no server. The `.txt` is a stdout-style summary. The renderer is deterministic: the same JSON always produces byte-identical HTML and TXT.
 
 ### Artifact scope
 
@@ -245,69 +251,98 @@ A remit with vague rules produces Low-confidence findings across the board. A re
 
 ---
 
-## 6. Finding Schema
+## 6. Canonical Findings JSON
 
-All findings use a single JSON schema. The HTML report is a pretty-print of the same data.
-
-```json
-{
-  "id": "PRAX-YYYY-MM-DD-NNN",
-  "timestamp": "<ISO 8601 UTC>",
-  "source": "scanner",
-  "detector_id": "<snake_case detector name>",
-  "raise_category": "<one of the six RAISE categories>",
-  "owasp_llm": "<LLM01–LLM10 or null>",
-  "owasp_agentic": "<ASI01–ASI10 or null>",
-  "severity": "Critical | High | Medium | Low | Informational",
-  "confidence": "High | Medium | Low",
-  "worker": "<agent name>",
-  "summary": "One-line description of the finding.",
-  "evidence": [
-    "Specific file path, line number, and pattern observed"
-  ],
-  "policy_reference": [
-    "WORKER_REMIT.md → <Section>: \"<exact quoted rule text>\""
-  ],
-  "posture_score": null,
-  "related_findings": [],
-  "recommended_action": "Specific, concrete action. Not generic advice.",
-  "escalation": "alert | log_only"
-}
-```
-
-**Notes:**
-- `posture_score` is populated only on the summary entry (id ends in `-POSTURE`), carrying the weighted overall score and per-category breakdown. All other findings have `posture_score: null`.
-- `related_findings` lists the IDs of other findings that combine with this one (compound signal).
-- Every finding that maps to a remit rule must populate `policy_reference` with the exact quoted text, not just a section name.
-- Findings are emitted to a single JSON file per analysis — Praxa does not maintain an append-only finding store.
-
-### Posture summary entry
-
-Every analysis emits exactly one posture summary entry as the first item in the findings array. It carries the weighted overall score and per-category breakdown for machine consumption. Downstream systems can locate it by `id` suffix (`-POSTURE`) or by `detector_id: "raise_posture_summary"`.
+Every analysis emits one JSON file — the **canonical, complete record** of the analysis. The HTML report and the `.txt` summary are rendered deterministically from it (§7); downstream consumers (ticketing, dashboards, compliance pipelines, run-to-run diffing) ingest the JSON directly. It is a single top-level object — *not* a list — and the bundled `schema.py` validator, which `render.py` runs before rendering, checks its shape, enumerations, and cross-field consistency; an analysis that produces a malformed JSON does not render.
 
 ```json
 {
-  "id": "PRAX-YYYY-MM-DD-POSTURE",
-  "detector_id": "raise_posture_summary",
-  "severity": "Informational",
-  "scan_summary": "The dominant finding pattern for this analysis, 2–4 sentences of verifier synthesis.",
-  "posture_score": {
-    "weighted_overall": 1.3,
-    "categories": {
-      "limit_your_domain":          { "score": 2, "confidence": "High",   "weight": 0.15 },
-      "balance_your_knowledge_base":{ "score": 1, "confidence": "High",   "weight": 0.15 },
-      "implement_zero_trust":       { "score": 0, "confidence": "High",   "weight": 0.25 },
-      "manage_your_supply_chain":   { "score": 2, "confidence": "Medium", "weight": 0.15 },
-      "build_an_ai_red_team":       { "score": 1, "confidence": "High",   "weight": 0.15 },
-      "monitor_continuously":       { "score": 1, "confidence": "High",   "weight": 0.15 }
+  "schema_version": "1.0",
+  "praxa_version": "0.2.0",
+  "scan": {
+    "agent": "<agent name>",
+    "agent_slug": "<agent-slug>",
+    "scan_date": "<YYYY-MM-DD>",
+    "scan_timestamp": "<ISO 8601 UTC>",
+    "workspace": "<absolute path to the analyzed workspace>",
+    "artifact_count": "<int — workspace artifacts read>"
+  },
+  "intro_band": {
+    "agent_remit_summary": "<2–4 sentences: what the remit says the agent is for; may contain <code>>",
+    "agent_structure_summary": "<2–4 sentences: what was observed in the workspace; may contain <code>>"
+  },
+  "behavior_summary": "<2–4 sentence dominant-pattern narrative; may contain <p> and <code>>",
+  "remit_coverage": {
+    "stat_counts": { "verified": "<int>", "gap": "<int>", "partial": "<int>", "vague": "<int>", "enp": "<int>", "total": "<int>" },
+    "rules": [
+      { "rule_id": "R-01", "section": "<remit section>", "rule_text": "<exact quoted rule>",
+        "status": "verified | gap | partial | vague | enp", "finding_id": "<PRAX-... or null>" }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-YYYY-MM-DD-NNN",
+      "severity": "Critical | High | Medium | Low | Informational",
+      "summary": "<one sentence, specific>",
+      "tags": [
+        { "kind": "raise",         "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm",     "label": "LLM01 — Prompt Injection" },
+        { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
+      ],
+      "policy_rule_ids": "<the R-NN id(s) violated, e.g. \"R-03\" or \"R-03, R-04\">",
+      "policy_rule_text": "<the exact quoted remit text; multiple rules joined with \" / \">",
+      "evidence": ["<file:line — exact observation>", "..."],
+      "recommended_action": "<specific change: file to edit, config to change, control to add; may contain <code>>",
+      "raise_category": "<one of the six RAISE keys>",
+      "owasp_llm": "<LLM01–LLM10 or null>",
+      "owasp_agentic": "<ASI01–ASI10 or null>",
+      "confidence": "High | Medium | Low",
+      "related_findings": ["<PRAX-... ids of related findings, or empty>"],
+      "escalation": "alert | log_only"
     }
+  ],
+  "positives": [
+    { "title": "<short>", "description": "<1–2 sentences>", "evidence_path": "<file:line or config key>" }
+  ],
+  "log_files": {
+    "present": "<true | false>",
+    "no_logs_note": "<one sentence on the absence when present is false; may be empty otherwise>",
+    "rows": [
+      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "active | new" }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": "<float 0.0–5.0 = Σ(score × weight)>",
+    "weighted_rationale": "<2–4 sentences>",
+    "categories": [
+      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": "<0–5>", "confidence": "High|Medium|Low", "weight": 0.15, "rationale": "<1–2 sentences>" },
+      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": "<0–5>", "confidence": "...",            "weight": 0.25, "rationale": "..." },
+      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "build_an_ai_red_team",        "name": "Build an AI Red Team",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "monitor_continuously",        "name": "Monitor Continuously",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." }
+    ]
+  },
+  "footer": {
+    "severity_counts": { "critical": "<int>", "high": "<int>", "medium": "<int>", "low": "<int>", "info": "<int>" }
   }
 }
 ```
 
-Weights are Praxa's standard RAISE category weighting (Zero Trust 25%, others 15% each). The weighted overall is the sum of `score × weight` across categories, producing a 0.0–5.0 scalar.
+**Invariants the validator enforces** (the renderer refuses to run otherwise):
 
-The `scan_summary` field carries the same narrative rendered in the HTML report's Behavior Summary section. Downstream systems that want a human-readable one-paragraph synthesis without parsing HTML should read this field.
+- `footer.severity_counts` matches the actual severities in `findings[]`; `remit_coverage.stat_counts` matches the actual statuses in `rules[]`, and `total` equals the number of rules.
+- Every non-null `rule.finding_id` exists in the `findings[]` id set; finding ids are unique.
+- `raise_posture.categories` is exactly the six RAISE keys, each with its standard weight (Zero Trust 0.25, the other five 0.15); `weighted_overall` equals Σ(score × weight) within rounding.
+- Severity, confidence, status, tag-kind, and log-status values are from their fixed enumerations.
+
+**Notes:**
+
+- The JSON holds **semantic data, not presentation** — `severity` is `"Critical"`, not a CSS class; `status` is `"gap"`, not a pill class; there are no pre-computed percentages or maturity labels. The renderer derives all presentation values.
+- `behavior_summary` carries the same narrative as the HTML report's Behavior Summary section; `weighted_overall` is the 0.0–5.0 RAISE posture scalar. Downstream consumers that want a human-readable synthesis or a single posture number read those fields directly — no HTML parsing needed.
+- `escalation` is `alert` for Critical/High, `log_only` for Medium/Low/Informational. `related_findings` lists the ids of findings that combine with this one (compound signal). Every finding that maps to a remit rule carries the exact quoted text in `policy_rule_text`, not just a section name.
+- `findings` may be empty (a genuinely clean agent); `positives` may be empty; `log_files.rows` is empty exactly when `present` is false.
+- This is the **v1.0** schema, introduced with Praxa 0.2.0. The pre-0.2 bare-list-of-findings format (with a trailing `-POSTURE` summary entry) is **not** read by the renderer — it is legacy.
 
 ### Severity model
 
@@ -327,18 +362,19 @@ Every finding carries both a RAISE category and, where applicable, OWASP LLM and
 
 ## 7. HTML Report
 
-Each analysis produces a self-contained HTML report from a canonical template (`skills/report_template.html`). The template is brand-compliant and not subject to per-analysis redesign — Step 11 of Praxa's skill instructs Praxa to copy the template verbatim and substitute only data placeholders.
+Each analysis produces a self-contained HTML report from a canonical template (`skills/behavior-verifier/report_template.html`). The template is brand-compliant and not subject to per-analysis redesign. Praxa does **not** render the HTML with the LLM: the skill (Step 11) runs `render.py`, a bundled deterministic Python script (standard library only) that substitutes the canonical findings JSON (§6) into the template — same JSON in, byte-identical HTML out, every time. The renderer also writes the `.txt` summary. The template, the renderer (`render.py`), and the schema validator (`schema.py`) are version-locked and ship together.
 
-**Sections, in order:**
+**Sections, in order** (the flow walks the reader from specifics to verdict):
 
-1. **Header** — navy bar with Exabeam-green accent, agent name, analysis timestamp, overall status badge
-2. **Intro band** — agent name, analysis date, orientation text
-3. **RAISE Scorecard** — weighted overall hero band plus a 3×2 grid of category cards (score, confidence, weight, rationale)
+1. **Header** — navy bar with Exabeam-green accent, agent name, analysis timestamp, overall status badge (`CRITICAL` / `HIGH` / `ADVISORY` / `CLEAN` — the highest finding severity present, *not* the maturity score)
+2. **Intro band** — Agent Remit (as declared) and Agent Structure (as observed): two short prose summaries
+3. **Behavior Summary** — the dominant finding pattern, 2–4 sentences of synthesis
 4. **Remit Coverage** — every actionable remit rule with quoted text, status (Verified / Gap / Partial / Vague Policy / Enforcement Not Possible), and a link to the linked finding
-5. **Findings Register** — full findings ordered Critical → High → Medium → Low → Informational. Each card shows severity badge, ID, summary, RAISE/OWASP/ASI tags, quoted policy rule, evidence, and recommended action.
+5. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags, quoted policy rule, evidence block, and recommended action
 6. **What's Working Well** — verified positive controls
-7. **Discovered Log Files** — log files found during the analysis, annotated with source/purpose/modification time
-8. **Footer** — brand, artifact count, finding counts, Praxa version
+7. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
+8. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
+9. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxa version
 
 The page renders correctly as `file://` — all CSS is inline, no external scripts, no external fonts beyond the declared Arial/Lausanne stack.
 
@@ -350,8 +386,9 @@ The page renders correctly as `file://` — all CSS is inline, no external scrip
 
 - Claude Code CLI installed and authenticated
 - An Anthropic API key (used by Claude Code)
+- Python 3.8+ on the PATH (used by `render.py`; standard library only — nothing to `pip install`)
 - The Praxa package in a directory Claude Code can see
-- A Worker Remit for the agent being scanned (or willingness to write one through Claude Code)
+- A Worker Remit for the agent being analyzed (or willingness to write one through Claude Code)
 
 No scheduler, daemon, installer, or configuration file is required.
 
@@ -362,12 +399,12 @@ No scheduler, daemon, installer, or configuration file is required.
 3. Open a Claude Code session in the Praxa directory (or any parent).
 4. Tell Claude Code:
    > *"Please read and run skills/behavior-verifier/SKILL.md to analyze [agent workspace path]."*
-5. Praxa reads the workspace, analyzes it, and writes two files to `./reports/`.
+5. Praxa reads the workspace, analyzes it, writes the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — three files in `./reports/`.
 6. Open the HTML report in a browser.
 
 ### Re-running
 
-Each invocation is independent. To re-analyze after changes, invoke the skill again — a new pair of timestamped files is written to `./reports/`; prior reports are not overwritten.
+Each invocation is independent. To re-analyze after changes, invoke the skill again — a new set of timestamped files is written to `./reports/`; prior reports are not overwritten.
 
 ### Automated scheduling
 
@@ -375,12 +412,12 @@ Praxa does not ship a scheduler. If recurring scans are desired, wrap the Claude
 
 ### Context window pressure on large workspaces
 
-An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the Claude Code session compresses mid-analysis. When this happens, Praxa is designed to degrade gracefully:
+An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the Claude Code session compresses mid-analysis. Praxa is designed to degrade gracefully:
 
-- An **interim scorecard** is printed to stdout between Step 9 and Step 10, so the operator sees the RAISE posture even if the session later truncates.
-- The **final summary is written to a `.txt` file** in `./reports/` as well as stdout, so the summary survives even if terminal output is lost.
+- An **interim overview** (behavior summary, RAISE posture, finding counts) is printed to stdout at the end of Step 9 — before any file is written — so the operator sees the synthesis even if the session later truncates.
+- Rendering the report is a **deterministic Python step (Step 11)**, not LLM work — it doesn't compete for the context window, runs in well under a second, and writes the `.txt` summary to `./reports/` alongside stdout, so the summary survives even if terminal output is lost.
 
-If you're analyzing a large archive and want to minimize context pressure, analyze one subdirectory at a time and merge the findings JSON files afterward.
+If you're analyzing a large archive and want to minimize context pressure, analyze one subdirectory at a time and diff the findings JSON files afterward.
 
 ---
 
@@ -418,9 +455,9 @@ Detection quality is directly proportional to remit specificity. A remit that sa
 Praxa is operating well when:
 
 1. An analysis against an intentionally misconfigured test agent produces at least one Critical or High finding with specific file:line evidence and a recommended action.
-2. The HTML report renders correctly in a browser opened directly from `./reports/`.
-3. The findings JSON parses cleanly and is suitable for ingestion into downstream systems.
-4. Every actionable remit rule appears in the Remit Coverage section with a verified status.
+2. `render.py` exits 0 (which guarantees the findings JSON validated against `schema.py` and the HTML/TXT contain no unresolved markers), and the HTML report renders correctly in a browser opened directly from `./reports/`.
+3. The findings JSON is the v1.0 canonical object and is suitable for direct ingestion into downstream systems (no HTML parsing needed for the summary, posture score, or counts).
+4. Every actionable remit rule appears in the Remit Coverage section with a status (Verified / Gap / Partial / Vague Policy / Enforcement Not Possible).
 
 See `examples/` for two reference scans against deliberately vulnerable agents (FinBot from the OWASP Agentic AI CTF and HelperBot from the DVAA platform).
 
@@ -432,9 +469,9 @@ The Praxa operationalizes the **RAISE Security Review Skill** — a structured f
 
 The key design decisions in Praxa's synthesis:
 - A single Worker Remit serves as the policy baseline — Praxa's primary signal is divergence between declared policy and observed implementation.
-- A unified finding schema with dual RAISE + OWASP classification provides consistent, standards-aligned output.
-- A canonical HTML template ensures every report looks identical regardless of which model produced it — design decisions are not delegated to the LLM.
-- The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state.
+- A unified canonical findings JSON with dual RAISE + OWASP classification is the complete record; it carries every prose field the report shows, so JSON-only consumers see the same content as humans.
+- A canonical HTML template *plus* a deterministic Python renderer (`render.py`): the LLM does judgment, code does the mechanical substitution — so every report looks identical, byte-for-byte, regardless of which model produced the findings, and a malformed analysis fails loudly at the schema validator rather than producing a broken report.
+- The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state. (Python 3 is the one runtime besides Claude Code — stdlib only.)
 
 ---
 

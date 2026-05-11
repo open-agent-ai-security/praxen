@@ -12,7 +12,8 @@ Praxa ships as a Claude Code plugin. You can install it through the plugin marke
 ## Prerequisites
 
 - **A coding agent** capable of tool use and multi-step instruction-following. Praxa is tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview); other coding agents that can read a skill markdown file and call tools (Read, Grep, Glob, Bash, Write) should also work.
-- **Network access for your coding agent's LLM provider** during analysis. Praxa itself does not phone home, but the LLM calls your coding agent makes during analysis will follow whatever provider configuration the agent uses.
+- **Python 3.8 or newer on the PATH.** Praxa's report renderer (`render.py`, bundled with the skill) is plain Python 3 — standard library only, nothing to `pip install`. Every macOS / Linux developer machine has this; on Windows, `py -3` works. If `python3` isn't found, the renderer step falls back to `python`.
+- **Network access for your coding agent's LLM provider** during analysis. Praxa itself does not phone home, but the LLM calls your coding agent makes during analysis follow whatever provider configuration the agent uses.
 
 That's the entire dependency surface.
 
@@ -33,7 +34,7 @@ The skill registers as `behavior-verifier`. Confirm it's available:
 /plugin list
 ```
 
-You should see `praxa` (with version `0.1.0` or later).
+You should see `praxa` (with version `0.2.0` or later).
 
 > **Note:** the GitHub repository is currently named `Exabeam/deckard`. The repository rename to match the project name is a separate administrative task. Use the URL above as-is.
 
@@ -44,9 +45,9 @@ You should see `praxa` (with version `0.1.0` or later).
 If you can't or don't want to use the plugin marketplace flow, unzip the release archive somewhere your coding agent can see it. There's no install step.
 
 ```bash
-curl -L -o praxa-0.1.0.zip <release-URL>
-unzip praxa-0.1.0.zip
-cd praxa-0.1.0
+curl -L -o praxa-0.2.0.zip <release-URL>
+unzip praxa-0.2.0.zip
+cd praxa-0.2.0
 ```
 
 Then point your coding agent at `skills/behavior-verifier/SKILL.md` when running an analysis. See [Usage](usage.md).
@@ -63,11 +64,11 @@ Please run the behavior-verifier skill against examples/finbot/. Use the Worker 
 
 A successful analysis produces three files in the reports directory:
 
-- `finbot-analysis-<timestamp>.html`
-- `finbot-findings-<date>.json`
-- `finbot-analysis-<timestamp>.txt`
+- `finbot-findings-<date>.json` — the canonical record (written by the skill)
+- `finbot-analysis-<timestamp>.html` — the report (rendered from the JSON by `render.py`)
+- `finbot-analysis-<timestamp>.txt` — a plain-text summary (also from `render.py`)
 
-Open the HTML in a browser. If the report renders with the Praxa header, six RAISE category cards, and a Findings Register populated with cited evidence, the install is working.
+If the renderer step printed `render.py: wrote .../finbot-analysis-...html` and exited cleanly, the JSON passed schema validation and the HTML is marker-free. Open the HTML in a browser: if it renders with the Praxa header, six RAISE category cards, and a Findings Register populated with cited evidence, the install is working.
 
 ---
 

@@ -76,7 +76,7 @@ def main():
     check("HTML has no leftover REPEAT/END/PICK/Variant markers",
           not re.search(r"<!--\s*(REPEAT:|END:|PICK:|Variant [AB]:)", html))
     check("HTML keeps the copyright comment", "Copyright" in html and "<!--" in html[:400])
-    check("HTML carries the agent name and version", "FinBot" in html and "Praxa v0.1.0" in html)
+    check("HTML carries the agent name and version", "FinBot" in html and "Praxa v0.2.0" in html)
     check("HTML footer findings tally matches the fixture",
           "8 Critical" in html and "6 High" in html and "2 Medium" in html)
     check("TXT summary is non-empty and names the agent", "FinBot" in txt and len(txt) > 200)

@@ -5,9 +5,9 @@
 
 # Interpreting Reports
 
-Praxa produces three output files per analysis. The HTML report is the primary deliverable for humans; the JSON is for automation; the `.txt` is a stdout-style summary.
+Praxa produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume.
 
-This page walks through what each section of the HTML report means, how severities and confidence levels work, and how the RAISE maturity score should be read.
+This page walks through what each section of the HTML report means, how severities and confidence levels work, how the RAISE maturity score should be read, and what's in the JSON.
 
 ---
 
@@ -102,7 +102,7 @@ Brand mark, project sponsor attribution, agent name, finding counts, framework r
 | **High** | Significant risk requiring prompt review. Control absent where remit requires it; or compound signal chain to a high-impact action. |
 | **Medium** | Meaningful gap or anomaly requiring scheduled review. |
 | **Low** | Weak signal or early warning. Single isolated event, minor drift. |
-| **Informational** | Baseline observation — scope note, positive posture, or neutral environmental fact. The posture summary entry in the JSON also has this severity. |
+| **Informational** | Baseline observation — scope note, positive posture, or neutral environmental fact. |
 
 The status badge in the header reflects the highest severity present in the analysis.
 
@@ -122,24 +122,41 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 
 ## The JSON output
 
-`<agent>-findings-<date>.json` is the machine-readable form of the report. The first entry is the **posture summary** (`id` ends in `-POSTURE`); subsequent entries are the individual findings.
+`<agent>-findings-<date>.json` is the **canonical, complete record** of the analysis — everything the HTML report shows is derived from it. It is a single top-level object (not a list), with these sections:
+
+| Key | What's in it |
+|---|---|
+| `schema_version`, `praxa_version` | `"1.0"` and the Praxa version that produced the file |
+| `scan` | agent name and slug, scan date and timestamp, the analyzed workspace path, artifact count |
+| `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
+| `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |
+| `remit_coverage` | `stat_counts` plus `rules[]` — every actionable remit rule with `rule_id`, `section`, quoted `rule_text`, `status` (`verified`/`gap`/`partial`/`vague`/`enp`), and the linked `finding_id` (or `null`) |
+| `findings[]` | each finding: `id`, `severity`, `summary`, `tags[]` (kind + full label), `policy_rule_ids` / `policy_rule_text`, `evidence[]`, `recommended_action`, `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
+| `positives[]` | verified positive controls — `title`, `description`, `evidence_path` |
+| `log_files` | `present`, `no_logs_note`, and `rows[]` (path / source / content type / purpose / mtime / status) |
+| `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |
+| `footer` | `severity_counts` (critical / high / medium / low / info) |
+
+The JSON holds **semantic values, not presentation** — `severity` is `"Critical"`, `status` is `"gap"`; CSS classes and the maturity label are computed by the renderer, not stored. So a consumer that wants the posture number reads `raise_posture.weighted_overall`; one that wants the headline reads `behavior_summary`; no HTML parsing needed. The bundled `schema.py` validator (which `render.py` runs before rendering) enforces the cross-field invariants — counts match the arrays, anchors resolve, the six RAISE keys are present, `weighted_overall` equals Σ(score × weight) — so a JSON that exists alongside an HTML report is internally consistent.
 
 Use the JSON for:
 
-- **Ticketing pipelines** — convert findings into Jira / Linear / GitHub issues with evidence and recommended actions pre-populated
-- **Dashboards** — chart maturity scores over time across multiple agents
-- **Diffing** — compare two analyses to detect regressions or improvements between releases
-- **Risk reports** — filter findings by severity, RAISE category, or OWASP tag for compliance reporting
+- **Ticketing pipelines** — convert `findings[]` into Jira / Linear / GitHub issues with evidence and recommended actions pre-populated
+- **Dashboards** — chart `raise_posture.weighted_overall` and per-category scores over time across multiple agents
+- **Diffing** — compare two analyses to detect regressions or improvements between releases (the prose fields diff cleanly too)
+- **Risk reports** — filter findings by `severity`, `raise_category`, or OWASP tag for compliance reporting
 
-The JSON schema is documented in [`PRAXA_SPEC.md`](../PRAXA_SPEC.md) §6.
+The full schema, with field types and the validator's invariants, is documented in [`PRAXA_SPEC.md`](../PRAXA_SPEC.md) §6 (and codified in `skills/behavior-verifier/schema.py`).
+
+> **Schema change in v0.2.** The v1.0 object schema replaces the pre-0.2 bare-list-of-findings format (which had a trailing `-POSTURE` summary entry carrying the posture score). Tooling built against the old format needs updating; the new format is strictly richer (it carries every prose field the report shows).
 
 ---
 
 ## The .txt summary
 
-`<agent>-analysis-<timestamp>.txt` is the same content as the stdout output: agent name, analysis timestamp, behavior summary, finding counts, RAISE category scores, weighted overall, and Critical findings with their recommended actions. It's designed to:
+`<agent>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
 
-- Survive context-window compression in long-running analyses (the file is written before stdout completes)
+- Survive context-window compression in long-running analyses — it's a file on disk, written before the skill's final stdout, so it's there regardless of whether terminal output is lost
 - Be pasted into a Slack thread, email, or PR comment
 - Show up in a terminal-only environment where the HTML can't be rendered
 
