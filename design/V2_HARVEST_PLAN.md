@@ -26,7 +26,7 @@ This document is that plan. It's being PR'd for review; once approved, Phase 0 b
 | Trunk | `main` (= `v0.2.0`) stays the trunk. |
 | PR #1 | Will be **closed** (Phase 0) with a comment pointing at this plan and the harvest tracking, so the branch and its parked pieces remain recoverable — not discarded. |
 | Schema version after the merge | **`schema_version: "2.0"`** (aligns with PR #1's "v2" framing; clean break from the just-shipped `1.0`). |
-| Supported Python floor | **3.8+** stays the documented floor; **3.9 is the practical floor** (it's the macOS Command Line Tools system Python — and the version this repo is developed and tested on). **Not** PR #1's 3.10 — raising the floor to 3.10 would break the dev box and force a `brew install python` on stock macOS, contradicting the "nothing to install" prerequisite. CI matrix must include **both 3.8 (the documented floor — else it goes untested) and 3.9 (the practical floor)**. |
+| Supported Python floor | **3.9+.** That's the macOS Command Line Tools system Python on Ventura / Sonoma / Sequoia, and the version this repo is developed and tested on. **3.8 is dropped** — it's been EOL since 2024-10-07 (no upstream security patches); we don't test or claim support for a dead interpreter. **Not** PR #1's 3.10 floor either — that would break stock macOS (which is on 3.9). CI matrix: **`3.9 / 3.12 / 3.13`** (floor / mid / latest). Phase 1 (or a quick standalone PR) bumps the `3.8+` strings in `PRAXA_SPEC.md` §2.6/§8 and `docs/installation.md` to `3.9+` to match. |
 | Harvest order | (1) JSON structure → (2) performance (parallel analysis) → (3) GitHub Actions + automated testing. |
 | Deferred | The "DEF/TAC OPS" look-and-feel reskin and the `--pdf` headless-Chrome output. Tracked in `design/DEFERRED.md`; PR #1's branch retains the code. |
 | Process | Every phase lands as **its own PR against `main`**, reviewed and CI-gated — no direct pushes. (Direct-pushing the `v0.2.0` work to `main` is what collided with PR #1; we don't repeat that.) |
@@ -94,13 +94,19 @@ PR #1's `lib/parallel.py` + `skills/behavior-verifier/SKILL-PARALLEL.md` — six
 
 ### 5.2 — Risks to resolve in this phase
 
-- **Calibration parity.** PR #1 has only a one-target spot-check ("3.7 vs 3.8 weighted RAISE"). We do a proper sequential-vs-parallel comparison across ≥ 4 suite targets — including OpenHands (the mature one) and HelperBot (the CTF anchor). Bar: parallel lands in the same `tests/README.md` bands as sequential and surfaces the same dominant themes. If a category mapper systematically over/under-scores its own category in isolation, that's the calibration knob to turn (likely in the mapper prompt for that category).
+- **Calibration parity.** PR #1 has only a one-target spot-check ("3.7 vs 3.8 weighted RAISE"). We do a proper sequential-vs-parallel comparison across ≥ 4 suite targets — including OpenHands (the mature one) and HelperBot (the CTF anchor). Bar: parallel lands in the same `tests/README.md` bands as sequential and surfaces the same dominant themes. If a category mapper systematically over/under-scores its own category in isolation, the first lever is the mapper prompt for that category — but the tuning is *time-boxed* and the call is made at the §5.3 decision point, not iterated open-endedly.
 - **The reducer must be able to verify cross-category chains.** PR #1's reducer reasons over the six mapper outputs only — it never re-opens the code, which caps compound-signal quality at "whatever the mappers surfaced as standalone findings" and creates a blind spot for chain *links* that aren't a finding on their own (e.g. "function X's output feeds function Y"). **Recommended: give the reducer the workspace path and let it do *targeted* re-reads** when verifying a candidate compound chain — a handful of file reads by one agent, not a full re-scan, so the ≈ 4–5× win holds. "No re-read" stays the fallback if calibration-parity testing shows the targeted-read reducer over-claims chains.
 - **Token cost.** Six parallel mappers ≈ 6× the input tokens of a single analyst pass — a speed-for-cost trade, not a free win. Document it; the sequential path stays available for cost-sensitive runs.
 
-### 5.3 — Gate
+### 5.3 — Decision gate & exit ramps
 
-Sequential-vs-parallel suite comparison passes; both paths produce valid merged-schema JSON that renders clean. CHANGELOG, `praxa_version` → `0.4.0`, tag `v0.4.0`, merge.
+Phase 2 is **time-boxed**: if the parallel path hasn't reached parity within ≈ 2 days of build-and-tune effort (i.e. the lower end of the 2–3 day estimate), we stop and decide — no open-ended tuning loop. The call is made once, after the ≥ 4-target sequential-vs-parallel comparison, against three explicit outcomes:
+
+1. **Parity achieved** — parallel lands in the same `tests/README.md` RAISE bands as sequential across the comparison targets and surfaces the same dominant themes. → **Ship parallel as the default path; sequential becomes the cost-sensitive fallback** (it's ~6× cheaper in tokens). CHANGELOG, `praxa_version` → `0.4.0`, tag `v0.4.0`, merge.
+2. **Close but not there** — themes covered, but scores drift outside the bands on some targets, traceable to category-isolated mappers lacking cross-category context by design. → **Ship parallel as opt-in/experimental** (a `--parallel` flag or a clearly-labelled `SKILL-PARALLEL.md`), sequential stays the default; revisit in a future phase. Still `v0.4.0` + merge, but documented as experimental.
+3. **Fundamentally broken** — category isolation loses too much cross-signal context for parity to be reachable without re-introducing holistic analysis (which would defeat the point). → **Drop the parallel path entirely, close the phase, reclaim the effort.** Document why in `design/DEFERRED.md` (and `parallel.py` etc. stay recoverable in PR #1's branch). No `v0.4.0`; Phase 3 follows directly.
+
+Outcome 1 is the goal; 2 is the realistic fallback; 3 is the off-ramp that keeps Phase 2 from becoming a sink.
 
 ---
 
@@ -112,7 +118,7 @@ Keep `tests/render/test_render.py` (invariant checks, negative cases, determinis
 
 ### 6.2 — CI / release workflows
 
-Adapt PR #1's `.github/workflows/ci.yml`: on push and PR, run `schema.py validate` on all fixtures + the full test suite, on a Python matrix that includes **both the documented floor (`3.8`) and the practical/macOS-system floor (`3.9`)** plus one recent release — e.g. `3.8 / 3.9 / 3.13` — **not** PR #1's `3.10 / 3.11 / 3.12` (which leaves both 3.8 *and* 3.9 untested). Adapt `.github/workflows/release.yml`: on tag, run `build.sh` and attach `dist/praxa-*.zip` to the GitHub Release (`dist/` stays gitignored; the zip is a release asset, not a committed file).
+Adapt PR #1's `.github/workflows/ci.yml`: on push and PR, run `schema.py validate` on all fixtures + the full test suite, on the agreed Python matrix — **`3.9 / 3.12 / 3.13`** (floor / mid / latest; 3.8 is dropped, EOL) — **not** PR #1's `3.10 / 3.11 / 3.12` (which omits the 3.9 macOS-system floor). Adapt `.github/workflows/release.yml`: on tag, run `build.sh` and attach `dist/praxa-*.zip` to the GitHub Release (`dist/` stays gitignored; the zip is a release asset, not a committed file).
 
 ### 6.3 — Gate
 
@@ -123,12 +129,12 @@ CI green on a fresh PR; release workflow dry-run produces the zip. CHANGELOG, `p
 ## 7. Open decisions
 
 1. **Schema version label — RESOLVED:** `schema_version: "2.0"`.
-2. **Supported Python floor — RESOLVED:** keep 3.8+ documented, 3.9 practical/macOS floor; CI matrix includes **both 3.8 and 3.9**; not 3.10.
+2. **Supported Python floor — RESOLVED:** **`3.9+`** — 3.8 is dropped (EOL since 2024-10-07); 3.9 is both the documented and the practical floor (macOS CLT system Python). CI matrix `3.9 / 3.12 / 3.13`; not 3.10. Phase 1 bumps the `3.8+` strings in `PRAXA_SPEC.md` / `docs/installation.md` to `3.9+`. *(Supersedes the earlier "must include 3.8" thread — David's right: change the floor, don't test a dead interpreter.)*
 3. **Layout** — keep `render.py` / `schema.py` / (new) `parallel.py` / `findings.schema.json` flat in `skills/behavior-verifier/` (where `main` has them, and what `build.sh` ships), or introduce a `skills/behavior-verifier/lib/` subdir (closer to PR #1's `lib/`)?
 4. **Parallel-path packaging** — a thin `SKILL-PARALLEL.md` orchestration wrapper (recommended) vs. a "parallel mode" section inside `SKILL.md`. Either way, **non-negotiable: the analysis logic (calibration anchors, detection patterns, the secrets rule, the empty-file / declared-but-never-consulted detectors) lives in `SKILL.md` only** — the parallel path quotes it at prompt-build time, never restates it, or the two modes drift.
 5. **The contested schema fields** — confirm or override the §4.1 table (especially: structured `evidence: [{file,line,snippet}]` ✔; keep per-category `confidence` / `weight` ✔; keep store-and-validate `severity_counts` / `weighted_overall` ✔; add `description` as optional ✔; ship `findings.schema.json` as a published contract with `schema.py` remaining the runtime validator ✔).
 6. **Reducer workspace access** (Phase 2) — **recommended: targeted re-reads** — the reducer gets the workspace path and re-opens a handful of files to verify candidate compound chains (closes the cross-category-chain blind spot, keeps the speed win). Fallback: no re-read, with the sequential path as the higher-fidelity option — only if calibration-parity testing shows the targeted-read reducer over-claims.
-7. **CI Python matrix** — must include **both** the documented floor (`3.8`) and the practical floor (`3.9`), plus one recent release — recommended `3.8 / 3.9 / 3.13`. (A matrix that starts at 3.9 or 3.10 leaves the documented 3.8 floor untested.)
+7. **CI Python matrix — RESOLVED (folds into #2):** `3.9 / 3.12 / 3.13`.
 
 ---
 
