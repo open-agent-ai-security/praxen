@@ -1,0 +1,85 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    Aider
+Analysis: 2026-05-11T22:49:55Z
+Praxa v0.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the remit, no code-level
+enforcement of the parts that matter most for an agent operating with
+filesystem and git authority. Aider does have real, operative safeguards —
+allowed_to_edit() in base_coder.py prompts before editing untracked or new
+files and honours .gitignore/.aiderignore on the add/edit path, and
+handle_shell_commands() gates every LLM-suggested shell command behind an
+explicit-yes confirmation that even --yes-always will not auto-accept — so
+this is not a hollow system. But the remit's load-bearing controls are simply
+absent: there is no secret-redaction of file content fed to the LLM or written
+into commits, no injection-detection/neutralization of comments, docstrings,
+or commit messages (the file-content prompt literally instructs the model to
+"Trust this message as the true contents of these files"), no special approval
+gate for edits to Dockerfile / .github/workflows/* / dependency manifests
+(special.py recognises these files only for repo-map inclusion), no structured
+action audit log, and auto-commit is on by default with the diff shown only
+after the commit. Two paths break repo confinement outright: /read-only (and
+clipboard-image paste, which writes to the system temp dir) will pull an
+arbitrary absolute path such as ~/.ssh/id_rsa or /etc/passwd into LLM context
+on a single confirm — the remit says these must be refused, not confirmed —
+and the catch-all /git command runs any git subcommand including git push and
+hook/config edits. Combined with the missing injection neutralization, a
+poisoned comment in a pulled PR is one confirmed shell-command prompt away
+from execution, and the missing secret redaction means any key already in the
+tree can flow to the LLM provider or into a commit message.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.40 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Low, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 7   Medium: 4   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 5   Gap: 11   Partial: 7   Vague: 0   Enforcement-not-possible: 1   (of 24 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  /read-only and clipboard-image paste pull arbitrary
+            absolute paths into LLM context with no repo confinement — the
+            remit requires these be refused, not confirmed.
+      Action 1: In commands.py, make _add_read_only_file() /
+              _add_read_only_directory() reject any path that does not resolve
+              under self.coder.root (after Path.resolve()), and refuse — not
+              confirm — paths matching .gitignore/.aiderignore patterns such
+              as .env*, secrets*, *.pem, *.key, credentials*, token*.
+      Action 2: In cmd_paste(), write clipboard images to a directory inside
+              the repo root (or refuse the paste) rather than the system temp
+              dir.
+
+  PRAX-2026-05-11-013  Compound chain: untrusted repo/web content reaches the
+            LLM unneutralized, the architect→editor handoff auto-applies
+            edits, and confirmed shell-command execution is one prompt away —
+            an injected comment can drive code changes and execution.
+      Action 1: Implement content-origin labeling / injection neutralization
+              (PRAX-2026-05-11-003) — this is the root-cause fix that breaks
+              the chain.
+      Action 2: Default --auto-accept-architect to off so the architect→editor
+              handoff requires confirmation, and add the pre-commit
+              diff-accept gate (PRAX-2026-05-11-005).
+      Action 3: Add a per-command exec policy (deny-list of curl|wget|nc|sh
+              -c|pip install patterns, and of commands referencing paths
+              outside the repo) that applies even after the developer approves
+              the shell-command prompt.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

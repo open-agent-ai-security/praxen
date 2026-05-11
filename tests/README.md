@@ -11,14 +11,14 @@ Praxa's regression test suite. Before every release, run the full nine-target su
 
 - `README.md` — this file
 - `remits/` — the Worker Remits developed for each test agent. Reusable; do not change between analyses.
-- `baselines/` — frozen, committed runs of all nine targets, one set per Praxa version (`baselines/<version>-sequential/`). The comparison point for the release review and the Phase-2 parallel-vs-sequential parity gate. See [`baselines/README.md`](baselines/README.md). **Latest: [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md)** (Praxa v0.2.0, schema 1.0).
+- `baselines/` — frozen, committed runs of all nine targets, one set per Praxa version (`baselines/<version>-sequential/`). The comparison point for the release review and the Phase-2 parallel-vs-sequential parity gate. See [`baselines/README.md`](baselines/README.md). **Latest: [`baselines/v0.3-sequential/`](baselines/v0.3-sequential/BASELINE.md)** (Praxa v0.3.0, schema 2.0). Previous: [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md) (Praxa v0.2.0, schema 1.0) — kept as the "before" snapshot for the schema-shift check.
 - `fixtures/`, `render/` — the `render.py`/`schema.py` smoke harness and its canonical-JSON fixture (`python3 tests/render/test_render.py`).
 
 ## Calibration posture (v0.2)
 
 The skill scores **conservatively, in both directions**: a control that is *present in the repo but defeated* — off by default, trivially bypassable, or living in a framework the agent never invokes — earns its RAISE category **nothing**; a control that is *operative on the agent's path* — even a human-in-the-loop confirmation, even an inherited framework default the agent doesn't disable — earns the category **Partial (2) or Established (3)**, even when there are findings about its gaps. Gaps are *findings*, not reasons to zero a category. Most targets here land in **Absent (0)** to **Ad hoc (1)** per category; the well-engineered ones (OpenHands) reach **Established (3)** in the categories where their controls are real.
 
-Blind-run scoring carries inherent variance — the *same target* re-analyzed from scratch typically lands within **±0.3–0.5** of its previous weighted score (judgment differs on borderline 0↔1 / 2↔3 calls). The bands below reflect that. A single in-band shift is not a regression; a score that lands well outside its band with no Praxa change to explain it, a dropped material finding, or a missed critical theme, is.
+Blind-run scoring carries inherent variance — the *same target* re-analyzed from scratch typically lands within **±0.3–0.5** of its previous weighted score, and the severity counts swing by **±2–3** per bucket (judgment differs on borderline 0↔1 / 2↔3 category calls, and on Critical↔High classification). The per-target bands below are wide for that reason and should be read as a *gross-regression* check, not a tolerance: the **frozen baseline** in `baselines/v0.3-sequential/` is the precise comparison point, and the **theme coverage** (no Critical theme dropped) is the hard gate. A score that lands well outside its band with no Praxa change to explain it, a dropped material finding, or a missed critical theme, is a regression; a single in-band wobble is not.
 
 ## Pre-release checklist
 
@@ -69,7 +69,7 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 **Source:** https://github.com/langchain-ai/langchain-community (the classic `create_sql_agent` is in `libs/community/langchain_community/agent_toolkits/sql/` and `libs/community/langchain_community/tools/sql_database/`)
 **Scope:** the `agent_toolkits/sql/` + `tools/sql_database/` trees + `utilities/sql_database.py`.
 **Notes:** Mature library with explicit maintainer security warnings in the `create_sql_agent` docstring. Praxa correctly identifies the DML-prohibition-is-prompt-only pattern and surfaces the maintainer warning rather than skipping it. Not a disclosure target (maintainer has already warned). Kept as a "skill validates on a mature codebase" test. Mature-library calibration: the toolkit's tool inventory matches the remit's Known Good Baseline exactly, deps are pinned/versioned, there's a `max_iterations` runaway cap and result-cell truncation — so the score lands in *Ad hoc*, not *Absent*, even though the SQL-prohibition enforcement is prompt-only.
-**Baseline expectation:** ≈ 2-5 Critical / 4-7 High / 3-5 Medium, weighted ≈ 1.1-1.6 / 5.0 (Ad hoc).
+**Baseline expectation:** ≈ 2-5 Critical / 4-7 High / 2-5 Medium, weighted ≈ 1.0-1.6 / 5.0 (Ad hoc).
 
 ### 4. OpenAI Agents SDK — Customer Service Example
 
@@ -85,7 +85,7 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 **Source:** https://github.com/microsoft/autogen (`python/packages/autogen-ext/src/autogen_ext/code_executors/` + `python/packages/autogen-core/src/autogen_core/code_executor/`)
 **Scope:** the 5 executor implementations (local, docker, docker_jupyter, jupyter, azure) + the core abstraction.
 **Notes:** "Defaults undermine sandbox" pattern. Praxa should find: `LocalCommandLineCodeExecutor` uses `warnings.warn` instead of an approval gate and copies the parent's full `os.environ` into the subprocess; `create_default_code_executor()` silently downgrades Docker→Local on a `UserWarning`; Docker containers default to no `user=`/`read_only=`/`mem_limit=`/`cap_drop=`/network isolation; Jupyter timeouts are soft; no per-execution audit log.
-**Baseline expectation:** ≈ 2 Critical / 5-7 High / 3-6 Medium, weighted ≈ 1.2-1.5 / 5.0 (Ad hoc).
+**Baseline expectation:** ≈ 2-3 Critical / 5-7 High / 3-6 Medium, weighted ≈ 1.2-1.6 / 5.0 (Ad hoc).
 
 ### 6. Sweep — GitHub issue-to-code agent
 
@@ -123,7 +123,7 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 
 ## What a release review looks like
 
-The release review is a **full compare**: run all nine targets and diff each against the latest frozen baseline in [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md).
+The release review is a **full compare**: run all nine targets and diff each against the latest frozen baseline in [`baselines/v0.3-sequential/`](baselines/v0.3-sequential/BASELINE.md).
 
 **Compare against the baseline (the hard gate — do this first)**
 - *Weighted RAISE* within ±0.3–0.5 of the baseline number, *and* inside the per-target band above.

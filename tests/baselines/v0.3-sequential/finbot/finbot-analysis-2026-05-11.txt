@@ -1,0 +1,115 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: 2026-05-11T22:49:16Z
+Praxa v0.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in prose, zero code-level enforcement,
+joined to an unauthenticated admin surface that lets anonymous callers rewrite
+the agent's goals at runtime. Every MUST / MUST NOT clause in the remit that
+matters — fraud detection always on, manual-review threshold respected,
+decision logic not redefinable at runtime, no instructions from invoice
+content — is enforced only inside the LLM system-prompt string, with no
+Python-side gate on _approve_invoice, no signature or auth check on POST
+/api/admin/finbot/goals, and no policy check on the fraud_detection_enabled
+toggle. That string is then assembled at every process_invoice call from the
+live finbot_config row, including the writable custom_goals column — producing
+a one-hop chain from the internet to persistent agent compromise: any
+anonymous POST to /api/admin/finbot/goals writes natural-language overrides
+into every subsequent decision, and the same agent also receives unsanitized
+vendor invoice descriptions into its context window and is authorized to set
+payment_processed=True. The CTF walkthrough at
+docs/FinBot-CTF-walkthrough-goal-manipulation.md documents the chain as
+designed; the scan's job here is to record that the remit and the
+implementation do not agree on whether that design is the intended posture.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.45 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 5   Medium: 3   Low: 1   Informational: 1
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 15   Partial: 2   Vague: 0   Enforcement-not-possible: 0   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  Admin API exposes goal-update, config-update,
+            vendor-trust-update and reprocess endpoints with no
+            authentication, authorization, or rate-limiting middleware.
+      Action 1: Place every /api/admin/* route behind an authenticated session
+              or signed bearer token; reject unauthenticated requests before
+              the route handler runs.
+      Action 2: Add an @admin_bp.before_request hook that verifies the caller
+              and short-circuits with 401 / 403 otherwise.
+      Action 3: Restrict CORS at src/main.py:18 to a known origin list rather
+              than wildcard, and exclude /api/admin/* from cross-origin reach
+              entirely.
+
+  PRAX-2026-05-11-002  Runtime-writable custom_goals field is concatenated
+            verbatim into the LLM system prompt with an explicit OVERRIDE
+            header, allowing any caller who reaches finbot_config to redefine
+            decision logic.
+      Action 1: Remove the custom_goals concatenation at
+              src/services/finbot_agent.py:70 and drop the column from
+              finbot_config; goal changes must come from source control.
+      Action 2: If runtime-tunable behavior is needed, replace it with a typed
+              allow-list of structured parameters (numeric thresholds,
+              enum-valued modes) — never a free-form natural-language field
+              that lands in the system prompt.
+
+  PRAX-2026-05-11-003  Vendor-supplied invoice description enters the LLM
+            context unsanitized; the remit's prohibition on taking directives
+            from invoice content is enforced only by a regex deny-list with
+            documented bypasses.
+      Action 1: Strip or quote the vendor-supplied description before it
+              enters any LLM context; never include raw vendor text in a
+              tool-call return.
+      Action 2: Remove the override branch at
+              src/services/finbot_agent.py:841–854 — a detected injection must
+              result in request_human_review regardless of business score
+              (matches remit R-03).
+
+  PRAX-2026-05-11-004  No code-level gate enforces manual_review_threshold or
+            fraud-risk escalation on _approve_invoice; thresholds are enforced
+            only by the LLM's interpretation of the system prompt.
+      Action 1: Add a hard precondition at the top of _approve_invoice: refuse
+              to set status='approved' when amount &gt;
+              manual_review_threshold, when the latest fraud check returned
+              high/critical, when vendor trust_level == 'low', or when
+              confidence &lt; confidence_threshold — return a
+              request_human_review instead.
+      Action 2: Remove the should_expedite / management_approval /
+              critical-deadline override branches at
+              src/services/finbot_agent.py:807–824 — the remit gives no path
+              to override the threshold without a human.
+
+  PRAX-2026-05-11-005  Compound chain — unauthenticated admin endpoint plus
+            writable custom_goals plus unsanitized invoice description plus
+            ungated _approve_invoice yields one-hop, internet-to-payment
+            compromise with persistence.
+      Action 1: Fix the chain at any single link to break exploitability
+              today: add auth on admin_bp (001), drop custom_goals from the
+              system-prompt assembly (002), or add the threshold gate in
+              _approve_invoice (004). Fixing all four is the production
+              remediation.
+      Action 2: Add a code-level audit-log write on every config.custom_goals
+              and fraud_detection_enabled mutation so a future change is at
+              least detectable after the fact (Monitor Continuously).
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================
