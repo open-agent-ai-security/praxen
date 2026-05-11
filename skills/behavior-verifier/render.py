@@ -449,8 +449,8 @@ def render_txt(data: dict) -> str:
             out.append("")
 
     out.append(bar)
-    out.append("Built on RAISE Framework  |  OWASP Top 10 for LLM Applications 2025  |  "
-               "OWASP Top 10 for Agentic Applications 2026")
+    out.append("OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026"
+               "  |  Built on RAISE Framework")
     out.append(bar)
     return "\n".join(out) + "\n"
 
