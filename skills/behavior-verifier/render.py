@@ -471,8 +471,9 @@ def render_txt(data: dict) -> str:
             actions = f["recommended_actions"]
             for k, action in enumerate(actions):
                 prefix = "Action: " if len(actions) == 1 else f"Action {k+1}: "
+                lead = "      "
                 out.extend(_wrap(prefix + strip_tags(action),
-                                 indent="      ", subsequent="              "))
+                                 indent=lead, subsequent=lead + " " * len(prefix)))
             out.append("")
 
     out.append(bar)

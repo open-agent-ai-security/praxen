@@ -59,8 +59,10 @@ REMIT_STATUSES = ["verified", "gap", "partial", "vague", "enp"]
 CONFIDENCES = ["High", "Medium", "Low"]
 TAG_KINDS = ["raise", "owasp_llm", "owasp_agentic", "mcp"]
 LOG_STATUSES = ["active", "new"]
+ESCALATIONS = ["alert", "log_only"]
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
 
 
 class SchemaError(ValueError):
@@ -262,7 +264,11 @@ def _validate_findings(data):
         _enum(f, "confidence", p, CONFIDENCES)
         rel = _get(f, "related_findings", p)
         _str_list(rel, f"{p}.related_findings")
-        _nonempty_str(f, "escalation", p)
+        for j, r in enumerate(rel or []):
+            if not _FINDING_ID_RE.match(r):
+                _err(f"{p}.related_findings[{j}]",
+                     f"{r!r} is not a PRAX-YYYY-MM-DD-NNN id")
+        _enum(f, "escalation", p, ESCALATIONS)
     return findings, seen
 
 
@@ -370,6 +376,13 @@ def _validate_consistency(data, findings, finding_ids):
         if fid and fid not in finding_ids:
             _err(f"$.remit_coverage (rule {r['rule_id']})",
                  f"references finding {fid!r} which does not exist in findings[]")
+
+    # 3b. every related_findings entry resolves to a real finding.
+    for f in findings:
+        for r in f.get("related_findings", []):
+            if r not in finding_ids:
+                _err(f"$.findings ({f['id']}).related_findings",
+                     f"references finding {r!r} which does not exist in findings[]")
 
     # 4. weighted overall matches Σ(score × weight) (allow 2-decimal rounding).
     cats = data["raise_posture"]["categories"]

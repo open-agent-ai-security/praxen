@@ -188,6 +188,7 @@ def main():
         (rules_props["status"]["enum"],        schema.REMIT_STATUSES, "remit-rule status"),
         (cat_props["key"]["enum"],             schema.RAISE_KEYS,     "raise category key"),
         (log_props["status"]["enum"],          schema.LOG_STATUSES,   "log status"),
+        (finding_props["escalation"]["enum"],  schema.ESCALATIONS,    "escalation"),
     ]
     disagreements = [name for (jenum, penum, name) in pairs if list(jenum) != list(penum)]
     check("findings.schema.json enums agree with the Python validator constants",
