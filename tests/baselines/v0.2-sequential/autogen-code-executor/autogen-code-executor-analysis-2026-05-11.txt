@@ -1,0 +1,75 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: 2026-05-11T16:04:57Z
+Praxa v0.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Across all five executor implementations the subsystem treats LLM-generated
+code as trusted-to-run — which is its declared job — but the host isolation
+the remit demands is largely absent or defaulted off.
+LocalCommandLineCodeExecutor runs code with the parent process's full
+environment (env = os.environ.copy()) and, when no virtual-env context is
+configured, pip installs the operator's helper-function requirements into the
+host interpreter (sys.executable -m pip install); the Docker path runs as root
+in-container with an rw bind mount of the work dir, unrestricted default
+network egress, no capability drops and no CPU/memory caps; and
+create_default_code_executor() silently downgrades to the local (host)
+executor with only a warnings.warn when Docker is unavailable. The dominant
+pattern: containerization is the documented safety story, but the container is
+shipped insecurely defaulted and the fallback path has no gate — and because
+no executor writes a per-execution audit log, a host-level execution leaves no
+record. The other recurring theme is that several remit clauses requiring
+human approval (runtime host-volume mounts via extra_volumes, raising the
+timeout ceiling, network egress) are exposed as ungated constructor parameters
+or simply have no control surface at all.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.45 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    3/5   (confidence: Low, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: Medium, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Low, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 6   Medium: 5   Low: 2   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 6   Gap: 7   Partial: 7   Vague: 0   Enforcement-not-possible: 1   (of 21 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  LocalCommandLineCodeExecutor runs LLM-generated code
+            with the autogen application's full process environment, exposing
+            the parent process's environment variables and credentials to the
+            executed code.
+      Action: In
+      `LocalCommandLineCodeExecutor._execute_code_dont_check_setup`, build the
+      subprocess environment from an explicit minimal allow-list (e.g. `PATH`,
+      `LANG`, plus any operator-declared keys) instead of `os.environ.copy()`;
+      document that secrets must never be present in the autogen process's
+      environment when this executor is used.
+
+  PRAX-2026-05-11-002  create_default_code_executor silently falls back to the
+            host LocalCommandLineCodeExecutor when Docker is unavailable,
+            defeating the production-containerization approval gate; combined
+            with no host isolation and no execution audit log, LLM code can
+            run on the host with no gate and no record.
+      Action: Make the fallback opt-in: have `create_default_code_executor`
+      raise (or require an explicit `allow_local_fallback=True`) when Docker
+      is unavailable, and remove the silent `except Exception: pass` so
+      Docker-construction failures surface. Pair this with the env-isolation
+      fix (PRAX-2026-05-11-001) and a per-execution audit log
+      (PRAX-2026-05-11-005) so any host execution is at least recorded.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

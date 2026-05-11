@@ -1,0 +1,118 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    Devika
+Analysis: 2026-05-11T21:36:40Z
+Praxa v0.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is planned-but-not-deployed controls layered over zero
+input/output trust enforcement. Four of the remit's load-bearing controls — a
+sandboxed code runner, per-project path confinement, instruction-injection
+detection on untrusted input, and a per-project audit log with step/wall-clock
+caps — have no running implementation: src/sandbox/code_runner.py and
+src/sandbox/firejail.py are 0-line stubs, and the live execution path in
+src/agents/runner/runner.py shells LLM-authored command strings through
+subprocess.run(command_set, cwd=project_path) with no approval gate, no
+per-command deny policy, and no isolation. These gaps compound into a single
+one-hop chain: web content fetched by the researcher agent passes through the
+formatter agent into the coder and runner LLM context
+(src/agents/agent.py:344-357, runner.py:81-90), so an attacker-controlled page
+can steer the agent into running arbitrary commands on the operator's host.
+The entire pipeline is reachable from an unauthenticated Flask/Socket.IO
+server bound to 0.0.0.0:1337 that additionally exposes arbitrary file read
+(/api/get-browser-snapshot), an unauthenticated config rewrite that can flip
+logging and swap provider keys (/api/settings), and a wildcard-CORS websocket.
+Code-writing agents (coder.py, patcher.py, feature.py) also derive file paths
+from raw LLM output with no traversal check, defeating the work-directory
+confinement the remit promises.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.45 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 6   High: 6   Medium: 4   Low: 1   Informational: 0
+  Total: 17
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 16   Partial: 4   Vague: 1   Enforcement-not-possible: 0   (of 22 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  The code runner executes LLM-authored shell commands on
+            the host via raw subprocess.run with no sandbox, no approval gate,
+            and no per-command policy; the sandbox modules that were supposed
+            to provide isolation are empty stub files.
+      Action: Implement the sandbox: route every command in
+      `Runner.run_code()` through a containerized or `firejail`-wrapped runner
+      (the empty `src/sandbox/firejail.py` / `src/sandbox/code_runner.py` were
+      meant to do this), enforce a per-command allow/deny policy, and require
+      explicit user confirmation before any command not present in the
+      approved plan. Do not pass `command.split(" ")` directly to
+      `subprocess.run`.
+
+  PRAX-2026-05-11-002  User prompts and web-retrieved page content flow into
+            every agent's LLM context with no instruction-injection detection
+            or content-origin separation, directly contradicting the remit's
+            requirement to treat both as untrusted.
+      Action: Before web content or user input enters any agent prompt, route
+      it through an instruction-injection detector and wrap it in clearly
+      delimited untrusted-content blocks; in `agent.py:search_queries()` apply
+      detection to `data`/formatter output before it reaches
+      `coder.execute()`, and in `decision.py`/`planner.py`/`action.py`
+      separate the trusted operator instruction from the untrusted user text
+      in the prompt template.
+
+  PRAX-2026-05-11-003  An unauthenticated HTTP endpoint streams any file on
+            the host back to the caller via send_file with a caller-supplied
+            path, giving arbitrary file read of operator secrets outside the
+            work directory.
+      Action: In `devika.py` `browser_snapshot()`, resolve `snapshot_path`
+      against the configured screenshots directory with `os.path.realpath` and
+      reject any path that escapes it; add authentication to the Flask app and
+      bind to `127.0.0.1` by default rather than `0.0.0.0`.
+
+  PRAX-2026-05-11-004  Code-writing agents build output file paths by joining
+            raw LLM-supplied filenames onto the project directory with no
+            traversal or absolute-path check, so a `..`-laden or absolute
+            filename writes anywhere the process can write.
+      Action: In `save_code_to_project()` in `coder.py`, `patcher.py`, and
+      `feature.py`, normalize the joined path with `os.path.realpath` and
+      assert it is within `os.path.realpath(os.path.join(self.project_dir,
+      project_name))` before `makedirs`/`open`; reject absolute paths and any
+      path component equal to `..`.
+
+  PRAX-2026-05-11-005  There is no approval gate on package installation: the
+            runner agent will execute LLM-generated `pip install` / arbitrary
+            install commands directly, contradicting the remit's hard
+            prohibition and explicit approval requirement.
+      Action: Add a confirmation gate in `Runner.run_code()` that pauses and
+      requires explicit user approval for any command matching package-manager
+      invocations (`pip`, `npm`, `apt`, `cargo`, etc.); maintain a small
+      pre-approved package list as the remit specifies and require approval
+      for anything outside it.
+
+  PRAX-2026-05-11-006  Web-content-to-shell compound chain: untrusted page
+            text retrieved by the researcher reaches the coder and runner LLM
+            context unfiltered, and the runner executes LLM-authored commands
+            on the host with no sandbox or approval — a single poisoned web
+            page can run arbitrary code on the operator's machine.
+      Action: Treat this as the priority architectural fix: insert an
+      injection detector and untrusted-content delimiting between
+      `agent.py:search_queries()` output and the coder/runner prompts, and
+      gate `Runner.run_code()` behind a sandbox plus per-command user
+      approval, so neither half of the chain remains open.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

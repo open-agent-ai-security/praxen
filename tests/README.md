@@ -5,12 +5,14 @@
 
 # Praxa Pre-Release Test Plan
 
-Praxa's regression test suite. Before every release, analyze each target in this document and review the resulting reports against the baseline expectations below. Reports themselves are **not** kept in this directory — they regenerate on each run and change between analyses.
+Praxa's regression test suite. Before every release, run the full nine-target suite below, then **diff every target against the latest frozen baseline in `baselines/`** and against the per-target bands in this document (see *[What a release review looks like](#what-a-release-review-looks-like)*). Ad-hoc / mid-development re-run reports are **not** kept here — they regenerate and drift; the only committed runs are the named, version-pinned baselines under `baselines/`.
 
 ## Directory contents
 
 - `README.md` — this file
-- `remits/` — the Worker Remits developed for each test agent. These are reusable and do not change between analyses.
+- `remits/` — the Worker Remits developed for each test agent. Reusable; do not change between analyses.
+- `baselines/` — frozen, committed runs of all nine targets, one set per Praxa version (`baselines/<version>-sequential/`). The comparison point for the release review and the Phase-2 parallel-vs-sequential parity gate. See [`baselines/README.md`](baselines/README.md). **Latest: [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md)** (Praxa v0.2.0, schema 1.0).
+- `fixtures/`, `render/` — the `render.py`/`schema.py` smoke harness and its canonical-JSON fixture (`python3 tests/render/test_render.py`).
 
 ## Calibration posture (v0.2)
 
@@ -20,12 +22,12 @@ Blind-run scoring carries inherent variance — the *same target* re-analyzed fr
 
 ## Pre-release checklist
 
-1. Build the candidate release zip: `./build.sh` from the repo root.
-2. For each target below, either:
+1. Build the candidate release zip: `./build.sh` from the repo root; run the render smoke harness (`python3 tests/render/test_render.py`).
+2. For each of the nine targets below, either:
    - Scan the already-built zip against the target workspace (confirms the distributed zip works), **or**
-   - Scan from the repo's `skills/` + `knowledge/` directly (confirms skill edits land correctly).
-3. Review each report against the baseline expectations in this document.
-4. Any regression — a material finding dropped, a critical theme missed, a weighted score well outside the band below — blocks the release. (An in-band shift, or a calibration-improvement-driven change in counts/severity, is fine — note it in the release notes.)
+   - Scan from the repo's `skills/` directly (confirms skill edits land correctly).
+3. **Full compare against the baseline.** For every target, diff the new findings JSON against `baselines/<latest>-sequential/<target>/…-findings-*.json`: weighted RAISE within ±0.3–0.5 of the baseline *and* inside the per-target band below; severity counts in the same neighbourhood; **dominant pattern / themes still covered (no Critical theme dropped)** — this last one is the hard gate. (See *[What a release review looks like](#what-a-release-review-looks-like)* for the per-report checks.)
+4. Any regression — a material finding dropped, a critical theme missed, a weighted score well outside the band, a target that drifts far from the baseline with no Praxa change to explain it — blocks the release. An in-band shift, or a deliberate calibration/detection change that moves the numbers, is fine: note it in the release notes **and re-freeze a new `baselines/<next-version>-sequential/`** (and update the "Latest" pointer above + the affected bands below).
 
 ## How to run an analysis
 
@@ -66,8 +68,8 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 **Remit:** `remits/langchain-sql.md`
 **Source:** https://github.com/langchain-ai/langchain-community (the classic `create_sql_agent` is in `libs/community/langchain_community/agent_toolkits/sql/` and `libs/community/langchain_community/tools/sql_database/`)
 **Scope:** the `agent_toolkits/sql/` + `tools/sql_database/` trees + `utilities/sql_database.py`.
-**Notes:** Mature library with explicit maintainer security warnings in the `create_sql_agent` docstring. Praxa correctly identifies the DML-prohibition-is-prompt-only pattern and surfaces the maintainer warning rather than skipping it. Not a disclosure target (maintainer has already warned). Kept as a "skill validates on a mature codebase" test. Note: when the workspace is just the SQL toolkit files (the scope above), the framework's broader callback/tracing infrastructure isn't in view, so monitoring scores low — that's correct ("score the deployed agent, not the framework it sits on").
-**Baseline expectation:** ≈ 5 Critical / 5-7 High / 1-4 Medium, weighted ≈ 0.3-0.6 / 5.0 (Absent).
+**Notes:** Mature library with explicit maintainer security warnings in the `create_sql_agent` docstring. Praxa correctly identifies the DML-prohibition-is-prompt-only pattern and surfaces the maintainer warning rather than skipping it. Not a disclosure target (maintainer has already warned). Kept as a "skill validates on a mature codebase" test. Mature-library calibration: the toolkit's tool inventory matches the remit's Known Good Baseline exactly, deps are pinned/versioned, there's a `max_iterations` runaway cap and result-cell truncation — so the score lands in *Ad hoc*, not *Absent*, even though the SQL-prohibition enforcement is prompt-only.
+**Baseline expectation:** ≈ 2-5 Critical / 4-7 High / 3-5 Medium, weighted ≈ 1.1-1.6 / 5.0 (Ad hoc).
 
 ### 4. OpenAI Agents SDK — Customer Service Example
 
@@ -99,7 +101,7 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 **Source:** https://github.com/stitionai/devika
 **Scope:** `devika.py` + `src/` (agents, llm, memory, apis) + `sample.config.toml`, `devika.dockerfile`, `requirements.txt`, `ARCHITECTURE.md`.
 **Notes:** Exercises the **empty-file signal** detector — `src/sandbox/firejail.py` and `src/sandbox/code_runner.py` are 0-line stubs (these *must* show up as a Critical, or the Step 4 empty-file heuristic regressed). Runner calls `subprocess.run` directly. Unauthenticated `/api/settings` POST on `0.0.0.0:1337`. Path traversal in `save_code_to_project`. Compound RCE chain (web → researcher → formatter → coder/runner → subprocess). The early-stage / successor-project README disclaimer is generic, not an explicit warning about these specific issues — don't treat it as a skip trigger.
-**Baseline expectation:** ≈ 5 Critical / 6-7 High / 3-4 Medium, weighted ≈ 0.4-0.6 / 5.0 (Absent).
+**Baseline expectation:** ≈ 5-6 Critical / 6-7 High / 3-4 Medium / 0-1 Low, weighted ≈ 0.4-0.6 / 5.0 (Absent).
 
 ### 8. Aider — interactive pair programming agent
 
@@ -115,13 +117,20 @@ Ordered from simplest (intentionally-vulnerable CTF) to most complex (active pro
 **Source:** https://github.com/All-Hands-AI/OpenHands
 **Scope:** `openhands/` core — `core/`, `controller/`, `runtime/`, `events/`, `server/`, `llm/`, `mcp/`, `integrations/` — plus `config.template.toml`, `docker-compose.yml`. Exclude `enterprise/`, `frontend/`, `kind/`.
 **Notes:** Best-architected agent in the test set. Sandboxed Docker runtime, per-integration OAuth scoping, structured event log, secret-redaction primitives. Praxa should still find: CLIRuntime / LocalRuntime / `process` runtime ship alongside the sandboxed one; `confirmation_mode` defaults False; the V1 control-plane API is unauthenticated unless `SESSION_API_KEY` is set while uvicorn binds `0.0.0.0` with `*` CORS; `.openhands/setup.sh` auto-sourced from a connected repo (supply-chain shaped); Docker socket mounted in default docker-compose; declared-but-never-consumed `save_trajectory_path`/`replay_trajectory_path`. The suite's "mature agent scores honestly" anchor — its *real* wired-in controls (sandboxed runtime, structured event log, OAuth scoping) must register at **Established (3)**; if every category came back ≤ 1 for this target, the scoring is over-corrected. Note: much of the controller/runtime/llm/mcp code has migrated to the separate `openhands-sdk` / `openhands-agent-server` PyPI packages, so several strong remit clauses come back Enforcement-Not-Possible from a source-only snapshot of `openhands/`.
-**Baseline expectation:** ≈ 0-2 Critical / 5-7 High / 5-6 Medium / 2 Low, weighted ≈ 2.2-2.5 / 5.0 (Partial).
+**Baseline expectation:** ≈ 0-3 Critical / 5-7 High / 4-6 Medium / 0-2 Low, weighted ≈ 2.2-2.5 / 5.0 (Partial).
 
 ---
 
 ## What a release review looks like
 
-For each target, open the HTML report and check:
+The release review is a **full compare**: run all nine targets and diff each against the latest frozen baseline in [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md).
+
+**Compare against the baseline (the hard gate — do this first)**
+- *Weighted RAISE* within ±0.3–0.5 of the baseline number, *and* inside the per-target band above.
+- *Severity counts* in the same neighbourhood. Small drifts and Critical↔High reclassifications are normal blind-run variance.
+- *Dominant pattern / themes still covered.* The numbers wobble; the themes shouldn't. **A target that drops a material finding or misses a Critical theme is a regression**, regardless of where the weighted score lands.
+
+Then, for each target, open the HTML report and check:
 
 **Structural correctness**
 - All three output files landed (`.html`, `.json`, `.txt`). `render.py` (Step 11) exited 0 — if it did, the HTML is guaranteed marker-free and the JSON passed `schema.py` validation (footer/remit counts, anchor resolution, RAISE category set, weighted-overall sanity all checked).
