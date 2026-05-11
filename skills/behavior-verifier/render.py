@@ -87,12 +87,14 @@ _OVERALL_STATUS_RULES = [
 ]
 
 # Rich-text JSON fields that may contain a small set of inline HTML tags. Every
-# other text field is fully escaped.
+# other text field is fully escaped. (`<p>` only makes sense in the multi-
+# paragraph behavior summary; `<code>`/`<strong>`/`<em>` are benign inline
+# emphasis the synthesis step naturally reaches for.)
 _RICH_FIELDS = {
-    "agent_remit_summary": ("code",),
-    "agent_structure_summary": ("code",),
-    "behavior_summary": ("p", "code"),
-    "recommended_action": ("code",),
+    "agent_remit_summary": ("code", "strong", "em"),
+    "agent_structure_summary": ("code", "strong", "em"),
+    "behavior_summary": ("p", "code", "strong", "em"),
+    "recommended_action": ("code", "strong", "em"),
 }
 
 
@@ -114,10 +116,12 @@ def esc(value) -> str:
 def render_rich(text, allow=("code",)) -> str:
     """Escape ``text`` but preserve a small allowlist of inline tags.
 
-    The Praxa skill emits these fields as plain prose plus, at most, ``<code>``
-    (and ``<p>`` in the behavior summary). We protect those exact tags, escape
-    everything else, then restore them — so an unbalanced ``<`` in the prose is
-    rendered as text, not as a stray tag. Literal ``{{...}}`` is neutralised too.
+    The Praxa skill emits these fields as plain prose plus, at most, the tags in
+    ``allow`` (``<p>`` / ``<code>`` / ``<strong>`` / ``<em>``). We protect those
+    exact tags, escape everything else, then restore them — so an unbalanced
+    ``<`` in the prose is rendered as text, not as a stray tag, and a tag the
+    skill reached for that is *not* in ``allow`` shows as escaped text rather
+    than affecting layout. Literal ``{{...}}`` is neutralised too.
     """
     text = str(text)
     if "\x00" in text:
@@ -135,8 +139,13 @@ def render_rich(text, allow=("code",)) -> str:
 
 
 def strip_tags(text) -> str:
-    """Remove the inline allow-tags from a rich-text field, yielding plain text."""
-    return re.sub(r"</?(?:code|p)\s*>", "", str(text), flags=re.IGNORECASE)
+    """Flatten a rich-text field to plain text for the TXT summary: a ``</p>``
+    paragraph break becomes a single space (so sentences don't run together),
+    and every other HTML-ish tag (``<p>``, ``<code>``, ``<strong>``, a stray
+    ``<a ...>``, …) is dropped. A lone ``<`` that is not a tag is left alone."""
+    t = re.sub(r"\s*</p\s*>\s*", " ", str(text), flags=re.IGNORECASE)
+    t = re.sub(r"</?[a-zA-Z][^>]*>", "", t)
+    return t
 
 
 # ── template engine ──────────────────────────────────────────────────────────

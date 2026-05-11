@@ -118,6 +118,31 @@ def main():
           and "&#123;&#123;DATABASE_URL&#125;&#125;" in sp_out   # cited braces -> entities
           and "FinBot" in sp_out)                   # the real AGENT_NAME placeholder still resolved
 
+    # 4c. multi-paragraph behavior summary with inline emphasis: <p>/<strong>/<em>
+    #     survive in HTML; the TXT flattens them (paragraph break -> space, tags dropped).
+    rich = json.loads(json.dumps(data))
+    rich["behavior_summary"] = ("<p>First paragraph ends with a period.</p>"
+                                "<p>Second paragraph has <strong>bold</strong> and <em>italic</em> and "
+                                "<code>code()</code> spans.</p>")
+    rich_path = os.path.join(tmp, "rich.json")
+    rich_html = os.path.join(tmp, "rich.html")
+    rich_txt = os.path.join(tmp, "rich.txt")
+    json.dump(rich, open(rich_path, "w"))
+    r = run_render(["--findings", rich_path, "--template", TEMPLATE,
+                    "--out-html", rich_html, "--out-txt", rich_txt])
+    rh = open(rich_html, encoding="utf-8").read() if os.path.exists(rich_html) else ""
+    rt = open(rich_txt, encoding="utf-8").read() if os.path.exists(rich_txt) else ""
+    check("render succeeds with <p>/<strong>/<em>/<code> in behavior_summary",
+          r.returncode == 0, r.stderr.strip())
+    check("HTML keeps <p>/<strong>/<em>/<code> in the behavior summary",
+          "<p>First paragraph" in rh and "<strong>bold</strong>" in rh
+          and "<em>italic</em>" in rh and "<code>code()</code>" in rh)
+    check("TXT flattens paragraphs to a space and drops all tags",
+          "period. Second paragraph" in rt        # </p><p> -> single space, no run-together
+          and "<strong>" not in rt and "<p>" not in rt and "<code>" not in rt
+          and "</p>" not in rt and "<em>" not in rt
+          and "bold" in rt and "italic" in rt and "code() spans" in rt)  # content kept, tags gone
+
     # 5. negative cases — each must exit non-zero with a useful message
     def negative(name, mutate):
         bad = json.loads(json.dumps(data))
