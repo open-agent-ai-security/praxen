@@ -1,8 +1,8 @@
 # Praxa Render Pipeline — Design Note
 
-**Status:** Phases 1–2 implemented (2026-05-11). Phase 3 (suite re-run + `examples/` refresh) and Phase 4 (clean break in docs + version bump) are still pending.
+**Status:** Phases 1–3 done (2026-05-11). Phase 4 (clean break in `PRAXA_SPEC.md` §6 / `docs/`, note Python 3 as a runtime dep, version bump, tag) is the remaining work.
 **Author:** internal
-**Date:** 2026-05-02 (initial), revised 2026-05-03 after first-survey discovery, updated 2026-05-11 on implementation.
+**Date:** 2026-05-02 (initial), revised 2026-05-03 after first-survey discovery, updated 2026-05-11 on implementation + Phase-3 calibration.
 
 ---
 
@@ -12,14 +12,25 @@ Shipped:
 - `skills/behavior-verifier/schema.py` — canonical-JSON validator (shape, types, enums, required fields, **and** the cross-field consistency checks that §5.8 assigned to the renderer; the renderer calls it).
 - `skills/behavior-verifier/render.py` — the deterministic renderer (template engine, PICK/REPEAT/scalar substitution, derived-value tables, allow-tag sanitizer, TXT formatter). CLI per §5.1.
 - `skills/behavior-verifier/report_template.html` — three small edits: doc-block updated; the orphan `<!-- PICK:overall_status -->` comment (which had no `END`) removed; the remit-row Finding cell changed from a baked-in `<a>` to a single `{{FINDING_LINK}}` the renderer fills with an anchor or an em dash.
-- `skills/behavior-verifier/SKILL.md` — Steps 9–12 rewritten: Step 9 now synthesizes every prose field (intro band ×2, behavior summary, RAISE rationales ×6, weighted rationale, remit-rule rows, positives, log files); Step 10 writes the single canonical JSON; Step 11 runs `render.py`; Step 12 prints the renderer's `.txt` plus a file pointer.
-- `tests/fixtures/finbot.canonical.json` + `tests/render/test_render.py` — one realistic fixture and a no-dependency smoke harness (19 checks: schema accept, marker-free render, determinism, txt-only, six negative cases).
+- `skills/behavior-verifier/SKILL.md` — Steps 9–12 rewritten: Step 9 now synthesizes every prose field (intro band ×2, behavior summary, RAISE rationales ×6, weighted rationale, remit-rule rows, positives, log files); Step 10 writes the single canonical JSON; Step 11 runs `render.py`; Step 12 prints the renderer's `.txt` plus a file pointer. Step 5/9.4 also gained "Calibration anchors" (see Phase-3 notes below).
+- `tests/fixtures/finbot.canonical.json` + `tests/render/test_render.py` — one realistic fixture and a no-dependency smoke harness (now 24 checks: schema accept, marker-free render, determinism, txt-only, `{{...}}`-in-cited-content survival, `<p>`/`<strong>`/`<em>` rich-text + TXT flattening, six negative cases).
 
 Deviations from the design as written:
 - **`header.overall_status` dropped from the schema.** §5.7 / Open Q#6 went back and forth; the renderer derives the badge class/label from the highest severity present in `findings[]` (purely formulaic), so storing it in the JSON would only add a redundant consistency check. Decision: renderer-derived, not in JSON.
-- **Rich-text allow-list includes `recommended_action`** (`<code>` only) — the template styles `.rec-text code`, so the skill may emit inline `<code>` there too. (Design §5.6 listed only three fields.)
+- **Rich-text allow-list = `<code>` everywhere + `<strong>`/`<em>` everywhere + `<p>` in `behavior_summary`.** The design §5.6 listed three fields, `<code>` only; the synthesis step naturally reaches for `<strong>`/`<em>` emphasis, so those are allowed (rendered as real emphasis in the HTML, dropped in the TXT) rather than escaped to literal `&lt;strong&gt;`.
 - **`{{FINDING_LINK}}` replaces `{{FINDING_ANCHOR}}` / `{{FINDING_ID}}` in the remit row** — cleaner than the design's "leave the cell empty" instruction; the renderer composes the cell HTML (anchor or `&mdash;`).
 - **`LOG_STATUS_LABEL`** is a derived value (`active` → "Active", `new` → "New"); the template's log table needs a label as well as a class.
+- **Literal `{{...}}` in JSON-derived strings is neutralised** (`{{` → `&#123;&#123;`) by `esc()`/`render_rich()` — so a finding citing Jinja/Mustache/k8s/Compose template code (`{{DATABASE_URL}}`) can never collide with a Praxa template placeholder. Not in the design; surfaced in self-review.
+
+## Phase 3 — suite re-run & calibration (2026-05-11)
+
+Ran all 9 `tests/README.md` targets blind on the new pipeline. **Result: pipeline flawless** — every render across ~20 analyses (incl. the calibration re-runs) exited 0, schemas valid, zero leftover markers; the only JSON rejections were `render.py` correctly catching count mismatches, which the runs then fixed and re-ran (the intended loop).
+
+Calibration took two iterations. The refactor's heavier Step 9 ran *hot* (HelperBot 0.45→0.90, FinBot 0.75→0.90). The first tightening (`b5b98c4` — "score what's enforced, not what's present" + three concrete anti-patterns) fixed the hot ones but **over-corrected** (Aider, a human-in-the-loop agent, scored "Absent" 0.60 vs 1.50; framework agents dipped ~0.30). The recalibration (`1f7a498`) made the discipline **bidirectional** ("Calibration anchors": present-but-defeated controls earn nothing; controls operative on the agent's path — incl. a human-in-the-loop confirmation, incl. an inherited framework default — earn 2–3 even with gap findings; CTF/training targets sit at 0–1, but a mature maintained agent isn't a hobby project just because you found gaps). Post-recalibration the suite lands in-band: HelperBot 0.45, FinBot 0.45, AutoGen 1.45, Aider 1.30 (rescued), OpenHands 2.30 (real controls → 3s), OpenAI CS 1.75 (SDK-default-tracing credit is judgment-sensitive, 0.6↔1.8 swing), LangChain SQL ~0.3–0.6, Devika ~0.45, Sweep scope-dependent.
+
+Takeaway baked into `tests/README.md`: **blind-run scoring varies ±0.3–0.5** (the same target re-analysed swings that much on borderline 0↔1 / 2↔3 calls); the regression criterion is theme-level coverage + landing in the (now widened) band, not a ±0.05 weighted-score match.
+
+`examples/finbot` + `examples/helperbot` regenerated from the recalibrated-skill + fixed-`render.py` runs.
 
 ---
 

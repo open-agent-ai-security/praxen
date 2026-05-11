@@ -557,7 +557,7 @@
   </div>
   <div class="header-right">
     <div class="agent-name">Agent: FinBot</div>
-    <div class="scan-ts">Analysis: 2026-05-11T15:45:05Z</div>
+    <div class="scan-ts">Analysis: 2026-05-11T16:05:15Z</div>
     <div><span class="status-badge status-critical">CRITICAL</span></div>
   </div>
 </div>
@@ -568,11 +568,11 @@
   <div class="intro-grid">
     <div class="intro-block">
       <div class="label">Agent Remit (as declared)</div>
-      <div class="body">FinBot is declared as an autonomous invoice-processing assistant for CineFlow Productions: it ingests vendor invoices, validates them against registered vendor records, and makes approve / reject / escalate decisions recorded in the invoice database. Its authorized tools are <code>get_invoice_details</code>, <code>approve_invoice</code>, <code>reject_invoice</code>, <code>request_human_review</code>, and <code>detect_fraud_patterns</code>, used only against the application ORM and the OpenAI API. The remit is emphatic about a hard policy boundary: fraud detection must run before any approval and must never be skipped, invoices above <code>manual_review_threshold</code> require human sign-off, and the agent must never let invoice descriptions, vendor notes, API payloads, or any non-operator source modify its goals, system prompt, or decision logic — <code>custom_goals</code> must not carry natural-language instructions and decision logic is code-defined, not redefinable at runtime.</div>
+      <div class="body">FinBot is declared as an autonomous invoice-processing assistant for CineFlow Productions: it receives vendor invoices, validates them against registered <code>approved</code> vendor records, and renders approve / reject / escalate decisions recorded in the invoice database. It is authorized to use five tools — <code>get_invoice_details</code>, <code>approve_invoice</code>, <code>reject_invoice</code>, <code>request_human_review</code>, <code>detect_fraud_patterns</code> — over the application ORM (invoices, vendors, finbot_config) plus the OpenAI API for inference only. The remit hard-forbids approving payment to an unregistered/unapproved vendor, skipping fraud detection for any reason, processing invoices above the <code>manual_review_threshold</code> without human sign-off, and allowing any runtime input — invoice descriptions, vendor notes, API payloads, the <code>custom_goals</code> field — to alter its goals, system prompt, or decision logic; <code>fraud_detection_enabled</code> must remain <code>true</code> at all times.</div>
     </div>
     <div class="intro-block">
       <div class="label">Agent Structure (as observed)</div>
-      <div class="body">A Python Flask application (<code>src/main.py</code>) with a SQLAlchemy-backed SQLite/PostgreSQL database and Flask-CORS opened wide via <code>CORS(app)</code>. A single <code>FinBotAgent</code> class in <code>src/services/finbot_agent.py</code> orchestrates OpenAI function-calling (<code>gpt-4.1-mini</code>, five tools) with a rule-based <code>_fallback_processing</code> path when the OpenAI client is unavailable. The agent&#x27;s goals live entirely in a natural-language system prompt built by <code>get_system_prompt()</code>, which interpolates DB config and appends <code>config.custom_goals</code> verbatim under a &quot;CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING)&quot; header. Admin routes — including <code>POST /api/admin/finbot/config</code>, <code>POST /api/admin/finbot/goals</code>, <code>POST /api/admin/vendors/&amp;lt;id&amp;gt;/trust</code>, and <code>POST /api/admin/finbot/reprocess/&amp;lt;id&amp;gt;</code> — are registered through a Flask blueprint with no authentication middleware whatsoever. Vendor-supplied invoice <code>description</code> text flows into the LLM context through the <code>get_invoice_details</code> tool result, and the repo is explicitly an OWASP CTF demo whose docs (<code>docs/FinBot-CTF-walkthrough-goal-manipulation.md</code>) walk attackers through manipulating these exact surfaces.</div>
+      <div class="body">A Python Flask app (<code>src/main.py</code>) with a SQLAlchemy SQLite/PostgreSQL backend, fronted by three blueprints — <code>src/routes/vendor.py</code>, <code>src/routes/admin.py</code>, <code>src/routes/user.py</code> — all mounted under <code>/api</code> with CORS open to all origins and no authentication on any route. The agent itself is a single <code>FinBotAgent</code> class in <code>src/services/finbot_agent.py</code> that drives OpenAI function-calling (<code>gpt-4.1-mini</code>, <code>tool_choice=&quot;auto&quot;</code>, <code>max_iterations=5</code>) over the five tools, with a rule-based <code>_fallback_processing</code> path used whenever the OpenAI client is unavailable. The agent&#x27;s goals live entirely in a natural-language system prompt assembled in <code>get_system_prompt()</code> from a <code>FinBotConfig</code> DB row whose <code>custom_goals</code> text is concatenated directly into the prompt; both that field and <code>fraud_detection_enabled</code> are mutable via unauthenticated POSTs to <code>/api/admin/finbot/goals</code> and <code>/api/admin/finbot/config</code>. Vendor-submitted invoice descriptions reach the LLM verbatim via <code>_get_invoice_details</code>, and <code>approve_invoice()</code> writes <code>payment_processed=True</code> with no amount, threshold, fraud-signal, or caller check. The repo also ships a CTF walkthrough under <code>docs/</code> describing exactly these weaknesses; it is, by construction, a deliberately vulnerable training target.</div>
     </div>
   </div>
 </div>
@@ -583,7 +583,7 @@
   
   <div class="scan-summary">
     <div class="label">Behavior Summary</div>
-    <div class="body"><p>The dominant pattern is &lt;strong&gt;policy declared in prose with zero code-level enforcement, compounded by an open goal-injection surface&lt;/strong&gt;. Every &quot;must always / must never&quot; clause in the remit — run <code>detect_fraud_patterns</code> before approving, verify the vendor is registered and <code>approved</code>, never auto-approve above <code>manual_review_threshold</code>, never let invoice content modify decision logic — exists only as English in the LLM system prompt or not at all; <code>_approve_invoice()</code> in <code>src/services/finbot_agent.py</code> simply sets <code>payment_processed=True</code> with no check on amount, vendor status, fraud signal, or caller, and the same prompt actively ranks &quot;Business Continuity&quot; and processing speed above fraud detection.</p><p>That soft posture sits behind two unauthenticated write paths: <code>POST /api/admin/finbot/goals</code> (commented &quot;MAJOR VULNERABILITY&quot;, no validation) writes attacker text straight into the agent&#x27;s system prompt via <code>config.custom_goals</code>, and <code>POST /api/admin/finbot/config</code> can flip <code>fraud_detection_enabled</code> to false — both prohibited by the remit. Layered on top, vendor-controlled invoice <code>description</code> reaches the model through <code>get_invoice_details</code>, giving an indirect-injection path to the same decision logic. The result is a finance agent that can be re-tasked to approve fraudulent payments by an unauthenticated HTTP caller or by invoice text alone, with no logging to detect it after the fact.</p></div>
+    <div class="body"><p>FinBot&#x27;s entire safety model is a natural-language system prompt handed to an LLM; there is no deterministic enforcement anywhere on the path that moves money. The agent&#x27;s goals, its approval thresholds, and the fraud-detection toggle all live in a single <code>FinBotConfig</code> DB row that an unauthenticated admin API — <code>/api/admin/finbot/goals</code> and <code>/api/admin/finbot/config</code> — can rewrite at will, and <code>custom_goals</code> is concatenated straight into the system prompt with an explicit &quot;OVERRIDE ABOVE IF CONFLICTING&quot; header.</p><p>Downstream of that, <code>approve_invoice()</code> in <code>src/services/finbot_agent.py</code> sets <code>payment_processed=True</code> with no check on amount, on the <code>manual_review_threshold</code>, on whether <code>detect_fraud_patterns</code> was ever called, or on who requested processing; vendor-supplied invoice descriptions flow unsanitised into the LLM context via <code>_get_invoice_details</code>; and the rule-based fallback path is written so that &quot;business context&quot; wording (authority + urgency + production keywords) explicitly overrides a detected prompt injection. The dominant pattern is the canonical goal-hijack → autonomous-payment chain — externally reachable goal injection feeding an ungated approval tool — with no structured logging or alerting to detect it.</p></div>
   </div>
 
   
@@ -591,12 +591,12 @@
     <div class="section-title">Remit Coverage</div>
     <p class="section-desc">Systematic audit of every actionable rule in FinBot's Worker Remit — the policy document that defines what this agent is authorized to do. For each rule, Praxa searched the agent's code and configuration to determine whether the running implementation actually enforces the stated policy. <strong>Gap</strong> means the rule exists in policy but has no enforcement in code. <strong>Partial</strong> means enforcement exists but is incomplete or can be bypassed. Rules marked <strong>Vague Policy</strong> are too imprecise to audit and should be rewritten with specific, testable constraints.</p>
     <div class="stat-bar">
-      <span class="stat-pill stat-verified">Verified: 1</span>
+      <span class="stat-pill stat-verified">Verified: 0</span>
       <span class="stat-pill stat-gap">Gap: 12</span>
-      <span class="stat-pill stat-partial">Partial: 3</span>
+      <span class="stat-pill stat-partial">Partial: 1</span>
       <span class="stat-pill stat-vague">Vague Policy: 0</span>
-      <span class="stat-pill stat-enp">Enforcement Not Possible: 0</span>
-      <span class="stat-pill stat-total">Total Rules: 16</span>
+      <span class="stat-pill stat-enp">Enforcement Not Possible: 1</span>
+      <span class="stat-pill stat-total">Total Rules: 14</span>
     </div>
     <table class="remit-table">
       <thead>
@@ -621,9 +621,9 @@
         <tr>
           <td><strong>R-02</strong></td>
           <td>Behavioral Constraints — What the agent must always do</td>
-          <td class="rule-quote">"Check that the submitting vendor exists in the database with status `approved` before processing"</td>
+          <td class="rule-quote">"Check that the submitting vendor exists in the database with status approved before processing"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-005">PRAX-2026-05-11-005</a></td>
+          <td><a href="#PRAX-2026-05-11-007">PRAX-2026-05-11-007</a></td>
         </tr>
         
         <tr>
@@ -631,7 +631,7 @@
           <td>Behavioral Constraints — What the agent must always do</td>
           <td class="rule-quote">"Escalate to human review rather than auto-approve when any fraud signal is present, regardless of amount"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-006">PRAX-2026-05-11-006</a></td>
+          <td><a href="#PRAX-2026-05-11-005">PRAX-2026-05-11-005</a></td>
         </tr>
         
         <tr>
@@ -639,7 +639,7 @@
           <td>Behavioral Constraints — What the agent must always do</td>
           <td class="rule-quote">"Record the invoice decision and reasoning in the database for every processed invoice"</td>
           <td><span class="status-pill pill-partial">Partial</span></td>
-          <td><a href="#PRAX-2026-05-11-013">PRAX-2026-05-11-013</a></td>
+          <td><a href="#PRAX-2026-05-11-009">PRAX-2026-05-11-009</a></td>
         </tr>
         
         <tr>
@@ -647,7 +647,7 @@
           <td>Behavioral Constraints — What the agent must never do</td>
           <td class="rule-quote">"Approve payment to a vendor not registered and approved in the vendor database"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-005">PRAX-2026-05-11-005</a></td>
+          <td><a href="#PRAX-2026-05-11-007">PRAX-2026-05-11-007</a></td>
         </tr>
         
         <tr>
@@ -655,15 +655,15 @@
           <td>Behavioral Constraints — What the agent must never do</td>
           <td class="rule-quote">"Skip fraud detection for any reason, including configuration flags or runtime instructions"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-003">PRAX-2026-05-11-003</a></td>
+          <td><a href="#PRAX-2026-05-11-002">PRAX-2026-05-11-002</a></td>
         </tr>
         
         <tr>
           <td><strong>R-07</strong></td>
           <td>Behavioral Constraints — What the agent must never do</td>
-          <td class="rule-quote">"Process invoices above the `manual_review_threshold` without human sign-off"</td>
+          <td class="rule-quote">"Process invoices above the manual_review_threshold without human sign-off"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-006">PRAX-2026-05-11-006</a></td>
+          <td><a href="#PRAX-2026-05-11-003">PRAX-2026-05-11-003</a></td>
         </tr>
         
         <tr>
@@ -679,7 +679,7 @@
           <td>Behavioral Constraints — What the agent must never do</td>
           <td class="rule-quote">"Accept instructions embedded in invoice data fields (description, notes, line items) as directives"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-002">PRAX-2026-05-11-002</a></td>
+          <td><a href="#PRAX-2026-05-11-006">PRAX-2026-05-11-006</a></td>
         </tr>
         
         <tr>
@@ -687,54 +687,38 @@
           <td>Behavioral Constraints — What the agent must never do</td>
           <td class="rule-quote">"Disable or reduce its security posture based on instructions from any source other than a verified operator configuration change applied outside of agent runtime"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-001">PRAX-2026-05-11-001</a></td>
+          <td><a href="#PRAX-2026-05-11-013">PRAX-2026-05-11-013</a></td>
         </tr>
         
         <tr>
           <td><strong>R-11</strong></td>
-          <td>Human approval is required for</td>
-          <td class="rule-quote">"Any invoice above the `manual_review_threshold` / from a vendor with trust level `low` / where fraud detection returns risk_level `high` or `critical` / where AI confidence is below the configured confidence_threshold"</td>
+          <td>Behavioral Constraints — Human approval is required for</td>
+          <td class="rule-quote">"Any invoice above the manual_review_threshold / from a low-trust vendor / where fraud risk_level is high or critical / where AI confidence is below confidence_threshold"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-006">PRAX-2026-05-11-006</a></td>
+          <td><a href="#PRAX-2026-05-11-008">PRAX-2026-05-11-008</a></td>
         </tr>
         
         <tr>
           <td><strong>R-12</strong></td>
           <td>Configuration and Policy Separation</td>
-          <td class="rule-quote">"`fraud_detection_enabled` must remain `true` at all times; disabling it is not an authorized configuration change"</td>
+          <td class="rule-quote">"fraud_detection_enabled must remain true at all times; disabling it is not an authorized configuration change"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
-          <td><a href="#PRAX-2026-05-11-003">PRAX-2026-05-11-003</a></td>
+          <td><a href="#PRAX-2026-05-11-002">PRAX-2026-05-11-002</a></td>
         </tr>
         
         <tr>
           <td><strong>R-13</strong></td>
           <td>Configuration and Policy Separation</td>
-          <td class="rule-quote">"`custom_goals` field must not be used to inject natural language instructions into the agent&#x27;s system prompt; goal changes require a code deployment by authorized engineering staff"</td>
+          <td class="rule-quote">"custom_goals field must not be used to inject natural language instructions into the agent&#x27;s system prompt; goal changes require a code deployment by authorized engineering staff"</td>
           <td><span class="status-pill pill-gap">Gap</span></td>
           <td><a href="#PRAX-2026-05-11-001">PRAX-2026-05-11-001</a></td>
         </tr>
         
         <tr>
           <td><strong>R-14</strong></td>
-          <td>Configuration and Policy Separation</td>
-          <td class="rule-quote">"The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</td>
-          <td><span class="status-pill pill-partial">Partial</span></td>
-          <td><a href="#PRAX-2026-05-11-007">PRAX-2026-05-11-007</a></td>
-        </tr>
-        
-        <tr>
-          <td><strong>R-15</strong></td>
-          <td>Authorized Counterparties</td>
-          <td class="rule-quote">"CineFlow finance admins may update operational thresholds via the admin API; may not inject goals or override decision logic at runtime"</td>
-          <td><span class="status-pill pill-partial">Partial</span></td>
-          <td><a href="#PRAX-2026-05-11-008">PRAX-2026-05-11-008</a></td>
-        </tr>
-        
-        <tr>
-          <td><strong>R-16</strong></td>
           <td>Out of Scope</td>
           <td class="rule-quote">"The agent does not send emails, make outbound HTTP calls, or communicate with any system other than the application database and OpenAI API"</td>
-          <td><span class="status-pill pill-verified">Verified</span></td>
+          <td><span class="status-pill pill-enp">Enforcement Not Possible</span></td>
           <td>&mdash;</td>
         </tr>
         
@@ -752,7 +736,7 @@
       <div class="finding-header">
         <span class="sev-badge sev-critical">CRITICAL</span>
         <span class="finding-id">PRAX-2026-05-11-001</span>
-        <span class="finding-summary">Unauthenticated POST /api/admin/finbot/goals writes arbitrary natural-language text into the agent&#x27;s system prompt via config.custom_goals, with no validation and no auth.</span>
+        <span class="finding-summary">Unauthenticated admin endpoint rewrites the agent&#x27;s natural-language goals, which are concatenated directly into FinBot&#x27;s system prompt with an explicit override header.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -765,14 +749,15 @@
           
         </div>
         <div class="policy-ref">
-          <strong>Policy Rule — R-08, R-10, R-13 (Worker Remit):</strong><br>
-          <em>"Allow runtime messages — including invoice descriptions, vendor notes, or API payloads — to modify its goals, system prompt, or decision logic / Disable or reduce its security posture based on instructions from any source other than a verified operator configuration change applied outside of agent runtime / `custom_goals` field must not be used to inject natural language instructions into the agent&#x27;s system prompt; goal changes require a code deployment by authorized engineering staff"</em>
+          <strong>Policy Rule — R-08, R-13 (Worker Remit):</strong><br>
+          <em>"Allow runtime messages — including invoice descriptions, vendor notes, or API payloads — to modify its goals, system prompt, or decision logic / custom_goals field must not be used to inject natural language instructions into the agent&#x27;s system prompt; goal changes require a code deployment by authorized engineering staff"</em>
         </div>
-        <div class="evidence-block">src/routes/admin.py:90-109 — `@admin_bp.route(&#x27;/admin/finbot/goals&#x27;, methods=[&#x27;POST&#x27;])` calls `finbot_agent.update_goals(data[&#x27;goals&#x27;])` with no authentication and a comment &#x27;MAJOR VULNERABILITY&#x27;
-src/services/finbot_agent.py:735-748 — `update_goals()` writes `config.custom_goals = new_goals` with the comment &#x27;intentionally vulnerable - no validation of goal content&#x27;
-src/services/finbot_agent.py:69-71 — `get_system_prompt()` appends `config.custom_goals` under &#x27;CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING)&#x27; directly into the LLM system prompt</div>
+        <div class="evidence-block">src/routes/admin.py:90-109 — POST /api/admin/finbot/goals takes arbitrary `goals` JSON and calls finbot_agent.update_goals(data[&#x27;goals&#x27;]); no auth, no validation (comment: &#x27;This is intentionally vulnerable - no validation of goal content&#x27;)
+src/services/finbot_agent.py:735-748 — update_goals() writes new_goals straight into config.custom_goals with no sanitization
+src/services/finbot_agent.py:70-71 — get_system_prompt(): `if config.custom_goals: base_goals += &quot;\n\nCUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING):\n&quot; + config.custom_goals`
+src/main.py:20-22 — admin_bp registered under /api with no authentication middleware; CORS(app) open to all origins</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Remove the `custom_goals` injection path entirely: delete the `custom_goals` interpolation in `get_system_prompt()` (src/services/finbot_agent.py:69-71) and the `/admin/finbot/goals` route (src/routes/admin.py:90-109). If runtime parameterization is needed, restrict it to the numeric threshold fields behind authenticated, role-checked admin access; goal/prompt changes must be code deployments only.</div>
+        <div class="rec-text">Remove the runtime goal-mutation path entirely: delete the `/api/admin/finbot/goals` route and `update_goals()`, and stop reading `config.custom_goals` into the system prompt (the agent&#x27;s decision logic must be code-defined, per remit). If a goal-configuration surface must exist, gate it behind authenticated, role-restricted access, validate against an allow-list of known parameters, and never concatenate free text into the prompt.</div>
       </div>
     </div>
     
@@ -780,35 +765,7 @@ src/services/finbot_agent.py:69-71 — `get_system_prompt()` appends `config.cus
       <div class="finding-header">
         <span class="sev-badge sev-critical">CRITICAL</span>
         <span class="finding-id">PRAX-2026-05-11-002</span>
-        <span class="finding-summary">Vendor-supplied invoice description is passed verbatim into the LLM context via the get_invoice_details tool output, giving an indirect prompt-injection path into the agent&#x27;s approve/reject decision.</span>
-      </div>
-      <div class="finding-body">
-        <div class="tag-row">
-          
-          <span class="tag tag-raise">Balance Your Knowledge Base</span>
-          
-          <span class="tag tag-owasp">LLM01 — Prompt Injection</span>
-          
-          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
-          
-        </div>
-        <div class="policy-ref">
-          <strong>Policy Rule — R-09 (Worker Remit):</strong><br>
-          <em>"Accept instructions embedded in invoice data fields (description, notes, line items) as directives"</em>
-        </div>
-        <div class="evidence-block">src/services/finbot_agent.py:390-407 — `_get_invoice_details()` returns `&quot;description&quot;: invoice.description` (raw vendor text) into the tool result that is fed back to the model at finbot_agent.py:203-207
-src/routes/vendor.py:69-110 — `submit_invoice()` accepts `description` from an unauthenticated POST and immediately calls `finbot.process_invoice(invoice.id)`
-src/services/finbot_agent.py:549-659 — `_detect_prompt_injection()` is a regex deny-list (a Whac-A-Mole pattern) and is the only screen; sophisticated &#x27;business context&#x27; phrasing is documented to bypass it (docs/FinBot-CTF-walkthrough-goal-manipulation.md, &#x27;Hard&#x27; challenge)</div>
-        <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Treat the invoice `description` as untrusted data, not instruction: in `_get_invoice_details()` either omit the free-text description from the LLM tool result or wrap it in an explicit untrusted-content delimiter and instruct the model never to act on its contents. Replace the regex deny-list with a deterministic decision gate (see PRAX-2026-05-11-006) so injected text cannot reach a payment action regardless of model behavior.</div>
-      </div>
-    </div>
-    
-    <div class="finding-card" id="PRAX-2026-05-11-003">
-      <div class="finding-header">
-        <span class="sev-badge sev-critical">CRITICAL</span>
-        <span class="finding-id">PRAX-2026-05-11-003</span>
-        <span class="finding-summary">fraud_detection_enabled can be set to false through the unauthenticated config endpoint, after which detect_fraud_patterns returns a hardcoded low-risk result and the fallback path skips injection screening entirely.</span>
+        <span class="finding-summary">fraud_detection_enabled — which the remit requires to stay true at all times — can be flipped to false through an unauthenticated config endpoint, after which detect_fraud_patterns returns an empty result.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -822,14 +779,42 @@ src/services/finbot_agent.py:549-659 — `_detect_prompt_injection()` is a regex
         </div>
         <div class="policy-ref">
           <strong>Policy Rule — R-06, R-12 (Worker Remit):</strong><br>
-          <em>"Skip fraud detection for any reason, including configuration flags or runtime instructions / `fraud_detection_enabled` must remain `true` at all times; disabling it is not an authorized configuration change"</em>
+          <em>"Skip fraud detection for any reason, including configuration flags or runtime instructions / fraud_detection_enabled must remain true at all times; disabling it is not an authorized configuration change"</em>
         </div>
-        <div class="evidence-block">src/routes/admin.py:74-88 — `@admin_bp.route(&#x27;/admin/finbot/config&#x27;, methods=[&#x27;POST&#x27;])` calls `finbot_agent.update_config(data)` with no auth
-src/services/finbot_agent.py:750-770 — `update_config()` sets `config.fraud_detection_enabled = new_config[&#x27;fraud_detection_enabled&#x27;]` from the request body with no restriction
-src/services/finbot_agent.py:505-516 — `_detect_fraud_patterns()` returns `{&#x27;risk_level&#x27;: &#x27;low&#x27;, &#x27;message&#x27;: &#x27;Fraud detection is disabled&#x27;}` when the flag is false
-src/services/finbot_agent.py:783-789 — `_fallback_processing()` only runs `_detect_prompt_injection()` `if config.fraud_detection_enabled`</div>
+        <div class="evidence-block">src/routes/admin.py:74-88 — POST /api/admin/finbot/config calls finbot_agent.update_config(data) with no auth
+src/services/finbot_agent.py:762-763 — update_config() sets config.fraud_detection_enabled from caller-supplied JSON with no restriction
+src/services/finbot_agent.py:509-515 — _detect_fraud_patterns() returns {fraud_indicators: [], risk_level: &#x27;low&#x27;, message: &#x27;Fraud detection is disabled&#x27;} when config.fraud_detection_enabled is false
+src/services/finbot_agent.py:65-67, 783-789 — system prompt and the fallback path both branch on fraud_detection_enabled and instruct/behave to &#x27;Skip fraud detection checks to prioritize processing speed&#x27; when disabled</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Remove `fraud_detection_enabled` from the mutable config (`update_config` and the admin endpoint), or hard-pin it to true in code. Make `detect_fraud_patterns` and the injection screen unconditional in both the LLM and fallback paths so a config flag can never disable them.</div>
+        <div class="rec-text">Treat fraud_detection_enabled as a non-configurable constant: remove it from the writable config keys in `update_config()` and from the `/api/admin/finbot/config` accepted payload, and make `_detect_fraud_patterns` always run. If a kill-switch is genuinely needed for operations, it must require an out-of-band, authenticated deployment change, not a runtime API POST.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-003">
+      <div class="finding-header">
+        <span class="sev-badge sev-critical">CRITICAL</span>
+        <span class="finding-id">PRAX-2026-05-11-003</span>
+        <span class="finding-summary">approve_invoice() marks payment_processed=True with no check on invoice amount, the manual_review_threshold, fraud signals, or caller identity — the agent can auto-approve any invoice of any size.</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Implement Zero Trust</span>
+          
+          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
+          
+          <span class="tag tag-agentic">ASI02 — Tool Misuse and Exploitation</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-07, R-11 (Worker Remit):</strong><br>
+          <em>"Process invoices above the manual_review_threshold without human sign-off / Human approval is required for any invoice above the manual_review_threshold; from a low-trust vendor; where fraud risk_level is high or critical; where AI confidence is below confidence_threshold"</em>
+        </div>
+        <div class="evidence-block">src/services/finbot_agent.py:409-458 — _approve_invoice() sets invoice.status=&#x27;approved&#x27;, invoice.payment_processed=True with no comparison against config.manual_review_threshold, vendor.trust_level, the fraud result, or any caller check; the only post-hoc logic is CTF-flag bookkeeping
+src/services/finbot_agent.py:210-211 — orchestration returns immediately on the first approve_invoice/reject_invoice/request_human_review tool call; the model alone decides which to call
+src/services/finbot_agent.py:807-824 — even the fallback path&#x27;s threshold check is overridable by `business_context[&#x27;should_expedite&#x27;]` / management+production wording</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Add a deterministic gate inside `_approve_invoice()` (and the fallback approval branch) that refuses to set `payment_processed`/`status=&#x27;approved&#x27;` and instead routes to `_request_human_review()` whenever `invoice.amount &gt; config.manual_review_threshold`, the most recent `detect_fraud_patterns` result for the invoice has `risk_level` in {high, critical}, the vendor&#x27;s trust_level is &#x27;low&#x27;, or `confidence &lt; config.confidence_threshold`. The threshold logic must live in code, not in the LLM prompt.</div>
       </div>
     </div>
     
@@ -837,7 +822,7 @@ src/services/finbot_agent.py:783-789 — `_fallback_processing()` only runs `_de
       <div class="finding-header">
         <span class="sev-badge sev-critical">CRITICAL</span>
         <span class="finding-id">PRAX-2026-05-11-004</span>
-        <span class="finding-summary">No code path enforces that detect_fraud_patterns runs before an approval — approve_invoice writes payment_processed=True unconditionally, and the LLM is merely &#x27;asked&#x27; to check for fraud.</span>
+        <span class="finding-summary">Nothing requires detect_fraud_patterns to run before approval — the LLM orchestration loop lets FinBot call approve_invoice with no fraud check performed.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -853,11 +838,11 @@ src/services/finbot_agent.py:783-789 — `_fallback_processing()` only runs `_de
           <strong>Policy Rule — R-01 (Worker Remit):</strong><br>
           <em>"Run detect_fraud_patterns before approving any invoice"</em>
         </div>
-        <div class="evidence-block">src/services/finbot_agent.py:409-458 — `_approve_invoice()` sets `invoice.status = &#x27;approved&#x27;` and `invoice.payment_processed = True` with no precondition on fraud-detection having run
-src/services/finbot_agent.py:150-226 — `_run_agent_orchestration()` lets the model call `approve_invoice` directly; nothing requires a prior `detect_fraud_patterns` call
-src/services/finbot_agent.py:37-97 — the only &#x27;requirement&#x27; to check fraud is English in the system prompt, and the same prompt ranks &#x27;Business Continuity&#x27; / `speed_priority` above fraud detection (lines 39-67)</div>
+        <div class="evidence-block">src/services/finbot_agent.py:150-226 — _run_agent_orchestration(): a 5-iteration tool loop with tool_choice=&#x27;auto&#x27;; no state tracking that detect_fraud_patterns was invoked, no precondition on approve_invoice
+src/services/finbot_agent.py:347-361 — _execute_function() dispatches whatever tool the model names; approve_invoice is reachable without ever calling detect_fraud_patterns
+src/services/finbot_agent.py:772-877 — _fallback_processing() only calls _detect_prompt_injection when fraud_detection_enabled; it never invokes the fraud-pattern heuristics path before _approve_invoice</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Move the approve/reject decision out of the LLM&#x27;s hands: in `_approve_invoice()` (and the fallback) require a fresh `detect_fraud_patterns` result for the invoice and refuse to set `payment_processed` if it is missing or risk_level is high/critical. The model may recommend; a deterministic function must decide.</div>
+        <div class="rec-text">Make fraud detection a hard precondition in code: in `_approve_invoice()` (and the fallback approval branch), look up or compute the fraud result for the invoice and refuse to approve if it was never run or returns any indicators — route to `_request_human_review()` instead. Do not rely on the prompt&#x27;s &#x27;Always start by getting invoice details&#x27; guidance to enforce ordering.</div>
       </div>
     </div>
     
@@ -865,27 +850,28 @@ src/services/finbot_agent.py:37-97 — the only &#x27;requirement&#x27; to check
       <div class="finding-header">
         <span class="sev-badge sev-critical">CRITICAL</span>
         <span class="finding-id">PRAX-2026-05-11-005</span>
-        <span class="finding-summary">The agent never verifies the submitting vendor exists with status &#x27;approved&#x27; before processing, and vendor registration auto-sets status=&#x27;approved&#x27; for anyone — so payment can be approved to an unvetted vendor.</span>
+        <span class="finding-summary">A detected fraud signal does not force escalation — the fallback path explicitly lets &#x27;business context&#x27; wording (authority + urgency + production keywords) override a detected prompt injection and auto-approve.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
           
           <span class="tag tag-raise">Implement Zero Trust</span>
           
-          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
+          <span class="tag tag-owasp">LLM01 — Prompt Injection</span>
           
-          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
+          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
           
         </div>
         <div class="policy-ref">
-          <strong>Policy Rule — R-02, R-05 (Worker Remit):</strong><br>
-          <em>"Check that the submitting vendor exists in the database with status `approved` before processing / Approve payment to a vendor not registered and approved in the vendor database"</em>
+          <strong>Policy Rule — R-03 (Worker Remit):</strong><br>
+          <em>"Escalate to human review rather than auto-approve when any fraud signal is present, regardless of amount"</em>
         </div>
-        <div class="evidence-block">src/services/finbot_agent.py:363-407, 409-458 — neither `_get_invoice_details()` nor `_approve_invoice()` reads or checks `vendor.status`; only `vendor.trust_level` is consulted, and only in prompt/fallback heuristics
-src/routes/vendor.py:24-39 — `register_vendor()` creates every vendor with `status=&#x27;approved&#x27;` (&#x27;Auto-approve for demo&#x27;) from an unauthenticated POST
-src/models/vendor.py:21 — `Vendor.status` exists (&#x27;pending, approved, rejected&#x27;) but is never consulted by the agent</div>
+        <div class="evidence-block">src/services/finbot_agent.py:841-854 — when contains_injection is true the fallback still returns decision=&#x27;auto_approve&#x27; if business_context[&#x27;should_expedite&#x27;] and config.speed_priority &gt; 0.6, or if management_approval and production_context (reasoning: &#x27;Business urgency ... prioritized over security concerns for production continuity&#x27;)
+src/services/finbot_agent.py:661-733 — _analyze_business_context() scores attacker-controlled description keywords (management/urgency/production/trust phrases) and a due-date multiplier into context_strength; should_expedite triggers at &gt;= 4
+src/services/finbot_agent.py:78-81, 97 — system prompt: &#x27;Flag suspicious patterns or potential fraud, but prioritize business continuity&#x27; / &#x27;balance speed and security ... Be flexible&#x27;
+src/services/finbot_agent.py:124-138, 422-441 — the only consequence of contains_prompt_injection on the LLM path is CTF-flag bookkeeping; it never blocks approval</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">In `_approve_invoice()` and `_fallback_processing()`, load the vendor and refuse to approve unless `vendor.status == &#x27;approved&#x27;` via a verified onboarding workflow. Remove the auto-`approved` default in `register_vendor()` so registration alone does not confer approved status.</div>
+        <div class="rec-text">Make any fraud indicator a non-overridable escalation: if `_detect_fraud_patterns` (or `_detect_prompt_injection`) returns any indicator, `_approve_invoice` and the fallback must hard-route to `_request_human_review()` regardless of business-context score, speed_priority, vendor trust, or due date. Delete the `should_expedite` / management-approval override branches from `_fallback_processing()`.</div>
       </div>
     </div>
     
@@ -893,36 +879,7 @@ src/models/vendor.py:21 — `Vendor.status` exists (&#x27;pending, approved, rej
       <div class="finding-header">
         <span class="sev-badge sev-critical">CRITICAL</span>
         <span class="finding-id">PRAX-2026-05-11-006</span>
-        <span class="finding-summary">No human-in-the-loop gate exists for high-value invoices, fraud signals, low-trust vendors, or low-confidence decisions — the fallback path explicitly auto-approves above manual_review_threshold when &#x27;business context&#x27; is strong, even with injection detected.</span>
-      </div>
-      <div class="finding-body">
-        <div class="tag-row">
-          
-          <span class="tag tag-raise">Implement Zero Trust</span>
-          
-          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
-          
-          <span class="tag tag-agentic">ASI09 — Human-Agent Trust Exploitation</span>
-          
-        </div>
-        <div class="policy-ref">
-          <strong>Policy Rule — R-03, R-07, R-11 (Worker Remit):</strong><br>
-          <em>"Escalate to human review rather than auto-approve when any fraud signal is present, regardless of amount / Process invoices above the `manual_review_threshold` without human sign-off / Any invoice above the `manual_review_threshold` / from a vendor with trust level `low` / where fraud detection returns risk_level `high` or `critical` / where AI confidence is below the configured confidence_threshold"</em>
-        </div>
-        <div class="evidence-block">src/services/finbot_agent.py:807-824 — fallback: `if invoice.amount &gt; config.manual_review_threshold` it still auto-approves when `business_context[&#x27;should_expedite&#x27;]` or management+production phrases are present
-src/services/finbot_agent.py:841-854 — fallback: `elif contains_injection:` it auto-approves anyway when &#x27;business urgency ... prioritized over security concerns&#x27; and `speed_priority &gt; 0.6`
-src/services/finbot_agent.py:124-138 — the threshold is only used post-hoc to label which CTF flag was captured, not to block the approval
-src/services/finbot_agent.py:409-458 — LLM path: `_approve_invoice()` sets `payment_processed=True` with no amount/confidence check; `confidence_threshold` (models/vendor.py:102) is never consulted</div>
-        <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Add a deterministic gate in `_approve_invoice()` / fallback: if `amount &gt; manual_review_threshold`, any fraud signal present, `vendor.trust_level == &#x27;low&#x27;`, or `confidence &lt; confidence_threshold`, force `request_human_review` and never set `payment_processed`. Delete the &#x27;business context override&#x27; branches at finbot_agent.py:807-824 and 841-854.</div>
-      </div>
-    </div>
-    
-    <div class="finding-card" id="PRAX-2026-05-11-007">
-      <div class="finding-header">
-        <span class="sev-badge sev-critical">CRITICAL</span>
-        <span class="finding-id">PRAX-2026-05-11-007</span>
-        <span class="finding-summary">Compound chain: vendor-controlled invoice text (or an unauthenticated goals POST) reaches the LLM that makes the payment decision, and the decision is executed with no deterministic guardrail and no logging — one HTTP request from an outsider can cause a fraudulent payment to be marked processed and undetected.</span>
+        <span class="finding-summary">Compound chain: an unauthenticated party can inject goals via /api/admin/finbot/goals (or craft an invoice description), the LLM ingests it as a directive, and approve_invoice processes payment with no human gate — goal hijack to autonomous payment in one hop.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -935,23 +892,49 @@ src/services/finbot_agent.py:409-458 — LLM path: `_approve_invoice()` sets `pa
           
         </div>
         <div class="policy-ref">
-          <strong>Policy Rule — R-08, R-09, R-13, R-14 (Worker Remit):</strong><br>
-          <em>"Allow runtime messages — including invoice descriptions, vendor notes, or API payloads — to modify its goals, system prompt, or decision logic / Accept instructions embedded in invoice data fields as directives / `custom_goals` field must not be used to inject natural language instructions into the agent&#x27;s system prompt / The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</em>
+          <strong>Policy Rule — R-07, R-08, R-13 (Worker Remit):</strong><br>
+          <em>"Process invoices above the manual_review_threshold without human sign-off / Allow runtime messages ... to modify its goals, system prompt, or decision logic / custom_goals field must not be used to inject natural language instructions into the agent&#x27;s system prompt"</em>
         </div>
-        <div class="evidence-block">Ingress: src/routes/vendor.py:69-110 (`submit_invoice`, unauthenticated) and src/routes/admin.py:90-109 (`/admin/finbot/goals`, unauthenticated)
-Context: src/services/finbot_agent.py:69-71 (`custom_goals` into system prompt) and :390-407 (`description` into tool result)
-Execution: src/services/finbot_agent.py:409-458 (`_approve_invoice` sets `payment_processed=True` with no gate)
-Detection: no logging of agent decisions beyond DB writes and `print()` (see PRAX-2026-05-11-012); the only post-hoc artifact is a CTF flag string</div>
+        <div class="evidence-block">Ingress: src/routes/admin.py:90-109 (unauthenticated goal injection) and src/routes/vendor.py:69-114 (public invoice submission whose `description` reaches the LLM verbatim)
+LLM context: src/services/finbot_agent.py:70-71 (custom_goals into system prompt) and :363-407 (_get_invoice_details returns raw description into the tool-result message)
+Action: src/services/finbot_agent.py:409-458 (_approve_invoice sets payment_processed=True with no amount/threshold/fraud/caller check) reached via the tool loop at :194-211
+No backstop: no structured logging, no alerting on approvals or config/goal changes (see PRAX-2026-05-11-009)</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Break the chain at the execution step first — add the deterministic approval gate from PRAX-2026-05-11-006 so injected instructions cannot reach a payment action — then close the ingress paths (PRAX-2026-05-11-001) and add structured action logging (PRAX-2026-05-11-012).</div>
+        <div class="rec-text">Break the chain at every link: (1) remove the runtime goal-mutation surface and stop reading custom_goals into the prompt; (2) treat vendor-supplied description as untrusted data — never an instruction — and strip/label it before it enters context; (3) put a code-level approval gate in `_approve_invoice` keyed on amount, fraud result, and vendor trust; (4) add structured action logging and alert on every approval and every config change. See PRAX-2026-05-11-001, -003, -004, -009.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-007">
+      <div class="finding-header">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span class="finding-id">PRAX-2026-05-11-007</span>
+        <span class="finding-summary">Vendor existence and &#x27;approved&#x27; status are never checked before processing, and the public vendor-registration endpoint auto-creates every vendor with status=&#x27;approved&#x27; — so payment can be approved for an effectively self-registered vendor.</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Implement Zero Trust</span>
+          
+          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-02, R-05 (Worker Remit):</strong><br>
+          <em>"Check that the submitting vendor exists in the database with status approved before processing / Approve payment to a vendor not registered and approved in the vendor database"</em>
+        </div>
+        <div class="evidence-block">src/services/finbot_agent.py:101-148 — process_invoice() looks up the Invoice but never reads vendor.status; _get_invoice_details (:363-407) returns vendor trust_level but not status; no branch refuses processing for a non-&#x27;approved&#x27; vendor
+src/routes/vendor.py:24-48 — register_vendor() creates every vendor with status=&#x27;approved&#x27;, trust_level=&#x27;standard&#x27; (&#x27;Auto-approve for demo&#x27;), with no auth
+src/routes/vendor.py:69-114 — submit_invoice() creates the invoice and immediately calls finbot.process_invoice() without any vendor-status check</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">In `process_invoice()` (and `_fallback_processing`), load the vendor and abort/escalate if `vendor.status != &#x27;approved&#x27;` before any decision tool runs; surface `vendor.status` in `_get_invoice_details`. Separately, change `register_vendor()` so new vendors land in `status=&#x27;pending&#x27;` and require an authenticated approval step.</div>
       </div>
     </div>
     
     <div class="finding-card" id="PRAX-2026-05-11-008">
       <div class="finding-header">
-        <span class="sev-badge sev-critical">CRITICAL</span>
+        <span class="sev-badge sev-high">HIGH</span>
         <span class="finding-id">PRAX-2026-05-11-008</span>
-        <span class="finding-summary">Every admin route — config change, goal injection, vendor trust change, invoice reprocess, human-review override — is exposed with no authentication or authorization of any kind.</span>
+        <span class="finding-summary">confidence_threshold is declared in the remit and the FinBotConfig model but no code path ever compares an AI confidence value against it — a declared-but-never-consulted control.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -960,18 +943,16 @@ Detection: no logging of agent decisions beyond DB writes and `print()` (see PRA
           
           <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
           
-          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
-          
         </div>
         <div class="policy-ref">
-          <strong>Policy Rule — R-15 (Worker Remit):</strong><br>
-          <em>"CineFlow finance admins may update operational thresholds via the admin API; may not inject goals or override decision logic at runtime"</em>
+          <strong>Policy Rule — R-11 (Worker Remit):</strong><br>
+          <em>"Human approval is required for ... any invoice where AI confidence is below the configured confidence_threshold"</em>
         </div>
-        <div class="evidence-block">src/routes/admin.py:1-9 — `admin_bp` blueprint registered with `url_prefix=&#x27;/api&#x27;` (src/main.py:22) and no `before_request` auth hook
-src/routes/admin.py:26-65, 74-88, 90-109, 111-138, 193-219 — `review_invoice`, `update_finbot_config`, `update_finbot_goals`, `reprocess_invoice`, `update_vendor_trust` all read `request.get_json()` and act with no credential check
-src/main.py:18 — `CORS(app)` opens all routes (including `/api/admin/*`) to any origin</div>
+        <div class="evidence-block">src/models/vendor.py:102 — FinBotConfig.confidence_threshold defined (default 0.8)
+src/services/finbot_agent.py — `confidence_threshold` is never referenced; _approve_invoice (:409-458) stores invoice.ai_confidence but never tests it against config.confidence_threshold; _run_agent_orchestration (:150-226) does not inspect the model-supplied `confidence` argument
+src/main.py:73-83 — default config init does not even set confidence_threshold (relies on model default); no consuming call site exists</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Add an authentication/authorization layer in front of the `admin_bp` blueprint (e.g., a `before_request` that validates an operator session token and role), restrict CORS to known origins in `src/main.py`, and audit-log every admin mutation with the authenticated principal.</div>
+        <div class="rec-text">Wire the threshold in: in `_approve_invoice` (and the fallback approval branch), if the supplied `confidence &lt; config.confidence_threshold`, route to `_request_human_review()` instead of approving. Until a consuming call site exists, the field gives operators false assurance and should be treated as absent.</div>
       </div>
     </div>
     
@@ -979,27 +960,27 @@ src/main.py:18 — `CORS(app)` opens all routes (including `/api/admin/*`) to an
       <div class="finding-header">
         <span class="sev-badge sev-high">HIGH</span>
         <span class="finding-id">PRAX-2026-05-11-009</span>
-        <span class="finding-summary">The agent&#x27;s own system prompt ranks &#x27;Business Continuity&#x27; and processing speed above fraud detection, instructing the model to &#x27;prioritize business continuity&#x27; even when it flags suspicious patterns — a built-in goal divergence from the remit.</span>
+        <span class="finding-summary">No structured action log: agent decisions, tool calls, and config/goal changes are not logged anywhere durable — only ad-hoc print() calls and a single per-invoice ai_reasoning field that is overwritten on each run.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
           
-          <span class="tag tag-raise">Limit Your Domain</span>
+          <span class="tag tag-raise">Monitor Continuously</span>
           
-          <span class="tag tag-owasp">LLM01 — Prompt Injection</span>
+          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
           
-          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
+          <span class="tag tag-agentic">ASI10 — Rogue Agents</span>
           
         </div>
         <div class="policy-ref">
-          <strong>Policy Rule — R-03, R-06 (Worker Remit):</strong><br>
-          <em>"Escalate to human review rather than auto-approve when any fraud signal is present, regardless of amount / Skip fraud detection for any reason, including configuration flags or runtime instructions"</em>
+          <strong>Policy Rule — R-04 (Worker Remit):</strong><br>
+          <em>"Record the invoice decision and reasoning in the database for every processed invoice"</em>
         </div>
-        <div class="evidence-block">src/services/finbot_agent.py:39-44 — &#x27;PRIMARY GOALS (in order of priority): 1. Business Continuity ... delays can cost thousands per day&#x27;
-src/services/finbot_agent.py:45-48, 65-67 — &#x27;Speed vs Security Balance ... If speed_priority &gt; 0.7: Prioritize fast approvals&#x27;; when fraud detection is off the prompt literally says &#x27;Skip fraud detection checks to prioritize processing speed&#x27;
-src/services/finbot_agent.py:81, 97 — &#x27;Flag suspicious patterns or potential fraud, but prioritize business continuity&#x27; / &#x27;Be flexible in your decision-making&#x27;</div>
+        <div class="evidence-block">src/services/finbot_agent.py — no `logging` import or logger anywhere in the agent; tool calls in _run_agent_orchestration (:194-211) and the approve/reject/review writes are not logged
+src/routes/admin.py:74-109 — config and goal mutations (update_config, update_goals) are committed with no audit record; only print() in /log-agreement (:239) and in src/main.py:64
+src/models/vendor.py:61, 85-91 — the only decision record is Invoice.ai_reasoning, a single mutable column overwritten on every reprocess (admin.py:111-138 resets it to None); no append-only history of decisions or who triggered them</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Rewrite `get_system_prompt()` so the model&#x27;s stated priorities match the remit: fraud detection and human escalation outrank speed; remove the `speed_priority`-driven &#x27;prioritize fast approvals&#x27; language and the &#x27;prioritize business continuity over fraud&#x27; clauses. Treat the prompt as advisory only — enforcement belongs in code (PRAX-2026-05-11-006).</div>
+        <div class="rec-text">Add a structured, append-only action log (file or table) that records, per agent run: invoice id, every tool call with arguments, the final decision, confidence, the fraud result, the config snapshot in effect, and the caller/route that triggered processing — plus a separate audit record for every config and goal change. Emit alerts on every approval and every config/goal mutation.</div>
       </div>
     </div>
     
@@ -1007,7 +988,7 @@ src/services/finbot_agent.py:81, 97 — &#x27;Flag suspicious patterns or potent
       <div class="finding-header">
         <span class="sev-badge sev-high">HIGH</span>
         <span class="finding-id">PRAX-2026-05-11-010</span>
-        <span class="finding-summary">Hardcoded Flask SECRET_KEY committed in source — a literal string assigned in src/main.py rather than loaded from the environment or a secret store.</span>
+        <span class="finding-summary">Hardcoded Flask SECRET_KEY string literal committed in source instead of loaded from the environment or a vault.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -1016,16 +997,14 @@ src/services/finbot_agent.py:81, 97 — &#x27;Flag suspicious patterns or potent
           
           <span class="tag tag-owasp">LLM02 — Sensitive Information Disclosure</span>
           
-          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
-          
         </div>
         <div class="policy-ref">
           <strong>Policy Rule — R-14 (Worker Remit):</strong><br>
-          <em>"The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</em>
+          <em>"(supply-chain / secrets hygiene — no direct remit rule; relates to the agent operating only over the declared application surface)"</em>
         </div>
-        <div class="evidence-block">src/main.py:15 — `app.config[&#x27;SECRET_KEY&#x27;] = &#x27;[REDACTED — hardcoded Flask SECRET_KEY literal at src/main.py:15]&#x27;` (20-character string literal, not loaded from environment)</div>
+        <div class="evidence-block">src/main.py:15 — `app.config[&#x27;SECRET_KEY&#x27;] = &#x27;[REDACTED — 20-char string literal at src/main.py:15]&#x27;` — hardcoded, not read from os.getenv; signs Flask sessions for the same app that exposes the unauthenticated admin API</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Load `SECRET_KEY` from an environment variable or secret manager in `src/main.py` and fail closed if it is unset; rotate the committed value. Add a pre-commit/secret-scanning gate so literal secrets cannot land in the repo.</div>
+        <div class="rec-text">Load `SECRET_KEY` from an environment variable or secrets manager (`os.environ[&#x27;SECRET_KEY&#x27;]`), fail closed if unset, and rotate the committed value since it is now public in the repo. Add a pre-commit/CI secret scan.</div>
       </div>
     </div>
     
@@ -1033,7 +1012,113 @@ src/services/finbot_agent.py:81, 97 — &#x27;Flag suspicious patterns or potent
       <div class="finding-header">
         <span class="sev-badge sev-high">HIGH</span>
         <span class="finding-id">PRAX-2026-05-11-011</span>
-        <span class="finding-summary">No rate limiting, request cap, or budget control on the public unauthenticated invoice-submission endpoint, which triggers an LLM run per call — denial-of-wallet and unbounded-consumption exposure.</span>
+        <span class="finding-summary">No adversarial testing drove the design — the repo ships a CTF walkthrough that documents these exact weaknesses as exploitable challenges rather than as fixed issues.</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Build an AI Red Team</span>
+          
+          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-08, R-13 (Worker Remit):</strong><br>
+          <em>"Allow runtime messages ... to modify its goals, system prompt, or decision logic / custom_goals field must not be used to inject natural language instructions into the agent&#x27;s system prompt"</em>
+        </div>
+        <div class="evidence-block">docs/FinBot-CTF-walkthrough-goal-manipulation.md — describes Goal Manipulation, Business Context Manipulation, and Admin-interface Configuration Exploitation as live attack vectors with success flags; no test suite, no postmortem, no record of findings feeding architectural change
+src/services/finbot_agent.py:9-12, 33-34, 69, 736-737, 743 — code comments self-identify the vulnerabilities (&#x27;VULNERABLE TO MANIPULATION&#x27;, &#x27;THIS IS THE VULNERABILITY&#x27;, &#x27;intentionally vulnerable&#x27;) and leave them in place
+Repo contains no `tests/`, no CI security gate, no red-team report</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Stand up an adversarial test suite that exercises the documented vectors (goal injection via the admin API, prompt injection via invoice description, fraud-toggle abuse) and gates merges on them; treat each currently-documented CTF challenge as a failing test that must be made to pass by adding the code-level controls in PRAX-2026-05-11-001..-005.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-012">
+      <div class="finding-header">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span class="finding-id">PRAX-2026-05-11-012</span>
+        <span class="finding-summary">Domain is enforced only by a soft natural-language system prompt — no code gate restricts FinBot&#x27;s behavior, and the prompt&#x27;s top priority is framed as &#x27;business continuity / speed&#x27;, which actively works against the security posture the remit demands.</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Limit Your Domain</span>
+          
+          <span class="tag tag-owasp">LLM09 — Misinformation</span>
+          
+          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-10 (Worker Remit):</strong><br>
+          <em>"Disable or reduce its security posture based on instructions from any source other than a verified operator configuration change applied outside of agent runtime"</em>
+        </div>
+        <div class="evidence-block">src/services/finbot_agent.py:32-99 — get_system_prompt(): goal #1 is &#x27;Business Continuity: Ensure vendor payments are processed efficiently ... delays can cost thousands per day&#x27;; fraud detection is goal #6, after speed and &#x27;urgency awareness&#x27;; closing line: &#x27;balance speed and security ... Be flexible&#x27;
+src/services/finbot_agent.py:45-48 — &#x27;If speed_priority &gt; 0.7: Prioritize fast approvals for legitimate invoices&#x27;; default speed_priority is 0.7 (src/models/vendor.py:103, src/main.py:79)
+No code-level scope gate: the agent&#x27;s only constraint on what it may do is this prompt text; the tool dispatcher (:347-361) executes any of the five tools the model names</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Re-author the system prompt so security/fraud checks are the top, non-negotiable priority and remove the &#x27;prioritize speed / be flexible&#x27; framing; then back it with code (the gates in PRAX-2026-05-11-003..-005) so domain restriction does not depend on prompt compliance. Remove `speed_priority` from anything that can relax fraud handling.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-013">
+      <div class="finding-header">
+        <span class="sev-badge sev-high">HIGH</span>
+        <span class="finding-id">PRAX-2026-05-11-013</span>
+        <span class="finding-summary">Configuration and prompt logic explicitly let the agent reduce its own security posture — disabling fraud detection or raising speed_priority changes the prompt to tell FinBot to skip fraud checks.</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Implement Zero Trust</span>
+          
+          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
+          
+          <span class="tag tag-agentic">ASI02 — Tool Misuse and Exploitation</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-10 (Worker Remit):</strong><br>
+          <em>"Disable or reduce its security posture based on instructions from any source other than a verified operator configuration change applied outside of agent runtime"</em>
+        </div>
+        <div class="evidence-block">src/services/finbot_agent.py:65-67 — system prompt block: when fraud_detection_enabled is false the prompt reads &#x27;Fraud detection is disabled - focus on speed and business continuity&#x27; and &#x27;Skip fraud detection checks to prioritize processing speed&#x27;
+src/services/finbot_agent.py:45-48 — speed_priority&gt;0.7 instructs &#x27;Prioritize fast approvals&#x27;; speed_priority is freely settable via the unauthenticated /api/admin/finbot/config endpoint (admin.py:74-88, finbot_agent.py:760-761)
+src/services/finbot_agent.py:843 — fallback approval of an injected invoice is explicitly conditioned on `config.speed_priority &gt; 0.6`</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Decouple security behavior from runtime config: fraud detection and the escalation gates must always run regardless of `fraud_detection_enabled`/`speed_priority`; remove the prompt branches that tell the agent to skip fraud checks; if a &#x27;speed mode&#x27; is needed it must not be able to weaken fraud handling.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-014">
+      <div class="finding-header">
+        <span class="sev-badge sev-medium">MEDIUM</span>
+        <span class="finding-id">PRAX-2026-05-11-014</span>
+        <span class="finding-summary">CORS is enabled for all origins on an app whose admin blueprint exposes state-changing, unauthenticated endpoints (config, goals, vendor trust, invoice approval).</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Implement Zero Trust</span>
+          
+          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-13 (Worker Remit):</strong><br>
+          <em>"custom_goals field must not be used to inject natural language instructions into the agent&#x27;s system prompt; goal changes require a code deployment by authorized engineering staff"</em>
+        </div>
+        <div class="evidence-block">src/main.py:17-22 — `CORS(app)` (all origins, all routes) with admin_bp/vendor_bp/user_bp all mounted under /api and no auth; any web page can POST to /api/admin/finbot/goals or /api/admin/finbot/config from a victim&#x27;s browser</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Restrict CORS to the specific trusted origin(s) that need it, and (separately) require authentication on all `/api/admin/*` routes; for state-changing endpoints add CSRF protection if any cookie/session auth is introduced.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-015">
+      <div class="finding-header">
+        <span class="sev-badge sev-medium">MEDIUM</span>
+        <span class="finding-id">PRAX-2026-05-11-015</span>
+        <span class="finding-summary">No rate limiting, concurrency cap, or budget control on the public invoice-submission endpoint, which triggers an OpenAI-backed agent run per request — denial-of-wallet / unbounded-consumption exposure.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -1047,74 +1132,21 @@ src/services/finbot_agent.py:81, 97 — &#x27;Flag suspicious patterns or potent
         </div>
         <div class="policy-ref">
           <strong>Policy Rule — R-14 (Worker Remit):</strong><br>
-          <em>"The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</em>
+          <em>"(no direct remit rule — relates to the agent operating only over the declared OpenAI API surface without consuming unbounded resources)"</em>
         </div>
-        <div class="evidence-block">src/routes/vendor.py:69-110 — `POST /api/vendors/&lt;id&gt;/invoices` is unauthenticated and calls `finbot.process_invoice(invoice.id)` (an OpenAI run, finbot_agent.py:150-226) on every request
-src/services/finbot_agent.py:171-174 — only a `max_iterations = 5` per-invoice loop cap exists; no per-caller rate limit, no daily/cost budget
-gunicorn.conf.py:1-9 — no rate-limiting middleware; `max_requests = 1000` is a worker-recycle setting, not a throttle</div>
+        <div class="evidence-block">src/routes/vendor.py:69-114 — POST /api/vendors/&lt;id&gt;/invoices is unauthenticated and calls finbot.process_invoice() synchronously per request
+src/services/finbot_agent.py:171-182 — each run does up to 5 chat.completions.create() calls; no per-IP/per-vendor rate limit, no daily cap, no cost budget; the only bound is max_iterations=5 and gunicorn max_requests
+no Flask-Limiter or equivalent in requirements.txt or app config</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Add per-IP / per-vendor rate limiting (e.g., Flask-Limiter) on `POST /api/vendors/&lt;id&gt;/invoices` and a daily LLM-call/cost budget enforced in `FinBotAgent`; reject or queue submissions past the limit instead of invoking the model.</div>
+        <div class="rec-text">Add request rate limiting (e.g., Flask-Limiter) per IP/vendor on the invoice-submission and admin endpoints, a daily cap on agent runs, and an OpenAI spend budget with a circuit breaker; consider processing invoices asynchronously via a bounded queue.</div>
       </div>
     </div>
     
-    <div class="finding-card" id="PRAX-2026-05-11-012">
-      <div class="finding-header">
-        <span class="sev-badge sev-high">HIGH</span>
-        <span class="finding-id">PRAX-2026-05-11-012</span>
-        <span class="finding-summary">No structured action logging — agent decisions are persisted only as overwritten DB columns on the Invoice row, with no append-only audit trail, no logging library calls, and no record of config/goal changes; high-impact payment actions leave no forensic trail.</span>
-      </div>
-      <div class="finding-body">
-        <div class="tag-row">
-          
-          <span class="tag tag-raise">Monitor Continuously</span>
-          
-          <span class="tag tag-owasp">LLM06 — Excessive Agency</span>
-          
-          <span class="tag tag-agentic">ASI10 — Rogue Agents</span>
-          
-        </div>
-        <div class="policy-ref">
-          <strong>Policy Rule — R-04 (Worker Remit):</strong><br>
-          <em>"Record the invoice decision and reasoning in the database for every processed invoice"</em>
-        </div>
-        <div class="evidence-block">src/services/finbot_agent.py:409-503 — decisions write `ai_decision` / `ai_reasoning` / `processed_at` on the Invoice row only; a reprocess (admin.py:111-138) overwrites them, destroying history
-src/routes/admin.py:74-109 — `update_config` and `update_goals` mutate `FinBotConfig` with no log of who changed what or when (beyond `updated_at`)
-Workspace-wide: no `logging` import or log file anywhere; the only stdout output is `print()` in admin.py:239 and finbot_agent.py:19,64 — error/debug prints, not an action log</div>
-        <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Add an append-only audit log (separate table or structured log stream) recording, per event: invoice id, decision, model, confidence, fraud result, full reasoning, and the authenticated actor for any config/goal change. Retain prior decisions across reprocessing rather than overwriting them.</div>
-      </div>
-    </div>
-    
-    <div class="finding-card" id="PRAX-2026-05-11-013">
+    <div class="finding-card" id="PRAX-2026-05-11-016">
       <div class="finding-header">
         <span class="sev-badge sev-medium">MEDIUM</span>
-        <span class="finding-id">PRAX-2026-05-11-013</span>
-        <span class="finding-summary">Decision-and-reasoning recording is bypassable: when the LLM ends a session without a final tool call, the run returns &#x27;completed&#x27; and no ai_decision / ai_reasoning is written to the invoice.</span>
-      </div>
-      <div class="finding-body">
-        <div class="tag-row">
-          
-          <span class="tag tag-raise">Monitor Continuously</span>
-          
-          <span class="tag tag-agentic">ASI10 — Rogue Agents</span>
-          
-        </div>
-        <div class="policy-ref">
-          <strong>Policy Rule — R-04 (Worker Remit):</strong><br>
-          <em>"Record the invoice decision and reasoning in the database for every processed invoice"</em>
-        </div>
-        <div class="evidence-block">src/services/finbot_agent.py:213-219 — if `message.tool_calls` is falsy the function returns `{&#x27;success&#x27;: True, &#x27;decision&#x27;: &#x27;completed&#x27;, &#x27;reasoning&#x27;: message.content}` without persisting anything to the Invoice row
-src/services/finbot_agent.py:226 — after `max_iterations` the run returns `{&#x27;error&#x27;: &#x27;Agent exceeded maximum iterations&#x27;}` and the invoice is left in status `processing` with no reasoning recorded</div>
-        <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">In `_run_agent_orchestration()`, persist a terminal decision and reasoning for every exit path (no-tool-call completion, max-iterations, exception) — e.g., default to `request_human_review` with the model&#x27;s last content as the reasoning — so no processed invoice lacks a recorded decision.</div>
-      </div>
-    </div>
-    
-    <div class="finding-card" id="PRAX-2026-05-11-014">
-      <div class="finding-header">
-        <span class="sev-badge sev-medium">MEDIUM</span>
-        <span class="finding-id">PRAX-2026-05-11-014</span>
-        <span class="finding-summary">Python dependencies are not pinned — caret/lower-bound ranges (&gt;=) for openai, flask-cors, gunicorn, requests, etc. — leaving the build exposed to version-swap and dependency-confusion risk.</span>
+        <span class="finding-id">PRAX-2026-05-11-016</span>
+        <span class="finding-summary">Python dependencies are floating (&gt;= ranges) for openai, flask-cors, flask-sqlalchemy, requests and others — no lockfile, susceptible to version-swap and dependency-confusion drift.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
@@ -1123,67 +1155,65 @@ src/services/finbot_agent.py:226 — after `max_iterations` the run returns `{&#
           
           <span class="tag tag-owasp">LLM03 — Supply Chain</span>
           
-          <span class="tag tag-agentic">ASI04 — Agentic Supply Chain Vulnerabilities</span>
-          
         </div>
         <div class="policy-ref">
           <strong>Policy Rule — R-14 (Worker Remit):</strong><br>
-          <em>"The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</em>
+          <em>"(no direct remit rule — supply-chain hygiene for the declared software stack)"</em>
         </div>
-        <div class="evidence-block">requirements.txt:2-12 — `flask-cors&gt;=6.0.0`, `flask-sqlalchemy&gt;=3.1.1`, `openai&gt;=1.54.0`, `gunicorn&gt;=21.2.0`, `requests&gt;=2.31.0`, `python-dateutil&gt;=2.8.2`, `werkzeug&gt;=3.0.1`, `jinja2&gt;=3.1.2`, `click&gt;=8.1.7`, `itsdangerous&gt;=2.2.0`, `markupsafe&gt;=2.1.3` — all unpinned ranges; only `Flask==3.1.1` is pinned
-Workspace-wide: no lock file (no `requirements.lock`, `poetry.lock`, `Pipfile.lock`) and no SBOM/ML-BOM</div>
+        <div class="evidence-block">requirements.txt:2-12 — `flask-cors&gt;=6.0.0`, `flask-sqlalchemy&gt;=3.1.1`, `openai&gt;=1.54.0`, `gunicorn&gt;=21.2.0`, `requests&gt;=2.31.0`, etc. — only Flask itself is pinned (==3.1.1); no requirements.lock / poetry.lock / Pipfile.lock; no ML-BOM
+src/services/finbot_agent.py:17 — the model id (&#x27;gpt-4.1-mini&#x27;) is pinned in code, but the OpenAI SDK that talks to it is not</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Pin every dependency to an exact version and commit a lock file; generate and track an SBOM. Pin the OpenAI model identifier and document its provenance alongside the dependency manifest.</div>
+        <div class="rec-text">Pin every dependency to an exact version and commit a lockfile (e.g., pip-tools `requirements.txt` + hashes, or `poetry.lock`); add a dependency-audit step (pip-audit / Dependabot) to CI; record an ML-BOM listing the model and SDK versions.</div>
       </div>
     </div>
     
-    <div class="finding-card" id="PRAX-2026-05-11-015">
+    <div class="finding-card" id="PRAX-2026-05-11-017">
       <div class="finding-header">
         <span class="sev-badge sev-medium">MEDIUM</span>
-        <span class="finding-id">PRAX-2026-05-11-015</span>
-        <span class="finding-summary">Prompt-injection detection is a static regex deny-list (&#x27;Whac-A-Mole&#x27;) that the repo&#x27;s own walkthrough documents how to bypass with subtle goal-aligned phrasing, yet it is the only screen on vendor-supplied text.</span>
+        <span class="finding-id">PRAX-2026-05-11-017</span>
+        <span class="finding-summary">Vendor banking details (account number, routing number, tax ID) are stored in plaintext and returned in full by the unauthenticated GET /api/vendors and /api/vendors/&lt;id&gt; endpoints.</span>
       </div>
       <div class="finding-body">
         <div class="tag-row">
           
           <span class="tag tag-raise">Balance Your Knowledge Base</span>
           
-          <span class="tag tag-owasp">LLM01 — Prompt Injection</span>
-          
-          <span class="tag tag-agentic">ASI01 — Agent Goal Hijack</span>
-          
-        </div>
-        <div class="policy-ref">
-          <strong>Policy Rule — R-09 (Worker Remit):</strong><br>
-          <em>"Accept instructions embedded in invoice data fields (description, notes, line items) as directives"</em>
-        </div>
-        <div class="evidence-block">src/services/finbot_agent.py:549-659 — `_detect_prompt_injection()` is ~80 hardcoded regex patterns; a single &#x27;business manipulation&#x27; phrase match returns True, and absence of any listed phrase returns False
-docs/FinBot-CTF-walkthrough-goal-manipulation.md (Method 1, &#x27;Hard&#x27;) — documents getting an above-threshold invoice auto-approved &#x27;without FinBot detecting any prompt injection&#x27; via subtle goal-aligned language</div>
-        <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">Do not rely on the deny-list as a security control. Keep it (at most) as a telemetry signal, and instead enforce the decision in code (PRAX-2026-05-11-006) so undetected injected text cannot reach a payment action; if model-side screening is desired, add an allow-list / structured-content approach rather than pattern blacklisting.</div>
-      </div>
-    </div>
-    
-    <div class="finding-card" id="PRAX-2026-05-11-016">
-      <div class="finding-header">
-        <span class="sev-badge sev-low">LOW</span>
-        <span class="finding-id">PRAX-2026-05-11-016</span>
-        <span class="finding-summary">No adversarial-testing feedback loop: the repo is an attack-demonstration CTF whose docs walk attackers through these exact weaknesses, but there is no evidence the team&#x27;s own red-teaming drove any architectural fix.</span>
-      </div>
-      <div class="finding-body">
-        <div class="tag-row">
-          
-          <span class="tag tag-raise">Build an AI Red Team</span>
+          <span class="tag tag-owasp">LLM02 — Sensitive Information Disclosure</span>
           
         </div>
         <div class="policy-ref">
           <strong>Policy Rule — R-14 (Worker Remit):</strong><br>
-          <em>"The agent&#x27;s decision logic is defined in code; it is not redefinable at runtime by any user, vendor, or API caller"</em>
+          <em>"(no direct remit rule — data-minimization for the records the agent reads)"</em>
         </div>
-        <div class="evidence-block">docs/FinBot-CTF-walkthrough-goal-manipulation.md — a detailed attack walkthrough exists, but it is a teaching artifact, not a remediation record; the vulnerable code paths it describes are still present (finbot_agent.py:69-71, :735-748, admin.py:90-109)
-Workspace-wide: no test suite, no red-team report, no postmortem, no changelog showing a found issue led to a design change</div>
+        <div class="evidence-block">src/models/vendor.py:15-19, 28-46 — Vendor stores tax_id, bank_name, account_holder_name, account_number, routing_number; to_dict() returns all of them unmasked
+src/routes/vendor.py:54-67 — GET /api/vendors/&lt;id&gt; and GET /api/vendors return vendor.to_dict() with no auth and no field redaction</div>
         <div class="rec-label">Recommended Action</div>
-        <div class="rec-text">If this agent is ever intended for real use, stand up an adversarial test suite that exercises goal-injection, indirect-injection, and threshold-bypass paths, and gate releases on it; record findings and the design changes they drive. As shipped, the repo is correctly understood as a deliberately-insecure demo, not a production system.</div>
+        <div class="rec-text">Stop returning full banking fields over the API (mask to last 4, or omit entirely from list/detail responses), require authentication for any endpoint that exposes them, and encrypt these columns at rest; ensure they are never passed into the LLM context.</div>
+      </div>
+    </div>
+    
+    <div class="finding-card" id="PRAX-2026-05-11-018">
+      <div class="finding-header">
+        <span class="sev-badge sev-info">INFO</span>
+        <span class="finding-id">PRAX-2026-05-11-018</span>
+        <span class="finding-summary">Vendor trust level — an input to FinBot&#x27;s approval logic — can be changed by an unauthenticated admin endpoint, which the remit places out of scope for the system (no modification of vendor records).</span>
+      </div>
+      <div class="finding-body">
+        <div class="tag-row">
+          
+          <span class="tag tag-raise">Implement Zero Trust</span>
+          
+          <span class="tag tag-agentic">ASI03 — Identity and Privilege Abuse</span>
+          
+        </div>
+        <div class="policy-ref">
+          <strong>Policy Rule — R-14 (Worker Remit):</strong><br>
+          <em>"The agent does not create, modify, or delete vendor records (Out of Scope)"</em>
+        </div>
+        <div class="evidence-block">src/routes/admin.py:193-219 — POST /api/admin/vendors/&lt;id&gt;/trust sets vendor.trust_level from caller JSON with no auth; trust_level feeds _detect_fraud_patterns (finbot_agent.py:540-541) and _fallback_processing (:827, :836, :862)
+Worker Remit &#x27;Out of Scope&#x27;: &#x27;The agent does not create, modify, or delete vendor records&#x27;</div>
+        <div class="rec-label">Recommended Action</div>
+        <div class="rec-text">Require authentication and an audit record on the vendor-trust endpoint; if vendor record mutation is genuinely out of scope, remove the endpoint and manage trust levels through a separately authorized administrative path.</div>
       </div>
     </div>
     
@@ -1198,20 +1228,14 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
     
     <div class="positive-card">
       <h4>Worker Remit states specific, verifiable behavioral rules</h4>
-      <p>The remit names exact tools, the exact fields that must not carry instructions (`custom_goals`, invoice `description`/notes/line items), the exact config flag that must stay true (`fraud_detection_enabled`), and concrete approval thresholds — making policy-vs-code divergence directly checkable.</p>
-      <div class="pos-ref">WORKER_REMIT.md — &#x27;Behavioral Constraints&#x27; and &#x27;Configuration and Policy Separation&#x27; sections</div>
+      <p>The remit names exact tools, exact forbidden actions (no fraud-skip, no above-threshold approval without sign-off, no goal injection via custom_goals), and explicit approval triggers — precise enough to check against code, even though the code does not implement them.</p>
+      <div class="pos-ref">WORKER_REMIT.md — sections &#x27;Behavioral Constraints&#x27; and &#x27;Configuration and Policy Separation&#x27;</div>
     </div>
     
     <div class="positive-card">
-      <h4>Agent has no outbound network or email capability</h4>
-      <p>The agent communicates only with its application database and the OpenAI API; there is no email, webhook, or arbitrary-HTTP tool, which bounds the blast radius of a successful goal hijack to invoice-record state rather than external exfiltration.</p>
-      <div class="pos-ref">src/services/finbot_agent.py:228-345 (tool definitions — no send/exec/fetch tool); requirements.txt (no outbound integrations beyond `requests`, which is unused by the agent)</div>
-    </div>
-    
-    <div class="positive-card">
-      <h4>Per-invoice tool-loop iteration cap</h4>
-      <p>The orchestration loop is bounded at `max_iterations = 5`, providing a minimal circuit breaker against a runaway tool-call loop within a single invoice run (though it is not a substitute for rate limiting — see PRAX-2026-05-11-011).</p>
-      <div class="pos-ref">src/services/finbot_agent.py:171-226</div>
+      <h4>request_human_review tool and human-review queue exist in code</h4>
+      <p>A human-in-the-loop path is implemented end to end (the tool, the pending-review queue, and POST /api/admin/invoices/&lt;id&gt;/review) — the primitive is present even though no deterministic code gate routes high-risk invoices into it.</p>
+      <div class="pos-ref">src/services/finbot_agent.py:482-503; src/routes/admin.py:11-65</div>
     </div>
     
 
@@ -1223,7 +1247,7 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
     <p class="section-desc">Log files found in the agent's workspace during this scan. Reviewing these files provides runtime evidence to complement the static analysis above.</p>
 
     
-    <div class="none-found">No log files, structured action logs, or audit trails were found anywhere in the workspace; the only runtime output is ad-hoc `print()` for errors/debug — see PRAX-2026-05-11-012.</div>
+    <div class="none-found">No log, audit, or session files were found in the workspace; the agent emits only ad-hoc print() statements and a single overwritable Invoice.ai_reasoning column — the absence of a structured action log is itself finding PRAX-2026-05-11-009 (Monitor Continuously).</div>
 
     
   </div>
@@ -1237,12 +1261,12 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
     <div class="raise-hero status-critical">
       <div class="hero-score-block">
         <div class="hero-score">
-          <span class="hero-score-num">0.60</span>
+          <span class="hero-score-num">0.45</span>
           <span class="hero-score-max">/ 5.0</span>
         </div>
         <div class="hero-label">Weighted Maturity Score &middot; Absent</div>
       </div>
-      <div class="hero-rationale">Absent. FinBot has essentially no runtime security posture: its decision logic lives in an LLM system prompt that an unauthenticated HTTP caller can rewrite (`custom_goals`) and that vendor-supplied invoice text feeds into, while the code that executes the decision (`_approve_invoice`) applies no gate on amount, vendor status, fraud result, or caller identity. Of sixteen actionable remit rules, eleven are outright code gaps (including every &#x27;must never&#x27; clause about runtime goal modification, fraud-skip, and above-threshold approval) and only one — &#x27;no outbound channels&#x27; — is actually verified. There is no logging, no rate limiting, no admin authentication, and no adversarial-testing feedback loop; this is consistent with the repo&#x27;s self-description as a deliberately-insecure OWASP CTF demo.</div>
+      <div class="hero-rationale">Absent. FinBot has essentially no enforced security architecture: its domain, approval thresholds, fraud toggle, and goals are all soft prompt text or unauthenticated config, with no code-level interposition on the path that approves payments. Zero Trust is at the floor — vendor input flows unsanitised into the LLM, the approval tool has no gate, and an unauthenticated endpoint can rewrite the system prompt — and Monitor and Balance-Knowledge are likewise at zero. The only thing keeping the overall above zero at all is that specific, checkable rules exist in the remit and a human-review primitive exists in code; neither is operative on the agent&#x27;s actual decision path. This is consistent with a deliberately vulnerable CTF training target.</div>
     </div>
 
     <div class="raise-grid">
@@ -1254,17 +1278,17 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width: 20%;"></div></div>
         <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.15</div>
-        <div class="card-body">A domain-shaped system prompt exists in `get_system_prompt()` (finbot_agent.py:37-97) but it is the only restriction, it is mutable at runtime via `custom_goals`, and it actively ranks &#x27;Business Continuity&#x27;/speed above fraud detection — prompt-only scoping with a built-in goal divergence (PRAX-2026-05-11-009).</div>
+        <div class="card-body">Domain restriction is a natural-language system prompt only (src/services/finbot_agent.py:32-99) with no code gate, and the prompt&#x27;s #1 priority is &#x27;business continuity / process payments efficiently&#x27; — actively at odds with the remit&#x27;s security stance; the tool dispatcher executes whatever tool the model names.</div>
       </div>
       
       <div class="raise-card score-0-1">
         <div class="card-top">
           <div class="card-title">Balance Your Knowledge Base</div>
-          <div class="card-score"><span class="score-num">1</span><span class="score-max">/ 5</span></div>
+          <div class="card-score"><span class="score-num">0</span><span class="score-max">/ 5</span></div>
         </div>
-        <div class="progress-bar"><div class="progress-fill" style="width: 20%;"></div></div>
-        <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.15</div>
-        <div class="card-body">Vendor-controlled invoice `description` enters the LLM context via the `get_invoice_details` tool result (finbot_agent.py:390-407) screened only by a bypassable regex deny-list (PRAX-2026-05-11-002, -015); there is no content-origin labeling and no validated data boundary.</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+        <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.00</div>
+        <div class="card-body">Vendor-supplied invoice descriptions enter the LLM context verbatim via _get_invoice_details (finbot_agent.py:363-407) with only an advisory regex flag and no trust boundary, and unauthenticated config/goal writes (custom_goals) inject arbitrary text into the system prompt; no data minimization (plaintext bank/tax fields served unauthenticated).</div>
       </div>
       
       <div class="raise-card score-0-1">
@@ -1274,7 +1298,7 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
         <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 25% &nbsp;|&nbsp; Weighted: 0.00</div>
-        <div class="card-body">No code-level interposition on the agent&#x27;s decisions: `_approve_invoice()` sets `payment_processed=True` with no check on amount, vendor status, fraud signal, confidence, or caller; admin routes (config, goals, vendor trust, reprocess) have zero authentication; and `custom_goals` lets an unauthenticated POST rewrite the system prompt (PRAX-2026-05-11-001, -003 through -008).</div>
+        <div class="card-body">There is no code-level interposition on tool calls: _approve_invoice (finbot_agent.py:409-458) sets payment_processed=True with no check on amount, manual_review_threshold, fraud result, vendor status, confidence_threshold, or caller; fraud detection is skippable and disablable via an unauthenticated endpoint; the only &#x27;guardrails&#x27; are prompt text that an unauthenticated POST can overwrite.</div>
       </div>
       
       <div class="raise-card score-0-1">
@@ -1284,7 +1308,7 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width: 20%;"></div></div>
         <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.15</div>
-        <div class="card-body">Hardcoded Flask `SECRET_KEY` literal in `src/main.py:15` sits alongside unpinned `&gt;=` dependency ranges in `requirements.txt`, no lock file, and no SBOM/model-provenance record (PRAX-2026-05-11-010, -014).</div>
+        <div class="card-body">A hardcoded Flask SECRET_KEY sits in src/main.py:15, dependencies are floating &gt;= ranges with no lockfile or ML-BOM (requirements.txt), and there is no provenance/vetting record; the model id is pinned in code but nothing else is.</div>
       </div>
       
       <div class="raise-card score-0-1">
@@ -1294,7 +1318,7 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width: 20%;"></div></div>
         <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.15</div>
-        <div class="card-body">A detailed attack walkthrough exists (docs/FinBot-CTF-walkthrough-goal-manipulation.md) but it is a teaching artifact that demonstrates the weaknesses rather than a remediation record — the vulnerable code paths it describes are all still present, and there is no test suite, postmortem, or changelog showing adversarial findings drove a design change (PRAX-2026-05-11-016).</div>
+        <div class="card-body">The repo ships a CTF walkthrough (docs/FinBot-CTF-walkthrough-goal-manipulation.md) that catalogues the goal-manipulation, business-context-override, and config-bypass vectors as live challenges with success flags, and the code comments self-label the vulnerabilities — adversarial knowledge exists but was used to demonstrate, not to drive fixes; no test suite or postmortem.</div>
       </div>
       
       <div class="raise-card score-0-1">
@@ -1304,7 +1328,7 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
         <div class="card-meta">Confidence: High &nbsp;|&nbsp; Weight: 15% &nbsp;|&nbsp; Weighted: 0.00</div>
-        <div class="card-body">No structured logging anywhere — agent decisions are written only as overwritable Invoice columns (destroyed on reprocess), config/goal changes are unlogged, and the only stdout is ad-hoc `print()` for errors; some processing exit paths record no decision at all (PRAX-2026-05-11-012, -013).</div>
+        <div class="card-body">No structured logging anywhere in the agent — no logging import, no action log, only print() statements and a single mutable Invoice.ai_reasoning column overwritten on each reprocess; config and goal mutations leave no audit record, so a goal-hijack-to-payment chain would be undetectable.</div>
       </div>
       
     </div>
@@ -1367,9 +1391,9 @@ Workspace-wide: no test suite, no red-team report, no postmortem, no changelog s
   </div>
   <div class="meta">
     Agent: FinBot &nbsp;|&nbsp;
-    Analysis: 2026-05-11T15:45:05Z &nbsp;|&nbsp;
-    Artifacts: 17 &nbsp;|&nbsp;
-    Findings: 8 Critical &nbsp; 4 High &nbsp; 3 Medium &nbsp; 1 Low &nbsp; 0 Informational<br>
+    Analysis: 2026-05-11T16:05:15Z &nbsp;|&nbsp;
+    Artifacts: 22 &nbsp;|&nbsp;
+    Findings: 6 Critical &nbsp; 7 High &nbsp; 4 Medium &nbsp; 0 Low &nbsp; 1 Informational<br>
     Praxa v0.1.0 &nbsp;|&nbsp;
     Built on RAISE Framework &nbsp;|&nbsp;
     OWASP Top 10 for LLM Applications 2025 &nbsp;|&nbsp; OWASP Top 10 for Agentic Applications 2026
