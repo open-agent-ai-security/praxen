@@ -99,16 +99,35 @@ PR #1's `lib/parallel.py` + `skills/behavior-verifier/SKILL-PARALLEL.md` — six
 - **Calibration parity.** PR #1 has only a one-target spot-check ("3.7 vs 3.8 weighted RAISE"). We do a proper sequential-vs-parallel comparison across ≥ 4 suite targets — including OpenHands (the mature one) and HelperBot (the CTF anchor) — **diffed against the `tests/baselines/v0.3-sequential` baseline frozen in §4.3** (re-running sequential on those targets too if any drift is suspected). Bar: parallel lands in the same `tests/README.md` bands as sequential and surfaces the same dominant themes. If a category mapper systematically over/under-scores its own category in isolation, the first lever is the mapper prompt for that category — but the tuning is *time-boxed* and the call is made at the §5.3 decision point, not iterated open-endedly.
 - **The reducer must be able to verify cross-category chains.** PR #1's reducer reasons over the six mapper outputs only — it never re-opens the code, which caps compound-signal quality at "whatever the mappers surfaced as standalone findings" and creates a blind spot for chain *links* that aren't a finding on their own (e.g. "function X's output feeds function Y"). **Recommended: give the reducer the workspace path and let it do *targeted* re-reads** when verifying a candidate compound chain — a handful of file reads by one agent, not a full re-scan, so the ≈ 4–5× win holds. "No re-read" stays the fallback if calibration-parity testing shows the targeted-read reducer over-claims chains.
 - **Token cost.** Six parallel mappers ≈ 6× the input tokens of a single analyst pass — a speed-for-cost trade, not a free win. Document it; the sequential path stays available for cost-sensitive runs.
+- **Measure the speedup with a controlled A/B — don't trust batch wall-clocks.** The ≈ 4–5× claim is verified against clean timings, not the noisy parallel-batch numbers in §5.4: pick a few representative targets (small / medium / big / worst-case — e.g. HelperBot / FinBot / OpenHands / Devika), **pre-clone each repo**, and time *just the analysis + render*, run each target **single-target (no parallel contention)**, sequentially and then in parallel map-reduce mode, back to back. Sequential wall-clock ≈ the Steps-1–9 LLM phase; parallel wall-clock ≈ max(mapper durations) + reducer; the render step (`render.py`, ≈ 0.08 s) is negligible in both.
 
 ### 5.3 — Decision gate & exit ramps
 
-Phase 2 is **time-boxed**: if the parallel path hasn't reached parity within ≈ 2 days of build-and-tune effort (i.e. the lower end of the 2–3 day estimate), we stop and decide — no open-ended tuning loop. The call is made once, after the ≥ 4-target sequential-vs-parallel comparison, against three explicit outcomes:
+Phase 2 is **time-boxed**: if the parallel path hasn't reached parity within ≈ 2 days of build-and-tune effort (i.e. the lower end of the 2–3 day estimate), we stop and decide — no open-ended tuning loop. The call is made once, after the ≥ 4-target sequential-vs-parallel comparison (parity *and* the §5.2 timed A/B), against three explicit outcomes:
 
-1. **Parity achieved** — parallel lands in the same `tests/README.md` RAISE bands as sequential across the comparison targets and surfaces the same dominant themes. → **Ship parallel as the default path; sequential becomes the cost-sensitive fallback** (it's ~6× cheaper in tokens). CHANGELOG, `praxa_version` → `0.4.0`, tag `v0.4.0`, merge.
-2. **Close but not there** — themes covered, but scores drift outside the bands on some targets, traceable to category-isolated mappers lacking cross-category context by design. → **Ship parallel as opt-in/experimental** (a `--parallel` flag or a clearly-labelled `SKILL-PARALLEL.md`), sequential stays the default; revisit in a future phase. Still `v0.4.0` + merge, but documented as experimental.
+1. **Parity achieved *and* a real speedup** — parallel lands in the same `tests/README.md` RAISE bands as sequential across the comparison targets, surfaces the same dominant themes, *and* the controlled A/B shows a meaningful wall-clock win on the analysis phase (the claim is ≈ 4–5×; anything materially short of ~2× is not worth defaulting to). → **Ship parallel as the default path; sequential becomes the cost-sensitive fallback** (it's ~6× cheaper in tokens). CHANGELOG, `praxa_version` → `0.4.0`, tag `v0.4.0`, merge.
+2. **Close but not there** — themes covered but scores drift outside the bands on some targets (traceable to category-isolated mappers lacking cross-category context by design), *or* parity holds but the speedup is marginal. → **Ship parallel as opt-in/experimental** (a `--parallel` flag or a clearly-labelled `SKILL-PARALLEL.md`), sequential stays the default; revisit in a future phase. Still `v0.4.0` + merge, but documented as experimental.
 3. **Fundamentally broken** — category isolation loses too much cross-signal context for parity to be reachable without re-introducing holistic analysis (which would defeat the point). → **Drop the parallel path entirely, close the phase, reclaim the effort.** Document why in `design/DEFERRED.md` (and `parallel.py` etc. stay recoverable in PR #1's branch). No `v0.4.0`; Phase 3 follows directly.
 
 Outcome 1 is the goal; 2 is the realistic fallback; 3 is the off-ramp that keeps Phase 2 from becoming a sink.
+
+### 5.4 — Sequential timings (the "before")
+
+The parallel path is measured against the sequential pipeline's *analysis* time (the render step is already free — `render.py` is ≈ 0.08 s). Rough reference, from the `v0.3-sequential` gate runs — **noisy:** each ran 9-in-parallel (possible API-throughput contention), and each wall-clock includes a `git clone --depth 1` of a wildly-varying-size repo, workspace staging, the analysis, the render, and any validator-caught re-render. A ballpark, not the comparator:
+
+| target | wall-clock (rough) | notes |
+|---|---:|---|
+| HelperBot | ~4.5 min | small JS repo |
+| OpenAI CS | ~4.5 min | example + SDK snapshot |
+| LangChain SQL | ~5.3 min | small focused slice; large repo to clone |
+| AutoGen Code Executor | ~5.4 min | five executors + core |
+| FinBot | ~6.0 min | small Flask app; +1 validator re-render |
+| Sweep | ~6.4 min | `sweepai/{agents,core,web,config}` + reaching out for context |
+| OpenHands | ~7.3 min | large repo, ~58 files read |
+| Aider | ~8.3 min | `aider/*.py` + `coders/`; +2 validator re-renders |
+| Devika | ~13.6 min | worst case — full `src/` tree, ~56–84 files read |
+
+≈ 6.8 min mean / 6 min median per target; the LLM analysis (Steps 1–9) is ~60–80% of that. Phase 2's gate (§5.2 / §5.3) replaces these with **clean controlled A/B timings** (repo pre-cloned, single-target, analysis + render only, sequential vs parallel) and commits the result — a `tests/baselines/TIMINGS.md`, or a "Timings" section in `tests/baselines/v0.3-sequential/BASELINE.md` — as the recorded "before" the parallel path is held to.
 
 ---
 
