@@ -141,11 +141,15 @@ def render_rich(text, allow=("code",)) -> str:
 def strip_tags(text) -> str:
     """Flatten a rich-text field to plain text for the TXT summary: a ``</p>``
     paragraph break becomes a single space (so sentences don't run together),
-    and every other HTML-ish tag (``<p>``, ``<code>``, ``<strong>``, a stray
-    ``<a ...>``, …) is dropped. A lone ``<`` that is not a tag is left alone."""
+    every other HTML-ish tag (``<p>``, ``<code>``, ``<strong>``, a stray
+    ``<a ...>``, …) is dropped, and HTML entities (``&mdash;``, ``&amp;``,
+    ``&lt;project&gt;`` …) are decoded to their characters — the prose fields
+    legitimately carry entities for the HTML report, and the plain-text summary
+    should show ``—`` / ``&`` / ``<project>`` rather than the raw entity text.
+    A lone ``<`` that is not a tag is left alone."""
     t = re.sub(r"\s*</p\s*>\s*", " ", str(text), flags=re.IGNORECASE)
     t = re.sub(r"</?[a-zA-Z][^>]*>", "", t)
-    return t
+    return html.unescape(t)
 
 
 # ── template engine ──────────────────────────────────────────────────────────

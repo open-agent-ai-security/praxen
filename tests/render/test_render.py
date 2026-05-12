@@ -125,6 +125,23 @@ def main():
           and open(out_txt, "rb").read() == open(golden_txt, "rb").read(),
           "rendered TXT differs from (or one side is missing) tests/fixtures/finbot.golden.txt — see header comment to regenerate")
 
+    # 3c. TXT entity decoding — prose fields carry HTML entities for the HTML
+    #     report; strip_tags() must decode them so the .txt summary shows the
+    #     characters, not the raw entity text. (The fixture has no entities, so
+    #     this is exercised on a mutated copy.)
+    ent = json.loads(json.dumps(data))
+    ent["behavior_summary"] = "Tooling <code>a &amp; b</code> &mdash; see &lt;project&gt; notes."
+    ent_path = os.path.join(tmp, "ent.json")
+    with open(ent_path, "w", encoding="utf-8") as fh:
+        json.dump(ent, fh)
+    ent_txt = os.path.join(tmp, "ent.txt")
+    run_render(["--findings", ent_path, "--out-txt", ent_txt])
+    et = open(ent_txt, encoding="utf-8").read() if os.path.exists(ent_txt) else ""
+    check("TXT decodes HTML entities in prose (no raw &amp;/&mdash;/&lt; in the summary)",
+          "Tooling a & b — see <project> notes." in et
+          and "&amp;" not in et and "&mdash;" not in et and "&lt;" not in et,
+          "entities were not decoded in the .txt output")
+
     # 4. txt-only mode (no template needed)
     out_txt_only = os.path.join(tmp, "only.txt")
     r = run_render(["--findings", FIXTURE, "--out-txt", out_txt_only])
