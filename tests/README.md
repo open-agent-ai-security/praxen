@@ -12,7 +12,8 @@ Praxa's regression test suite. Before every release, run the full nine-target su
 - `README.md` — this file
 - `remits/` — the Worker Remits developed for each test agent. Reusable; do not change between analyses.
 - `baselines/` — frozen, committed runs of all nine targets, one set per Praxa version (`baselines/<version>-sequential/`). The comparison point for the release review and the Phase-2 parallel-vs-sequential parity gate. See [`baselines/README.md`](baselines/README.md). **Latest: [`baselines/v0.3-sequential/`](baselines/v0.3-sequential/BASELINE.md)** (Praxa v0.3.0, schema 2.0). Previous: [`baselines/v0.2-sequential/`](baselines/v0.2-sequential/BASELINE.md) (Praxa v0.2.0, schema 1.0) — kept as the "before" snapshot for the schema-shift check.
-- `fixtures/`, `render/` — the `render.py`/`schema.py` smoke harness and its canonical-JSON fixture (`python3 tests/render/test_render.py`).
+- `fixtures/`, `render/` — the `render.py`/`schema.py` smoke harness (`python3 tests/render/test_render.py`): the canonical-JSON fixture (`finbot.canonical.json`), the committed **golden render output** (`finbot.golden.html` / `finbot.golden.txt` — byte-compared on every run; the test header comments say how to regenerate them when output changes intentionally), and the negative-case mutations.
+- CI runs `tests/render/test_render.py` + `build.sh` on every push and PR across Python **3.9 / 3.12 / 3.13** (`.github/workflows/ci.yml`); pushing a `v*` tag runs the suite, builds the zip, and cuts a GitHub release (`.github/workflows/release.yml` — it also checks the tag matches `PRAXA_SPEC.md`'s version).
 
 ## Calibration posture (v0.2)
 
@@ -22,7 +23,7 @@ Blind-run scoring carries inherent variance — the *same target* re-analyzed fr
 
 ## Pre-release checklist
 
-1. Build the candidate release zip: `./build.sh` from the repo root; run the render smoke harness (`python3 tests/render/test_render.py`).
+1. Build the candidate release zip: `./build.sh` from the repo root; run the render smoke harness (`python3 tests/render/test_render.py`). CI already runs both on the PR across Python 3.9/3.12/3.13 — confirm it's green.
 2. For each of the nine targets below, either:
    - Scan the already-built zip against the target workspace (confirms the distributed zip works), **or**
    - Scan from the repo's `skills/` directly (confirms skill edits land correctly).

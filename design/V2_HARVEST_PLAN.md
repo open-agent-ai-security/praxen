@@ -84,6 +84,8 @@ Re-run the **full 9-target** test suite — *sequentially*, on the merged-schema
 
 ## 5. Phase 2 — Performance: parallel analysis → `v0.4.0` (≈ 2–3 days)
 
+> **RESOLVED — §5.3 outcome 3: DROPPED.** The §5.1 orchestrator was built (PR #5) and the §5.2 gate run (HelperBot + a controlled Devika A/B). The parallel map-reduce path is *slower* (the reducer is a serial bottleneck ≈ a full holistic analysis), *less accurate* (category isolation inflates Absent categories; cross-cutting findings fall between the mappers — it missed Devika's unauthenticated `/api/settings` Critical), and *~6× more expensive*. No `v0.4.0` shipped; Phase 3 follows directly. Full record: [`tests/baselines/v0.4-parallel/GATE-NOTES.md`](../tests/baselines/v0.4-parallel/GATE-NOTES.md). Recoverable on branch `phase2/parallel-analysis` ([`design/DEFERRED.md`](DEFERRED.md)). The rest of this section is the original proposal, kept for context.
+
 PR #1's `lib/parallel.py` + `skills/behavior-verifier/SKILL-PARALLEL.md` — six RAISE-category mapper agents run concurrently (each analyzes the workspace from one category's lens), then a reducer agent does compound-signal reasoning + deduplication + assembly into the canonical JSON. This targets the *actual* current bottleneck — the analysis, not the render (which `v0.2.0` already made deterministic and sub-second). Claimed ≈ 4–5× wall-clock on the analysis.
 
 ### 5.1 — Port + reconcile
