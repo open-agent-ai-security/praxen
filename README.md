@@ -1,6 +1,6 @@
 <!--
-  Copyright © 2026 Exabeam, Inc. All Rights Reserved.
-  Confidential and Proprietary. Do not distribute. Use by permission only.
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
 -->
 
 # Praxa
@@ -188,6 +188,9 @@ The test suite exists so that every Praxa release can be validated against the s
 ```
 praxa/
   README.md                   ← You are here
+  LICENSE                     ← Apache License 2.0
+  NOTICE                      ← Attribution notices (bundled OWASP material, CC BY-SA 4.0)
+  CONTRIBUTING.md             ← How to contribute (DCO sign-off)
   PRAXA_SPEC.md               ← Full specification
   CHANGELOG.md                ← Release notes
   WORKER_REMIT_template.md    ← Starting point for writing your own remit
@@ -203,3 +206,19 @@ praxa/
     RAISE.md                  ← RAISE framework reference + maturity scale
   examples/                   ← Example analyses against real vulnerable agents
 ```
+
+---
+
+## License
+
+Praxa is licensed under the [Apache License, Version 2.0](LICENSE).
+
+Portions of the knowledge base (`skills/behavior-verifier/knowledge/`) are
+distilled from OWASP Gen AI Security Project publications and are used under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); see [NOTICE](NOTICE)
+for the attribution details.
+
+Contributions are welcome under the same license, with a DCO sign-off — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+*Praxa is a project sponsored by [Exabeam](https://www.exabeam.com/).*

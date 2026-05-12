@@ -1,6 +1,6 @@
 <!--
-  Copyright © 2026 Exabeam, Inc. All Rights Reserved.
-  Confidential and Proprietary. Do not distribute. Use by permission only.
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
 -->
 
 # Knowledge Base: OWASP Top 10 for LLM Applications (2025)

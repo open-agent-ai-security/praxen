@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright © 2026 Exabeam, Inc. All Rights Reserved.
-# Confidential and Proprietary. Do not distribute. Use by permission only.
+# Copyright 2026 Exabeam, Inc.
+# SPDX-License-Identifier: Apache-2.0
 """Praxa canonical findings-JSON schema and validator.
 
 Stage 1 of the Praxa pipeline (the behavior-verifier skill) emits a JSON
