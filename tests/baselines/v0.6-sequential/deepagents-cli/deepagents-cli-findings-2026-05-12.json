@@ -1,0 +1,757 @@
+{
+  "schema_version": "2.0",
+  "praxa_version": "0.6.0",
+  "scan": {
+    "agent": "Deep Agents CLI",
+    "agent_slug": "deepagents-cli",
+    "scan_date": "2026-05-12",
+    "scan_timestamp": "2026-05-12T18:57:28Z",
+    "workspace": "/tmp/deepagents",
+    "artifact_count": 30
+  },
+  "intro_band": {
+    "agent_remit_summary": "An interactive terminal coding/automation agent (the Deep Agents CLI, built on the <code>deepagents</code> SDK and LangGraph). It is meant to plan and carry out multi-step development tasks in a developer's local workspace under that developer's supervision — reading, searching and editing files, running shell commands via <code>execute</code>, tracking work with <code>write_todos</code>, spawning <code>task</code> subagents, and consulting external documentation through MCP servers declared in trusted <code>.mcp.json</code> files. High-impact actions are expected to be reviewable via human-in-the-loop approval, untrusted project MCP configs are expected to require explicit trust, and credentials are expected to stay out of the workspace and out of the logs.",
+    "agent_structure_summary": "A Python monorepo. The <code>deepagents</code> SDK (<code>libs/deepagents/</code>) builds a LangGraph agent in <code>deepagents/graph.py</code> (<code>create_deep_agent</code>, <code>BASE_AGENT_PROMPT</code>) with <code>FilesystemMiddleware</code> (allow/deny path ACLs, path-traversal validation), <code>SubAgentMiddleware</code>, a pluggable shell backend whose default <code>LocalShellBackend</code> (<code>backends/local_shell.py</code>) runs commands on the host with no sandbox, and an opt-in <code>interrupt_on</code> human-in-the-loop hook. The <code>deepagents-cli</code> package (<code>libs/cli/</code>) adds the MCP subsystem: <code>mcp_tools.discover_mcp_configs()</code> auto-discovers <code>.mcp.json</code> from the user home dir and the project root, <code>mcp_trust.py</code> gates project-level configs behind a SHA-256 fingerprint approval, <code>mcp_auth.py</code> runs OAuth device-code login and stores tokens 0600 under <code>~/.deepagents/.state/mcp-tokens/</code>, and <code>langchain-mcp-adapters</code> exposes the servers' tools to the model. The repo's top-level <code>.mcp.json</code> declares two first-party HTTPS doc servers (<code>docs-langchain</code>, <code>reference-langchain</code>). Dependencies are range-pinned with committed <code>uv.lock</code> lockfiles; there is no durable local action log and no <code>SECURITY.md</code>."
+  },
+  "behavior_summary": "<p>The dominant pattern is a <strong>capable harness whose strong primitives are opt-in while its riskiest path is the default.</strong> Deep Agents ships real controls — path-scoped filesystem permissions, a tested human-in-the-loop interrupt hook, a fingerprint trust gate for project MCP configs, careful 0600 credential storage — but none of the high-impact gates are on by default: the bundled shell <code>execute</code> tool uses an explicitly-unsandboxed <code>LocalShellBackend</code>, nothing requires approval before a write or a command, and the CLI's <code>default_agent_prompt.md</code> is a session-loaded notes file the agent is told it may rewrite. Combined with external content reaching the model unfiltered (file contents, shell output, MCP doc-server results), the default configuration is a one-hop persistence-and-execution chain (PRAX-2026-05-12-001).</p><p>On the MCP surface specifically the practical exposure today is low — the two declared servers are read-only first-party LangChain doc endpoints over TLS — but the structural gaps are real: no tool-poisoning check on tool descriptions or sanitization of tool outputs before they re-enter the model, no approval gate on MCP tool calls, and user-level <code>.mcp.json</code> files loaded with no trust prompt at all.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 6,
+      "gap": 3,
+      "partial": 3,
+      "vague": 0,
+      "enp": 1,
+      "total": 13
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Mission",
+        "rule_text": "Help a developer accomplish coding and automation tasks in their local workspace — read/search/edit files, run shell commands, plan, spawn subagents, and consult declared MCP servers — under interactive developer supervision.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Authorized Tools",
+        "rule_text": "The agent may use read_file, write_file, edit_file, ls, glob, grep, execute, write_todos, task, and MCP tools loaded from trusted .mcp.json configs.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Authorized Channels / Counterparties",
+        "rule_text": "Outbound network is limited to: the configured LLM provider API; remote MCP servers declared in trusted .mcp.json files; LangSmith when tracing is enabled; and whatever the developer's own shell commands reach.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-12-009"
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Approval Requirements",
+        "rule_text": "High-impact actions — shell command execution, file writes/deletes outside the working tree, and any MCP tool that sends/deletes/executes — should be gated by human-in-the-loop approval when the agent runs in a non-trivial context.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-12-003"
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Action Boundaries",
+        "rule_text": "The agent MUST NOT load tools from an untrusted project-level .mcp.json without explicit operator approval (fingerprint trust).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-12-008"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Action Boundaries",
+        "rule_text": "When the agent processes untrusted input or runs in a non-trusted/multi-tenant/production context, the shell execute tool MUST use a sandboxed backend, not the unsandboxed LocalShellBackend.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-12-002"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Forbidden Actions",
+        "rule_text": "Credentials (provider API keys, MCP OAuth tokens) MUST be stored with restrictive file permissions, never written into the workspace or version control, and never logged or printed.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Action Boundaries",
+        "rule_text": "File operations MUST reject path traversal and absolute-path escapes, and should be restrictable to an allowlist of paths.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Behavioral Expectations",
+        "rule_text": "The agent should maintain a durable, structured record of the actions it takes (tool invocations with parameters and timestamps) sufficient to reconstruct an incident.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-12-005"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Behavioral Expectations",
+        "rule_text": "The agent operates interactively under developer supervision; it MUST NOT run as an unattended background service.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Known Good Baseline",
+        "rule_text": "Dependencies MUST be version-controlled via a committed lockfile and should be pinned to compatible ranges; the LLM model version should be specified.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Action Boundaries",
+        "rule_text": "Remote MCP servers MUST be reached over TLS.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Forbidden Actions",
+        "rule_text": "External content that enters the agent's context (file contents, shell output, MCP tool results, fetched docs) should be treated as untrusted and not allowed to silently redirect the agent's behaviour.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-12-006"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-12-001",
+      "severity": "Critical",
+      "summary": "Default CLI configuration chains unfiltered external content → an agent-writable session-notes file → unsandboxed shell exec with no approval, forming a one-hop persistence-and-execution chain.",
+      "description": "Each link is a default, not an edge case: file contents, shell output and MCP doc-server results enter the model context with no origin labeling or sanitization (PRAX-2026-05-12-006); <code>default_agent_prompt.md</code> is loaded into context and the agent is told it may rewrite it (PRAX-2026-05-12-004); and <code>execute</code> runs on the host through the unsandboxed <code>LocalShellBackend</code> with no per-command approval because human-in-the-loop is off by default (PRAX-2026-05-12-002, PRAX-2026-05-12-003). Injected instructions in any ingested content can therefore (a) be written into the notes file to persist across sessions and (b) drive arbitrary host commands. Mitigations exist and are each one configuration flag away — a sandbox backend, <code>interrupt_on</code>, scoped <code>FilesystemPermission</code> rules — but the shipped default engages none of them.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        }
+      ],
+      "policy_rule_ids": "R-04, R-06, R-13",
+      "policy_rule_text": "High-impact actions — shell command execution, file writes/deletes outside the working tree, and any MCP tool that sends/deletes/executes — should be gated by human-in-the-loop approval when the agent runs in a non-trivial context. / When the agent processes untrusted input or runs in a non-trusted/multi-tenant/production context, the shell execute tool MUST use a sandboxed backend, not the unsandboxed LocalShellBackend. / External content that enters the agent's context (file contents, shell output, MCP tool results, fetched docs) should be treated as untrusted and not allowed to silently redirect the agent's behaviour.",
+      "evidence": [
+        {
+          "file": "libs/deepagents/deepagents/backends/local_shell.py",
+          "line": 3,
+          "snippet": "module docstring: \"It provides NO sandboxing or isolation - all operations run directly on the host machine with full system access.\""
+        },
+        {
+          "file": "libs/cli/deepagents_cli/default_agent_prompt.md",
+          "line": 3,
+          "snippet": "\"This file is for tracking project-specific context as you work. You can update this file to remember decisions, patterns, and context about this project.\" — a session-loaded file the agent is instructed it may rewrite"
+        },
+        {
+          "file": "libs/deepagents/deepagents/graph.py",
+          "line": null,
+          "snippet": "interrupt_on / InterruptOnConfig is an optional parameter to create_deep_agent(); no tool is gated unless the embedder sets it"
+        }
+      ],
+      "recommended_actions": [
+        "Ship the CLI with a non-permissive default: either a sandboxed shell backend (one of the <code>BaseSandbox</code> implementations) or <code>interrupt_on</code> covering <code>execute</code>, <code>write_file</code>/<code>edit_file</code> and <code>task</code>, so an out-of-the-box install does not present this chain.",
+        "Treat <code>default_agent_prompt.md</code> writes as a high-impact action (approval-gated) or make the file read-only to the agent and require an explicit user action to update it.",
+        "Label or fence external content (file contents, shell output, MCP tool results) when it re-enters the model context so injected instructions are distinguishable from operator intent."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI05",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-12-002",
+        "PRAX-2026-05-12-003",
+        "PRAX-2026-05-12-004",
+        "PRAX-2026-05-12-006"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-12-002",
+      "severity": "High",
+      "summary": "The execute shell tool runs under the default LocalShellBackend, which executes commands on the host with no sandbox, no resource limits, and no per-command approval.",
+      "description": "The backend's own docstring states it \"provides NO sandboxing or isolation\" and lists production / multi-tenant / untrusted-input use as inappropriate, recommending an external sandbox or HumanInTheLoopMiddleware — but it is the default the SDK and CLI fall back to, and the project README's \"shell access — <code>execute</code> for running commands (with sandboxing)\" overstates the out-of-the-box posture. A sandboxed alternative (<code>BaseSandbox</code> and the LangSmith / Daytona / Modal / RunLoop implementations) exists; nothing enforces or defaults to it.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "When the agent processes untrusted input or runs in a non-trusted/multi-tenant/production context, the shell execute tool MUST use a sandboxed backend, not the unsandboxed LocalShellBackend.",
+      "evidence": [
+        {
+          "file": "libs/deepagents/deepagents/backends/local_shell.py",
+          "line": 1,
+          "snippet": "\"`LocalShellBackend`: Filesystem backend with unrestricted local shell execution. ... It provides NO sandboxing or isolation - all operations run directly on the host machine with full system access.\""
+        },
+        {
+          "file": "README.md",
+          "line": null,
+          "snippet": "\"Shell access — `execute` for running commands (with sandboxing)\" — sandboxing is not the default; it requires a sandbox backend or HITL"
+        }
+      ],
+      "recommended_actions": [
+        "Default the CLI's shell backend to a sandboxed implementation, or refuse to enable <code>execute</code> on the unsandboxed backend without an explicit opt-in flag.",
+        "Reword the README so \"with sandboxing\" reflects what's available rather than what's on by default."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-12-001",
+        "PRAX-2026-05-12-003"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-12-003",
+      "severity": "High",
+      "summary": "Human-in-the-loop approval (interrupt_on / HumanInTheLoopMiddleware) is available and tested but off by default; nothing gates filesystem writes, shell exec, subagent spawns, or MCP tool calls unless the embedder configures it.",
+      "description": "<code>create_deep_agent()</code> accepts an <code>interrupt_on</code> / <code>InterruptOnConfig</code> with per-tool decision rules, the config propagates to subagents, and the behaviour is covered by <code>tests/integration_tests/test_hitl.py</code> — a genuine, working approval mechanism. But it is opt-in: a default agent or default CLI session runs every tool, including <code>execute</code>, without a confirmation step.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-04",
+      "policy_rule_text": "High-impact actions — shell command execution, file writes/deletes outside the working tree, and any MCP tool that sends/deletes/executes — should be gated by human-in-the-loop approval when the agent runs in a non-trivial context.",
+      "evidence": [
+        {
+          "file": "libs/deepagents/deepagents/graph.py",
+          "line": null,
+          "snippet": "interrupt_on is an optional kwarg of create_deep_agent(); InterruptOnConfig supports per-tool allowed_decisions but is unset by default"
+        },
+        {
+          "file": "libs/deepagents/tests/integration_tests/test_hitl.py",
+          "line": null,
+          "snippet": "HITL interrupt payload shape, decision configs and post-resume tool messages are tested — the mechanism works; it is just not enabled by default"
+        }
+      ],
+      "recommended_actions": [
+        "Enable <code>interrupt_on</code> for high-impact tools (<code>execute</code>, <code>write_file</code>, <code>edit_file</code>, <code>task</code>, send/delete MCP tools) by default in the CLI, with an explicit flag to relax it.",
+        "Document the recommended <code>interrupt_on</code> configuration prominently in the SDK quickstart."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-12-001",
+        "PRAX-2026-05-12-002",
+        "PRAX-2026-05-12-007"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-12-004",
+      "severity": "High",
+      "summary": "default_agent_prompt.md is a session-loaded \"project notes\" file the agent is explicitly told it may rewrite without approval — a persistence surface, since file contents and MCP doc output reach the model context.",
+      "description": "The file's own text addresses the agent (\"You can update this file to remember decisions, patterns, and context about this project\"), so it is part of the agent's runtime context and the agent has standing instruction to write it; <code>write_file</code>/<code>edit_file</code> are available with no approval by default. Content that the agent ingests from files it reads or from MCP doc servers can therefore steer a write into this file that then re-enters context on the next session. It is not version-controlled per session and not change-audited.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI06 — Memory and Context Poisoning"
+        }
+      ],
+      "policy_rule_ids": "R-13",
+      "policy_rule_text": "External content that enters the agent's context (file contents, shell output, MCP tool results, fetched docs) should be treated as untrusted and not allowed to silently redirect the agent's behaviour.",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/default_agent_prompt.md",
+          "line": 3,
+          "snippet": "\"This file is for tracking project-specific context as you work. You can update this file to remember decisions, patterns, and context about this project.\""
+        },
+        {
+          "file": "libs/cli/deepagents_cli/file_ops.py",
+          "line": null,
+          "snippet": "the agent's file tools (read/write/edit) operate on the workspace with no per-write approval by default; the notes file is a writable path"
+        }
+      ],
+      "recommended_actions": [
+        "Require explicit user confirmation before the agent writes <code>default_agent_prompt.md</code> (or any session-loaded notes/memory file), or make it append-only with a visible diff.",
+        "Keep a change log / version history for the notes file so a poisoning write is auditable after the fact."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI06",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-12-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-12-005",
+      "severity": "High",
+      "summary": "No durable, structured local audit log of tool invocations (filesystem ops, shell exec, subagent spawns, MCP tool calls); observability relies on optional LangSmith tracing and an in-memory session counter.",
+      "description": "The CLI keeps a <code>SessionStats</code> object (request count, token totals, wall time) in memory for the current run, and the SDK can trace to LangSmith when <code>LANGSMITH_API_KEY</code> is set; the MCP session manager logs invocations \"internally\" but does not persist them. There is no on-disk, structured, action-level record by default, so an incident cannot be reconstructed from the agent's own output.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "mcp",
+          "label": "All tool invocations logged with identity and parameters"
+        }
+      ],
+      "policy_rule_ids": "R-09",
+      "policy_rule_text": "The agent should maintain a durable, structured record of the actions it takes (tool invocations with parameters and timestamps) sufficient to reconstruct an incident.",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/_session_stats.py",
+          "line": null,
+          "snippet": "SessionStats accumulates request/token/wall-time counters in memory for the current session — not an action log and not persisted"
+        },
+        {
+          "file": "libs/deepagents/deepagents/backends/langsmith.py",
+          "line": null,
+          "snippet": "tracing path exists via LangSmith but is opt-in (off unless LANGSMITH_API_KEY / tracing is configured)"
+        }
+      ],
+      "recommended_actions": [
+        "Write a structured local action log (JSON lines: timestamp, tool name, parameters with secrets redacted, result status) for every tool invocation, on by default.",
+        "Make the MCP session manager's per-invocation records persist to that log rather than staying in memory."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-12-006",
+      "severity": "Medium",
+      "summary": "MCP tools are loaded from declared servers with no tool-poisoning check on tool descriptions and no sanitization of tool outputs before they re-enter the model context.",
+      "description": "<code>load_mcp_tools()</code> / <code>langchain-mcp-adapters</code> surface whatever tools and descriptions a server advertises directly to the model, and tool results (e.g. documentation pages fetched from <code>docs.langchain.com</code> / <code>reference.langchain.com</code>) flow back into context unfiltered. A tool description containing instruction-like language, or a doc page carrying an injected instruction, would be an indirect-injection vector. The practical risk is bounded today because the two declared servers are first-party LangChain HTTPS endpoints, but the check is structurally absent.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "mcp",
+          "label": "Tool descriptions contain no hidden model instructions"
+        },
+        {
+          "kind": "mcp",
+          "label": "All tool outputs sanitized before returning to model"
+        }
+      ],
+      "policy_rule_ids": "R-13",
+      "policy_rule_text": "External content that enters the agent's context (file contents, shell output, MCP tool results, fetched docs) should be treated as untrusted and not allowed to silently redirect the agent's behaviour.",
+      "evidence": [
+        {
+          "file": ".mcp.json",
+          "line": 1,
+          "snippet": "two HTTP MCP servers declared: docs-langchain (https://docs.langchain.com/mcp), reference-langchain (https://reference.langchain.com/mcp) — their tools and outputs are exposed to the model as-is"
+        },
+        {
+          "file": "libs/cli/deepagents_cli/mcp_tools.py",
+          "line": null,
+          "snippet": "load_mcp_tools()/_discover_tools() return the server's advertised tools; no scan of tool descriptions for instruction-like language and no sanitization of tool result content"
+        }
+      ],
+      "recommended_actions": [
+        "Scan MCP tool descriptions for instruction-like language at load time and warn (or refuse) when found.",
+        "Treat MCP tool results as untrusted external content — fence or label them when they re-enter the model context."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-12-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-007",
+      "severity": "Medium",
+      "summary": "MCP tool calls are invoked with no approval checkpoint unless interrupt_on is configured; a trusted server that exposed a send/delete/exec tool would have it invoked without confirmation.",
+      "description": "MCP tools loaded via the adapter are ordinary tools in the agent's tool set, so they inherit the default no-approval posture (PRAX-2026-05-12-003). The two declared servers expose only read-only documentation lookups, so today's exposure is low; the gap is that the trust gate covers <em>loading</em> a config, not <em>invoking</em> a high-risk tool from one.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        },
+        {
+          "kind": "mcp",
+          "label": "High-risk actions require human-in-the-loop approval"
+        }
+      ],
+      "policy_rule_ids": "R-04",
+      "policy_rule_text": "High-impact actions — shell command execution, file writes/deletes outside the working tree, and any MCP tool that sends/deletes/executes — should be gated by human-in-the-loop approval when the agent runs in a non-trivial context.",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/mcp_tools.py",
+          "line": null,
+          "snippet": "loaded MCP tools are added to the agent's tool list; tool filtering supports fnmatch name-exclusion but there is no per-call approval hook specific to MCP tools"
+        },
+        {
+          "file": ".mcp.json",
+          "line": 1,
+          "snippet": "declared servers expose read-only doc lookups; nothing prevents a future trusted server from advertising a send/delete/exec tool"
+        }
+      ],
+      "recommended_actions": [
+        "Default to <code>interrupt_on</code> for MCP tools, or at least for any MCP tool whose name/schema suggests a write, send, delete or exec action.",
+        "Surface the full tool list a server contributes (with descriptions) at trust-prompt time so the operator approves capabilities, not just a config file."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI02",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-12-003"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-008",
+      "severity": "Medium",
+      "summary": "User-level MCP configs (~/.mcp.json, ~/.deepagents/.mcp.json) are auto-loaded and trusted with no fingerprint or approval gate — only project-level .mcp.json files are gated.",
+      "description": "<code>discover_mcp_configs()</code> reads <code>~/.deepagents/.mcp.json</code>, <code>~/.mcp.json</code>, <code>&lt;project&gt;/.deepagents/.mcp.json</code> and <code>&lt;project&gt;/.mcp.json</code>; <code>classify_discovered_configs()</code> sends only the project-level ones through the trust store, and <code>mcp_trust.py</code> exists specifically because project configs may contain stdio servers that execute local commands. A user-home-dir config (which can also declare stdio command-executing servers) is loaded with no prompt — so anything that can write a file in the user's home directory can inject MCP servers into every Deep Agents session.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        }
+      ],
+      "policy_rule_ids": "R-05",
+      "policy_rule_text": "The agent MUST NOT load tools from an untrusted project-level .mcp.json without explicit operator approval (fingerprint trust).",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/mcp_tools.py",
+          "line": 644,
+          "snippet": "discovery paths include (\"~/.deepagents/.mcp.json\", \"user-level\"), (\"~/.mcp.json\", \"user-level\") — classify_discovered_configs treats user-level configs as trusted; only project-level configs go through the trust store"
+        },
+        {
+          "file": "libs/cli/deepagents_cli/mcp_trust.py",
+          "line": 3,
+          "snippet": "module docstring: \"Manages persistent approval of project-level MCP configs that contain stdio servers (which execute local commands).\" — user-level configs are out of scope of the trust check"
+        }
+      ],
+      "recommended_actions": [
+        "Apply the same fingerprint trust gate to user-level <code>.mcp.json</code> files (or at minimum prompt on first sight of a stdio/command server from any source).",
+        "Show which discovered configs are being loaded, and from where, at session start."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-009",
+      "severity": "Medium",
+      "summary": "The agent's domain is unrestricted by default — a general-purpose shell + filesystem + subagent harness with no topic or scope gate; scoping primitives exist but are not applied out of the box.",
+      "description": "<code>create_deep_agent()</code> with the default backend gives the model file read/write/edit, glob/grep, host shell <code>execute</code>, and <code>task</code> subagent spawning with no constraint on what it works on. Scoping is possible — <code>FilesystemMiddleware</code> allow/deny path ACLs, <code>fnmatch</code> tool-name exclusion for MCP tools, named subagent profiles — but the CLI applies none of them by default, and there is no egress restriction on either <code>execute</code> or (once trusted) an MCP HTTP server URL.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-03",
+      "policy_rule_text": "Outbound network is limited to: the configured LLM provider API; remote MCP servers declared in trusted .mcp.json files; LangSmith when tracing is enabled; and whatever the developer's own shell commands reach.",
+      "evidence": [
+        {
+          "file": "libs/deepagents/deepagents/graph.py",
+          "line": null,
+          "snippet": "create_deep_agent() wires read_file/write_file/edit_file/ls/glob/grep/execute/write_todos/task with no domain restriction; restriction is the embedder's job"
+        },
+        {
+          "file": "libs/deepagents/deepagents/middleware/filesystem.py",
+          "line": null,
+          "snippet": "FilesystemMiddleware supports FilesystemPermission(operations, paths, mode) allow/deny rules — a real scoping primitive that is not populated by default"
+        }
+      ],
+      "recommended_actions": [
+        "Ship the CLI with a sensible default <code>FilesystemPermission</code> rule set (e.g. allow reads/writes under the project root, deny outside it) rather than wide-open.",
+        "Offer a documented \"restricted\" profile (no host <code>execute</code>, project-only file access) and make switching to it a one-flag operation."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-010",
+      "severity": "Medium",
+      "summary": "No SECURITY.md, threat model, or documented adversarial-testing program; control behaviour is well unit-/integration-tested but there is no injection/jailbreak/red-team test suite.",
+      "description": "The repo tests its controls thoroughly — <code>tests/unit_tests/test_permissions.py</code> exercises filesystem permission enforcement, <code>tests/integration_tests/test_hitl.py</code> exercises the approval interrupt, and ACP's <code>tests/test_dangerous_patterns.py</code> exercises shell-injection pattern detection — which is real evidence of adversarial thinking driving the design of those controls. What's missing for a higher score is a dedicated adversarial test suite (prompt injection, tool poisoning, jailbreak), a published threat model / <code>SECURITY.md</code>, and any record of red-team findings changing the architecture.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Build an AI Red Team"
+        }
+      ],
+      "policy_rule_ids": "R-04",
+      "policy_rule_text": "High-impact actions ... should be gated by human-in-the-loop approval when the agent runs in a non-trivial context.",
+      "evidence": [
+        {
+          "file": "libs/acp/tests/test_dangerous_patterns.py",
+          "line": null,
+          "snippet": "tests detection of command substitution, backticks, ${VAR}/$VAR expansion, process substitution, here-docs, redirects and background ops — a real injection-pattern control with tests behind it"
+        },
+        {
+          "file": "SECURITY.md",
+          "line": null,
+          "snippet": "absent — no published threat model, security policy, or disclosure process at the repo root"
+        }
+      ],
+      "recommended_actions": [
+        "Add a <code>SECURITY.md</code> with the threat model (host RCE via <code>execute</code>, context poisoning, MCP supply chain) and a disclosure process.",
+        "Add an adversarial test suite: prompt-injection-in-file-content, tool-poisoning-in-MCP-description, notes-file-poisoning round-trip — and wire the results back into defaults."
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-011",
+      "severity": "Low",
+      "summary": "MCP OAuth tokens are stored as plaintext JSON files under ~/.deepagents/.state/mcp-tokens/ (0600, 0700 dir, atomic write, never logged) rather than an OS keychain or secret vault.",
+      "description": "<code>mcp_auth.py</code> handles this carefully — <code>os.open</code> with <code>O_EXCL</code> and mode <code>0o600</code>, a follow-up <code>chmod</code> for Windows, an atomic temp-file-then-replace write, a <code>0o700</code> parent directory, and a docstring explicitly forbidding logging the token via <code>%r</code>/<code>str()</code>/f-strings. It is a reasonable approach. It is still below the OWASP MCP minimum-bar item \"secrets stored in a vault, not in files\" — a macOS Keychain / libsecret / Windows Credential Manager backend would close that gap.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "mcp",
+          "label": "Secrets stored in vault, not in files"
+        }
+      ],
+      "policy_rule_ids": "R-07",
+      "policy_rule_text": "Credentials (provider API keys, MCP OAuth tokens) MUST be stored with restrictive file permissions, never written into the workspace or version control, and never logged or printed.",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/mcp_auth.py",
+          "line": 319,
+          "snippet": "fd = os.open(str(tmp), flags, 0o600) ... parent dir chmod 0o700 ... tokens written under ~/.deepagents/.state/mcp-tokens/<server>.json; docstring: never log a token via %r/str()/f-string"
+        }
+      ],
+      "recommended_actions": [
+        "Offer an OS-keychain token-storage backend (macOS Keychain / libsecret / Windows Credential Manager) and prefer it when available, falling back to the current 0600-file store."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-012",
+      "severity": "Low",
+      "summary": "libs/deepagents/pyproject.toml leaves langsmith unbounded (>=0.8.3) and wcmatch with no version spec; the committed uv.lock makes installs reproducible but a plain pip install could resolve a future-major langsmith.",
+      "description": "The committed <code>uv.lock</code> files for both packages mean <code>uv sync</code> / CI installs are reproducible, and the CLI pins its internal dependency exactly (<code>deepagents==0.6.1</code>) with a Dependabot config in place. The residual gap is the SDK's <code>pyproject.toml</code> dependency specs: <code>langsmith&gt;=0.8.3</code> has no upper bound and <code>wcmatch</code> has no version constraint at all, so a non-locked install (e.g. <code>pip install deepagents</code> into a fresh env) could pull an incompatible future release.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        }
+      ],
+      "policy_rule_ids": "R-11",
+      "policy_rule_text": "Dependencies MUST be version-controlled via a committed lockfile and should be pinned to compatible ranges; the LLM model version should be specified.",
+      "evidence": [
+        {
+          "file": "libs/deepagents/pyproject.toml",
+          "line": null,
+          "snippet": "dependency specs include langsmith>=0.8.3 (no upper bound) and wcmatch (no version spec); other deps are range-pinned (e.g. langchain-core>=1.4.0,<2.0.0)"
+        }
+      ],
+      "recommended_actions": [
+        "Add upper bounds: <code>langsmith&gt;=0.8.3,&lt;1.0.0</code> and a compatible range for <code>wcmatch</code> in <code>libs/deepagents/pyproject.toml</code>."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-12-013",
+      "severity": "Informational",
+      "summary": "DEEPAGENTS_CLI_<NAME> environment variables are allowed to shadow canonical provider env vars (precedence: DEEPAGENTS_CLI_<NAME> > <NAME>).",
+      "description": "<code>_env_vars.py</code> centralises the CLI's environment-variable registry and a drift test enforces it; the precedence rule lets a <code>DEEPAGENTS_CLI_</code>-prefixed variable override the canonical one (e.g. an API key or base URL). This is operator-controlled and intentional, but worth noting: a process-environment foothold could redirect provider/API configuration without touching any file.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        }
+      ],
+      "policy_rule_ids": "R-03",
+      "policy_rule_text": "Outbound network is limited to: the configured LLM provider API; remote MCP servers declared in trusted .mcp.json files; LangSmith when tracing is enabled; and whatever the developer's own shell commands reach.",
+      "evidence": [
+        {
+          "file": "libs/cli/deepagents_cli/_env_vars.py",
+          "line": null,
+          "snippet": "central registry of DEEPAGENTS_CLI_* vars; documented precedence DEEPAGENTS_CLI_<NAME> > <NAME> allows shadowing canonical env vars"
+        }
+      ],
+      "recommended_actions": [
+        "No action required; if surfacing it, document that <code>DEEPAGENTS_CLI_</code>-prefixed overrides take precedence so operators can reason about effective config."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Filesystem path-safety + allow/deny ACLs",
+      "description": "FilesystemMiddleware validates every path (rejects '..', requires absolute paths, rejects '~') unconditionally, and supports FilesystemPermission allow/deny rules per operation and path pattern — a real, runnable Zero-Trust primitive on the file tools.",
+      "evidence_path": "libs/deepagents/deepagents/middleware/filesystem.py"
+    },
+    {
+      "title": "Fingerprint trust gate for project MCP configs",
+      "description": "Project-level .mcp.json files (which may declare stdio servers that execute local commands) must be approved via a SHA-256 fingerprint stored in ~/.deepagents/config.toml before their tools load — an explicit operator-in-the-loop checkpoint for the MCP supply chain.",
+      "evidence_path": "libs/cli/deepagents_cli/mcp_trust.py:1"
+    },
+    {
+      "title": "Disciplined credential handling",
+      "description": "API keys (auth_store.py → ~/.deepagents/.state/auth.json) and MCP OAuth tokens (mcp_auth.py → mcp-tokens/*.json) are written 0600 in 0700 directories via atomic temp-file-then-replace, with explicit docstring discipline against ever logging credential values; no hardcoded secrets were found in the repo.",
+      "evidence_path": "libs/cli/deepagents_cli/auth_store.py"
+    },
+    {
+      "title": "Working, tested human-in-the-loop interrupt",
+      "description": "create_deep_agent()'s interrupt_on / InterruptOnConfig supports per-tool approval decisions, propagates from parent to subagents, and is covered by integration tests — the approval mechanism exists and works; the gap is that it is not on by default.",
+      "evidence_path": "libs/deepagents/deepagents/graph.py"
+    },
+    {
+      "title": "Reproducible dependency builds",
+      "description": "Both packages commit uv.lock lockfiles, the CLI pins its internal dependency exactly (deepagents==0.6.1), the default model version is specified (claude-sonnet-4-6), and .github/dependabot.yml automates dependency updates.",
+      "evidence_path": ".github/dependabot.yml"
+    },
+    {
+      "title": "Shell dangerous-pattern detection (ACP)",
+      "description": "The ACP layer detects command-injection patterns — command substitution, backticks, variable expansion, process substitution, here-docs, redirects, background operators — and the detection is unit-tested.",
+      "evidence_path": "libs/acp/tests/test_dangerous_patterns.py"
+    },
+    {
+      "title": "Declared MCP servers use TLS and are first-party",
+      "description": "The repo's top-level .mcp.json declares only two HTTPS servers, both LangChain-operated documentation endpoints (docs.langchain.com, reference.langchain.com); the config loader validates transport types.",
+      "evidence_path": ".mcp.json"
+    }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No durable, structured action log was found in the codebase; observability relies on optional LangSmith tracing (off unless LANGSMITH_API_KEY is configured) and an in-memory SessionStats counter — see PRAX-2026-05-12-005.",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 2.0,
+    "weighted_rationale": "Partial. Deep Agents has the building blocks of a defensible posture — filesystem path ACLs and traversal checks that run unconditionally, a tested human-in-the-loop interrupt mechanism, a fingerprint trust gate for project MCP configs, disciplined credential handling, committed lockfiles and Dependabot — which keeps it well clear of the bottom of the scale. What holds it at Partial is that the controls protecting the highest-impact capability (shell execution) are not engaged by default: the default backend is unsandboxed, approval is opt-in, external content enters the model context unfiltered, and there is no durable local audit trail. Supply-chain hygiene is the strongest dimension; continuous monitoring is the weakest.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "A general-purpose shell + filesystem + subagent harness with no topic or scope gate by default; scoping primitives exist — FilesystemMiddleware path allow/deny ACLs, fnmatch MCP tool-name exclusion, named subagent profiles — but the CLI applies none of them out of the box (PRAX-2026-05-12-009)."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "External content — file contents, shell output, MCP tool results, fetched LangChain docs — enters the model context with no origin labeling or sanitization, and the CLI's writable default_agent_prompt.md is itself a session-loaded surface (PRAX-2026-05-12-004, -006); the practical risk is bounded today only because the declared MCP servers are first-party."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.25,
+        "rationale": "Real interposition exists and some of it runs unconditionally — FilesystemMiddleware validates every path and the project-MCP fingerprint trust gate is enforced — but the shell execute tool runs unsandboxed on the host with no per-command policy and human-in-the-loop approval is off by default, so the highest-impact capability is ungated (PRAX-2026-05-12-001, -002, -003)."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Both packages ship committed uv.lock lockfiles, the CLI pins its internal dep exactly (deepagents==0.6.1), the default model version is specified, .github/dependabot.yml automates updates, and no credentials live in the repo; loose specs for langsmith and wcmatch in libs/deepagents/pyproject.toml are the only gap (PRAX-2026-05-12-012)."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Control behaviour is genuinely exercised — tests/unit_tests/test_permissions.py, tests/integration_tests/test_hitl.py, and ACP's tests/test_dangerous_patterns.py test the permission system, the approval interrupt, and shell-injection detection — but there is no adversarial/injection/jailbreak test suite, no SECURITY.md, and no record of red-team findings driving design changes (PRAX-2026-05-12-010)."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 1,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "No durable, structured record of the agent's actions: tool invocations are not logged locally; observability depends on optional LangSmith tracing (off unless LANGSMITH_API_KEY is set) and an in-memory SessionStats counter (PRAX-2026-05-12-005)."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 1,
+      "high": 4,
+      "medium": 5,
+      "low": 2,
+      "info": 1
+    }
+  }
+}

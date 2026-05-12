@@ -15,18 +15,24 @@ Frozen runs of the nine targets in [`../README.md`](../README.md), one set per P
 ```
 baselines/
   README.md                 ← this file
-  v0.3-sequential/           ← CURRENT — the nine targets on Praxa v0.3.0 (schema 2.0; structured evidence + recommended_actions[])
+  v0.6-sequential/           ← PARTIAL — deepagents-cli only, on Praxa v0.6.0; the MCP-coverage target, added later
+    BASELINE.md              ← target table + MCP-path coverage note + how to compare
+    deepagents-cli/
+      deepagents-cli-findings-<date>.json   ← the canonical record (the thing you actually diff)
+      deepagents-cli-analysis-<date>.html   ← the rendered report
+      deepagents-cli-analysis-<date>.txt    ← the plain-text summary
+  v0.3-sequential/           ← CURRENT for the nine core targets — on Praxa v0.3.0 (schema 2.0; structured evidence + recommended_actions[])
     BASELINE.md              ← summary table, per-target provenance, schema-shift check, how to re-render
     <target>/
-      <target>-findings-<date>.json   ← the canonical record (the thing you actually diff)
-      <target>-analysis-<date>.html   ← the rendered report
-      <target>-analysis-<date>.txt    ← the plain-text summary
-  v0.2-sequential/           ← PREVIOUS — the nine targets on Praxa v0.2.0 (schema 1.0); kept as the "before" snapshot
+      <target>-findings-<date>.json
+      <target>-analysis-<date>.html
+      <target>-analysis-<date>.txt
+  v0.2-sequential/           ← PREVIOUS — the nine core targets on Praxa v0.2.0 (schema 1.0); kept as the "before" snapshot
     BASELINE.md
     <target>/ …
 ```
 
-When a Praxa version bumps and the calibration legitimately moves (or the JSON schema changes), the suite is re-run and re-frozen under a new `vX.Y-sequential/` directory, and the "latest baseline" pointer in `../README.md` is updated. The current one, `v0.3-sequential/`, was produced by Phase 1's gate in `design/V2_HARVEST_PLAN.md` (the merged `schema_version: "2.0"` skill); it's the comparator for the Phase-2 parallel path. `v0.2-sequential/` is retained as the "before" so Phase 1's schema change can be shown not to have moved calibration (see `v0.3-sequential/BASELINE.md` → "Schema-shift check").
+When a Praxa version bumps and the calibration legitimately moves (or the JSON schema changes), the suite is re-run and re-frozen under a new `vX.Y-sequential/` directory, and the "latest baseline" pointer in `../README.md` is updated. `v0.3-sequential/` was produced by Phase 1's gate in `design/V2_HARVEST_PLAN.md` (the merged `schema_version: "2.0"` skill) and is the current comparator for the nine core targets; `v0.2-sequential/` is retained as the "before" so Phase 1's schema change can be shown not to have moved calibration (see `v0.3-sequential/BASELINE.md` → "Schema-shift check"). `v0.6-sequential/` is a **partial** baseline — it holds only `deepagents-cli`, the MCP-coverage target added when the MCP Server Evaluation path was exercised on a real repo; the other nine fold into it at the next full re-freeze (see `v0.6-sequential/BASELINE.md`).
 
 ## Re-rendering the HTML/TXT from a baseline JSON
 
