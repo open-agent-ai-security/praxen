@@ -405,8 +405,8 @@ def render_html(template: str, data: dict) -> str:
     assert_fully_rendered(tpl)
 
     # 5. Drop all template comments (authoring notes + license header), then
-    #    trim the blank line they leave behind so the document starts at <!DOCTYPE>.
-    tpl = strip_comments(tpl).lstrip("\n")
+    #    trim whatever whitespace they leave behind so the document starts at <!DOCTYPE>.
+    tpl = strip_comments(tpl).lstrip()
     return tpl
 
 
