@@ -5,7 +5,7 @@
 
 # Praxa — Specification
 
-**Version:** 0.6.0
+**Version:** 0.6.1
 **Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -258,7 +258,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 ```json
 {
   "schema_version": "2.0",
-  "praxa_version": "0.6.0",
+  "praxa_version": "0.6.1",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",

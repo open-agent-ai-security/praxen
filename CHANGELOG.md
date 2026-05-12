@@ -9,6 +9,17 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 
 ---
 
+## [0.6.1] — 2026-05-12
+
+**MCP coverage.** The MCP Server Evaluation path — `.mcp.json` discovery → `knowledge/KB_MCP_SECURITY.md` → the MCP minimum-bar checklist → `mcp`-tagged findings, the machinery itself introduced with the knowledge base in 0.3.0 — is now exercised end-to-end against a real repo and held under regression. No changes to the detection logic, RAISE scoring, Worker Remit structure, or the findings schema (still `"2.0"`); no new release bundle (`praxa_version` / plugin version bump only).
+
+### Added
+- `tests/` target #10 — **`deepagents-cli`** (`langchain-ai/deepagents`): the first regression-suite target with a real checked-in `.mcp.json` *and* a non-trivial MCP subsystem (auto-discovery of user- and project-level configs, a SHA-256 fingerprint trust store, OAuth device-code login with 0600 token files, env-var header interpolation). Keeps the MCP eval path under regression — a healthy run must discover the `.mcp.json`, load `KB_MCP_SECURITY.md`, apply the checklist, and emit `mcp`-tagged findings — and doubles as a bidirectional-calibration target (strong opt-in primitives, permissive defaults → weighted 2.00 "Partial"). Remit: `tests/remits/deepagents-cli.md`. Partial baseline: `tests/baselines/v0.6-sequential/` — just this one target, produced on the v0.6.0 skill; the nine core targets stay at `v0.3-sequential/` until a full re-freeze.
+
+### Changed
+- `render.py` (`render_txt` / `strip_tags`): the plain-text summary now decodes HTML entities, so `&mdash;` / `&amp;` / `&lt;…&gt;` in prose render as `—` / `&` / `<…>` instead of leaking literally into the `.txt`.
+- `SKILL.md` Step 9: added guidance to write report prose with literal characters, not HTML entities (the renderer HTML-escapes prose, so an entity in a prose field double-escapes — `&mdash;` → `&amp;mdash;` — and renders as the literal entity text).
+
 ## [0.6.0] — 2026-05-12
 
 **Relicensed to Apache-2.0.** Praxa moves from the Exabeam commercial / by-permission license to the [Apache License, Version 2.0](LICENSE) — it's now open source. No functional changes to the skill, detection logic, RAISE scoring, Worker Remit structure, or the findings schema (still `"2.0"`); this is a licensing / metadata release. (`praxa_version` bumps `0.5.0` → `0.6.0`.)

@@ -4,7 +4,7 @@
 -->
 
 # Praxa
-**agent behavior verifier · Version 0.6.0**
+**agent behavior verifier · Version 0.6.1**
 
 > *Make sure your agent does its job — and only its job.*
 

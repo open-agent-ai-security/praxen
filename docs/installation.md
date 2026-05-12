@@ -34,7 +34,7 @@ The skill registers as `behavior-verifier`. Confirm it's available:
 /plugin list
 ```
 
-You should see `praxa` (with version `0.6.0` or later).
+You should see `praxa` (with version `0.6.1` or later).
 
 > **Note:** the GitHub repository is currently named `Exabeam/deckard`. The repository rename to match the project name is a separate administrative task. Use the URL above as-is.
 
@@ -45,9 +45,9 @@ You should see `praxa` (with version `0.6.0` or later).
 If you can't or don't want to use the plugin marketplace flow, unzip the release archive somewhere your coding agent can see it. There's no install step.
 
 ```bash
-curl -L -o praxa-0.6.0.zip <release-URL>
-unzip praxa-0.6.0.zip
-cd praxa-0.6.0
+curl -L -o praxa-0.6.1.zip <release-URL>
+unzip praxa-0.6.1.zip
+cd praxa-0.6.1
 ```
 
 Then point your coding agent at `skills/behavior-verifier/SKILL.md` when running an analysis. See [Usage](usage.md).

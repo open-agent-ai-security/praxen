@@ -557,7 +557,7 @@ This file is the **complete behavioral record**: everything the HTML report show
 ```json
 {
   "schema_version": "2.0",
-  "praxa_version": "<the version in .claude-plugin/plugin.json, e.g. 0.6.0>",
+  "praxa_version": "<the version in .claude-plugin/plugin.json, e.g. 0.6.1>",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
