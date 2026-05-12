@@ -11,6 +11,7 @@ Covers:
   * schema validation accepts a well-formed canonical fixture
   * render.py produces HTML with zero unsubstituted placeholders / leftover markers
   * render.py output is byte-deterministic
+  * rendered HTML/TXT match the committed golden files (tests/fixtures/finbot.golden.*)
   * --out-txt-only mode works
   * negative cases (legacy bare list, missing field, count mismatch, bad enum,
     missing RAISE category, broken anchor) all fail loudly with a non-zero exit
@@ -95,6 +96,26 @@ def main():
           open(out_html, "rb").read() == open(out_html2, "rb").read())
     check("TXT render is byte-deterministic",
           open(out_txt, "rb").read() == open(out_txt2, "rb").read())
+
+    # 3b. golden-file fixtures — the rendered HTML/TXT for the canonical fixture
+    #     must match what's committed, byte for byte. This is the regression net
+    #     for the renderer + template + derived-value tables together: any change
+    #     to render.py, report_template.html, or the fixture that alters output
+    #     trips this. To intentionally accept new output, regenerate the goldens:
+    #       python3 skills/behavior-verifier/render.py \
+    #         --findings tests/fixtures/finbot.canonical.json \
+    #         --template skills/behavior-verifier/report_template.html \
+    #         --out-html tests/fixtures/finbot.golden.html \
+    #         --out-txt  tests/fixtures/finbot.golden.txt
+    #     ...and review the diff before committing.
+    golden_html = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.golden.html")
+    golden_txt = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.golden.txt")
+    check("HTML render matches the committed golden file (byte-identical)",
+          os.path.exists(golden_html) and open(out_html, "rb").read() == open(golden_html, "rb").read(),
+          "rendered HTML differs from tests/fixtures/finbot.golden.html — see header comment to regenerate")
+    check("TXT render matches the committed golden file (byte-identical)",
+          os.path.exists(golden_txt) and open(out_txt, "rb").read() == open(golden_txt, "rb").read(),
+          "rendered TXT differs from tests/fixtures/finbot.golden.txt — see header comment to regenerate")
 
     # 4. txt-only mode (no template needed)
     out_txt_only = os.path.join(tmp, "only.txt")

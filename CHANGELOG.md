@@ -9,6 +9,15 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 
 ---
 
+## [0.5.0] — 2026-05-11
+
+**Phase 3 of the V2 harvest: GitHub Actions CI + release automation, golden-file render fixtures.** No changes to the skill, the detection logic, the RAISE scoring, the Worker Remit structure, the findings schema (still `"2.0"`), or the report — this is a tooling / repo-infrastructure release. (There is no 0.4.0: Phase 2's parallel map-reduce analysis path was prototyped and gated, found slower / less accurate / ~6× more expensive than the sequential pipeline, and dropped — see [`tests/baselines/v0.4-parallel/GATE-NOTES.md`](tests/baselines/v0.4-parallel/GATE-NOTES.md) and [`design/DEFERRED.md`](design/DEFERRED.md).)
+
+### Added
+- `.github/workflows/ci.yml` — runs `tests/render/test_render.py` and `build.sh` on every push and pull request, across Python **3.9 / 3.12 / 3.13** (3.9 is the floor — the macOS Command Line Tools system Python).
+- `.github/workflows/release.yml` — on a `v*` tag: checks the tag matches `PRAXA_SPEC.md`'s version, runs the test suite, builds `dist/praxa-<version>.zip`, and creates the GitHub release.
+- `tests/fixtures/finbot.golden.html` / `finbot.golden.txt` — committed golden render output for the canonical fixture; `test_render.py` now byte-compares the renderer's output against them (regression net for `render.py` + `report_template.html` + the derived-value tables together). Header comments in the test say how to regenerate them when output changes intentionally.
+
 ## [0.3.0] — 2026-05-11
 
 **Phase 1 of the V2 harvest: merged findings schema (`schema_version: "2.0"`).**
