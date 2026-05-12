@@ -13,7 +13,7 @@ A frozen run of the **`deepagents-cli`** test target on **Praxa v0.6.0** — the
 
 | Target | Weighted RAISE | Label | Per-category (LYD / BYKB / IZT / MYSC / BART / MC) | Findings (C/H/M/L/Info, total) | Remit (V/G/P/Vague/ENP, total) |
 |---|---:|---|---|---|---|
-| deepagents-cli | **2.00** | Partial | 2 / 2 / 2 / 3 / 2 / 1 | 1 / 4 / 5 / 2 / 1 — 13 | 6 / 3 / 3 / 0 / 1 — 13 |
+| deepagents-cli | **2.00** | Partial | 2 / 2 / 2 / 3 / 2 / 1 | 1 / 4 / 5 / 2 / 1 — 13 | 6 / 4 / 3 / 0 / 1 — 14 |
 
 *(LYD = Limit Your Domain, BYKB = Balance Your Knowledge Base, IZT = Implement Zero Trust, MYSC = Manage Your Supply Chain, BART = Build an AI Red Team, MC = Monitor Continuously.)*
 

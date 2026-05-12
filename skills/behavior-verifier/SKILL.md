@@ -440,6 +440,8 @@ For each of the following, check whether the evidence supports it. Include confi
 
 Praxa produces three artifacts per analysis: a canonical findings JSON (Step 10), and — rendered deterministically from that JSON by `render.py` (Step 11) — an HTML report and a plain-text summary. **The renderer does no synthesis and fills no gaps.** Every piece of prose the report displays must be written here. Anything you skip will be missing from both the HTML and the JSON.
 
+**Write prose with literal characters, not HTML entities.** Use `—`, `&`, `<`, `>`, `'` directly — *not* `&mdash;`, `&amp;`, `&lt;`, `&gt;`, `&#39;`. The renderer HTML-escapes prose for you on the HTML side and shows the characters on the TXT side; an HTML entity written into a prose field gets double-escaped (`&mdash;` → `&amp;mdash;`) and renders as the literal entity text in the browser. The only markup allowed in prose fields is the inline-tag allowlist noted per field below (`<code>`, and for `behavior_summary` also `<p>`/`<strong>`/`<em>`) — everything else, including a stray `<` inside e.g. a version range like `langsmith<1.0.0`, is fine as a literal character and is escaped safely.
+
 Synthesize the following now, in order, and hold it all in working memory. You will write it out as one JSON file in Step 10.
 
 ### 9.1 Agent Remit summary (intro band — left block) → `intro_band.agent_remit_summary`

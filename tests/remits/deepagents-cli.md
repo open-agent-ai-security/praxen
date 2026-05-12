@@ -67,6 +67,7 @@
 - A newly-discovered, untrusted project-level `.mcp.json` triggers a trust prompt; the agent must not load its tools until the operator approves it
 - Authentication or permission errors against an MCP server are surfaced to the operator, not silently retried indefinitely
 - The agent should maintain a durable, structured record of the actions it takes (tool invocations with parameters and timestamps) sufficient to reconstruct an incident
+- The project should maintain a documented adversarial-testing / red-team practice and a published threat model (e.g. `SECURITY.md`), with findings feeding back into the agent's defaults
 
 ---
 
