@@ -12,18 +12,24 @@ Covers:
   * render.py produces HTML with zero unsubstituted placeholders / leftover markers
   * render.py output is byte-deterministic
   * rendered HTML/TXT match the committed golden files (tests/fixtures/finbot.golden.*)
+  * HTML normalises stray HTML entities in prose (no double-escaping)
   * --out-txt-only mode works
+  * every committed regression baseline under tests/baselines/ validates against
+    schema.py, and the post-relicense ones re-render byte-identically from their
+    JSON and quote their remit doc verbatim
   * negative cases (legacy bare list, missing field, count mismatch, bad enum,
     missing RAISE category, broken anchor) all fail loudly with a non-zero exit
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SKILL_DIR = os.path.join(REPO_ROOT, "skills", "behavior-verifier")
@@ -53,9 +59,32 @@ def run_render(args):
                           capture_output=True, text=True)
 
 
+# Small file-I/O helpers — Path.read_*/write_* open, (de)serialise, and close in
+# one call, so no bare `open(...).read()` is left dangling (matters in the
+# baseline loop in section 6, and keeps the file uniform).
+def read_text(path) -> str:
+    return Path(path).read_text(encoding="utf-8")
+
+
+def read_bytes(path) -> bytes:
+    return Path(path).read_bytes()
+
+
+def text_or_empty(path) -> str:
+    return read_text(path) if os.path.exists(path) else ""
+
+
+def load_json(path):
+    return json.loads(read_text(path))
+
+
+def dump_json(path, obj) -> None:
+    Path(path).write_text(json.dumps(obj), encoding="utf-8")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="praxa_render_test_")
-    data = json.load(open(FIXTURE, encoding="utf-8"))
+    data = load_json(FIXTURE)
 
     # 1. schema accepts the fixture
     try:
@@ -70,8 +99,8 @@ def main():
     r = run_render(["--findings", FIXTURE, "--template", TEMPLATE,
                     "--out-html", out_html, "--out-txt", out_txt])
     check("render exits 0 on the fixture", r.returncode == 0, r.stderr.strip())
-    html = open(out_html, encoding="utf-8").read() if os.path.exists(out_html) else ""
-    txt = open(out_txt, encoding="utf-8").read() if os.path.exists(out_txt) else ""
+    html = text_or_empty(out_html)
+    txt = text_or_empty(out_txt)
     check("HTML has no unsubstituted {{PLACEHOLDER}}",
           not re.search(r"\{\{[A-Z0-9_]+\}\}", html))
     check("HTML has no leftover REPEAT/END/PICK/Variant markers",
@@ -98,10 +127,8 @@ def main():
     out_txt2 = os.path.join(tmp, "b.txt")
     run_render(["--findings", FIXTURE, "--template", TEMPLATE,
                 "--out-html", out_html2, "--out-txt", out_txt2])
-    check("HTML render is byte-deterministic",
-          open(out_html, "rb").read() == open(out_html2, "rb").read())
-    check("TXT render is byte-deterministic",
-          open(out_txt, "rb").read() == open(out_txt2, "rb").read())
+    check("HTML render is byte-deterministic", read_bytes(out_html) == read_bytes(out_html2))
+    check("TXT render is byte-deterministic", read_bytes(out_txt) == read_bytes(out_txt2))
 
     # 3b. golden-file fixtures — the rendered HTML/TXT for the canonical fixture
     #     must match what's committed, byte for byte. This is the regression net
@@ -118,11 +145,11 @@ def main():
     golden_txt = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.golden.txt")
     check("HTML render matches the committed golden file (byte-identical)",
           os.path.isfile(out_html) and os.path.isfile(golden_html)
-          and open(out_html, "rb").read() == open(golden_html, "rb").read(),
+          and read_bytes(out_html) == read_bytes(golden_html),
           "rendered HTML differs from (or one side is missing) tests/fixtures/finbot.golden.html — see header comment to regenerate")
     check("TXT render matches the committed golden file (byte-identical)",
           os.path.isfile(out_txt) and os.path.isfile(golden_txt)
-          and open(out_txt, "rb").read() == open(golden_txt, "rb").read(),
+          and read_bytes(out_txt) == read_bytes(golden_txt),
           "rendered TXT differs from (or one side is missing) tests/fixtures/finbot.golden.txt — see header comment to regenerate")
 
     # 3c. HTML-entity tolerance in prose. The SKILL prompt asks for literal
@@ -134,13 +161,12 @@ def main():
     ent["behavior_summary"] = "Tooling <code>a &amp; b</code> &mdash; see &lt;project&gt; notes."
     ent["raise_posture"]["categories"][0]["rationale"] = "Range &lt;1.0.0&gt; &amp; a &mdash; b."
     ent_path = os.path.join(tmp, "ent.json")
-    with open(ent_path, "w", encoding="utf-8") as fh:
-        json.dump(ent, fh)
+    dump_json(ent_path, ent)
     ent_html = os.path.join(tmp, "ent.html")
     ent_txt = os.path.join(tmp, "ent.txt")
     run_render(["--findings", ent_path, "--template", TEMPLATE, "--out-html", ent_html, "--out-txt", ent_txt])
-    eh = open(ent_html, encoding="utf-8").read() if os.path.exists(ent_html) else ""
-    et = open(ent_txt, encoding="utf-8").read() if os.path.exists(ent_txt) else ""
+    eh = text_or_empty(ent_html)
+    et = text_or_empty(ent_txt)
     check("HTML normalises stray entities in prose (no double-escaping like &amp;mdash; / &amp;lt;)",
           "&amp;mdash;" not in eh and "&amp;lt;" not in eh and "&amp;amp;" not in eh
           # the full injected phrases, rendered: `&mdash;` -> the em-dash char, `&amp;` -> a single `&amp;`,
@@ -168,10 +194,10 @@ def main():
     spiced["raise_posture"]["categories"][0]["rationale"] += " (config uses {{SCORE}} interpolation)"
     sp_path = os.path.join(tmp, "spiced.json")
     sp_html = os.path.join(tmp, "spiced.html")
-    json.dump(spiced, open(sp_path, "w"))
+    dump_json(sp_path, spiced)
     r = run_render(["--findings", sp_path, "--template", TEMPLATE, "--out-html", sp_html,
                     "--out-txt", os.path.join(tmp, "spiced.txt")])
-    sp_out = open(sp_html, encoding="utf-8").read() if os.path.exists(sp_html) else ""
+    sp_out = text_or_empty(sp_html)
     check("render survives {{placeholder-like}} text in cited evidence/rationale",
           r.returncode == 0, r.stderr.strip())
     check("cited braces are neutralised, not substituted, and not flagged as unfilled",
@@ -190,11 +216,11 @@ def main():
     rich_path = os.path.join(tmp, "rich.json")
     rich_html = os.path.join(tmp, "rich.html")
     rich_txt = os.path.join(tmp, "rich.txt")
-    json.dump(rich, open(rich_path, "w"))
+    dump_json(rich_path, rich)
     r = run_render(["--findings", rich_path, "--template", TEMPLATE,
                     "--out-html", rich_html, "--out-txt", rich_txt])
-    rh = open(rich_html, encoding="utf-8").read() if os.path.exists(rich_html) else ""
-    rt = open(rich_txt, encoding="utf-8").read() if os.path.exists(rich_txt) else ""
+    rh = text_or_empty(rich_html)
+    rt = text_or_empty(rich_txt)
     check("render succeeds with <p>/<strong>/<em>/<code> in behavior_summary",
           r.returncode == 0, r.stderr.strip())
     check("HTML keeps <p>/<strong>/<em>/<code> in the behavior summary",
@@ -219,10 +245,10 @@ def main():
     ]
     sched_path = os.path.join(tmp, "sched.json")
     sched_html = os.path.join(tmp, "sched.html")
-    json.dump(sched, open(sched_path, "w"))
+    dump_json(sched_path, sched)
     r = run_render(["--findings", sched_path, "--template", TEMPLATE,
                     "--out-html", sched_html, "--out-txt", os.path.join(tmp, "sched.txt")])
-    sh = open(sched_html, encoding="utf-8").read() if os.path.exists(sched_html) else ""
+    sh = text_or_empty(sched_html)
     check("v2.0 evidence renders as `file:line — snippet` and `file — snippet`",
           r.returncode == 0
           and "src/foo.py:42 — needs validation" in sh
@@ -232,7 +258,7 @@ def main():
 
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
-    js = json.load(open(sch_path, encoding="utf-8"))
+    js = load_json(sch_path)
     finding_props = js["properties"]["findings"]["items"]["properties"]
     rules_props = js["properties"]["remit_coverage"]["properties"]["rules"]["items"]["properties"]
     cat_props = js["properties"]["raise_posture"]["properties"]["categories"]["items"]["properties"]
@@ -256,10 +282,10 @@ def main():
         bad = json.loads(json.dumps(data))
         path = os.path.join(tmp, "bad.json")
         if mutate is None:                       # special: write a legacy bare list
-            json.dump([{"id": "x"}], open(path, "w"))
+            dump_json(path, [{"id": "x"}])
         else:
             mutate(bad)
-            json.dump(bad, open(path, "w"))
+            dump_json(path, bad)
         r = run_render(["--findings", path, "--out-txt", os.path.join(tmp, "n.txt")])
         check(name, r.returncode != 0 and bool(r.stderr.strip()),
               f"rc={r.returncode} stderr={r.stderr.strip()!r}")
@@ -277,6 +303,80 @@ def main():
              lambda d: d["raise_posture"]["categories"].pop())
     negative("rejects a weighted_overall that doesn't match the category sum",
              lambda d: d["raise_posture"].__setitem__("weighted_overall", 4.99))
+
+    # 6. committed regression baselines under tests/baselines/. The canonical
+    #    JSON is the source of truth; the committed HTML/TXT are derived. For the
+    #    post-relicense baselines (rendered with the current template) this asserts
+    #    they re-render byte-for-byte from their JSON — the regression net that
+    #    would have caught a renderer change silently desyncing a committed report.
+    #    Pre-relicense baselines (and the schema-1.0 v0.2 set) keep the old report
+    #    header by design — see tests/baselines/README.md → "Note on the relicense";
+    #    those are validated as far as the current schema/template allow and the
+    #    byte-compare is skipped. From praxa_version 0.6.0 on, the baseline must
+    #    also quote its remit doc verbatim (tests/remits/<slug>.md): every rule_text
+    #    and every `/`-separated policy_rule_text segment must be a substring.
+    baselines_root = os.path.join(REPO_ROOT, "tests", "baselines")
+    baseline_jsons = sorted(glob.glob(os.path.join(baselines_root, "*", "*", "*-findings-*.json")))
+    check("found committed regression baselines under tests/baselines/", len(baseline_jsons) > 0)
+    remit_cache: dict[str, str] = {}                 # slug -> remit text (one remit per target, but cache anyway)
+    for bj in baseline_jsons:
+        rel = os.path.relpath(bj, REPO_ROOT)
+        bdata = load_json(bj)
+        sv = str(bdata.get("schema_version", ""))
+        if not sv.startswith("2."):
+            check(f"baseline {rel}: schema_version {sv!r} — frozen pre-2.0 artifact, schema/render checks skipped", True)
+            continue
+        try:
+            schema.validate(bdata)
+            check(f"baseline {rel}: validates against schema.py", True)
+        except schema.SchemaError as e:
+            check(f"baseline {rel}: validates against schema.py", False, str(e))
+            continue
+        bdir = os.path.dirname(bj)
+        c_html = next(iter(glob.glob(os.path.join(bdir, "*-analysis-*.html"))), None)
+        c_txt = next(iter(glob.glob(os.path.join(bdir, "*-analysis-*.txt"))), None)
+        check(f"baseline {rel}: has a committed .html and .txt alongside it", bool(c_html and c_txt))
+        if not (c_html and c_txt):
+            continue
+        r_html = os.path.join(tmp, "bl.html")
+        r_txt = os.path.join(tmp, "bl.txt")
+        r = run_render(["--findings", bj, "--template", TEMPLATE, "--out-html", r_html, "--out-txt", r_txt])
+        check(f"baseline {rel}: render exits 0", r.returncode == 0, r.stderr.strip())
+        committed_html = read_bytes(c_html)
+        if b"github.com/Exabeam/deckard" in committed_html and r.returncode == 0:   # post-relicense template
+            check(f"baseline {rel}: HTML re-renders byte-identical from its JSON",
+                  committed_html == read_bytes(r_html),
+                  "committed HTML differs from a fresh render of the committed JSON")
+            check(f"baseline {rel}: TXT re-renders byte-identical from its JSON",
+                  read_bytes(c_txt) == read_bytes(r_txt),
+                  "committed TXT differs from a fresh render of the committed JSON")
+        else:
+            check(f"baseline {rel}: pre-relicense template — byte re-render comparison skipped", True)
+        # remit-quote invariant (praxa_version >= 0.6.0)
+        try:
+            pv = tuple(int(x) for x in str(bdata.get("praxa_version", "0")).split("."))
+        except ValueError:
+            pv = (0,)
+        slug = bdata.get("scan", {}).get("agent_slug") or os.path.basename(bdir)
+        remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
+        if pv < (0, 6, 0):
+            check(f"baseline {rel}: praxa_version < 0.6.0 — remit-quote check skipped", True)
+        elif not os.path.isfile(remit_path):
+            check(f"baseline {rel}: has a matching tests/remits/{slug}.md", False)
+        else:
+            if slug not in remit_cache:
+                remit_cache[slug] = read_text(remit_path)
+            remit = remit_cache[slug]
+            quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
+                      for rule in bdata["remit_coverage"]["rules"]]
+            for f in bdata["findings"]:
+                for seg in f.get("policy_rule_text", "").split(" / "):
+                    if seg.strip():
+                        quoted.append(("policy_rule_text", f["id"], seg.strip()))
+            missing = [(kind, who, txt) for (kind, who, txt) in quoted if txt not in remit]
+            check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from tests/remits/{slug}.md",
+                  not missing,
+                  "; ".join(f"{kind} of {who}: {txt[:60]!r}" for kind, who, txt in missing[:3]))
 
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0
