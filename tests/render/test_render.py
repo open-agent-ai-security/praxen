@@ -111,11 +111,11 @@ def main():
     golden_html = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.golden.html")
     golden_txt = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.golden.txt")
     check("HTML render matches the committed golden file (byte-identical)",
-          os.path.exists(out_html) and os.path.exists(golden_html)
+          os.path.isfile(out_html) and os.path.isfile(golden_html)
           and open(out_html, "rb").read() == open(golden_html, "rb").read(),
           "rendered HTML differs from (or one side is missing) tests/fixtures/finbot.golden.html — see header comment to regenerate")
     check("TXT render matches the committed golden file (byte-identical)",
-          os.path.exists(out_txt) and os.path.exists(golden_txt)
+          os.path.isfile(out_txt) and os.path.isfile(golden_txt)
           and open(out_txt, "rb").read() == open(golden_txt, "rb").read(),
           "rendered TXT differs from (or one side is missing) tests/fixtures/finbot.golden.txt — see header comment to regenerate")
 
