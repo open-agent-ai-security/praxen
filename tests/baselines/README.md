@@ -1,6 +1,6 @@
 <!--
-  Copyright © 2026 Exabeam, Inc. All Rights Reserved.
-  Confidential and Proprietary. Do not distribute. Use by permission only.
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
 -->
 
 # Test-suite baselines
@@ -30,7 +30,7 @@ When a Praxa version bumps and the calibration legitimately moves (or the JSON s
 
 ## Re-rendering the HTML/TXT from a baseline JSON
 
-The renderer is deterministic, so the committed HTML/TXT re-render byte-for-byte from the committed JSON:
+The renderer is deterministic, so a baseline's committed HTML/TXT re-render byte-for-byte from its committed JSON **using the renderer/template of that era**:
 
 ```bash
 python3 skills/behavior-verifier/render.py \
@@ -38,6 +38,8 @@ python3 skills/behavior-verifier/render.py \
   --template skills/behavior-verifier/report_template.html \
   --out-html /tmp/<target>.html --out-txt /tmp/<target>.txt
 ```
+
+> **Note on the relicense (Unreleased):** the `v0.2-sequential/` and `v0.3-sequential/` HTML/TXT snapshots were rendered before the Apache-2.0 relicense, so they still carry the old `Copyright © 2026 Exabeam, Inc. … Confidential and Proprietary` report header. They're intentionally left as-is — they're frozen historical artifacts, and the *findings JSON* is the thing that actually gets diffed. Re-rendering them with the current template will not be byte-identical (the new template strips that header and uses the open-source footer); the next baseline cut will pick up the new template.
 
 ## What is *not* kept here
 
