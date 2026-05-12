@@ -383,7 +383,7 @@ For each config file found, check for:
 
 ### MCP Server Evaluation
 
-If any MCP server configuration was found in Step 4 — a Claude-style `.mcp.json` / `mcp.json` / `mcp_config.json`, an agent-platform config (`opencode.json` / `.opencode/*.json`, `cline_mcp_settings.json`, `.roo/mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.copilot/mcp-config.json`, OpenClaw's `openclaw.json` with an `mcp.servers` block), **or any file the content rule flagged as carrying MCP server definitions regardless of filename** — load `knowledge/KB_MCP_SECURITY.md` and evaluate against the full MCP minimum bar checklist. Run every item in the checklist. Any "No" is a finding at the severity level specified in the KB.
+If any MCP server configuration was found in Step 4 — a Claude-style `.mcp.json` / `mcp.json` / `mcp_config.json`, an agent-platform config (`opencode.json` / `opencode.jsonc` / `.opencode/*.json`, `cline_mcp_settings.json`, `.roo/mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.copilot/mcp-config.json`, OpenClaw's `openclaw.json` or legacy `clawdbot.json` with an `mcp.servers` block), **or any file the content rule flagged as carrying MCP server definitions regardless of filename** — load `knowledge/KB_MCP_SECURITY.md` and evaluate against the full MCP minimum bar checklist. Run every item in the checklist. Any "No" is a finding at the severity level specified in the KB.
 
 Pay particular attention to:
 - Tool descriptions containing instruction-like language (tool poisoning indicator) → **Critical**

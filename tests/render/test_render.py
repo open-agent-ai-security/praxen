@@ -143,9 +143,11 @@ def main():
     et = open(ent_txt, encoding="utf-8").read() if os.path.exists(ent_txt) else ""
     check("HTML normalises stray entities in prose (no double-escaping like &amp;mdash; / &amp;lt;)",
           "&amp;mdash;" not in eh and "&amp;lt;" not in eh and "&amp;amp;" not in eh
-          and "&mdash;" in eh and "&lt;project&gt;" in eh   # the *single*-escaped forms (browser shows — / <project>)
-          and "<code>a &amp; b</code>" in eh,              # & inside the kept <code> span escaped once
-          "stray HTML entities in prose were double-escaped in the HTML output")
+          # the full injected phrases, rendered: `&mdash;` -> the em-dash char, `&amp;` -> a single `&amp;`,
+          # `&lt;..&gt;` -> a single `&lt;..&gt;`. These exact substrings can't come from a template default.
+          and "Tooling <code>a &amp; b</code> — see &lt;project&gt; notes." in eh
+          and "Range &lt;1.0.0&gt; &amp; a — b." in eh,   # the injected RAISE rationale (esc path)
+          "stray HTML entities in prose were double-escaped (or not normalised) in the HTML output")
     check("TXT decodes HTML entities in prose (no raw &amp;/&mdash;/&lt; in the summary)",
           "Tooling a & b — see <project> notes." in et
           and "&amp;" not in et and "&mdash;" not in et and "&lt;" not in et,
