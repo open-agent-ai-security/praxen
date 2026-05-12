@@ -76,7 +76,7 @@ def main():
     check("HTML has no leftover REPEAT/END/PICK/Variant markers",
           not re.search(r"<!--\s*(REPEAT:|END:|PICK:|Variant [AB]:)", html))
     check("HTML keeps the copyright comment", "Copyright" in html and "<!--" in html[:400])
-    check("HTML carries the agent name and version", "FinBot" in html and "Praxa v0.2.0" in html)
+    check("HTML carries the agent name and version", "FinBot" in html and "Praxa v0.3.0" in html)
     bad_links = [h for h in re.findall(r'href="([^"]*)"', html)
                  if not (h.startswith("#") or h.startswith("http://") or h.startswith("https://"))]
     check("HTML has no relative/broken <a href> (only #anchors and absolute URLs)",
@@ -104,8 +104,10 @@ def main():
     # 4b. cited code that *looks* like a template placeholder must not corrupt the
     #     render or trip the "unsubstituted placeholder" check.
     spiced = json.loads(json.dumps(data))
-    spiced["findings"][0]["evidence"].append(
-        "docker-compose.yml:12 — DATABASE_URL: {{DATABASE_URL}}, AGENT: {{AGENT_NAME}}")
+    spiced["findings"][0]["evidence"].append({
+        "file": "docker-compose.yml", "line": 12,
+        "snippet": "DATABASE_URL: {{DATABASE_URL}}, AGENT: {{AGENT_NAME}}",
+    })
     spiced["raise_posture"]["categories"][0]["rationale"] += " (config uses {{SCORE}} interpolation)"
     sp_path = os.path.join(tmp, "spiced.json")
     sp_html = os.path.join(tmp, "spiced.html")
@@ -146,6 +148,51 @@ def main():
           and "<strong>" not in rt and "<p>" not in rt and "<code>" not in rt
           and "</p>" not in rt and "<em>" not in rt
           and "bold" in rt and "italic" in rt and "code() spans" in rt)  # content kept, tags gone
+
+    # 4d. v2.0 structured evidence renders as `file:line — snippet`;
+    #     multi-item recommended_actions renders as a <ul>; single-item stays inline.
+    sched = json.loads(json.dumps(data))
+    sched["findings"][0]["evidence"] = [
+        {"file": "src/foo.py", "line": 42, "snippet": "needs validation"},
+        {"file": "src/bar.py", "line": None, "snippet": "file-level note"},
+    ]
+    sched["findings"][0]["recommended_actions"] = [
+        "First action with a <code>code</code> span.",
+        "Second action.",
+    ]
+    sched_path = os.path.join(tmp, "sched.json")
+    sched_html = os.path.join(tmp, "sched.html")
+    json.dump(sched, open(sched_path, "w"))
+    r = run_render(["--findings", sched_path, "--template", TEMPLATE,
+                    "--out-html", sched_html, "--out-txt", os.path.join(tmp, "sched.txt")])
+    sh = open(sched_html, encoding="utf-8").read() if os.path.exists(sched_html) else ""
+    check("v2.0 evidence renders as `file:line — snippet` and `file — snippet`",
+          r.returncode == 0
+          and "src/foo.py:42 — needs validation" in sh
+          and "src/bar.py — file-level note" in sh, r.stderr.strip())
+    check("multi-item recommended_actions renders as a <ul> with inline <code> preserved",
+          "<ul><li>" in sh and "<code>code</code>" in sh and "Second action." in sh)
+
+    # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
+    sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
+    js = json.load(open(sch_path, encoding="utf-8"))
+    finding_props = js["properties"]["findings"]["items"]["properties"]
+    rules_props = js["properties"]["remit_coverage"]["properties"]["rules"]["items"]["properties"]
+    cat_props = js["properties"]["raise_posture"]["properties"]["categories"]["items"]["properties"]
+    log_props = js["properties"]["log_files"]["properties"]["rows"]["items"]["properties"]
+    pairs = [
+        (finding_props["severity"]["enum"],    schema.SEVERITIES,   "severity"),
+        (finding_props["confidence"]["enum"],  schema.CONFIDENCES,  "confidence"),
+        (finding_props["raise_category"]["enum"], schema.RAISE_KEYS, "raise_category"),
+        (finding_props["tags"]["items"]["properties"]["kind"]["enum"], schema.TAG_KINDS, "tag.kind"),
+        (rules_props["status"]["enum"],        schema.REMIT_STATUSES, "remit-rule status"),
+        (cat_props["key"]["enum"],             schema.RAISE_KEYS,     "raise category key"),
+        (log_props["status"]["enum"],          schema.LOG_STATUSES,   "log status"),
+        (finding_props["escalation"]["enum"],  schema.ESCALATIONS,    "escalation"),
+    ]
+    disagreements = [name for (jenum, penum, name) in pairs if list(jenum) != list(penum)]
+    check("findings.schema.json enums agree with the Python validator constants",
+          not disagreements, f"diverged: {disagreements}")
 
     # 5. negative cases — each must exit non-zero with a useful message
     def negative(name, mutate):

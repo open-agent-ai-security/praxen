@@ -94,7 +94,7 @@ _RICH_FIELDS = {
     "agent_remit_summary": ("code", "strong", "em"),
     "agent_structure_summary": ("code", "strong", "em"),
     "behavior_summary": ("p", "code", "strong", "em"),
-    "recommended_action": ("code", "strong", "em"),
+    "recommended_actions": ("code", "strong", "em"),
 }
 
 
@@ -259,10 +259,34 @@ def _finding_ctx(finding, _idx):
         "FINDING_SUMMARY": esc(finding["summary"]),
         "RULE_IDS": esc(finding["policy_rule_ids"]),
         "QUOTED_RULE_TEXT": esc(finding["policy_rule_text"]),
-        "EVIDENCE": "\n".join(esc(line) for line in finding["evidence"]),
-        "RECOMMENDED_ACTION": render_rich(finding["recommended_action"],
-                                          allow=_RICH_FIELDS["recommended_action"]),
+        "EVIDENCE": _format_evidence(finding["evidence"]),
+        "RECOMMENDED_ACTION": _format_recommended_actions(finding["recommended_actions"]),
     }
+
+
+def _format_evidence(items):
+    """Render the structured-evidence array as a `\n`-joined block of
+    `file:line — snippet` lines (or `file — snippet` for file-level evidence),
+    each component HTML-escaped. The `<div class="evidence-block">` has
+    `white-space: pre-wrap`, so the newlines render as visible line breaks."""
+    lines = []
+    for item in items:
+        head = esc(item["file"])
+        if item.get("line") is not None:
+            head = f"{head}:{item['line']}"
+        lines.append(f"{head} — {esc(item['snippet'])}")
+    return "\n".join(lines)
+
+
+def _format_recommended_actions(actions):
+    """A single action renders as text (same as the v1.0 single-string field);
+    multiple actions render as a `<ul>` of `<li>`s. Each entry goes through
+    `render_rich` so `<code>`/`<strong>`/`<em>` survive inline."""
+    allow = _RICH_FIELDS["recommended_actions"]
+    if len(actions) == 1:
+        return render_rich(actions[0], allow=allow)
+    items = "".join(f"<li>{render_rich(a, allow=allow)}</li>" for a in actions)
+    return f"<ul>{items}</ul>"
 
 
 def _positive_ctx(p, _idx):
@@ -444,8 +468,12 @@ def render_txt(data: dict) -> str:
         out.append(sub)
         for f in crits:
             out.extend(_wrap(f"{f['id']}  {f['summary']}", indent="  ", subsequent="            "))
-            out.extend(_wrap("Action: " + strip_tags(f["recommended_action"]),
-                             indent="      ", subsequent="      "))
+            actions = f["recommended_actions"]
+            for k, action in enumerate(actions):
+                prefix = "Action: " if len(actions) == 1 else f"Action {k+1}: "
+                lead = "      "
+                out.extend(_wrap(prefix + strip_tags(action),
+                                 indent=lead, subsequent=lead + " " * len(prefix)))
             out.append("")
 
     out.append(bar)

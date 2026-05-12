@@ -554,8 +554,8 @@ This file is the **complete behavioral record**: everything the HTML report show
 
 ```json
 {
-  "schema_version": "1.0",
-  "praxa_version": "<the version in .claude-plugin/plugin.json, e.g. 0.2.0>",
+  "schema_version": "2.0",
+  "praxa_version": "<the version in .claude-plugin/plugin.json, e.g. 0.3.0>",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -579,7 +579,8 @@ This file is the **complete behavioral record**: everything the HTML report show
     {
       "id": "PRAX-YYYY-MM-DD-001",
       "severity": "<Critical | High | Medium | Low | Informational>",
-      "summary": "<one sentence, specific — not generic>",
+      "summary": "<one sentence, specific — not generic; this is what shows on the finding card header>",
+      "description": "<OPTIONAL longer-form body, one short paragraph; may contain inline <code>/<strong>/<em>. Carried in the JSON for downstream consumers; surfaced in the HTML in a future release. Omit the field entirely if you have nothing to add beyond the summary.>",
       "tags": [
         { "kind": "raise", "label": "<RAISE category display name, e.g. Implement Zero Trust>" },
         { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" },
@@ -587,8 +588,13 @@ This file is the **complete behavioral record**: everything the HTML report show
       ],
       "policy_rule_ids": "<the R-NN id(s) this finding violates, e.g. \"R-03\" or \"R-03, R-04\">",
       "policy_rule_text": "<the exact quoted remit text the finding violates; if it spans rules, concatenate with \" / \">",
-      "evidence": ["<file:line — exact observation>", "<...>"],
-      "recommended_action": "<specific action: file to edit, config to change, control to add; may contain <code> tags>",
+      "evidence": [
+        { "file": "<workspace-relative path>", "line": <integer or null>, "snippet": "<exact observation or quoted context — never reprint secrets>" }
+      ],
+      "recommended_actions": [
+        "<specific action: file to edit, config to change, control to add; may contain inline <code>>",
+        "<additional action if there are multiple; one-action findings get a single-item array>"
+      ],
       "raise_category": "<one of: limit_your_domain | balance_your_knowledge_base | implement_zero_trust | manage_your_supply_chain | build_an_ai_red_team | monitor_continuously>",
       "owasp_llm": "<LLM01–LLM10, or null>",
       "owasp_agentic": "<ASI01–ASI10, or null>",
@@ -628,7 +634,9 @@ This file is the **complete behavioral record**: everything the HTML report show
 Rules for the findings array and the JSON as a whole:
 
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
-- **`evidence` must be specific** — a file path with a line or pattern, or an explicit observed absence. "No input validation found" is not evidence; "`src/agent.py:34` — `fetch_message()` returns the full body before the trust check at `:67`" is. Every finding needs at least one evidence item. Never reprint a secret value (see the rule at the top of this skill).
+- **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (the deferred L&F revisit, `design/DEFERRED.md`, will surface the description). If you have nothing more to say than the summary, omit `description` entirely.
+- **`evidence` is structured: an array of `{ "file", "line", "snippet" }` objects** — *not* free-form strings. `file` is a workspace-relative path (or a workspace-relative identifier when there's no single file); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context — a short, specific piece of prose. The renderer formats each item as `file:line — snippet` in the report. Every finding needs at least one evidence item. Bad evidence ("No input validation found") is still bad — say *what* and *where*, e.g. `{ "file": "src/agent.py", "line": 34, "snippet": "fetch_message() returns the full body before the trust check at :67" }`. **Never reprint a secret value** in `snippet` (see the rule at the top of this skill).
+- **`recommended_actions` is an array of strings.** One action → single-item array; multiple actions → multiple items. The renderer renders a single-item array as inline text and a multi-item array as a bulleted list. Each item is one concrete action: file to edit, config to change, control to add. Inline `<code>` / `<strong>` / `<em>` is allowed.
 - **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Cascading & Multi-Agent Failures`, not `ASI05`. Use the canonical names from `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md`. For an MCP-specific finding, add `{ "kind": "mcp", "label": "<the MCP checklist item>" }`.
 - **`escalation`** is `alert` for Critical and High findings, `log_only` for Medium, Low, and Informational.
 - **Counts must be consistent.** `footer.severity_counts` must match the actual severities in `findings[]`. `remit_coverage.stat_counts` must match the actual statuses in `rules[]`, and `total` must equal `len(rules)`. Every non-null `rule.finding_id` must exist in `findings[]`. `weighted_overall` must equal Σ(score × weight) within rounding. **The renderer re-checks all of this and refuses to run if it's off**, naming the offending path — so get it right here.

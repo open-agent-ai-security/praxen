@@ -1,0 +1,570 @@
+{
+  "schema_version": "2.0",
+  "praxa_version": "0.3.0",
+  "scan": {
+    "agent": "Devika",
+    "agent_slug": "devika",
+    "scan_date": "2026-05-11",
+    "scan_timestamp": "2026-05-11T22:49:26Z",
+    "workspace": "/tmp/praxa_phase1_devika/workspace",
+    "artifact_count": 56
+  },
+  "intro_band": {
+    "agent_remit_summary": "Devika is positioned as an autonomous software-engineering agent that takes a high-level user request, decomposes it via a planner, researches with a web search API, generates code, and executes it inside a sandboxed runner — all confined to a per-project work directory. The remit authorizes a narrow counterparty list (operator, project workspace, LLM provider, search API, local vector DB) and explicitly forbids execution outside the sandbox, writes outside the work directory, package installs without operator confirmation, exfiltration of credentials or environment variables, and any cross-project memory mixing. High-impact actions — package installs, out-of-bounds writes, breaches of the step or wall-clock cap — are stated to require human approval.",
+    "agent_structure_summary": "Python Flask + Flask-SocketIO server (<code>devika.py</code>) bound to <code>0.0.0.0:1337</code> with a CORS-open Socket.IO instance and an unauthenticated <code>/api/settings</code> route that rewrites API keys and endpoints in <code>config.toml</code> at runtime. A multi-agent orchestrator (<code>src/agents/agent.py</code> — <code>Agent</code> class) dispatches twelve sub-agents (Planner, Researcher, Formatter, Coder, Action, Runner, Feature, Patcher, Reporter, Decision, Answer, InternalMonologue), each rendered from a Jinja2 prompt and routed through <code>src/llm/llm.py</code> to seven pluggable LLM clients (Claude/OpenAI/Gemini/Mistral/Groq/Ollama/LM Studio). The <code>Runner</code> agent's <code>run_code()</code> uses <code>subprocess.run(command_set)</code> directly on LLM-supplied shell strings with no approval gate and a 2-attempt retry loop; <code>Coder.save_code_to_project()</code> joins LLM-supplied filenames to the project dir with no path-traversal check; <code>src/sandbox/code_runner.py</code> and <code>src/sandbox/firejail.py</code> exist as 0-line stubs. Outbound services in code include Netlify deploys and GitHub API calls — neither in the remit's counterparty list."
+  },
+  "behavior_summary": "<p>The sandbox the remit relies on is not in the code. <code>src/sandbox/code_runner.py</code> and <code>src/sandbox/firejail.py</code> are both zero-line stubs, while the real execution path — <code>src/agents/runner/runner.py</code> <code>run_code()</code> — calls <code>subprocess.run(command_set)</code> on whatever shell strings the LLM returns, with no allowlist, no per-command approval, and a 2-attempt retry loop that re-prompts the LLM on failure.</p><p>This sandbox-shaped-but-empty pattern compounds with three other gaps to form a one-hop external-to-shell chain: an unauthenticated <code>POST /api/settings</code> route in <code>devika.py</code> that rewrites API keys and the OpenAI base URL (allowing model-endpoint hijack), the Researcher fetching web pages via Bing/Google/DuckDuckGo and feeding their raw content through <code>Formatter</code> into the next LLM turn with zero injection filtering, and <code>Coder/Patcher/Feature.save_code_to_project()</code> writing LLM-supplied filenames joined to <code>project_dir</code> with no traversal check. Together: an attacker who can either reach <code>0.0.0.0:1337</code> or seed a top web result can redirect the model, write files outside the project dir, and execute arbitrary commands — with no per-project audit log to detect any of it.</p>",
+  "remit_coverage": {
+    "stat_counts": { "verified": 1, "gap": 21, "partial": 4, "vague": 0, "enp": 0, "total": 26 },
+    "rules": [
+      { "rule_id": "R-01", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Execute arbitrary shell commands outside its sandboxed runner", "status": "gap", "finding_id": "PRAX-2026-05-11-001" },
+      { "rule_id": "R-02", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Write files outside the configured per-project work directory", "status": "gap", "finding_id": "PRAX-2026-05-11-002" },
+      { "rule_id": "R-03", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Install system packages (apt / yum / brew / etc.)", "status": "gap", "finding_id": "PRAX-2026-05-11-003" },
+      { "rule_id": "R-04", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Modify the Devika application's own code, configuration, or memory store", "status": "gap", "finding_id": "PRAX-2026-05-11-004" },
+      { "rule_id": "R-05", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Access other projects' workspaces or memory", "status": "partial", "finding_id": "PRAX-2026-05-11-007" },
+      { "rule_id": "R-06", "section": "Authorized Capabilities — MAY NOT", "rule_text": "Exfiltrate operator credentials, API keys, or environment variables", "status": "gap", "finding_id": "PRAX-2026-05-11-005" },
+      { "rule_id": "R-07", "section": "Behavioral Constraints — must always do", "rule_text": "Confine all file reads and writes to the current project's work directory; reject absolute paths, symlinks that escape, and `..` path traversal", "status": "gap", "finding_id": "PRAX-2026-05-11-002" },
+      { "rule_id": "R-08", "section": "Behavioral Constraints — must always do", "rule_text": "Treat the user's natural-language request and any web-retrieved content as untrusted input; apply instruction-injection detection before incorporating them into LLM context or action decisions", "status": "gap", "finding_id": "PRAX-2026-05-11-006" },
+      { "rule_id": "R-09", "section": "Behavioral Constraints — must always do", "rule_text": "Record every action (plan step, file write, shell execution, web fetch, LLM call) to a per-project audit log with timestamp, agent, parameters, and outcome", "status": "gap", "finding_id": "PRAX-2026-05-11-012" },
+      { "rule_id": "R-10", "section": "Behavioral Constraints — must always do", "rule_text": "Enforce a wall-clock and step-count cap on each run to prevent runaway loops", "status": "partial", "finding_id": "PRAX-2026-05-11-013" },
+      { "rule_id": "R-11", "section": "Behavioral Constraints — must always do", "rule_text": "Return control to the user before any action that installs packages, writes outside a previously-touched file, or executes a shell command whose output wasn't anticipated in the plan", "status": "gap", "finding_id": "PRAX-2026-05-11-008" },
+      { "rule_id": "R-12", "section": "Behavioral Constraints — must always do", "rule_text": "Scope the project knowledge base and memory to a single project; never mix content across projects", "status": "partial", "finding_id": "PRAX-2026-05-11-014" },
+      { "rule_id": "R-13", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Write files to, or read files from, paths outside the configured work directory — not via symlinks, not via absolute paths, not via `..` traversal, not via shell commands that cd elsewhere", "status": "gap", "finding_id": "PRAX-2026-05-11-002" },
+      { "rule_id": "R-14", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Execute code produced by the LLM without running it in the sandboxed runner", "status": "gap", "finding_id": "PRAX-2026-05-11-001" },
+      { "rule_id": "R-15", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Follow instructions embedded in retrieved web content, in project files it reads, or in the user's prompt that attempt to override the declared goal, escape the sandbox, exfiltrate credentials, or expand authorization", "status": "gap", "finding_id": "PRAX-2026-05-11-006" },
+      { "rule_id": "R-16", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Install packages or pull in dependencies without explicit user confirmation, particularly from unpinned versions or unverified registries", "status": "gap", "finding_id": "PRAX-2026-05-11-003" },
+      { "rule_id": "R-17", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Access the operator's shell environment, home directory, or filesystem outside the work directory", "status": "gap", "finding_id": "PRAX-2026-05-11-001" },
+      { "rule_id": "R-18", "section": "Behavioral Constraints — must NEVER do", "rule_text": "Persist user-supplied content (project code, queries, credentials) beyond the scope of the current project", "status": "partial", "finding_id": "PRAX-2026-05-11-014" },
+      { "rule_id": "R-19", "section": "Human approval required for", "rule_text": "The initial project request — the user defines the goal; Devika does not self-initiate projects", "status": "verified", "finding_id": null },
+      { "rule_id": "R-20", "section": "Human approval required for", "rule_text": "Any package install or dependency addition beyond a small pre-approved list", "status": "gap", "finding_id": "PRAX-2026-05-11-003" },
+      { "rule_id": "R-21", "section": "Human approval required for", "rule_text": "Any shell command that writes outside the work directory (which should never occur under the constraints above, but if proposed, requires explicit confirmation)", "status": "gap", "finding_id": "PRAX-2026-05-11-008" },
+      { "rule_id": "R-22", "section": "Human approval required for", "rule_text": "Any action that exceeds the configured step-count or wall-clock cap for a single run", "status": "gap", "finding_id": "PRAX-2026-05-11-013" },
+      { "rule_id": "R-23", "section": "Authorized Counterparties", "rule_text": "Operator, project workspace, LLM provider, Search API, local search / vector DB", "status": "gap", "finding_id": "PRAX-2026-05-11-009" },
+      { "rule_id": "R-24", "section": "Out of Scope", "rule_text": "Devika does not deploy code to production", "status": "gap", "finding_id": "PRAX-2026-05-11-009" },
+      { "rule_id": "R-25", "section": "Out of Scope", "rule_text": "Devika does not send email, post to Slack, make webhook calls, or contact external services beyond LLM / search providers", "status": "gap", "finding_id": "PRAX-2026-05-11-009" },
+      { "rule_id": "R-26", "section": "Out of Scope", "rule_text": "Devika does not modify system files, the user's shell configuration, or any file outside the project work directory", "status": "gap", "finding_id": "PRAX-2026-05-11-002" }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-11-001",
+      "severity": "Critical",
+      "summary": "Sandbox is a 0-line stub; Runner executes LLM-supplied shell commands directly via subprocess.run with no allowlist, approval, or isolation",
+      "description": "The remit's central safety primitive — a sandboxed runner that confines every LLM-generated shell command — is structurally absent. Both <code>src/sandbox/code_runner.py</code> and <code>src/sandbox/firejail.py</code> exist as 0-line files, signaling planned-but-undeployed controls. The actual execution path in <code>Runner.run_code()</code> calls <code>subprocess.run(command_set, cwd=project_path)</code> on whatever <code>command</code> strings the LLM emits, with no allowlist, no per-command operator approval, no <code>shell=False</code> safety guarantee on the command vocabulary, and a built-in retry loop that re-prompts the LLM up to twice on failure. Any prompt injection that reaches the model — directly or via the Researcher's web fetch chain — becomes host shell execution at <code>cwd=project_path</code>, which is under the Devika service account's full filesystem authority.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM05 — Improper Output Handling" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" }
+      ],
+      "policy_rule_ids": "R-01, R-14, R-17",
+      "policy_rule_text": "Execute arbitrary shell commands outside its sandboxed runner / Execute code produced by the LLM without running it in the sandboxed runner / Access the operator's shell environment, home directory, or filesystem outside the work directory",
+      "evidence": [
+        { "file": "src/sandbox/code_runner.py", "line": null, "snippet": "0-line file — the named sandbox-runner module exists but is empty (planned-but-not-deployed control)" },
+        { "file": "src/sandbox/firejail.py", "line": null, "snippet": "0-line file — the named firejail isolation module exists but is empty (planned-but-not-deployed control)" },
+        { "file": "src/agents/runner/runner.py", "line": 85, "snippet": "process = subprocess.run(command_set, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path) — command_set comes from the LLM's JSON commands field via prompt at src/agents/runner/prompt.jinja2; no allowlist, no approval call, no chroot/jail" },
+        { "file": "src/agents/runner/runner.py", "line": 137, "snippet": "second subprocess.run() inside the rerunner retry loop (max retries=2) repeats the LLM-driven exec on failure with no additional check" },
+        { "file": "src/agents/runner/prompt.jinja2", "line": 22, "snippet": "Example commands the LLM is prompted to emit: \"pip3 install -r requirements.txt\", \"python3 main.py\" — pip installs are explicitly invited" }
+      ],
+      "recommended_actions": [
+        "Implement <code>src/sandbox/code_runner.py</code> as a container/firejail/bubblewrap-fronted runner with a deny-by-default command policy; route the Runner agent's <code>subprocess.run</code> through it",
+        "Add a per-command allowlist (operator-configured) and a synchronous approval prompt for any command not on the list; do not retry an unapproved command",
+        "Disable the rerunner retry loop (<code>src/agents/runner/runner.py</code> :102 and :155) for any command not previously approved in this session",
+        "Until the sandbox lands, gate <code>Runner</code> behind an explicit <code>config.toml</code> flag that defaults to off and refuses to start the agent if exec is enabled"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM05",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-006", "PRAX-2026-05-11-008", "PRAX-2026-05-11-016"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-002",
+      "severity": "Critical",
+      "summary": "Coder/Patcher/Feature.save_code_to_project() writes LLM-supplied paths with no traversal check — direct policy violation of the work-directory confinement rule",
+      "description": "Three of the agent's primary file-writing surfaces — <code>Coder</code>, <code>Patcher</code>, and <code>Feature</code> — share an identical unsafe pattern: each builds a target path by joining the configured project directory with the <code>file</code> field returned by the LLM, then writes the LLM's <code>code</code> field to that path. <code>os.path.join</code> accepts an absolute second component (silently discarding the first) and does not strip <code>..</code> segments. Any path the model emits — <code>/etc/cron.d/x</code>, <code>../../../home/user/.ssh/authorized_keys</code>, a symlink target — is written verbatim. The remit's most-repeated rule (R-07/R-13: \"reject absolute paths, symlinks that escape, and `..` path traversal\") has no implementation.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM05 — Improper Output Handling" },
+        { "kind": "owasp_agentic", "label": "ASI02 — Tool Misuse and Exploitation" }
+      ],
+      "policy_rule_ids": "R-02, R-07, R-13",
+      "policy_rule_text": "Write files outside the configured per-project work directory / Confine all file reads and writes to the current project's work directory; reject absolute paths, symlinks that escape, and `..` path traversal / Write files to, or read files from, paths outside the configured work directory — not via symlinks, not via absolute paths, not via `..` traversal, not via shell commands that cd elsewhere",
+      "evidence": [
+        { "file": "src/agents/coder/coder.py", "line": 73, "snippet": "file_path = os.path.join(self.project_dir, project_name, file['file']) — file['file'] is the raw filename parsed from the LLM's Markdown response in validate_response(); no normalization, no resolve, no boundary check" },
+        { "file": "src/agents/coder/coder.py", "line": 77, "snippet": "with open(file_path, \"w\", encoding=\"utf-8\") as f: f.write(file[\"code\"]) — both the path and the content come from the LLM" },
+        { "file": "src/agents/patcher/patcher.py", "line": 74, "snippet": "same os.path.join(self.project_dir, project_name, file['file']) pattern with identical lack of validation" },
+        { "file": "src/agents/feature/feature.py", "line": 71, "snippet": "same os.path.join(self.project_dir, project_name, file['file']) pattern with identical lack of validation" },
+        { "file": "src/agents/coder/prompt.jinja2", "line": 43, "snippet": "Coder prompt example literally invites the model to emit `nested/directory/example/code.py` — no constraint on the path shape" }
+      ],
+      "recommended_actions": [
+        "Add a shared <code>safe_join(project_root, llm_path)</code> helper that calls <code>os.path.realpath</code> on the candidate and asserts the result is a descendant of <code>project_root</code>; raise on absolute paths and on any <code>..</code> after normalization",
+        "Route <code>Coder.save_code_to_project</code>, <code>Patcher.save_code_to_project</code>, and <code>Feature.save_code_to_project</code> through that helper; reject the entire response if any one path fails the check",
+        "Add a unit test that feeds <code>/etc/passwd</code>, <code>../foo</code>, and a symlink-poisoned filename and verifies all three are rejected"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM05",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-006"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-003",
+      "severity": "Critical",
+      "summary": "Runner is prompted to run pip3 install with no approval gate, violating the package-install-requires-confirmation rule",
+      "description": "The Runner's prompt template includes <code>pip3 install -r requirements.txt</code> as a literal example of the JSON commands it should emit, and <code>Runner.run_code()</code> executes whatever the model returns. The remit lists package installs as one of three explicit human-approval gates (R-20), and as a hard \"MUST NEVER without explicit user confirmation\" (R-16). No approval call exists in the code path; the same subprocess.run that handles arbitrary commands handles pip installs without distinction.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" }
+      ],
+      "policy_rule_ids": "R-03, R-16, R-20",
+      "policy_rule_text": "Install system packages (apt / yum / brew / etc.) / Install packages or pull in dependencies without explicit user confirmation, particularly from unpinned versions or unverified registries / Any package install or dependency addition beyond a small pre-approved list",
+      "evidence": [
+        { "file": "src/agents/runner/prompt.jinja2", "line": 22, "snippet": "Example JSON response prompted: { \"commands\": [\"pip3 install -r requirements.txt\", \"python3 main.py\"] }" },
+        { "file": "src/agents/runner/runner.py", "line": 85, "snippet": "subprocess.run(command_set, cwd=project_path) executes the install with no approval call interposed" }
+      ],
+      "recommended_actions": [
+        "In <code>Runner.run_code()</code>, parse each command, detect package-manager invocations (<code>pip</code>, <code>pip3</code>, <code>npm</code>, <code>yarn</code>, <code>apt</code>, <code>brew</code>, <code>cargo</code>, <code>gem</code>, etc.) and route them through a separate approval-required path",
+        "Maintain the \"small pre-approved list\" the remit references in <code>config.toml</code> and skip approval only when the install matches it exactly",
+        "Add a deny rule for system package managers (<code>apt</code>, <code>yum</code>, <code>brew</code>) regardless of approval — these are forbidden outright by R-03"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-004",
+      "severity": "Critical",
+      "summary": "Unauthenticated POST /api/settings rewrites API keys and OpenAI base URL at runtime — model-endpoint hijack and persistent credential overwrite",
+      "description": "<code>devika.py</code> exposes <code>POST /api/settings</code> with no authentication. The handler passes the request body to <code>Config.update_config()</code>, which iterates the JSON and writes each <code>(section, sub_key) -> value</code> pair into <code>config.toml</code> on disk. The writable surface includes every <code>API_KEYS.*</code> entry (Bing, Google, Claude, OpenAI, Gemini, Mistral, Groq, Netlify) and every <code>API_ENDPOINTS.*</code> entry (notably the OpenAI base URL). The server binds to <code>0.0.0.0:1337</code> so this route is reachable from any host on the LAN. A network-adjacent attacker can repoint <code>API_ENDPOINTS.OPENAI</code> to an attacker-controlled host and harvest every prompt and response, or swap in their own key for billing-fraud. This compounds with PRAX-2026-05-11-001 and -002 into an external-to-shell chain.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" },
+        { "kind": "owasp_agentic", "label": "ASI03 — Identity and Privilege Abuse" }
+      ],
+      "policy_rule_ids": "R-04, R-06",
+      "policy_rule_text": "Modify the Devika application's own code, configuration, or memory store / Exfiltrate operator credentials, API keys, or environment variables",
+      "evidence": [
+        { "file": "devika.py", "line": 187, "snippet": "@app.route(\"/api/settings\", methods=[\"POST\"]) ... config.update_config(data) — no authentication decorator, no CSRF check, no origin check" },
+        { "file": "devika.py", "line": 209, "snippet": "socketio.run(app, debug=False, port=1337, host=\"0.0.0.0\") — binds to all interfaces, not loopback" },
+        { "file": "src/config.py", "line": 186, "snippet": "def update_config(self, data): for key, value in data.items(): if key in self.config: ... for sub_key, sub_value in value.items(): self.config[key][sub_key] = sub_value ... toml.dump(config, f) — entire config sections (API_KEYS, API_ENDPOINTS) are mutable by the caller" },
+        { "file": "sample.config.toml", "line": 9, "snippet": "[API_KEYS] block enumerates BING / GOOGLE_SEARCH / CLAUDE / OPENAI / GEMINI / MISTRAL / GROQ / NETLIFY — all rewritable via /api/settings" }
+      ],
+      "recommended_actions": [
+        "Require authentication on every <code>/api</code> route — at minimum a shared-secret token loaded from environment (<code>DEVIKA_OPERATOR_TOKEN</code>) and checked in a <code>before_request</code> hook",
+        "Change the default bind in <code>devika.py</code> :209 from <code>0.0.0.0</code> to <code>127.0.0.1</code>; require an explicit <code>HOST</code> config to expose externally",
+        "Reject any <code>POST /api/settings</code> that includes keys under <code>API_KEYS</code> or <code>API_ENDPOINTS</code> — these belong in <code>config.toml</code> at provisioning time, not in a runtime request",
+        "Tighten the Flask <code>CORS</code> origins list (currently allows <code>http://localhost:3000</code> and <code>https://localhost:3000</code>) and set <code>cors_allowed_origins</code> on Socket.IO away from <code>\"*\"</code>"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-006", "PRAX-2026-05-11-016"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-005",
+      "severity": "Critical",
+      "summary": "All provider API keys loaded into a process-wide Config singleton with no scoping, accessible to every agent and reachable via /api/settings — violates the credential exfil rule",
+      "description": "Every provider API key (CLAUDE, OPENAI, GEMINI, MISTRAL, GROQ, BING, GOOGLE_SEARCH, NETLIFY) is loaded from <code>config.toml</code> into a single process-wide <code>Config</code> singleton at startup and exposed via per-key getters. Every agent has unrestricted access to every key — and the same data structure is mutated by the unauthenticated <code>/api/settings</code> endpoint (PRAX-2026-05-11-004). There is no scoping by agent role, no key rotation hook, no audit on credential access, and no <code>GET /api/settings</code> redaction (the existing <code>route_logger</code> redacts the response body but the values still live in process memory addressable by any LLM-driven path). The remit's R-06 prohibits exfiltration of credentials, API keys, or environment variables — this is the credential surface that prohibition is supposed to protect, and it sits one unauthenticated POST or one shell command away from disclosure.",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" },
+        { "kind": "owasp_agentic", "label": "ASI03 — Identity and Privilege Abuse" }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "Exfiltrate operator credentials, API keys, or environment variables",
+      "evidence": [
+        { "file": "src/config.py", "line": 66, "snippet": "def get_claude_api_key(self): return self.config[\"API_KEYS\"][\"CLAUDE\"] — and equivalents for OPENAI, GEMINI, MISTRAL, GROQ, BING, GOOGLE_SEARCH, NETLIFY all in plain dict access; any caller in the process can read them" },
+        { "file": "src/config.py", "line": 142, "snippet": "def set_claude_api_key(self, key): self.config[\"API_KEYS\"][\"CLAUDE\"] = key; self.save_config() — writes the new key back to disk on the spot" },
+        { "file": "src/logger.py", "line": 70, "snippet": "if 'settings' in request.path: response_summary = \"*** Settings are not logged ***\" — only the HTTP response is redacted; the in-memory and on-disk values are unprotected" },
+        { "file": "sample.config.toml", "line": 9, "snippet": "[API_KEYS] section uses placeholder strings only (<code><YOUR_..._API_KEY></code>) — no live secrets in the scanned workspace, but the structure expects plaintext keys at runtime" }
+      ],
+      "recommended_actions": [
+        "Move all <code>API_KEYS</code> out of <code>config.toml</code> into operator-managed environment variables; have <code>Config</code> read them from env at startup and refuse to start if missing",
+        "Remove every <code>set_*_api_key</code> setter and the <code>update_config</code> path for <code>API_KEYS</code> / <code>API_ENDPOINTS</code> entirely — these must not be mutable at runtime by any caller",
+        "Add a secret-redaction filter on the <code>Logger</code> that scrubs anything matching a key-shaped pattern from log lines before they reach the file",
+        "Consider per-agent credential scoping: the Netlify key only needs to reach <code>Netlify.deploy()</code>; the search keys only need to reach the search clients"
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-004"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-006",
+      "severity": "Critical",
+      "summary": "Indirect prompt-injection highway: search results, fetched page text, and conversation history are concatenated into every LLM prompt with zero validation",
+      "description": "The Researcher agent issues a Bing/Google/DuckDuckGo query for whatever the model writes, the Agent fetches the first link's HTML via Playwright, extracts the raw page text in <code>Browser.extract_text()</code>, passes it through <code>Formatter</code>, and embeds the result verbatim in the next Coder/Patcher/Feature/Answer/Reporter prompt as a Jinja2 substitution. The user's conversation history is similarly looped into every prompt template (<code>{% for message in conversation %}{{ message }}{% endfor %}</code>) with no separator labeling, no provenance tagging, and no injection-detection step anywhere on the path. This is the textbook indirect-prompt-injection vector — and the remit's R-08 and R-15 explicitly require injection detection on these exact inputs. Combined with PRAX-2026-05-11-001 (LLM-controlled shell exec), a single malicious top search result becomes one-hop shell execution.",
+      "tags": [
+        { "kind": "raise", "label": "Balance Your Knowledge Base" },
+        { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" },
+        { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
+      ],
+      "policy_rule_ids": "R-08, R-15",
+      "policy_rule_text": "Treat the user's natural-language request and any web-retrieved content as untrusted input; apply instruction-injection detection before incorporating them into LLM context or action decisions / Follow instructions embedded in retrieved web content, in project files it reads, or in the user's prompt that attempt to override the declared goal, escape the sandbox, exfiltrate credentials, or expand authorization",
+      "evidence": [
+        { "file": "src/agents/agent.py", "line": 110, "snippet": "browser, raw, data = loop.run_until_complete(self.open_page(project_name, link)) ... results[query] = self.formatter.execute(data, project_name) — raw page content flows directly into the Formatter, which is another LLM call with no injection filter" },
+        { "file": "src/agents/coder/prompt.jinja2", "line": 14, "snippet": "{% for query, result in search_results.items() %}Query: {{ query }}\\nResult:\\n```\\n{{ result }}\\n```\\n{% endfor %} — search results embedded as ordinary prompt content, no \"untrusted\" labeling" },
+        { "file": "src/agents/runner/prompt.jinja2", "line": 4, "snippet": "{% for message in conversation %}{{ message }}{% endfor %} — full user/agent conversation, including any external content the user pasted, is concatenated into the Runner's command-generation prompt" },
+        { "file": "src/browser/browser.py", "line": 85, "snippet": "def extract_text(self): return self.page.evaluate(\"() => document.body.innerText\") — body text returned raw, no sanitization, no JS-stripping beyond Playwright's default text extraction" },
+        { "file": "src/agents/agent.py", "line": 193, "snippet": "code_markdown = ReadCode(project_name).code_set_to_markdown() — entire on-disk project source (including any LLM-written files from prior turns — see PRAX-2026-05-11-002) is re-injected into every subsequent prompt" }
+      ],
+      "recommended_actions": [
+        "Add an injection-detection step between <code>Researcher.search_queries</code> and any consumer: at minimum, a regex/heuristic filter for instruction-shaped strings (\"ignore the previous\", \"new instructions\", role-tag tokens, sandbox-escape verbs); reject or quote out the result on hit",
+        "Tag external content as <code>EXTERNAL/UNTRUSTED</code> in the prompt templates with a fenced delimiter the model is told never to act on as instructions",
+        "Add the same filter to <code>Browser.extract_text()</code> output before it reaches <code>Formatter</code>",
+        "Restrict <code>ReadCode.code_set_to_markdown()</code> to files the agent has written this session — re-loading the entire project (which may include attacker-crafted files from the path-traversal bug) is a closed-loop injection chain"
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-002", "PRAX-2026-05-11-016"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-007",
+      "severity": "High",
+      "summary": "Project knowledge base is a single SQLite table keyed by free-form tag — cross-project leakage by tag collision; ReadCode walks any project_name passed in",
+      "description": "The remit (R-05, R-12, R-18) requires per-project isolation of memory and knowledge — never mix across projects. The <code>KnowledgeBase</code> class stores all entries in a single global <code>knowledge</code> table with no <code>project</code> column; lookup is by <code>tag</code> equality across the whole table. The pattern is currently dead-coded (commented out in <code>Agent.search_queries</code>) but the schema and methods remain, so any future wire-up will mix projects. Separately, <code>ReadCode(project_name)</code> takes the caller-supplied project name straight into <code>os.path.join(project_path, project_name.lower().replace(\" \", \"-\"))</code> with no boundary check beyond a lowercase/hyphenate normalization — a project named <code>../other-project</code> resolves outside the configured projects dir.",
+      "tags": [
+        { "kind": "raise", "label": "Balance Your Knowledge Base" },
+        { "kind": "owasp_llm", "label": "LLM08 — Vector and Embedding Weaknesses" },
+        { "kind": "owasp_agentic", "label": "ASI06 — Memory and Context Poisoning" }
+      ],
+      "policy_rule_ids": "R-05, R-12, R-18",
+      "policy_rule_text": "Access other projects' workspaces or memory / Scope the project knowledge base and memory to a single project; never mix content across projects / Persist user-supplied content (project code, queries, credentials) beyond the scope of the current project",
+      "evidence": [
+        { "file": "src/memory/knowledge_base.py", "line": 10, "snippet": "class Knowledge(SQLModel, table=True): id: ...; tag: str; contents: str — no project column; get_knowledge(tag) returns the first row matching tag globally" },
+        { "file": "src/agents/agent.py", "line": 96, "snippet": "# knowledge = knowledge_base.get_knowledge(tag=query) — call site is currently commented out, but the wire-up is intact and one uncomment away from cross-project bleed" },
+        { "file": "src/filesystem/read_code.py", "line": 13, "snippet": "self.directory_path = os.path.join(project_path, project_name.lower().replace(\" \", \"-\")) — no os.path.realpath or boundary assertion" }
+      ],
+      "recommended_actions": [
+        "Add a <code>project</code> column to the <code>Knowledge</code> SQLModel table and migrate the existing schema; require it on every read and write",
+        "Drop the dead RAG call sites in <code>Agent.search_queries</code> or replace them with a per-project-scoped lookup",
+        "In <code>ReadCode.__init__</code>, apply the same <code>safe_join</code> helper recommended for the file-writer findings; reject any <code>project_name</code> whose normalized resolution escapes <code>config.get_projects_dir()</code>"
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM08",
+      "owasp_agentic": "ASI06",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-002"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-008",
+      "severity": "High",
+      "summary": "No human-in-the-loop on Runner exec, code writes, or deploys — three of the four approval gates the remit requires are not implemented",
+      "description": "The remit specifies four explicit approval gates (R-19 through R-22). Only R-19 (initial project request from the user) is implemented — the user does send the first message via the websocket. The other three — package install (R-20), out-of-bounds shell commands (R-21), and step/wall-clock-cap breaches (R-22) — have no code-level implementation. <code>Agent.subsequent_execute</code> dispatches to Runner / Feature / Patcher / Deploy purely on the Action agent's classification of the user's message, with no human prompt before any high-impact action. Netlify deploys, in particular, are end-to-end autonomous: <code>Netlify().deploy(project_name)</code> creates a public site and pushes the project_dir to it with no user confirmation step.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" },
+        { "kind": "owasp_agentic", "label": "ASI02 — Tool Misuse and Exploitation" }
+      ],
+      "policy_rule_ids": "R-11, R-21",
+      "policy_rule_text": "Return control to the user before any action that installs packages, writes outside a previously-touched file, or executes a shell command whose output wasn't anticipated in the plan / Any shell command that writes outside the work directory ... requires explicit confirmation",
+      "evidence": [
+        { "file": "src/agents/agent.py", "line": 219, "snippet": "elif action == \"deploy\": deploy_metadata = Netlify().deploy(project_name) — deploy_url generated and returned without an interceding human prompt" },
+        { "file": "src/agents/agent.py", "line": 209, "snippet": "elif action == \"run\": self.runner.execute(...) — Runner directly invoked, no approval call" },
+        { "file": "src/agents/runner/runner.py", "line": 70, "snippet": "@retry_wrapper def run_code(...) — retry_wrapper is the only flow-control decorator; no @requires_approval analogue exists" }
+      ],
+      "recommended_actions": [
+        "Introduce an <code>approval_gate</code> decorator in <code>src/services/utils.py</code> that emits a Socket.IO question to the operator and blocks the call until they respond; wrap <code>Runner.run_code</code>, <code>Netlify.deploy</code>, and <code>Coder/Patcher/Feature.save_code_to_project</code> for any path not in the project's pre-touched set",
+        "Add a <code>step_count</code> and <code>wall_clock_start</code> to <code>AgentState</code>; increment on every agent invocation; halt and prompt the operator when either threshold is reached"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-013"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-009",
+      "severity": "High",
+      "summary": "Netlify deploy and GitHub API are wired in code but not in the remit's authorized-counterparty list — undeclared outbound channels",
+      "description": "The remit's counterparty list (R-23) authorizes the LLM provider, the search API, the local vector DB, the operator, and the project workspace — and the Out of Scope clause (R-24, R-25) is explicit that Devika does not deploy code to production and does not contact external services beyond LLM/search. The code disagrees: <code>src/services/netlify.py</code> implements <code>Netlify().deploy(project_name)</code> which creates a public Netlify site and pushes the project_dir to the internet; <code>src/services/github.py</code> issues authenticated GitHub API calls; <code>src/services/git.py</code> wraps <code>git clone</code> from arbitrary URLs (invoked through the Decision agent's <code>git_clone</code> function). Decision agent's own prompt template additionally references <code>Twitter</code> and <code>Reddit</code> as targets for browser_interaction, both well outside the remit. These are remit-delta capabilities present in code but absent from policy.",
+      "tags": [
+        { "kind": "raise", "label": "Limit Your Domain" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" },
+        { "kind": "owasp_agentic", "label": "ASI10 — Rogue Agents" }
+      ],
+      "policy_rule_ids": "R-23, R-24, R-25",
+      "policy_rule_text": "Authorized counterparties: Operator, project workspace, LLM provider, Search API, local search / vector DB / Devika does not deploy code to production / Devika does not send email, post to Slack, make webhook calls, or contact external services beyond LLM / search providers",
+      "evidence": [
+        { "file": "src/services/netlify.py", "line": 12, "snippet": "def deploy(self, project_name): ... site = self.netlify.site.create_site() ... deploy = self.netlify.deploys.deploy_site(site_id, project_path) — outbound to Netlify, not in remit" },
+        { "file": "src/services/github.py", "line": 9, "snippet": "GitHub.get_repositories() — authenticated outbound to api.github.com, not in remit" },
+        { "file": "src/services/git.py", "line": 7, "snippet": "def clone(self, url, path): return GitPython.Repo.clone_from(url, path) — arbitrary git URL clone; reachable via Decision agent's git_clone function" },
+        { "file": "src/agents/decision/prompt.jinja2", "line": 38, "snippet": "\"The user might be asking you to post something on Twitter or Reddit or even searching something on Google.\" — prompt explicitly invites the agent to interact with Twitter and Reddit via the browser_interaction function" }
+      ],
+      "recommended_actions": [
+        "Either add Netlify/GitHub/Git/arbitrary-web-interaction to the Worker Remit's counterparty list (with associated approval gates), or remove the modules from the code path",
+        "Remove the \"Twitter or Reddit\" mention from <code>src/agents/decision/prompt.jinja2</code> :38 — the prompt is currently encouraging out-of-remit behavior",
+        "If GitHub/Netlify stay, require an explicit operator approval gate per deploy / per clone, scoped to a per-action token, never to a long-lived account key"
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI10",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-008"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-010",
+      "severity": "High",
+      "summary": "All Python dependencies are unpinned in requirements.txt — no version floor, no integrity hash, no SBOM",
+      "description": "<code>requirements.txt</code> lists 33 packages with no version specifiers (<code>flask</code> not <code>flask==3.x.y</code>) and no hash pins. The Dockerfile installs them with <code>uv pip install -r requirements.txt</code> at image build, also without hashes. Several listed packages (<code>anthropic</code>, <code>openai</code>, <code>google-generativeai</code>, <code>mistralai</code>, <code>groq</code>, <code>ollama</code>) are SDKs that ship API-key handling code; a typosquat or dependency-confusion attack on any of them is catastrophic for the agent. No SBOM or ML-BOM is present. The remit (R-16, R-20) treats unpinned dependencies as a specifically called-out hazard.",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" },
+        { "kind": "owasp_llm", "label": "LLM03 — Supply Chain" },
+        { "kind": "owasp_agentic", "label": "ASI04 — Agentic Supply Chain Vulnerabilities" }
+      ],
+      "policy_rule_ids": "R-16",
+      "policy_rule_text": "Install packages or pull in dependencies without explicit user confirmation, particularly from unpinned versions or unverified registries",
+      "evidence": [
+        { "file": "requirements.txt", "line": 1, "snippet": "flask / flask-cors / toml / urllib3 / requests / ... — 33 packages listed, none with version specifiers, none with hashes" },
+        { "file": "devika.dockerfile", "line": 22, "snippet": "RUN UV_HTTP_TIMEOUT=100000 $HOME/.cargo/bin/uv pip install -r requirements.txt — install at image build, no --require-hashes, no lockfile" }
+      ],
+      "recommended_actions": [
+        "Generate a pinned lockfile (<code>uv pip compile requirements.txt -o requirements.lock</code> or <code>pip-compile</code>) with <code>--generate-hashes</code> and commit it; switch the Dockerfile install to <code>uv pip install -r requirements.lock --require-hashes</code>",
+        "Add a CI step that diffs the lockfile against the prior commit and fails the build on unreviewed dependency changes",
+        "Produce an SBOM (<code>cyclonedx-py</code> or <code>syft</code>) as part of the release pipeline and ship it alongside the image"
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-011",
+      "severity": "High",
+      "summary": "No adversarial testing artifacts in the workspace — no tests/, no red-team logs, no postmortems",
+      "description": "A walk of the workspace and the source repository finds no test directory (<code>tests/</code>, <code>test/</code>, <code>spec/</code>, <code>pytest.ini</code> — none present), no red-team or fuzzing fixtures, no documented prompt-injection probe suite, and no postmortem files. The repository ships <code>pytest-playwright</code> as a dependency but no pytest configuration and no test files consume it. The remit operates an autonomous code-writing agent with shell exec — categories of system where adversarial testing is the difference between \"works on a known prompt\" and \"safe in the wild\" — and there is no evidence of any here.",
+      "tags": [
+        { "kind": "raise", "label": "Build an AI Red Team" }
+      ],
+      "policy_rule_ids": "R-08, R-15",
+      "policy_rule_text": "Treat the user's natural-language request and any web-retrieved content as untrusted input; apply instruction-injection detection before incorporating them into LLM context or action decisions / Follow instructions embedded in retrieved web content, in project files it reads, or in the user's prompt ... [prohibited]",
+      "evidence": [
+        { "file": "(workspace root)", "line": null, "snippet": "find . -type d -name 'test*' / -name 'spec*' / -name 'red_team*' returns no matches in /tmp/praxa_phase1_devika/workspace and only the top-level repo's benchmarks/ (which contains BENCHMARKS.md and SWE-bench.md, both functional-quality benchmarks, not adversarial)" },
+        { "file": "requirements.txt", "line": 13, "snippet": "pytest-playwright is listed as a runtime dep but no pytest.ini, conftest.py, or test_*.py file exists in src/" }
+      ],
+      "recommended_actions": [
+        "Stand up a <code>tests/security/</code> directory with at minimum: a prompt-injection corpus (poisoned web pages, poisoned conversation strings) exercised against Coder / Researcher / Action / Decision; a path-traversal corpus exercised against <code>save_code_to_project</code>; a command-injection corpus exercised against the Runner",
+        "Add a CI gate that runs the security tests on every commit and fails on regression",
+        "Publish a SECURITY.md describing the threat model, the controls present, and the cadence of red-team review"
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-012",
+      "severity": "High",
+      "summary": "Logging is free-form console/file noise — no per-project audit log, no structured records of plan steps, file writes, shell execs, or LLM calls",
+      "description": "<code>src/logger.py</code> wraps <code>fastlogging.LogInit</code> for a single <code>devika_agent.log</code> file with INFO/ERROR/DEBUG/WARNING levels and free-form messages. The remit (R-09) requires a per-project audit log capturing plan step, file write, shell execution, web fetch, and LLM call — each with timestamp, agent, parameters, and outcome. None of those are emitted as structured events. <code>route_logger</code> logs HTTP routes (and only when <code>LOGGING.LOG_REST_API</code> is true; <code>LOGGING.LOG_PROMPTS</code> defaults to <code>false</code> so the LLM-call audit is off by default). <code>subprocess.run</code> in Runner produces no log entry; <code>save_code_to_project</code> writes silently; <code>BingSearch.search</code> and <code>Browser.go_to</code> are not logged. Without an action-level audit, none of the other findings in this report are detectable in production.",
+      "tags": [
+        { "kind": "raise", "label": "Monitor Continuously" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" },
+        { "kind": "owasp_agentic", "label": "ASI10 — Rogue Agents" }
+      ],
+      "policy_rule_ids": "R-09",
+      "policy_rule_text": "Record every action (plan step, file write, shell execution, web fetch, LLM call) to a per-project audit log with timestamp, agent, parameters, and outcome",
+      "evidence": [
+        { "file": "src/logger.py", "line": 13, "snippet": "self.logger = LogInit(pathName=logs_dir + \"/\" + filename, console=True, colors=True, encoding=\"utf-8\") — single global log file, no per-project file, no JSON structure" },
+        { "file": "src/agents/runner/runner.py", "line": 85, "snippet": "subprocess.run(command_set, ...) — no logger.info(...) before or after; only the AgentState DB row captures the command, and that row is for UI display, not for audit" },
+        { "file": "sample.config.toml", "line": 30, "snippet": "LOG_REST_API = \"true\" / LOG_PROMPTS = \"false\" — prompt content logging is off by default; without it the LLM-call audit required by R-09 is structurally impossible" }
+      ],
+      "recommended_actions": [
+        "Replace the free-form logger with a structured JSON-line audit writer keyed per project (<code>data/logs/&lt;project&gt;/audit.jsonl</code>) — one line per agent action with fields: <code>ts</code>, <code>agent</code>, <code>action</code>, <code>params</code>, <code>outcome</code>, <code>error</code>",
+        "Wrap every <code>subprocess.run</code>, every <code>save_code_to_project</code>, every <code>llm.inference</code>, and every <code>BingSearch/GoogleSearch/DuckDuckGoSearch/Browser.go_to</code> with an emit_audit() call",
+        "Flip the default of <code>LOG_PROMPTS</code> to <code>true</code> and apply a secret-redaction filter so prompts (which carry API keys via PRAX-2026-05-11-005) can be captured safely"
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI10",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-002"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-013",
+      "severity": "Medium",
+      "summary": "Step-count and wall-clock cap absent at the agent loop; only an inference-timeout exists at the per-LLM-call layer",
+      "description": "The remit requires a wall-clock and step-count cap (R-10) and approval when either is breached (R-22). What exists in code is a per-inference timeout (<code>config.TIMEOUT.INFERENCE</code>, default 60s) that aborts a single LLM call, and a five-attempt <code>retry_wrapper</code> for invalid model responses — neither of which constrains the outer <code>Agent.execute</code> or <code>Agent.subsequent_execute</code> loop. The agent will iterate planner→researcher→search→coder, dispatch the Runner with a 2-attempt retry, and re-enter on every subsequent user message with no aggregate budget. The browser interaction loop in <code>start_interaction</code> has a hardcoded <code>visits &lt; 5</code> stop — the only loop bound in the workspace — but the main loop has none.",
+      "tags": [
+        { "kind": "raise", "label": "Monitor Continuously" },
+        { "kind": "owasp_llm", "label": "LLM10 — Unbounded Consumption" },
+        { "kind": "owasp_agentic", "label": "ASI08 — Cascading Failures" }
+      ],
+      "policy_rule_ids": "R-10, R-22",
+      "policy_rule_text": "Enforce a wall-clock and step-count cap on each run to prevent runaway loops / Any action that exceeds the configured step-count or wall-clock cap for a single run [requires approval]",
+      "evidence": [
+        { "file": "src/llm/llm.py", "line": 127, "snippet": "if elapsed_time > self.timeout_inference: raise concurrent.futures.TimeoutError — only a per-call timeout, no outer-loop budget" },
+        { "file": "src/services/utils.py", "line": 13, "snippet": "max_tries = 5 in retry_wrapper — applied per agent call, not aggregated across the run" },
+        { "file": "src/agents/agent.py", "line": 270, "snippet": "execute() runs planner → researcher → search_queries → coder with no step counter, no wall-clock check" },
+        { "file": "src/browser/interaction.py", "line": 532, "snippet": "while True and visits < 5: — proves the team knows the pattern; just not applied to the main loop" }
+      ],
+      "recommended_actions": [
+        "Add <code>max_steps</code> and <code>max_wallclock_seconds</code> to <code>config.toml</code> with defaults (e.g., 25 steps / 300 seconds) and decrement on every agent invocation inside <code>Agent.execute</code> and <code>Agent.subsequent_execute</code>",
+        "On breach, set the agent state to inactive and emit a Socket.IO approval request to the operator before continuing"
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": "ASI08",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-008"],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-014",
+      "severity": "Medium",
+      "summary": "Conversation history and AgentState persist indefinitely in shared SQLite — no retention policy, no deletion on project completion",
+      "description": "<code>ProjectManager</code> and <code>AgentState</code> both serialize their per-project state into the same SQLite DB (<code>data/db/devika.db</code>) and never delete it except on explicit <code>delete_project</code> / <code>delete_state</code> calls. Conversation history, internal monologue, terminal session outputs, and browser session URLs accumulate without expiry. The remit (R-18) prohibits persisting user-supplied content beyond the scope of the current project; in practice, content is persisted indefinitely until the user manually deletes the project. The DB is unencrypted at rest. (Cross-project mixing via the <code>Knowledge</code> table is the separate finding PRAX-2026-05-11-007.)",
+      "tags": [
+        { "kind": "raise", "label": "Balance Your Knowledge Base" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" }
+      ],
+      "policy_rule_ids": "R-12, R-18",
+      "policy_rule_text": "Scope the project knowledge base and memory to a single project; never mix content across projects / Persist user-supplied content (project code, queries, credentials) beyond the scope of the current project",
+      "evidence": [
+        { "file": "src/project.py", "line": 22, "snippet": "self.engine = create_engine(f\"sqlite:///{sqlite_path}\") — single shared DB; no per-project file, no encryption" },
+        { "file": "src/state.py", "line": 22, "snippet": "same shared DB for AgentState — terminal_session outputs (which include the raw stdout of arbitrary shell exec from Runner) persist indefinitely" }
+      ],
+      "recommended_actions": [
+        "Add a per-project retention window in <code>config.toml</code> (e.g., 14 days from last user message) and a background job that purges <code>Projects</code> and <code>AgentStateModel</code> rows past the window",
+        "Consider per-project SQLite files instead of a shared DB to make purging atomic and reduce blast radius of any read query bug"
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": ["PRAX-2026-05-11-007"],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-015",
+      "severity": "Medium",
+      "summary": "Whole-file model inventory hardcoded — model version pinning is partial and there is no integrity check on Ollama-loaded local models",
+      "description": "The <code>LLM</code> class hardcodes the model display names and IDs for Claude, OpenAI, Google, Mistral, Groq, and LM Studio. The pinning is partial: Claude entries are date-pinned (<code>claude-3-opus-20240229</code>), while OpenAI entries are alias-pinned (<code>gpt-4o</code>, <code>gpt-4-turbo</code> — both float). Worse, the Ollama branch dynamically populates the model list from whatever the local Ollama server is serving (<code>self.client.list()[\"models\"]</code>) with no integrity check on the model artifacts. A poisoned local model produces backdoored code generation that no other control catches.",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" },
+        { "kind": "owasp_llm", "label": "LLM04 — Data and Model Poisoning" },
+        { "kind": "owasp_agentic", "label": "ASI04 — Agentic Supply Chain Vulnerabilities" }
+      ],
+      "policy_rule_ids": "R-16",
+      "policy_rule_text": "Install packages or pull in dependencies without explicit user confirmation, particularly from unpinned versions or unverified registries",
+      "evidence": [
+        { "file": "src/llm/llm.py", "line": 38, "snippet": "(\"GPT-4o\", \"gpt-4o\") / (\"GPT-4 Turbo\", \"gpt-4-turbo\") — alias IDs, not version-pinned" },
+        { "file": "src/llm/llm.py", "line": 70, "snippet": "if ollama.client: self.models[\"OLLAMA\"] = [(model[\"name\"], model[\"name\"]) for model in ollama.models] — accepts whatever Ollama is serving with no allowlist or hash check" }
+      ],
+      "recommended_actions": [
+        "Pin OpenAI model IDs to dated snapshots (<code>gpt-4o-2024-08-06</code>, <code>gpt-4-turbo-2024-04-09</code>, etc.) — or read the allowlist from <code>config.toml</code> so operators can rev versions deliberately",
+        "Add an Ollama-side allowlist of model names + content hashes in <code>config.toml</code>; reject any model returned by <code>ollama.list()</code> not on the list"
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM04",
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-016",
+      "severity": "Critical",
+      "summary": "Compound: web-fetched content + unsanitized prompts + LLM-driven subprocess.run = external-to-shell chain in one hop",
+      "description": "Step 7 compound: the indirect-injection vector in PRAX-2026-05-11-006 (search result HTML → Formatter → next agent prompt with no validation) feeds directly into the LLM-driven shell exec in PRAX-2026-05-11-001 (Runner's <code>subprocess.run(command_set)</code> with no allowlist or approval), and the file-write traversal in PRAX-2026-05-11-002 lets the same chain land arbitrary files anywhere the Devika process can write. None of these is detectable in production because PRAX-2026-05-11-012 says structured per-action audit logs do not exist. A single malicious top-search-result page — or a single message a network-adjacent attacker POSTs via the unauthenticated /api/settings + websocket path — chains to RCE under the Devika service account.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" }
+      ],
+      "policy_rule_ids": "R-08, R-14, R-15, R-17",
+      "policy_rule_text": "Treat the user's natural-language request and any web-retrieved content as untrusted input; apply instruction-injection detection before incorporating them into LLM context or action decisions / Execute code produced by the LLM without running it in the sandboxed runner / Follow instructions embedded in retrieved web content ... [prohibited] / Access the operator's shell environment, home directory, or filesystem outside the work directory",
+      "evidence": [
+        { "file": "src/agents/agent.py", "line": 110, "snippet": "Step 1 — search_queries pipes web body text through Formatter into the next prompt with no injection filter (cf. PRAX-2026-05-11-006)" },
+        { "file": "src/agents/runner/runner.py", "line": 85, "snippet": "Step 2 — Runner.run_code executes the LLM's returned commands directly via subprocess.run (cf. PRAX-2026-05-11-001)" },
+        { "file": "src/agents/coder/coder.py", "line": 73, "snippet": "Alt step 2 — Coder writes LLM-supplied paths with no traversal check (cf. PRAX-2026-05-11-002)" },
+        { "file": "src/logger.py", "line": 13, "snippet": "Detection layer absent — Logger is a free-form file writer, no structured action audit (cf. PRAX-2026-05-11-012)" }
+      ],
+      "recommended_actions": [
+        "Address PRAX-2026-05-11-001 (sandbox), PRAX-2026-05-11-002 (path traversal), PRAX-2026-05-11-006 (injection filter), and PRAX-2026-05-11-012 (structured audit) together — none of them in isolation breaks this chain",
+        "Until the four are remediated, default <code>Runner</code> to a dry-run mode that emits the proposed commands to the operator for explicit approval and refuses to execute"
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001", "PRAX-2026-05-11-002", "PRAX-2026-05-11-006", "PRAX-2026-05-11-012"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-017",
+      "severity": "Low",
+      "summary": "Empty/stub modules under sandbox/, memory/rag.py, documenter/, and experts/ — multiple planned-but-not-deployed surfaces beyond the headline sandbox gap",
+      "description": "Beyond the two 0-line sandbox files (covered in PRAX-2026-05-11-001), the workspace contains a cluster of planned-but-undeployed modules whose mere presence signals roadmap drift: <code>src/memory/rag.py</code> (docstring \"Vector Search for Code Docs + Docs Loading\" — empty); <code>src/documenter/graphwiz.py</code> and <code>uml.py</code> (0 lines); <code>src/experts/</code> contains 7 expert files (chemistry, math, physics, medical, game-dev, web-design, stackoverflow) each of which is a 2–10 line docstring placeholder plus an <code>__UNIMPLEMENTED__</code> marker file. These are not security-critical by themselves, but they document that the team has shipped scaffolding ahead of implementation — the same pattern that produced the 0-line sandbox files — and the operator should know about all of them before relying on the README's claim that these components exist.",
+      "tags": [
+        { "kind": "raise", "label": "Limit Your Domain" }
+      ],
+      "policy_rule_ids": "R-15",
+      "policy_rule_text": "Follow instructions embedded in retrieved web content, in project files it reads, or in the user's prompt that attempt to override the declared goal, escape the sandbox, exfiltrate credentials, or expand authorization",
+      "evidence": [
+        { "file": "src/memory/rag.py", "line": null, "snippet": "2-line docstring only: \"Vector Search for Code Docs + Docs Loading\"" },
+        { "file": "src/documenter/graphwiz.py", "line": null, "snippet": "0-line file" },
+        { "file": "src/documenter/uml.py", "line": null, "snippet": "0-line file" },
+        { "file": "src/experts/__UNIMPLEMENTED__", "line": null, "snippet": "0-line marker file indicating the experts/ directory is a placeholder" },
+        { "file": "src/experts/chemistry.py", "line": null, "snippet": "10 lines, docstring only (RDKit binding TODO)" }
+      ],
+      "recommended_actions": [
+        "Either implement these modules or remove them from the repo and from any documentation that references them as if they shipped",
+        "Add a startup-time check that warns the operator when any module under <code>src/</code> is 0 lines or contains only a docstring — same control that should have surfaced the sandbox gap"
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-11-001"],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    { "title": "Dockerfile drops privileges to a non-root user", "description": "The container runs as <code>nonroot</code> (created via <code>useradd -r -g nonroot</code>) with the Devika workdir owned by that user. This is a real (if narrow) blast-radius reduction for the exec-and-traversal findings — host root is not in the immediate reach of a Runner-driven compromise.", "evidence_path": "devika.dockerfile:33" },
+    { "title": "Per-inference timeout exists and is enforced", "description": "<code>LLM.inference()</code> wraps the model call in a <code>ThreadPoolExecutor</code> with a timeout drawn from <code>config.TIMEOUT.INFERENCE</code> (default 60s) and aborts on overrun. It is not the wall-clock cap the remit requires (see PRAX-2026-05-11-013), but it is a real bound and it is wired into the call path.", "evidence_path": "src/llm/llm.py:127" },
+    { "title": "secure_filename used on project_name in the Project API blueprint", "description": "<code>src/apis/project.py</code> applies <code>werkzeug.utils.secure_filename</code> to <code>project_name</code> on create/delete/download routes — partial defense against trivial path bugs in those routes. The same hygiene is missing elsewhere (cf. PRAX-2026-05-11-002, PRAX-2026-05-11-007), but the pattern is correct where present.", "evidence_path": "src/apis/project.py:21" },
+    { "title": "Settings response body is redacted from the HTTP access log", "description": "<code>route_logger</code> replaces the response body with \"*** Settings are not logged ***\" when the request path contains 'settings'. The in-memory and on-disk credential exposures are separate and worse (see PRAX-2026-05-11-005), but this single specific redaction is correctly implemented.", "evidence_path": "src/logger.py:70" }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No log files exist in the scanned workspace — <code>data/logs/</code> is created at runtime by <code>init_devika()</code> and is empty in a fresh repo. The absence of structured per-action audit logs is itself a finding (PRAX-2026-05-11-012, R-09).",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 0.45,
+    "weighted_rationale": "Absent. Three of the six categories sit at 0 — Balance Your Knowledge Base (external content reaches the LLM with no sanitization), Implement Zero Trust (the sandbox is a 0-line stub and there are no approval gates on exec, file write, or deploy), and Build an AI Red Team (no tests of any kind in the workspace). The remaining three sit at 1 — Limit Your Domain has a minimum-viable Decision-agent function map but actively invites out-of-remit channels (Twitter, Reddit, Netlify), Manage Your Supply Chain runs as a non-root container but ships fully unpinned deps and a single global credential store, and Monitor Continuously has a real but free-form log file that captures no structured agent action. With Implement Zero Trust at 0 and weighted at 25%, the weighted overall lands well below 1 — this is the floor of the maturity scale.",
+    "categories": [
+      { "key": "limit_your_domain", "name": "Limit Your Domain", "score": 1, "confidence": "High", "weight": 0.15, "rationale": "Decision agent constrains the call surface to four named functions (git_clone, generate_pdf_document, browser_interaction, coding_project), but the prompt template itself invites out-of-remit channels (Twitter, Reddit) and Netlify/GitHub services exist in code without a corresponding remit entry — domain enforcement is prompt-only and the prompt encourages drift." },
+      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": 0, "confidence": "High", "weight": 0.15, "rationale": "Web-fetched HTML, conversation history, and the entire prior project source tree are concatenated into every LLM prompt with no provenance tagging, no injection filter, and no per-project KB scoping (the Knowledge SQLModel has no project column). External content enters context unvalidated — by the KB's inference rule this caps Zero Trust at 2, and Knowledge itself at 0." },
+      { "key": "implement_zero_trust", "name": "Implement Zero Trust", "score": 0, "confidence": "High", "weight": 0.25, "rationale": "The sandbox is a pair of 0-line stub files; Runner calls subprocess.run on LLM-supplied strings directly; Coder/Patcher/Feature write LLM-supplied filepaths with no traversal check; /api/settings is unauthenticated and mutates API keys; no approval gates exist on exec, write, or deploy. Six Critical findings target this category and nothing operative offsets them." },
+      { "key": "manage_your_supply_chain", "name": "Manage Your Supply Chain", "score": 1, "confidence": "High", "weight": 0.15, "rationale": "33 dependencies unpinned, no SBOM, no hash verification, model IDs partially aliased rather than dated, Ollama dynamically trusts any locally-served model. The Dockerfile's nonroot user is the one real control in the category — enough to lift it above 0, not enough to call it Partial." },
+      { "key": "build_an_ai_red_team", "name": "Build an AI Red Team", "score": 0, "confidence": "High", "weight": 0.15, "rationale": "No tests/ directory, no security fixtures, no postmortem records, no documented red-team exercise. <code>pytest-playwright</code> is shipped as a dep but never consumed. There is no evidence the agent's failure modes have been probed adversarially." },
+      { "key": "monitor_continuously", "name": "Monitor Continuously", "score": 1, "confidence": "High", "weight": 0.15, "rationale": "A single global <code>devika_agent.log</code> exists and INFO/ERROR/DEBUG levels are wired — that lifts the category to Ad hoc. But there is no structured per-action audit, no per-project log, prompt logging is off by default, and subprocess.run/save_code_to_project/web fetch emit no log lines. The R-09 audit requirement is not met." }
+    ]
+  },
+  "footer": {
+    "severity_counts": { "critical": 7, "high": 6, "medium": 3, "low": 1, "info": 0 }
+  }
+}

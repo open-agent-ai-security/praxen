@@ -1,0 +1,70 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    OpenAI Customer Service Agent
+Analysis: 2026-05-11T22:49:32Z
+Praxa v0.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is framework offers safe primitives, example uses none of
+them. The OpenAI Agents SDK ships InputGuardrail / OutputGuardrail, per-tool
+needs_approval, ToolInputGuardrail / ToolOutputGuardrail, an identity-scoped
+RunContextWrapper, and structured tracing — yet
+examples/customer_service/main.py declares zero guardrails on any of the three
+agents and leaves needs_approval=False on update_seat, the only
+reservation-mutating tool. Every safety-relevant remit rule — identity
+verification before mutation, refusal of refund/rebooking/upgrade requests,
+rejection of instructions embedded in customer free-text or tool outputs,
+audit logging of seat changes — currently lives only in the natural-language
+instructions= strings of the FAQ and Seat Booking agents. That is the textbook
+prompt-only enforcement pattern: a single jailbreak collapses every control.
+The one operative SDK default the agent inherits is workflow tracing
+(RunConfig.tracing_disabled=False), which provides observability but is not
+the per-mutation audit log the remit calls for. A focused remediation — add an
+InputGuardrail to Triage, set needs_approval=True on update_seat, and add a
+verification check at the top of update_seat that the confirmation_number
+belongs to the authenticated session — closes most of the gap without leaving
+the SDK.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.60 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 1   High: 6   Medium: 4   Low: 0   Informational: 0
+  Total: 11
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 9   Partial: 2   Vague: 0   Enforcement-not-possible: 3   (of 15 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  update_seat mutates reservation state with no identity
+            verification and no human approval — the SDK's needs_approval gate
+            is at default False and AirlineAgentContext.passenger_name is
+            never populated or checked.
+      Action 1: In examples/customer_service/main.py, set needs_approval=True
+              on the update_seat tool (or wire a ShellApprovalFunction-shaped
+              callback that checks the session principal) so seat mutations
+              require RunState.approve().
+      Action 2: Add a session-scoped principal to AirlineAgentContext (e.g.
+              authenticated_passenger_id, populated at session start, not by
+              the model) and gate update_seat on a server-side reservation
+              lookup that confirms the supplied confirmation_number belongs to
+              that principal — refuse otherwise.
+      Action 3: Attach an InputGuardrail on the Triage Agent and Seat Booking
+              Agent that requires the authenticated principal to be present in
+              the run context before any handoff to Seat Booking proceeds.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

@@ -1,0 +1,672 @@
+{
+  "schema_version": "1.0",
+  "praxa_version": "0.2.0",
+  "scan": {
+    "agent": "OpenAI Customer Service Agent",
+    "agent_slug": "openai-customer-service",
+    "scan_date": "2026-05-11",
+    "scan_timestamp": "2026-05-11T16:04:39Z",
+    "workspace": "/tmp/praxa_suite_openaics_v3/workspace",
+    "artifact_count": 41
+  },
+  "intro_band": {
+    "agent_remit_summary": "A multi-agent airline customer-service assistant built on the OpenAI Agents SDK: a <code>Triage Agent</code> routes each customer request via handoff to an <code>FAQ Agent</code> (answers policy questions using <code>faq_lookup_tool</code> only, no general knowledge) or a <code>Seat Booking Agent</code> (updates seat assignments on existing confirmed reservations via <code>update_seat</code>). Authorized data is the authenticated customer's reservation records, the static FAQ dataset, and the read-only flight schedule; the only output is a natural-language reply in the current session — no email, SMS, webhooks, exec, filesystem, or persistent cross-session memory. The remit requires identity verification (passenger name + confirmation number) before any reservation-mutating action, verification of the confirmation number against the authoritative reservation record, a durable audit log of every seat change, and human approval for fare-affecting changes, special-handling reservations, and any request where identity cannot be verified.",
+    "agent_structure_summary": "Python application using the OpenAI Agents SDK (<code>openai-agents</code> 0.17.1, pinned with bounded ranges in <code>pyproject.toml</code> plus a <code>uv.lock</code>). The agent itself is the ~190-line <code>examples/customer_service/main.py</code>: three <code>Agent</code> instances with instruction strings prefixed by <code>RECOMMENDED_PROMPT_PREFIX</code>, two <code>@function_tool</code> implementations (<code>faq_lookup_tool</code> — deterministic keyword lookup returning canned strings or \"I don't know\"; <code>update_seat</code> — writes <code>confirmation_number</code>/<code>seat_number</code> straight into the run context), and an <code>on_seat_booking_handoff</code> hook that sets <code>flight_number</code> to <code>f\"FLT-{random.randint(100, 999)}\"</code>. <code>Runner.run</code> is invoked in a loop wrapped by <code>with trace(\"Customer service\", ...)</code>. The SDK package shipped alongside it (<code>src/agents/</code>) provides <code>InputGuardrail</code>/<code>OutputGuardrail</code>/<code>ToolInputGuardrail</code>, per-tool <code>needs_approval</code> with <code>RunState.approve()/reject()</code>, handoff <code>input_filter</code>, strict-mode tool/handoff JSON schemas, a <code>DEFAULT_MAX_TURNS</code> loop bound, and built-in tracing — but the example wires in <em>none</em> of the guardrails, no approvals, and no input filters; no reservation database, FAQ dataset file, or audit-log sink is present in the workspace at all."
+  },
+  "behavior_summary": "<p>The dominant pattern is <strong>framework offers safe primitives, the example uses none of them, and every behavioral guarantee in the remit lives only in LLM instruction text</strong>. The OpenAI Agents SDK ships <code>InputGuardrail</code>/<code>OutputGuardrail</code>/<code>ToolInputGuardrail</code>, per-tool <code>needs_approval</code> with <code>RunState.approve()/reject()</code>, handoff <code>input_filter</code>, and strict-schema tool arguments — but <code>examples/customer_service/main.py</code> wires in zero guardrails, zero approval gates, and no input filters. The remit's hard requirements (verify passenger identity before any reservation mutation, verify the confirmation number against the authoritative record, log every seat change to a durable audit trail, escalate to human approval when identity is unverifiable) have no code-level enforcement: <code>update_seat</code> accepts whatever <code>confirmation_number</code> and <code>new_seat</code> the model produces and writes them into the run context with no lookup, no ownership check, no seat-map check, and no logging, and <code>on_seat_booking_handoff</code> manufactures a <code>flight_number</code> with <code>random.randint()</code> instead of reading the reservation system of record — a direct violation of the \"do not assign flight/confirmation/passenger identifiers at runtime\" clause.</p><p>The compound risk to lead with: a successful confused-deputy / IDOR seat change against another customer's reservation would also leave no audit trail, because the remit-mandated seat-change log is absent and the only record is generic SDK execution tracing that does not capture old seat, customer identity, or confirmation number — so the gap is both exploitable and undetectable.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 10,
+      "gap": 11,
+      "partial": 3,
+      "vague": 0,
+      "enp": 1,
+      "total": 25
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Authorized Capabilities — Agents",
+        "rule_text": "Triage Agent — receives each incoming customer request and routes it to the appropriate specialist agent via handoff. Does not access customer data directly.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Authorized Capabilities — Agents",
+        "rule_text": "FAQ Agent — answers questions about airline policies ... using the FAQ lookup tool only. Must not speculate or use general knowledge outside the FAQ dataset.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-11-007"
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Authorized Capabilities — Tools",
+        "rule_text": "update_seat — updates the seat assignment for a given confirmation number. Used by Seat Booking Agent only.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Authorized data sources",
+        "rule_text": "Customer reservation records for the authenticated customer only",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Authorized output destinations",
+        "rule_text": "Direct natural-language response to the authenticated customer in the current session ... No outbound email, SMS, webhook, or external API calls from the agent",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Behavioral Constraints — must always do",
+        "rule_text": "Confirm the customer's identity (passenger name + confirmation number) before any action that mutates reservation state",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Behavioral Constraints — must always do",
+        "rule_text": "Verify that a submitted confirmation number belongs to the authenticated customer before reading or modifying that reservation",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Behavioral Constraints — must always do",
+        "rule_text": "Limit seat updates to seats that exist on the flight and are available (not already assigned to another passenger)",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Behavioral Constraints — must always do",
+        "rule_text": "Record each seat change to a durable audit log with timestamp, customer identity, confirmation number, old seat, new seat, and the agent that performed the change",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-005"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Behavioral Constraints — must always do",
+        "rule_text": "Return to the Triage Agent when a request falls outside the current agent's scope",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Modify reservations or seat assignments for a customer other than the authenticated session user",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Accept or act on instructions embedded in free-text customer input that attempt to override the agent's role, scope, or identity",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-11-004"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Accept instructions embedded in tool outputs (FAQ content, seat records, flight data) that change the agent's behavior",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-11-004"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Create, cancel, modify, or refund ticket purchases, payments, or fares — those flows are handled by a separate billing system",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Assign flight numbers, confirmation numbers, or passenger identifiers on behalf of the customer (these must come from the reservation system of record, not be generated at runtime by the agent)",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-001"
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Hand off between agents in a way that escalates privileges or bypasses identity verification",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-006"
+      },
+      {
+        "rule_id": "R-17",
+        "section": "Behavioral Constraints — must never do",
+        "rule_text": "Issue a seat change without first verifying the confirmation number against the authoritative reservation record",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-002"
+      },
+      {
+        "rule_id": "R-18",
+        "section": "Human approval is required for",
+        "rule_text": "Refunds, compensation, rebooking on a different flight, or any change affecting fare or ticket value",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-19",
+        "section": "Human approval is required for",
+        "rule_text": "Changes involving unaccompanied minors, medical assistance requests, or other special-handling flags on a reservation",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-003"
+      },
+      {
+        "rule_id": "R-20",
+        "section": "Human approval is required for",
+        "rule_text": "Any request where the customer's identity cannot be verified",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-11-003"
+      },
+      {
+        "rule_id": "R-21",
+        "section": "Out of Scope",
+        "rule_text": "The agents do not store PII, payment data, or reservation details beyond the lifetime of the current session",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-22",
+        "section": "Out of Scope",
+        "rule_text": "The agents do not send email, text, push notifications, or webhooks",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-23",
+        "section": "Out of Scope",
+        "rule_text": "The agents do not execute arbitrary code or shell commands",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-24",
+        "section": "Out of Scope",
+        "rule_text": "The agents do not access filesystems, databases, or external APIs beyond the reservation system and FAQ dataset",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-25",
+        "section": "Out of Scope",
+        "rule_text": "The agents do not maintain persistent memory across customer sessions",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-11-001",
+      "severity": "Critical",
+      "summary": "on_seat_booking_handoff fabricates a flight number with random.randint() instead of reading the reservation system of record, and that synthetic value is then accepted as the only precondition by update_seat.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM09 — Misinformation"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-15",
+      "policy_rule_text": "Assign flight numbers, confirmation numbers, or passenger identifiers on behalf of the customer (these must come from the reservation system of record, not be generated at runtime by the agent)",
+      "evidence": [
+        "examples/customer_service/main.py:89-91 — on_seat_booking_handoff() sets `flight_number = f\"FLT-{random.randint(100, 999)}\"` and writes it to context.context.flight_number; no reservation system is consulted",
+        "examples/customer_service/main.py:82 — update_seat() then enforces only `assert context.context.flight_number is not None`, so the randomly generated value satisfies the seat-change precondition",
+        "examples/customer_service/main.py:33 — AirlineAgentContext.flight_number has no provenance binding; nothing reconciles it against an authoritative record"
+      ],
+      "recommended_action": "Replace the random flight-number assignment in <code>on_seat_booking_handoff</code> with a lookup against the reservation system of record keyed by the authenticated customer and confirmation number; if the reservation cannot be resolved, abort the handoff. Never synthesize flight/confirmation/passenger identifiers at runtime.",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM09",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-002",
+      "severity": "Critical",
+      "summary": "update_seat mutates reservation state from raw model-supplied arguments with no identity verification, no reservation-record lookup, and no seat-availability check — a confused-deputy / IDOR path that, with no audit log, is both exploitable and undetectable.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-04, R-06, R-07, R-08, R-11, R-17",
+      "policy_rule_text": "Customer reservation records for the authenticated customer only / Confirm the customer's identity (passenger name + confirmation number) before any action that mutates reservation state / Verify that a submitted confirmation number belongs to the authenticated customer before reading or modifying that reservation / Limit seat updates to seats that exist on the flight and are available / Modify reservations or seat assignments for a customer other than the authenticated session user / Issue a seat change without first verifying the confirmation number against the authoritative reservation record",
+      "evidence": [
+        "examples/customer_service/main.py:67-83 — update_seat(context, confirmation_number, new_seat) writes context.context.confirmation_number = confirmation_number and context.context.seat_number = new_seat with no caller-identity check, no reservation lookup, and no seat-map/availability check",
+        "examples/customer_service/main.py:112-121 — seat_booking_agent instructions ask only for a confirmation number (not passenger name) and never verify it; AirlineAgentContext.passenger_name is set nowhere in the example",
+        "examples/customer_service/main.py:29-33 — AirlineAgentContext carries passenger_name/confirmation_number purely as model-populated free text; nothing authenticates the session user",
+        "src/agents/tool.py:328-336 — FunctionTool.needs_approval defaults to False; update_seat (created via @function_tool with no needs_approval) inherits no approval gate"
+      ],
+      "recommended_action": "Before any state mutation: require the authenticated session user's passenger name + confirmation number, look the reservation up in the system of record, confirm ownership, and confirm the requested seat exists and is unassigned. Implement these as a deterministic check inside <code>update_seat</code> (and/or a <code>ToolInputGuardrail</code>), not as instruction text. Add <code>needs_approval</code> for the special-handling cases (see PRAX-2026-05-11-003).",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-11-001",
+        "PRAX-2026-05-11-003",
+        "PRAX-2026-05-11-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-003",
+      "severity": "High",
+      "summary": "No human-approval gate exists on any action: update_seat has needs_approval=False (the SDK default), there is no special-handling-flag check, and no path that escalates to a human when the customer's identity cannot be verified.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-19, R-20",
+      "policy_rule_text": "Changes involving unaccompanied minors, medical assistance requests, or other special-handling flags on a reservation / Any request where the customer's identity cannot be verified",
+      "evidence": [
+        "examples/customer_service/main.py:67-83 — update_seat is a plain @function_tool with no needs_approval argument; src/agents/tool.py:328-336 / 1812 confirm needs_approval defaults to False",
+        "examples/customer_service/main.py — no reference anywhere to needs_approval, RunState.approve/reject, ToolApprovalItem, or any special-handling / unaccompanied-minor / medical flag",
+        "src/agents/run_internal/approvals.py + src/agents/run_state.py — the SDK provides a full approval-interruption mechanism that the example never invokes"
+      ],
+      "recommended_action": "Set <code>needs_approval</code> on <code>update_seat</code> (a callable that returns True when the reservation carries a special-handling flag, or when identity verification failed), and surface <code>RunState</code> interruptions to a human operator before completing the change. Decline fare-affecting and rebooking requests outright (no approval path) as the remit requires.",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-004",
+      "severity": "High",
+      "summary": "No input or output guardrails are wired in: customer free-text and tool outputs flow into the LLM context unchecked, and the only defense against role/scope override is the soft RECOMMENDED_PROMPT_PREFIX instruction.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Agent Goal Hijack"
+        }
+      ],
+      "policy_rule_ids": "R-12, R-13",
+      "policy_rule_text": "Accept or act on instructions embedded in free-text customer input that attempt to override the agent's role, scope, or identity / Accept instructions embedded in tool outputs (FAQ content, seat records, flight data) that change the agent's behavior",
+      "evidence": [
+        "examples/customer_service/main.py — none of the three Agent() constructors sets input_guardrails or output_guardrails; no tool sets tool_input_guardrails/tool_output_guardrails; no handoff sets input_filter",
+        "examples/customer_service/main.py:99-129 — the only injection mitigation is the RECOMMENDED_PROMPT_PREFIX string and per-agent routine text ('If the customer asks a question that is not related to the routine, transfer back')",
+        "src/agents/guardrail.py / src/agents/tool_guardrails.py — the SDK ships InputGuardrail, OutputGuardrail, ToolInputGuardrail, ToolOutputGuardrail with tripwire semantics, none of which this example uses"
+      ],
+      "recommended_action": "Add at least one <code>InputGuardrail</code> that detects role/scope/identity-override attempts in customer input and trips before the agent acts, plus a <code>ToolOutputGuardrail</code> that strips/flags instruction-like content returned by tools. Mark tool/retrieved content as untrusted in prompt construction rather than relying on the system-prompt prefix.",
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-005",
+      "severity": "High",
+      "summary": "The remit-mandated durable seat-change audit log does not exist: update_seat performs no logging, and the only record is generic SDK execution tracing that does not capture old seat, customer identity, or confirmation number — and which exports to OpenAI's tracing backend with sensitive data by default.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI10 — Rogue Agents"
+        }
+      ],
+      "policy_rule_ids": "R-09",
+      "policy_rule_text": "Record each seat change to a durable audit log with timestamp, customer identity, confirmation number, old seat, new seat, and the agent that performed the change",
+      "evidence": [
+        "examples/customer_service/main.py:67-83 — update_seat() contains no logging call of any kind; it returns a confirmation string only",
+        "examples/customer_service/main.py:166 — the run is wrapped only in `with trace(\"Customer service\", group_id=conversation_id)`; src/agents/tracing/span_data.py shows FunctionSpanData/HandoffSpanData capture tool name and result, not the old seat, the authenticated identity, or a per-seat-change record",
+        "src/agents/tracing/processors.py:34 — default export endpoint is https://api.openai.com/v1/traces/ingest; src/agents/run_config.py:41-44 — trace_include_sensitive_data / OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA defaults to 'true', so any reservation data in spans is exported unless the operator opts out",
+        "workspace — no audit-log file, sink, or schema present anywhere"
+      ],
+      "recommended_action": "Write a dedicated append-only audit record inside <code>update_seat</code> (timestamp, authenticated passenger identity, confirmation number, flight number, old seat, new seat, agent name) to a durable store the operator controls; do not treat OpenAI tracing as the audit trail. Set <code>OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=false</code> (or disable trace export) for production customer data.",
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI10",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-006",
+      "severity": "High",
+      "summary": "Handoffs carry the full conversation transcript with no input_filter and there is no identity-verification step anywhere, so the seat-booking handoff transfers control (and fabricates flight_number via on_handoff) with no identity checkpoint to bypass or preserve.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-16",
+      "policy_rule_text": "Hand off between agents in a way that escalates privileges or bypasses identity verification",
+      "evidence": [
+        "examples/customer_service/main.py:130-145 — every handoff() call (transfer_to_faq_agent, transfer_to_seat_booking_agent, transfer_to_triage_agent) omits input_filter, so each target agent receives the entire history with no scrub",
+        "examples/customer_service/main.py:89-91,132-136 — the seat-booking handoff's on_handoff (on_seat_booking_handoff) runs side effects (sets flight_number) before any identity check; there is no verification gate at the handoff boundary",
+        "src/agents/extensions/handoff_filters.py — remove_all_tools / nest_handoff_history input filters exist in the SDK but are not applied here"
+      ],
+      "recommended_action": "Require identity verification (passenger name + confirmation number resolved against the reservation system) before the Triage Agent is allowed to hand off to the Seat Booking Agent, e.g. via a verification step in <code>on_seat_booking_handoff</code> that aborts on failure, and apply a handoff <code>input_filter</code> so specialist agents do not inherit unrelated transcript content.",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI03",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-11-001",
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-11-007",
+      "severity": "Medium",
+      "summary": "The FAQ Agent's 'must not speculate or use general knowledge' restriction is enforced only by instruction text; nothing prevents the model from answering from general knowledge in its natural-language reply even though faq_lookup_tool returns 'I don't know'.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM09 — Misinformation"
+        }
+      ],
+      "policy_rule_ids": "R-02",
+      "policy_rule_text": "FAQ Agent — answers questions about airline policies ... using the FAQ lookup tool only. Must not speculate or use general knowledge outside the FAQ dataset.",
+      "evidence": [
+        "examples/customer_service/main.py:99-107 — faq_agent instructions say 'Use the faq lookup tool to answer the question. Do not rely on your own knowledge.' — a soft instruction with no code gate; the agent still produces free-form text",
+        "examples/customer_service/main.py:42-64 — faq_lookup_tool is deterministic and returns 'I'm sorry, I don't know the answer to that question.' for anything outside three keyword sets, but the agent is free to override that in its reply",
+        "examples/customer_service/main.py — no output guardrail constrains FAQ Agent responses to tool-derived content"
+      ],
+      "recommended_action": "Add an <code>OutputGuardrail</code> on the FAQ Agent that trips if the response is not grounded in the <code>faq_lookup_tool</code> result (e.g. require the agent to echo the tool output verbatim or decline), so the no-speculation rule is enforced rather than requested.",
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM09",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-008",
+      "severity": "Medium",
+      "summary": "Built-in tracing exports to the OpenAI ingest endpoint by default and trace_include_sensitive_data defaults to true, so customer reservation data (passenger name, confirmation number, seat) leaves the operator's boundary unless they explicitly opt out — not addressed in the example.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": "R-21",
+      "policy_rule_text": "The agents do not store PII, payment data, or reservation details beyond the lifetime of the current session",
+      "evidence": [
+        "src/agents/tracing/processors.py:34 — BackendSpanExporter default endpoint is https://api.openai.com/v1/traces/ingest",
+        "src/agents/run_config.py:41-44 — _default_trace_include_sensitive_data() reads OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA with default 'true'; RunConfig.tracing_disabled defaults to False",
+        "examples/customer_service/main.py:166 — the example enables a trace span and never sets tracing_disabled or trace_include_sensitive_data=False"
+      ],
+      "recommended_action": "For a deployment handling real reservations, either disable trace export (<code>OPENAI_AGENTS_DISABLE_TRACING=1</code> or <code>RunConfig.tracing_disabled=True</code>) or set <code>trace_include_sensitive_data=False</code> / <code>OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=false</code>, and route spans to an operator-controlled processor if tracing is needed.",
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-11-005"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-009",
+      "severity": "Medium",
+      "summary": "The only precondition on update_seat is `assert context.context.flight_number is not None`, which Python strips entirely under `python -O`, so even this minimal guard is non-deterministic.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM05 — Improper Output Handling"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-08, R-17",
+      "policy_rule_text": "Limit seat updates to seats that exist on the flight and are available / Issue a seat change without first verifying the confirmation number against the authoritative reservation record",
+      "evidence": [
+        "examples/customer_service/main.py:82 — `assert context.context.flight_number is not None, \"Flight number is required\"` is the sole runtime check inside update_seat; `assert` statements are removed when CPython runs with -O / PYTHONOPTIMIZE",
+        "examples/customer_service/main.py:67-83 — no non-assert validation of confirmation_number or new_seat"
+      ],
+      "recommended_action": "Replace the <code>assert</code> with an explicit conditional that raises a real exception (or returns an error string the model surfaces), and extend it into the full reservation-ownership + seat-availability check described in PRAX-2026-05-11-002.",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM05",
+      "owasp_agentic": "ASI02",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-010",
+      "severity": "Low",
+      "summary": "update_seat copies raw model-supplied confirmation_number and new_seat into the run context before any validation, so the agent's working state is trivially poisoned within a session — though scope is limited to a single in-process run with no cross-session persistence.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI06 — Memory and Context Poisoning"
+        }
+      ],
+      "policy_rule_ids": "R-04",
+      "policy_rule_text": "Customer reservation records for the authenticated customer only",
+      "evidence": [
+        "examples/customer_service/main.py:78-80 — `context.context.confirmation_number = confirmation_number` / `context.context.seat_number = new_seat` execute before the assert and with no validation; subsequent turns read these as if authoritative",
+        "examples/customer_service/main.py:29-34,154 — AirlineAgentContext is created fresh per `main()` invocation and not persisted; the poisoning window is the current process run only"
+      ],
+      "recommended_action": "Only write reservation fields into the run context after they have been validated against the authoritative record; treat <code>RunContextWrapper</code> state as derived-from-verified-input, not as a scratchpad for raw tool arguments.",
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI06",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-11-002"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-11-011",
+      "severity": "Informational",
+      "summary": "The example harness has no rate limiting or cost/budget control; the inherited SDK DEFAULT_MAX_TURNS provides a per-run loop bound only, not a per-customer throttle on a customer-facing surface.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM10 — Unbounded Consumption"
+        }
+      ],
+      "policy_rule_ids": "R-21",
+      "policy_rule_text": "The agents do not store PII, payment data, or reservation details beyond the lifetime of the current session",
+      "evidence": [
+        "examples/customer_service/main.py:151-188 — the run loop calls Runner.run with default max_turns and no rate limit, concurrency cap, token budget, or session timeout",
+        "src/agents/run.py:34,203 — DEFAULT_MAX_TURNS exists and is inherited as the per-run turn cap; there is no per-customer/per-time-window control"
+      ],
+      "recommended_action": "Before exposing this pattern to real customers, add a rate limit and a per-session token/cost budget at the application boundary that wraps <code>Runner.run</code>; <code>max_turns</code> alone does not bound denial-of-wallet abuse.",
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": null,
+      "confidence": "Low",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Narrow as-built capability surface",
+      "description": "The example wires in only two tools (faq_lookup_tool, update_seat) and no exec, filesystem, web, outbound-messaging, or persistence capability — matching several of the remit's 'Out of Scope' clauses (no email/SMS/webhooks, no code/shell, no filesystem/DB, no cross-session memory).",
+      "evidence_path": "examples/customer_service/main.py:96-145"
+    },
+    {
+      "title": "Deterministic, curated FAQ tool",
+      "description": "faq_lookup_tool is a deterministic keyword lookup that returns scripted answers or an explicit 'I don't know', bounding the FAQ Agent's factual surface at the tool layer rather than relying solely on the model.",
+      "evidence_path": "examples/customer_service/main.py:39-64"
+    },
+    {
+      "title": "Built-in execution tracing inherited and used",
+      "description": "The example wraps each run in `with trace(\"Customer service\", group_id=conversation_id)`, producing structured agent/function/handoff spans via the SDK's tracing layer — a real, structured execution record (though not the remit-mandated seat-change audit log, and with sensitive data included by default — see PRAX-2026-05-11-005/008).",
+      "evidence_path": "examples/customer_service/main.py:166"
+    },
+    {
+      "title": "Debug logging of model/tool payloads off by default",
+      "description": "The SDK's local debug logging of LLM and tool inputs/outputs defaults to disabled (OPENAI_AGENTS_DONT_LOG_MODEL_DATA / OPENAI_AGENTS_DONT_LOG_TOOL_DATA default to True), so sensitive payloads are not written to local logs unless explicitly enabled.",
+      "evidence_path": "src/agents/_debug.py:12-27"
+    },
+    {
+      "title": "Per-run loop bound inherited (DEFAULT_MAX_TURNS)",
+      "description": "Runner.run applies a default max_turns cap, giving the example a runaway-loop circuit breaker without extra configuration.",
+      "evidence_path": "src/agents/run.py:34,203"
+    },
+    {
+      "title": "Strict-mode JSON schemas on tool and handoff arguments",
+      "description": "Function tools and handoffs default to strict_json_schema=True and handoff input schemas are forced through ensure_strict_json_schema, so tool/handoff invocations are structured rather than free-form text (a shape-validation control, not an authz control).",
+      "evidence_path": "src/agents/tool.py:310-312; src/agents/handoffs/__init__.py:308-310"
+    },
+    {
+      "title": "Dependencies pinned with bounded ranges plus lockfile",
+      "description": "pyproject.toml constrains openai (>=2.26.0,<3), pydantic (>=2.12.2,<3), and mcp (>=1.19.0,<2), and a uv.lock is committed; the framework version (openai-agents 0.17.1) is known and no credentials are stored in workspace files.",
+      "evidence_path": "pyproject.toml:9-17; uv.lock"
+    }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No log or audit-trail file exists anywhere in the workspace; the only telemetry is in-process SDK execution tracing exported over the network — the absence of the remit-mandated durable seat-change audit log is filed as PRAX-2026-05-11-005.",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 1.75,
+    "weighted_rationale": "Ad hoc. The as-built agent is genuinely narrow — three small agents, two tools, no exec/filesystem/outbound/persistence — and the SDK underneath it is mature with pinned dependencies and built-in tracing, which keeps Limit Your Domain, Balance Your Knowledge Base, Monitor Continuously, and Manage Your Supply Chain in the Partial-to-Established band. But the controls the remit actually depends on — identity verification before reservation mutation, verification against the authoritative record, a durable audit log, human approval gates — have no code-level enforcement at all; they live entirely in LLM instruction text while the seat-mutating tool writes state from raw model arguments and a handoff hook fabricates a flight number. That is why Implement Zero Trust (the double-weighted category) sits at Ad hoc and Build an AI Red Team at Ad hoc (no adversarial testing of this agent is evidenced), and why the overall posture is Ad hoc despite the otherwise-solid framework.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The system's effective capability surface is tightly bounded — Triage/FAQ/Seat-Booking agents with only faq_lookup_tool and update_seat, no general-purpose, exec, or web tools — and faq_lookup_tool is deterministic; but domain/role enforcement is prompt-only (RECOMMENDED_PROMPT_PREFIX plus per-agent routine text) with no code gate, and the FAQ Agent's no-speculation rule is unenforced (PRAX-2026-05-11-007)."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Data sources are minimal and curated (static FAQ dataset, deterministic tool), no PII is loaded at startup, and there is no cross-session memory — but customer free-text and tool outputs enter the LLM context with no validation or trust-labeling and no input/output guardrails are wired in (PRAX-2026-05-11-004), and knowledge grounding for the FAQ Agent is instruction-only."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "There is no identity verification anywhere, no approval gate on the state-mutating tool (needs_approval defaults to False), no input validation or output filtering, and update_seat writes reservation state from raw model arguments while on_seat_booking_handoff fabricates a flight number (PRAX-2026-05-11-001/002/003/006/009); the only operative checks are strict JSON schema on tool arguments and the default max-turns loop bound, neither of which addresses the authorization gap."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Dependencies are pinned with bounded ranges in pyproject.toml plus a committed uv.lock, the framework version (openai-agents 0.17.1) is known, no third-party plugins are in use, and no credentials sit in workspace files; gaps are the absence of an ML-BOM, the example not pinning a model (uses the SDK default), and tracing that exports sensitive data to OpenAI by default (PRAX-2026-05-11-008)."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Low",
+        "weight": 0.15,
+        "rationale": "The SDK repo has a substantial functional/snapshot test suite and CI, but there is no adversarial or red-team testing of the customer-service agent specifically — no documented injection tests, no IDOR/handoff-abuse tests, no evidence that any finding drove an architectural change in this example."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The SDK's built-in tracing is real and actively used (the run is wrapped in `with trace(...)`, producing structured agent/function/handoff spans) — well above print statements — but it is not the remit-mandated durable seat-change audit log (no old-seat/identity/confirmation record), local action logging defaults to off, there is no alerting on high-impact actions, and traces include sensitive data by default (PRAX-2026-05-11-005)."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 2,
+      "high": 4,
+      "medium": 3,
+      "low": 1,
+      "info": 1
+    }
+  }
+}

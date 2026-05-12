@@ -1,0 +1,108 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: 2026-05-11T21:37:35Z
+Praxa v0.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the remit, zero code-level
+enforcement of it, stacked on a fail-open trust gate. The remit's load-bearing
+controls — treat all issue/comment/file/diff text as untrusted and run
+instruction-injection detection before it reaches an LLM, never execute shell,
+never touch CI/CD or security-sensitive files without explicit issue
+authorization, scope changes to the named issue — have no counterpart in the
+code. Issue titles and bodies are f-string-interpolated directly into prompts
+(sweepai/core/prompts.py); no module mentions injection detection,
+sanitization, or quote-wrapping of instruction-like content. Several agent
+tools shell out with shell=True on model- and issue-influenced arguments
+(sweepai/agents/question_answerer.py:270, sweepai/core/context_pruning.py:186,
+sweepai/core/dynamic_context_bot.py:44, sweepai/config/client.py:338). The
+make_change/create_file tools in sweepai/agents/modify_utils.py write to any
+path the model names with no CI/CD blocklist, no security-sensitive-file gate,
+and no scope check against the originating issue. And
+sweepai/core/external_searcher.py fetches arbitrary URLs scraped out of issue
+text straight into LLM context — a channel the remit explicitly forbids.
+Compounding all of it: webhook HMAC verification fails open —
+verify_signature() returns True when WEBHOOK_SECRET is unset
+(sweepai/utils/hash.py:22, declared at sweepai/config/server.py:204), and the
+/jira endpoint has no verification at all — so the untrusted-content →
+prompt-injection → shell-exec / arbitrary-file-write chain is reachable by an
+unauthenticated caller forging a webhook.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.15 / 5.0   (Ad hoc)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 6   Medium: 5   Low: 1   Informational: 0
+  Total: 16
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 2   Gap: 11   Partial: 4   Vague: 1   Enforcement-not-possible: 2   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  Untrusted issue/comment/file text is
+            f-string-interpolated directly into LLM prompts with no
+            instruction-injection detection or neutralization anywhere in the
+            code path.
+      Action: Add a content-origin boundary in prompt construction: wrap all
+      issue/comment/file/diff text in clearly delimited,
+      non-instruction-bearing blocks, and add an instruction-injection
+      detector (regex or LLM-judge) that runs on issue bodies, comments, and
+      retrieved file content before they enter `create_user_message()` in
+      `sweepai/agents/modify_utils.py` and the prompt builders in
+      `sweepai/core/prompts.py`. Treat detected instruction-like content as
+      data to summarize, never as commands.
+
+  PRAX-2026-05-11-002  Agent tools and the file-suitability check shell out
+            with `shell=True` on model- and issue-influenced arguments,
+            contradicting the remit's absolute prohibition on shell execution.
+      Action: Replace every `shell=True` call in
+      `sweepai/agents/question_answerer.py`,
+      `sweepai/core/context_pruning.py`,
+      `sweepai/core/dynamic_context_bot.py`, and `sweepai/config/client.py`
+      with a list-form `subprocess.run([...], shell=False)` so arguments are
+      passed without shell interpretation, and validate/escape the `query` and
+      `file_name` parameters (allowlist of characters, length cap) before they
+      reach the subprocess. Per the remit, these tools should not exist at all
+      in their current form.
+
+  PRAX-2026-05-11-003  The make_change/create_file tools write to any path the
+            model names with no CI/CD blocklist and no security-sensitive-file
+            gate, so injected issue content can rewrite `.github/workflows/*`,
+            `Dockerfile`, or `CODEOWNERS` and have it land in a PR.
+      Action: In `sweepai/agents/modify_utils.py`, add a non-overridable
+      protected-path classifier (`.github/workflows/*`, `Dockerfile`,
+      `docker-compose.yml`, `Jenkinsfile`, `.circleci/*`,
+      `.github/CODEOWNERS`, `.github/dependabot.yml`, `SECURITY.md`,
+      `*.pem`/key/cert paths). When `make_change`/`create_file` targets one of
+      these, require an explicit issue-level authorization token in the
+      request and emit a prominent flag into the PR description; otherwise
+      reject the tool call. Re-check the final `modify_files_dict` against the
+      same list in `sweepai/handlers/create_pr.py` before opening the PR.
+
+  PRAX-2026-05-11-012  Compound chain: webhook HMAC verification fails open
+            when WEBHOOK_SECRET is unset, so an unauthenticated forged webhook
+            reaches the unsanitized-prompt → shell-exec / arbitrary-file-write
+            pipeline end to end.
+      Action: Make `WEBHOOK_SECRET` mandatory: in `sweepai/config/server.py`
+      add `assert WEBHOOK_SECRET, "WEBHOOK_SECRET is required"` alongside the
+      existing API-key asserts, and change `sweepai/utils/hash.py`
+      `verify_signature` to return `False` (not `True`) when the secret is
+      missing. Add HMAC verification to the `/jira` route in `sweepai/api.py`.
+      Then close the downstream legs per PRAX-2026-05-11-001/002/003.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

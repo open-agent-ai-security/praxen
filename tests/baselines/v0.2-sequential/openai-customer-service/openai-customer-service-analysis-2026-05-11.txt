@@ -1,0 +1,79 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    OpenAI Customer Service Agent
+Analysis: 2026-05-11T16:04:39Z
+Praxa v0.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is framework offers safe primitives, the example uses
+none of them, and every behavioral guarantee in the remit lives only in LLM
+instruction text. The OpenAI Agents SDK ships
+InputGuardrail/OutputGuardrail/ToolInputGuardrail, per-tool needs_approval
+with RunState.approve()/reject(), handoff input_filter, and strict-schema tool
+arguments — but examples/customer_service/main.py wires in zero guardrails,
+zero approval gates, and no input filters. The remit's hard requirements
+(verify passenger identity before any reservation mutation, verify the
+confirmation number against the authoritative record, log every seat change to
+a durable audit trail, escalate to human approval when identity is
+unverifiable) have no code-level enforcement: update_seat accepts whatever
+confirmation_number and new_seat the model produces and writes them into the
+run context with no lookup, no ownership check, no seat-map check, and no
+logging, and on_seat_booking_handoff manufactures a flight_number with
+random.randint() instead of reading the reservation system of record — a
+direct violation of the "do not assign flight/confirmation/passenger
+identifiers at runtime" clause. The compound risk to lead with: a successful
+confused-deputy / IDOR seat change against another customer's reservation
+would also leave no audit trail, because the remit-mandated seat-change log is
+absent and the only record is generic SDK execution tracing that does not
+capture old seat, customer identity, or confirmation number — so the gap is
+both exploitable and undetectable.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.75 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Low, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 4   Medium: 3   Low: 1   Informational: 1
+  Total: 11
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 10   Gap: 11   Partial: 3   Vague: 0   Enforcement-not-possible: 1   (of 25 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  on_seat_booking_handoff fabricates a flight number with
+            random.randint() instead of reading the reservation system of
+            record, and that synthetic value is then accepted as the only
+            precondition by update_seat.
+      Action: Replace the random flight-number assignment in
+      on_seat_booking_handoff with a lookup against the reservation system of
+      record keyed by the authenticated customer and confirmation number; if
+      the reservation cannot be resolved, abort the handoff. Never synthesize
+      flight/confirmation/passenger identifiers at runtime.
+
+  PRAX-2026-05-11-002  update_seat mutates reservation state from raw
+            model-supplied arguments with no identity verification, no
+            reservation-record lookup, and no seat-availability check — a
+            confused-deputy / IDOR path that, with no audit log, is both
+            exploitable and undetectable.
+      Action: Before any state mutation: require the authenticated session
+      user's passenger name + confirmation number, look the reservation up in
+      the system of record, confirm ownership, and confirm the requested seat
+      exists and is unassigned. Implement these as a deterministic check
+      inside update_seat (and/or a ToolInputGuardrail), not as instruction
+      text. Add needs_approval for the special-handling cases (see
+      PRAX-2026-05-11-003).
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================

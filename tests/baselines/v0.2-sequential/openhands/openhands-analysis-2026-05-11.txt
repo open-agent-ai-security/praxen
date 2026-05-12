@@ -1,0 +1,101 @@
+==============================================================================
+PRAXA — AGENT BEHAVIOR VERIFIER
+Agent:    OpenHands
+Analysis: 2026-05-11T21:36:07Z
+Praxa v0.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is declared approval gates with no enforcement at the
+layer Praxa can see: the remit requires human confirmation before
+cross-repository writes, PR merges, force-push/history-rewrite, CI/workflow
+file edits, committing dependency changes, runtime MCP-server additions, and
+new integration grants — but the app_server contains no interposition for any
+of these. The MCP tools create_pr/create_mr/create_bitbucket_pr in
+mcp/mcp_router.py open pull requests with the user's provider token and zero
+confirmation step; confirmation_mode defaults to false in
+config.template.toml; and the deterministic exec/tool gating that would back
+the "reject shell commands that reach outside the sandbox" rule lives in the
+openhands-sdk package that is not part of this repo. Two secondary themes
+compound that: (1) untrusted external content — GitHub/GitLab/Jira issue
+bodies, titles, and PR comments — is rendered straight into the agent's task
+prompt by the Jinja2 templates under integrations/templates/resolver/ with no
+origin-labeling or sanitization, putting an indirect-injection ingress
+directly upstream of the agent's tool-calling loop; and (2) in OSS/local mode
+the /api/v1/* API has no authentication at all (DefaultUserAuth.get_user_id()
+returns None, get_dependencies() adds nothing unless SESSION_API_KEY is set)
+and CORS falls back to allow-any-origin. The codebase does carry real controls
+— running-state-gated session-key auth,
+validate_secret_name/validate_secrets_dict, time-limited LookupSecret token
+references instead of static creds in the agent, a structured event store, and
+pervasive log-side secret redaction — so this is a mature system with genuine
+safeguards, not theatre; the gap is that the remit's most consequential
+promises (the approval gates) and its most dangerous ingress (resolver-fed
+untrusted text) are unmet at this layer.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.30 / 5.0   (Partial)
+  Limit Your Domain              3/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Low, weight: 15%)
+  Monitor Continuously           3/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 6   Medium: 5   Low: 1   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 7   Partial: 8   Vague: 0   Enforcement-not-possible: 3   (of 22 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-11-001  Remit-required human-approval gates for cross-repo
+            writes and PR merges are not implemented anywhere in the
+            app_server; the MCP create_pr/create_mr/create_bitbucket_pr tools
+            open pull requests with the user's provider token and no
+            confirmation step.
+      Action: Add an approval interposition before the PR/MR creation tools in
+      mcp/mcp_router.py: require the caller to pass a per-action confirmation
+      token, or check repo_name against the conversation's selected_repository
+      and refuse (or escalate to a pending-approval state) when they differ.
+      Surface PR-merge as a distinct gated capability rather than relying on
+      the SDK's optional confirmation_mode.
+
+  PRAX-2026-05-11-002  Untrusted external content
+            (GitHub/GitLab/Bitbucket/Jira/Linear issue bodies, titles, and PR
+            comments) is rendered straight into the agent's task prompt via
+            Jinja2 templates with no origin-labeling or sanitization, putting
+            an indirect-prompt-injection ingress directly upstream of the
+            agent's tool-calling loop — including the auto-approved
+            PR-creation tools (compound with PRAX-2026-05-11-001).
+      Action: Wrap all provider-sourced text (issue body, title, comments, PR
+      comments) in an explicit untrusted-content delimiter when building the
+      resolver prompt, and add a note in the resolver instruction template
+      telling the agent that everything inside the delimiter is data, not
+      instructions. Better: strip or escape instruction-like constructs
+      server-side before templating, and have the agent-server treat
+      resolver-origin text as a distinct lower-trust context channel.
+
+  PRAX-2026-05-11-003  Remit-required confirmation gates for destructive git
+            operations (force-push, branch delete, history rewrite),
+            CI/workflow file edits, and committing dependency changes have no
+            corresponding control in the app_server — these are left entirely
+            to the SDK agent loop, which this repo neither configures nor
+            enforces.
+      Action: Either (a) document explicitly that these gates are enforced by
+      openhands-sdk and pin/verify the SDK version that contains them, or (b)
+      add a server-side policy layer (consulted by the agent-server before
+      high-impact git/file actions) that denies force-push / branch-delete /
+      history-rewrite and requires confirmation for edits under
+      .github/workflows/*, CI config files, and dependency manifests. Do not
+      rely on the default-off confirmation_mode.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+==============================================================================
