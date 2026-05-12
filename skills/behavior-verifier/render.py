@@ -109,8 +109,15 @@ def _neutralise_braces(s: str) -> str:
 
 def esc(value) -> str:
     """HTML-escape a value for either text content or an attribute value, and
-    neutralise any literal ``{{...}}`` (see ``_neutralise_braces``)."""
-    return _neutralise_braces(html.escape(str(value)))
+    neutralise any literal ``{{...}}`` (see ``_neutralise_braces``).
+
+    The value is HTML-*un*escaped first, so a string that already carries an HTML
+    entity (``&mdash;``, ``&amp;``, ``&lt;NAME&gt;`` — easy to write into a prose
+    field out of habit) renders as the character, not as the literal entity text.
+    ``unescape`` then ``escape`` round-trips cleanly: a literal ``&`` and an
+    ``&amp;`` both come out as ``&amp;`` (browser shows ``&``); ``&lt;`` and a
+    literal ``<`` both come out as ``&lt;`` (browser shows ``<``)."""
+    return _neutralise_braces(html.escape(html.unescape(str(value))))
 
 
 def render_rich(text, allow=("code",)) -> str:
@@ -122,8 +129,15 @@ def render_rich(text, allow=("code",)) -> str:
     ``<`` in the prose is rendered as text, not as a stray tag, and a tag the
     skill reached for that is *not* in ``allow`` shows as escaped text rather
     than affecting layout. Literal ``{{...}}`` is neutralised too.
+
+    The text is HTML-*un*escaped first (before tag protection), so an HTML
+    entity written into a prose field — ``&mdash;``, ``&amp;``, ``&lt;NAME&gt;``,
+    easy to do out of HTML habit — becomes the character it stands for instead of
+    rendering double-escaped (``&amp;mdash;``) and showing the literal entity
+    text. (The SKILL prompt asks for literal characters; this makes a slip
+    harmless rather than visible in the report.)
     """
-    text = str(text)
+    text = html.unescape(str(text))
     if "\x00" in text:
         raise RenderError("rich-text field contains a NUL byte")
     tag_alt = "|".join(re.escape(t) for t in allow)

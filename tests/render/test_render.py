@@ -125,18 +125,27 @@ def main():
           and open(out_txt, "rb").read() == open(golden_txt, "rb").read(),
           "rendered TXT differs from (or one side is missing) tests/fixtures/finbot.golden.txt — see header comment to regenerate")
 
-    # 3c. TXT entity decoding — prose fields carry HTML entities for the HTML
-    #     report; strip_tags() must decode them so the .txt summary shows the
-    #     characters, not the raw entity text. (The fixture has no entities, so
-    #     this is exercised on a mutated copy.)
+    # 3c. HTML-entity tolerance in prose. The SKILL prompt asks for literal
+    #     characters, but the renderer must normalise an entity written by
+    #     mistake: un-escape prose before re-escaping for HTML (so &mdash; ->
+    #     &mdash; not &amp;mdash;) and decode it entirely for the .txt summary.
+    #     (The fixture has no entities, so this runs on a mutated copy.)
     ent = json.loads(json.dumps(data))
     ent["behavior_summary"] = "Tooling <code>a &amp; b</code> &mdash; see &lt;project&gt; notes."
+    ent["raise_posture"]["categories"][0]["rationale"] = "Range &lt;1.0.0&gt; &amp; a &mdash; b."
     ent_path = os.path.join(tmp, "ent.json")
     with open(ent_path, "w", encoding="utf-8") as fh:
         json.dump(ent, fh)
+    ent_html = os.path.join(tmp, "ent.html")
     ent_txt = os.path.join(tmp, "ent.txt")
-    run_render(["--findings", ent_path, "--out-txt", ent_txt])
+    run_render(["--findings", ent_path, "--template", TEMPLATE, "--out-html", ent_html, "--out-txt", ent_txt])
+    eh = open(ent_html, encoding="utf-8").read() if os.path.exists(ent_html) else ""
     et = open(ent_txt, encoding="utf-8").read() if os.path.exists(ent_txt) else ""
+    check("HTML normalises stray entities in prose (no double-escaping like &amp;mdash; / &amp;lt;)",
+          "&amp;mdash;" not in eh and "&amp;lt;" not in eh and "&amp;amp;" not in eh
+          and "&mdash;" in eh and "&lt;project&gt;" in eh   # the *single*-escaped forms (browser shows — / <project>)
+          and "<code>a &amp; b</code>" in eh,              # & inside the kept <code> span escaped once
+          "stray HTML entities in prose were double-escaped in the HTML output")
     check("TXT decodes HTML entities in prose (no raw &amp;/&mdash;/&lt; in the summary)",
           "Tooling a & b — see <project> notes." in et
           and "&amp;" not in et and "&mdash;" not in et and "&lt;" not in et,
