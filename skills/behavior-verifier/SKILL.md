@@ -56,6 +56,16 @@ If in doubt, redact. The operator can always open the source file to see the act
 
 ## Step 1 — Find Your Inputs
 
+**Authoritative date and time — run this first, before anything else in this step.** `date -u` is the single source of truth for every date and timestamp in this scan — finding IDs, filenames, report header, the `scan.scan_date` / `scan.scan_timestamp` fields, footer metadata. Do not infer the date from conversation context, memory files, prior scan artifacts, or any other source — context is frequently wrong (stale session, timezone confusion) and a wrong date here produces silently wrong IDs throughout the report with no error raised. **Do not proceed to the rest of Step 1 until you have run it.** If `date -u` is genuinely unavailable in this environment, stop and ask the operator for the current UTC date before continuing.
+
+```bash
+SCAN_DATE=$(date -u +%Y-%m-%d)        # e.g., 2026-04-23 — used in finding IDs and findings-<date>.json
+SCAN_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ) # e.g., 2026-04-23T14:30:22Z — used in the JSON scan_timestamp field
+TIMESTAMP=$(date -u +%Y-%m-%d-%H%M%S)  # e.g., 2026-04-23-143022 — used in analysis-<timestamp>.html / .txt
+```
+
+Reuse `$SCAN_DATE`, `$SCAN_TS`, and `$TIMESTAMP` throughout the scan; do not regenerate them mid-run.
+
 **Worker Remit.** Search in this order, stop at first match:
 1. `WORKER_REMIT.md` in the current directory
 2. Any file matching `WORKER_REMIT*.md` in the current directory (e.g., `WORKER_REMIT_LOBOT.md`). If multiple match, prefer the one that names the agent being scanned.
@@ -80,16 +90,6 @@ If Praxa was invoked non-interactively (e.g., `claude -p`) and (1) does not appl
 ```bash
 mkdir -p ./reports
 ```
-
-**Authoritative date and time.** Use `date -u` as the single source of truth for every date and timestamp in this scan — finding IDs, filenames, report header, the `scan.scan_date` / `scan.scan_timestamp` fields, footer metadata. Do not infer the date from conversation context, memory files, prior scan artifacts, or any other source. If `date -u` is unavailable, ask the operator for the current UTC date before proceeding.
-
-```bash
-SCAN_DATE=$(date -u +%Y-%m-%d)        # e.g., 2026-04-23 — used in finding IDs and findings-<date>.json
-SCAN_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ) # e.g., 2026-04-23T14:30:22Z — used in the JSON scan_timestamp field
-TIMESTAMP=$(date -u +%Y-%m-%d-%H%M%S)  # e.g., 2026-04-23-143022 — used in analysis-<timestamp>.html / .txt
-```
-
-Reuse `$SCAN_DATE`, `$SCAN_TS`, and `$TIMESTAMP` throughout the scan; do not regenerate them mid-run.
 
 ---
 
@@ -140,7 +140,7 @@ Using the workspace path from Step 1, discover all artifacts in the agent's work
 | Skill / prompt files | `*.md`, `AGENT*.md`, `SYSTEM*.md`, `*_skill.md`, `*_prompt.md`, `CLAUDE.md`, `AGENTS.md` |
 | Code files | `*.py`, `*.js`, `*.ts`, `*.sh` — anything executable |
 | Tool / API definitions | `tools.json`, `openapi.yaml`, `functions.json`, any file named `tools*` or `capabilities*` |
-| MCP server configs | The Claude-style names — `.mcp.json`, `mcp.json`, `mcp_config.json` — **and the agent-platform config files**: `opencode.json` / `opencode.jsonc` / `.opencode/*.json` (OpenCode), `cline_mcp_settings.json` (Cline), `.roo/mcp.json` (Roo Code), `.vscode/mcp.json` (VS Code), `.cursor/mcp.json` (Cursor), `.copilot/mcp-config.json` (Copilot), `openclaw.json` and legacy `clawdbot.json` (OpenClaw — MCP servers under an `mcp.servers` block). **Content rule (do not rely on filenames alone):** treat *any* JSON / JSONC / TOML / YAML file that contains an `mcpServers` key, an `mcp.servers` or `mcp_servers` section, or a top-level `servers` map whose entries are MCP-shaped (`command` + `args`, or `url` + `type`/`transport`) as an MCP server configuration — regardless of what it's named or which directory it's in — and carry it into the MCP Server Evaluation in Step 6. |
+| MCP server configs | **Content first — the criterion is the content, not the name.** Treat *any* JSON / JSONC / TOML / YAML file that contains an `mcpServers` key, an `mcp.servers` or `mcp_servers` section, or a top-level `servers` map whose entries are MCP-shaped (`command` + `args`, or `url` + `type`/`transport`) as an MCP server configuration — regardless of what it's named or which directory it's in — and carry it into the MCP Server Evaluation in Step 6. A file is *not* MCP config just because its name is on the list below; it's MCP config when it has that content. **Filenames that typically satisfy the rule** (use as a discovery hint, not the trigger): the Claude-style `.mcp.json` / `mcp.json` / `mcp_config.json`; `opencode.json` / `opencode.jsonc` / `.opencode/*.json` (OpenCode); `cline_mcp_settings.json` (Cline); `.roo/mcp.json` (Roo Code); `.vscode/mcp.json` (VS Code); `.cursor/mcp.json` (Cursor); `.copilot/mcp-config.json` (Copilot); `openclaw.json` and legacy `clawdbot.json` (OpenClaw — MCP servers under an `mcp.servers` block). |
 | Configuration | `*.json`, `*.yaml`, `*.toml`, `*.env*`, `*config*`, `*settings*` |
 | Policy / remit documents | `*remit*`, `*policy*`, `*rules*`, `*boundaries*` |
 | Plugin manifests | `plugin.json`, `manifest.json`, `package.json`, `pyproject.toml`, `requirements.txt`, `Pipfile` |
@@ -383,7 +383,7 @@ For each config file found, check for:
 
 ### MCP Server Evaluation
 
-If any MCP server configuration was found in Step 4 — a Claude-style `.mcp.json` / `mcp.json` / `mcp_config.json`, an agent-platform config (`opencode.json` / `opencode.jsonc` / `.opencode/*.json`, `cline_mcp_settings.json`, `.roo/mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.copilot/mcp-config.json`, OpenClaw's `openclaw.json` or legacy `clawdbot.json` with an `mcp.servers` block), **or any file the content rule flagged as carrying MCP server definitions regardless of filename** — load `knowledge/KB_MCP_SECURITY.md` and evaluate against the full MCP minimum bar checklist. Run every item in the checklist. Any "No" is a finding at the severity level specified in the KB.
+If any MCP server configuration was found in Step 4 — *any* file carrying MCP server definitions (an `mcpServers` key, an `mcp.servers` / `mcp_servers` section, or an MCP-shaped top-level `servers` map), whatever it's named, including the Claude-style `.mcp.json` / `mcp.json` / `mcp_config.json` and the agent-platform configs (`opencode.json` / `opencode.jsonc` / `.opencode/*.json`, `cline_mcp_settings.json`, `.roo/mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.copilot/mcp-config.json`, OpenClaw's `openclaw.json` or legacy `clawdbot.json`) — load `knowledge/KB_MCP_SECURITY.md` and evaluate against the full MCP minimum bar checklist. Run every item in the checklist. Any "No" is a finding at the severity level specified in the KB.
 
 Pay particular attention to:
 - Tool descriptions containing instruction-like language (tool poisoning indicator) → **Critical**
@@ -443,7 +443,7 @@ Praxa produces three artifacts per analysis: a canonical findings JSON (Step 10)
 
 **Write prose with literal characters, not HTML entities.** Use `—`, `&`, `<`, `>`, `'` directly — *not* `&mdash;`, `&amp;`, `&lt;`, `&gt;`, `&#39;`. Literal is cleaner and matches the examples; the renderer will normalise an entity you write by mistake (it un-escapes prose before re-escaping for HTML, so `&mdash;` still renders as `—`), but don't rely on that. The only markup allowed in prose fields is the inline-tag allowlist noted per field below (`<code>`, and for `behavior_summary` also `<p>`/`<strong>`/`<em>`) — everything else, including a stray `<` inside e.g. a version range like `langsmith<1.0.0`, is fine as a literal character and is escaped safely.
 
-Synthesize the following now, in order, and hold it all in working memory. You will write it out as one JSON file in Step 10.
+Synthesize 9.1–9.8 now, in order, and hold them in working memory. Then **9.9 is a mandatory action, not a held item** — you print the interim overview to stdout before you write anything in Step 10.
 
 ### 9.1 Agent Remit summary (intro band — left block) → `intro_band.agent_remit_summary`
 
@@ -515,9 +515,9 @@ For each confirmed positive from Step 8: a `title` (short), a `description` (one
 
 If you found log files in Step 4: set `present` to true and, for each, record `path`, `source` (the component that writes it), `content_type` (e.g., "structured JSON lines", "plaintext", "agent decision log"), `purpose` (what it captures), `mtime` (last-modified as you observed it — a date or `"unknown"`), and `status` (`active` if recently written, `new` if it looks freshly created this run). If you found none: set `present` to false, leave `rows` empty, and write a one-sentence `no_logs_note` — and if the absence of logging is itself a finding (it usually is for Monitor Continuously), say so and cite the finding ID.
 
-### 9.9 Print an interim overview to stdout now
+### 9.9 Print an interim overview to stdout NOW — gate before Step 10
 
-Before writing any files, print a short interim overview so the operator sees the synthesis even if the session is truncated before the final summary:
+This is a hard gate, not a closing note. **Do not proceed to writing the findings JSON in Step 10 until you have printed this block to stdout.** It exists so the operator still sees the synthesis if the session is truncated before the final summary — which is a real risk in long scans, and the only protection against losing the whole analysis. Print it now:
 
 ```
 Praxa — interim behavior analysis overview
@@ -640,11 +640,22 @@ Rules for the findings array and the JSON as a whole:
 - **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (the deferred L&F revisit, `design/DEFERRED.md`, will surface the description). If you have nothing more to say than the summary, omit `description` entirely.
 - **`evidence` is structured: an array of `{ "file", "line", "snippet" }` objects** — *not* free-form strings. `file` is a workspace-relative path (or a workspace-relative identifier when there's no single file); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context — a short, specific piece of prose. The renderer formats each item as `file:line — snippet` in the report. Every finding needs at least one evidence item. Bad evidence ("No input validation found") is still bad — say *what* and *where*, e.g. `{ "file": "src/agent.py", "line": 34, "snippet": "fetch_message() returns the full body before the trust check at :67" }`. **Never reprint a secret value** in `snippet` (see the rule at the top of this skill).
 - **`recommended_actions` is an array of strings.** One action → single-item array; multiple actions → multiple items. The renderer renders a single-item array as inline text and a multi-item array as a bulleted list. Each item is one concrete action: file to edit, config to change, control to add. Inline `<code>` / `<strong>` / `<em>` is allowed.
-- **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Cascading & Multi-Agent Failures`, not `ASI05`. Use the canonical names from `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md`. For an MCP-specific finding, add `{ "kind": "mcp", "label": "<the MCP checklist item>" }`.
+- **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Cascading & Multi-Agent Failures`, not `ASI05`. The exact format is `<CODE> — <Name>`: the code (`LLM01`, `ASI05`), a space, an **em dash** (`—`, not a hyphen `-`, not an en dash `–`), a space, then the canonical name exactly as written in the KB. Don't retype it — copy the heading line straight from `knowledge/KB_LLM_TOP10.md` / `knowledge/KB_AGENTIC_TOP10.md` so the spelling and punctuation match across every finding. For an MCP-specific finding, add `{ "kind": "mcp", "label": "<the MCP checklist item>" }`.
 - **`escalation`** is `alert` for Critical and High findings, `log_only` for Medium, Low, and Informational.
 - **Counts must be consistent.** `footer.severity_counts` must match the actual severities in `findings[]`. `remit_coverage.stat_counts` must match the actual statuses in `rules[]`, and `total` must equal `len(rules)`. Every non-null `rule.finding_id` must exist in `findings[]`. `weighted_overall` must equal Σ(score × weight) within rounding. **The renderer re-checks all of this and refuses to run if it's off**, naming the offending path — so get it right here.
 - **`findings`** may be empty (a genuinely clean agent). `positives` may be empty. `log_files.rows` is empty exactly when `present` is false.
 - **No presentation values in the JSON.** `severity` is `"Critical"`, never `"sev-critical"`; `status` is `"gap"`, never `"pill-gap"`; do not put CSS classes, percentages, or `floor()`ed maturity labels anywhere. The renderer derives all of that.
+
+**Common validation errors — check these before you run the renderer.** The validator is strict about cross-field consistency, and these are the mistakes it catches most often. None are obvious bugs; they're consequences of the strict checks, so look for them deliberately:
+
+- **`footer.severity_counts` doesn't match `findings[]`.** Re-count the actual severities in the findings array; `critical` + `high` + `medium` + `low` + `info` must equal `len(findings)` and each bucket must match.
+- **`remit_coverage.stat_counts` doesn't match `rules[]`.** Re-count the actual `status` values; `verified` + `gap` + `partial` + `vague` + `enp` must equal `total`, and `total` must equal `len(rules)`.
+- **Wrong RAISE weight or category name.** `weight` is `0.25` for `implement_zero_trust` and `0.15` for the other five — exactly, no rounding. `name` must be the exact display string for the `key` (`limit_your_domain` → `"Limit Your Domain"`, etc.). And `weighted_overall` must equal Σ(score × weight) to two decimals.
+- **A `finding_id` / `related_findings` id that doesn't exist.** Every non-null `rule.finding_id` and every entry in any `related_findings` array must be the `id` of a finding actually present in `findings[]`. No self-references in `related_findings`.
+- **`escalation` inconsistent with `severity`.** `alert` for Critical and High; `log_only` for Medium, Low, Informational. The validator cross-checks this.
+- **`owasp_llm` / `owasp_agentic` not in canonical form.** These are `LLM01`–`LLM10` / `ASI01`–`ASI10` (or `null`) — not free text, not the full label (the label goes in `tags`).
+
+When the renderer rejects the JSON it names the offending path (e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`) — fix that path and re-run.
 
 After writing the file, re-read it and confirm it parses as valid JSON and the counts line up. (Step 11 will catch any problem, but catching it here saves a round trip.)
 

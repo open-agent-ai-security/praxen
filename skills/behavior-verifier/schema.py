@@ -62,7 +62,22 @@ LOG_STATUSES = ["active", "new"]
 ESCALATIONS = ["alert", "log_only"]
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Finding IDs are PRAX-YYYY-MM-DD-NNN — a three-digit sequence, so the
+# implicit ceiling is 999 findings in a single scan. No real target has come
+# close; if one ever does, widen the sequence here and in findings.schema.json.
 _FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
+# OWASP taxonomy codes, canonical form: LLM01–LLM10, ASI01–ASI10. The `tags[]`
+# label carries the full "CODE — Name" string; these scalar fields carry the
+# code alone (or null).
+_OWASP_LLM_RE = re.compile(r"^LLM(?:0[1-9]|10)$")
+_OWASP_ASI_RE = re.compile(r"^ASI(?:0[1-9]|10)$")
+
+# Escalation is a function of severity, not a free choice:
+# Critical/High -> "alert"; Medium/Low/Informational -> "log_only".
+_ESCALATION_FOR_SEVERITY = {
+    "Critical": "alert", "High": "alert",
+    "Medium": "log_only", "Low": "log_only", "Informational": "log_only",
+}
 
 
 class SchemaError(ValueError):
@@ -229,7 +244,7 @@ def _validate_findings(data):
         if fid in seen:
             _err(f"{p}.id", f"duplicate finding id {fid!r}")
         seen.add(fid)
-        _enum(f, "severity", p, SEVERITIES)
+        severity = _enum(f, "severity", p, SEVERITIES)
         _nonempty_str(f, "summary", p)
         tags = _list(f, "tags", p, min_len=1)
         for j, tag in enumerate(tags):
@@ -259,8 +274,14 @@ def _validate_findings(data):
             if not isinstance(val, str) or not val.strip():
                 _err(f"{p}.description", "if present, must be a non-empty string")
         _enum(f, "raise_category", p, RAISE_KEYS)
-        _str(f, "owasp_llm", p, allow_none=True)
-        _str(f, "owasp_agentic", p, allow_none=True)
+        owasp_llm = _str(f, "owasp_llm", p, allow_none=True)
+        if owasp_llm is not None and not _OWASP_LLM_RE.match(owasp_llm):
+            _err(f"{p}.owasp_llm",
+                 f"must be a canonical code LLM01–LLM10 or null; got {owasp_llm!r}")
+        owasp_agentic = _str(f, "owasp_agentic", p, allow_none=True)
+        if owasp_agentic is not None and not _OWASP_ASI_RE.match(owasp_agentic):
+            _err(f"{p}.owasp_agentic",
+                 f"must be a canonical code ASI01–ASI10 or null; got {owasp_agentic!r}")
         _enum(f, "confidence", p, CONFIDENCES)
         rel = _get(f, "related_findings", p)
         _str_list(rel, f"{p}.related_findings")
@@ -268,7 +289,14 @@ def _validate_findings(data):
             if not _FINDING_ID_RE.match(r):
                 _err(f"{p}.related_findings[{j}]",
                      f"{r!r} is not a PRAX-YYYY-MM-DD-NNN id")
-        _enum(f, "escalation", p, ESCALATIONS)
+            if r == fid:
+                _err(f"{p}.related_findings[{j}]",
+                     f"finding {fid!r} lists its own id in related_findings")
+        escalation = _enum(f, "escalation", p, ESCALATIONS)
+        expected_esc = _ESCALATION_FOR_SEVERITY[severity]
+        if escalation != expected_esc:
+            _err(f"{p}.escalation",
+                 f"must be {expected_esc!r} for a {severity} finding; got {escalation!r}")
     return findings, seen
 
 
@@ -384,7 +412,11 @@ def _validate_consistency(data, findings, finding_ids):
                 _err(f"$.findings ({f['id']}).related_findings",
                      f"references finding {r!r} which does not exist in findings[]")
 
-    # 4. weighted overall matches Σ(score × weight) (allow 2-decimal rounding).
+    # 4. weighted overall matches Σ(score × weight).
+    # Scores are integers and weights are exact (0.25 / 0.15), so the true sum
+    # has no floating-point error; the only slack we allow is the rounding in
+    # the two-decimal JSON representation (so 0.011, just over half a unit in
+    # the last place) — not a fudge factor for anything else.
     cats = data["raise_posture"]["categories"]
     computed = sum(c["score"] * c["weight"] for c in cats)
     declared = data["raise_posture"]["weighted_overall"]

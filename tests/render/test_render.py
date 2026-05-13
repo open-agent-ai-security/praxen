@@ -303,6 +303,14 @@ def main():
              lambda d: d["raise_posture"]["categories"].pop())
     negative("rejects a weighted_overall that doesn't match the category sum",
              lambda d: d["raise_posture"].__setitem__("weighted_overall", 4.99))
+    negative("rejects an escalation inconsistent with severity (Critical + log_only)",
+             lambda d: d["findings"][0].__setitem__("escalation", "log_only"))
+    negative("rejects a non-canonical owasp_llm code",
+             lambda d: d["findings"][0].__setitem__("owasp_llm", "LLM99"))
+    negative("rejects a non-canonical owasp_agentic code",
+             lambda d: d["findings"][0].__setitem__("owasp_agentic", "bananas"))
+    negative("rejects a finding that lists its own id in related_findings",
+             lambda d: d["findings"][0].__setitem__("related_findings", [d["findings"][0]["id"]]))
 
     # 6. committed regression baselines under tests/baselines/. The canonical
     #    JSON is the source of truth; the committed HTML/TXT are derived. For the

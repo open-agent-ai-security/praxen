@@ -65,6 +65,11 @@ done
 find "$STAGE_DIR" -name '.DS_Store' -delete
 find "$STAGE_DIR" -name '__MACOSX' -type d -exec rm -rf {} +
 
+# Strip Python bytecode caches — these appear in skills/ once the test suite
+# has run on the build machine, and have no business in a source distribution.
+find "$STAGE_DIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
+find "$STAGE_DIR" -name '*.pyc' -delete
+
 # Strip any local/ directory that might have been inadvertently copied
 rm -rf "$STAGE_DIR/local"
 

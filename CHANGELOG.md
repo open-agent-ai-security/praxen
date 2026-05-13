@@ -9,6 +9,26 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 
 ---
 
+## [Unreleased]
+
+**Field-review cheap wins.** Small robustness and clarity fixes from the v0.6.1 field review (one executing-LLM ran the full pipeline against a workspace and wrote up what it hit). No changes to detection logic, RAISE scoring, the Worker Remit structure, or the findings schema (still `"2.0"`).
+
+### Changed
+- **`SKILL.md` Step 1 — `date -u` is now the first executable action of the step**, not a code block buried among the variable-naming examples at the end, with an explicit "do not proceed until you have run it" gate and a stated reason (context is frequently wrong; a bad date here produces silently wrong finding IDs with no error). If `date -u` is genuinely unavailable, the skill is told to stop and ask the operator rather than infer.
+- **`SKILL.md` Step 9.9 — the interim-overview print is now framed as a hard gate before Step 10**, not a closing note at the end of the synthesis block ("do not proceed to writing the findings JSON until you have printed this"). The Step 9 intro now calls out 9.9 as a mandatory action rather than a held item. (A field-review run skipped it because its placement read as a closing note.)
+- **`SKILL.md` Step 4 / Step 6 — the MCP-config rule now leads with the content criterion**, not the filename list: a file is MCP config when it carries an `mcpServers` / `mcp.servers` / `mcp_servers` block (or an MCP-shaped top-level `servers` map), whatever it's named; the familiar filenames (`.mcp.json`, `opencode.json`, `clawdbot.json`, …) are presented as discovery hints, not the trigger. (Previously the prose listed filenames first and the content rule second as a clarification, which read as "check these names, and also anything that looks like this.")
+- **`SKILL.md` Step 10 — added a "Common validation errors" checklist** (severity/stat-count miscounts, RAISE weight / category-name strings, dangling `finding_id` / `related_findings` ids, escalation-vs-severity, non-canonical `owasp_*` codes) so the most frequent strict-validator round-trips can be caught before running the renderer. Tag-label format spelled out explicitly: `CODE — Name` with an em dash, copied from the KB rather than retyped.
+
+### Added
+- **`schema.py` now cross-checks `escalation` against `severity`** — `alert` for Critical/High, `log_only` for Medium/Low/Informational — the same way it already cross-checks `footer.severity_counts` against the findings array. A Critical finding tagged `log_only` no longer passes silently.
+- **`schema.py` now validates `owasp_llm` / `owasp_agentic` against the canonical code pattern** (`LLM01`–`LLM10` / `ASI01`–`ASI10`, or `null`) instead of accepting any string; the matching `pattern` was added to `findings.schema.json`. (Garbage values produced garbage tags in the rendered report.)
+- **`schema.py` now rejects a finding that lists its own id in `related_findings`** (a self-reference).
+- `test_render.py` — negative cases for the three new validations.
+
+### Internal
+- **`build.sh` strips `__pycache__` / `*.pyc` from the staged distribution** before zipping (these appear in `skills/` once the test suite has run on the build machine). The published `praxa-0.6.1.zip` was already clean; this prevents a future rebuild from a post-test working tree shipping bytecode.
+- `schema.py` — comments added explaining the `0.011` `weighted_overall` tolerance (it's the two-decimal-rounding slack, not a fudge factor) and the implicit 999-findings-per-scan ceiling in the `PRAX-…-NNN` id format.
+
 ## [0.6.1] — 2026-05-12
 
 **MCP coverage + render robustness.** The MCP Server Evaluation path — discovery → `knowledge/KB_MCP_SECURITY.md` → the MCP minimum-bar checklist → `mcp`-tagged findings, the machinery itself introduced with the knowledge base in 0.3.0 — is now widened beyond Claude-style filenames, exercised end-to-end against two real repos, and held under regression; the renderer is hardened against HTML entities in prose; and the test harness now validates every committed regression baseline. No changes to the detection logic, RAISE scoring, Worker Remit structure, or the findings schema (still `"2.0"`).
