@@ -9,18 +9,9 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 
 ---
 
-## [Unreleased]
+## [0.6.2] — 2026-05-18
 
-**Field-review cheap wins.** Small robustness and clarity fixes from the v0.6.1 field review (one executing-LLM ran the full pipeline against a workspace and wrote up what it hit). No changes to detection logic, RAISE scoring, the Worker Remit structure, or the findings schema (still `"2.0"`).
-
-### Fixed
-- **`.claude-plugin/marketplace.json` — `plugins[0].source` is now `"./"` instead of `"."`** so the marketplace passes the Claude Code schema validator. The bare `"."` form was rejected by `/plugin marketplace add Exabeam/deckard` with `Invalid schema: plugins.0.source: Invalid input`, blocking install. Per the [marketplace docs](https://code.claude.com/docs/en/plugin-marketplaces#relative-paths), relative plugin sources must start with `./`.
-
-### Changed
-- **`SKILL.md` Step 1 — `date -u` is now the first executable action of the step**, not a code block buried among the variable-naming examples at the end, with an explicit "do not proceed until you have run it" gate and a stated reason (context is frequently wrong; a bad date here produces silently wrong finding IDs with no error). If `date -u` is genuinely unavailable, the skill is told to stop and ask the operator rather than infer.
-- **`SKILL.md` Step 9.9 — the interim-overview print is now framed as a hard gate before Step 10**, not a closing note at the end of the synthesis block ("do not proceed to writing the findings JSON until you have printed this"). The Step 9 intro now calls out 9.9 as a mandatory action rather than a held item. (A field-review run skipped it because its placement read as a closing note.)
-- **`SKILL.md` Step 4 / Step 6 — the MCP-config rule now leads with the content criterion**, not the filename list: a file is MCP config when it carries an `mcpServers` / `mcp.servers` / `mcp_servers` block (or an MCP-shaped top-level `servers` map), whatever it's named; the familiar filenames (`.mcp.json`, `opencode.json`, `clawdbot.json`, …) are presented as discovery hints, not the trigger. (Previously the prose listed filenames first and the content rule second as a clarification, which read as "check these names, and also anything that looks like this.")
-- **`SKILL.md` Step 10 — added a "Common validation errors" checklist** (severity/stat-count miscounts, RAISE weight / category-name strings, dangling `finding_id` / `related_findings` ids, escalation-vs-severity, non-canonical `owasp_*` codes) so the most frequent strict-validator round-trips can be caught before running the renderer. Tag-label format spelled out explicitly: `CODE — Name` with an em dash, copied from the KB rather than retyped.
+**Plugin-marketplace install fix, plus the v0.6.1 field-review cheap wins.** `/plugin marketplace add Exabeam/deckard` was rejected by the Claude Code marketplace schema validator — `.claude-plugin/marketplace.json` declared the plugin `source` as a bare `"."` where the schema requires a `"./"`-prefixed relative path — so the marketplace-install path silently never worked for any tagged release (the unzip-the-release path was unaffected). 0.6.2 fixes that, and bundles in the small robustness and clarity fixes from the v0.6.1 field review (one executing-LLM ran the full pipeline against a workspace and wrote up what it hit). No changes to detection logic, RAISE scoring, the Worker Remit structure, or the findings schema (still `"2.0"`).
 
 ### Added
 - **`schema.py` now cross-checks `escalation` against `severity`** — `alert` for Critical/High, `log_only` for Medium/Low/Informational — the same way it already cross-checks `footer.severity_counts` against the findings array. A Critical finding tagged `log_only` no longer passes silently.
@@ -28,9 +19,24 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 - **`schema.py` now rejects a finding that lists its own id in `related_findings`** (a self-reference).
 - `test_render.py` — negative cases for the three new validations.
 
+### Changed
+- **`SKILL.md` Step 1 — `date -u` is now the first executable action of the step**, not a code block buried among the variable-naming examples at the end, with an explicit "do not proceed until you have run it" gate and a stated reason (context is frequently wrong; a bad date here produces silently wrong finding IDs with no error). If `date -u` is genuinely unavailable, the skill is told to stop and ask the operator rather than infer.
+- **`SKILL.md` Step 9.9 — the interim-overview print is now framed as a hard gate before Step 10**, not a closing note at the end of the synthesis block ("do not proceed to writing the findings JSON until you have printed this"). The Step 9 intro now calls out 9.9 as a mandatory action rather than a held item. (A field-review run skipped it because its placement read as a closing note.)
+- **`SKILL.md` Step 4 / Step 6 — the MCP-config rule now leads with the content criterion**, not the filename list: a file is MCP config when it carries an `mcpServers` / `mcp.servers` / `mcp_servers` block (or an MCP-shaped top-level `servers` map), whatever it's named; the familiar filenames (`.mcp.json`, `opencode.json`, `clawdbot.json`, …) are presented as discovery hints, not the trigger. (Previously the prose listed filenames first and the content rule second as a clarification, which read as "check these names, and also anything that looks like this.")
+- **`SKILL.md` Step 10 — added a "Common validation errors" checklist** (severity/stat-count miscounts, RAISE weight / category-name strings, dangling `finding_id` / `related_findings` ids, escalation-vs-severity, non-canonical `owasp_*` codes) so the most frequent strict-validator round-trips can be caught before running the renderer. Tag-label format spelled out explicitly: `CODE — Name` with an em dash, copied from the KB rather than retyped.
+
+### Fixed
+- **`.claude-plugin/marketplace.json` — `plugins[0].source` is now `"./"` instead of `"."`** so the marketplace passes the Claude Code schema validator. The bare `"."` form was rejected by `/plugin marketplace add Exabeam/deckard` with `Invalid schema: plugins.0.source: Invalid input`, blocking install. Per the [marketplace docs](https://code.claude.com/docs/en/plugin-marketplaces#relative-paths), relative plugin sources must start with `./`. (Reported and fixed by an external first-time contributor — PR #32.)
+
 ### Internal
 - **`build.sh` strips `__pycache__` / `*.pyc` from the staged distribution** before zipping (these appear in `skills/` once the test suite has run on the build machine). The published `praxa-0.6.1.zip` was already clean; this prevents a future rebuild from a post-test working tree shipping bytecode.
 - `schema.py` — comments added explaining the `0.011` `weighted_overall` tolerance (it's the two-decimal-rounding slack, not a fudge factor) and the implicit 999-findings-per-scan ceiling in the `PRAX-…-NNN` id format.
+- **`tests/README.md` pre-release checklist now includes a plugin-marketplace install smoke check** (`/plugin marketplace add` → `/plugin install` → invoke the skill) so the marketplace-install path is verified before each revision — the gap that let the `"."`-source bug ship undetected.
+
+### Notes
+- `praxa_version` / plugin version bumps `0.6.1` → `0.6.2`. Release bundle: `praxa-0.6.2.zip`.
+- With the marketplace fix, `/plugin marketplace add Exabeam/deckard` + `/plugin install praxa@exabeam` works against a tagged release for the first time — installation had effectively been zip-only in practice.
+- Field-review follow-ups not in this release are tracked as low-priority RFEs — issues [#27](https://github.com/Exabeam/deckard/issues/27)–[#31](https://github.com/Exabeam/deckard/issues/31).
 
 ## [0.6.1] — 2026-05-12
 
