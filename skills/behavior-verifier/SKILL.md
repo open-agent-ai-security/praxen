@@ -311,7 +311,7 @@ Also extract any clause containing: MUST, MUST NOT, NEVER, ALWAYS, REQUIRED, PRO
 Assign each extracted rule a short ID: R-01, R-02, etc. Record:
 - Rule ID
 - Section it came from
-- Exact quoted text (verbatim from the remit — trim a long clause to its operative sentence)
+- Exact quoted text — a single **contiguous, verbatim** span copied from the remit: the rule's operative sentence, in full. Do **not** elide the middle with `...`, do not splice together non-adjacent fragments, and do not add, drop, or change punctuation. If the sentence is long, quote all of it — a long verbatim quote is correct; an elided one is not. Markdown emphasis (`**`) is formatting, not text: quote the words, not the `**` markers, but keep the span contiguous (a rule written `**clause** and a continuation` is quoted as the whole sentence `clause and a continuation`).
 - Rule type: Behavioral (about what the agent does) or Structural (about what controls must exist)
 
 Hold this inventory in working memory. You will account for every rule.
@@ -505,7 +505,7 @@ Compute the weighted overall: Σ(score × weight) across the six categories, whe
 
 ### 9.6 Remit Coverage rule audit → `remit_coverage.rules[]` + `remit_coverage.stat_counts`
 
-Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Phase 1 + Phase 2). For each rule, in document order: `rule_id` (`R-NN`), `section` (the remit section heading it came from), `rule_text` (the exact quoted text — short; the operative clause), `status` (`verified` | `gap` | `partial` | `vague` | `enp`), and `finding_id` (the `PRAX-...` id of the finding documenting this gap, or `null` for `verified` / `vague` / `enp` rules — every `gap` should normally point at one). Then count the statuses into `stat_counts` (the counts must match the rows, and `total` must equal the number of rows).
+Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Phase 1 + Phase 2). For each rule, in document order: `rule_id` (`R-NN`), `section` (the remit section heading it came from), `rule_text` (the rule's operative sentence — a contiguous, verbatim quote from the remit, never elided or trimmed mid-sentence; see Step 6 Phase 1), `status` (`verified` | `gap` | `partial` | `vague` | `enp`), and `finding_id` (the `PRAX-...` id of the finding documenting this gap, or `null` for `verified` / `vague` / `enp` rules — every `gap` should normally point at one). Then count the statuses into `stat_counts` (the counts must match the rows, and `total` must equal the number of rows).
 
 ### 9.7 Positives → `positives[]`
 
@@ -598,7 +598,7 @@ This file is the **complete behavioral record**: everything the HTML report show
   "remit_coverage": {
     "stat_counts": { "verified": <int>, "gap": <int>, "partial": <int>, "vague": <int>, "enp": <int>, "total": <int — must equal the number of rules below> },
     "rules": [
-      { "rule_id": "R-01", "section": "<remit section heading>", "rule_text": "<exact quoted rule text>", "status": "<verified | gap | partial | vague | enp>", "finding_id": "<PRAX-... or null>" }
+      { "rule_id": "R-01", "section": "<remit section heading>", "rule_text": "<the rule's operative sentence — contiguous and verbatim from the remit, never elided>", "status": "<verified | gap | partial | vague | enp>", "finding_id": "<PRAX-... or null>" }
     ]
   },
   "findings": [
@@ -613,7 +613,7 @@ This file is the **complete behavioral record**: everything the HTML report show
         { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
       ],
       "policy_rule_ids": "<the R-NN id(s) this finding violates, e.g. \"R-03\" or \"R-03, R-04\" — or null if the finding does not trace to a specific remit rule>",
-      "policy_rule_text": "<the exact quoted remit text the finding violates; if it spans rules, concatenate with \" / \" — or null, together with policy_rule_ids>",
+      "policy_rule_text": "<the remit text the finding violates — each rule quoted contiguous and verbatim (never elided), exactly as in rule_text; if it spans rules, concatenate the quotes with \" / \" — or null, together with policy_rule_ids>",
       "evidence": [
         { "file": "<workspace-relative path>", "line": <integer or null>, "snippet": "<exact observation or quoted context — never reprint secrets>" }
       ],

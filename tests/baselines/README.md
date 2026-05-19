@@ -5,42 +5,38 @@
 
 # Test-suite baselines
 
-Frozen runs of the nine targets in [`../README.md`](../README.md), one set per Praxa version, kept in the repo so they can be diffed against. Two uses:
-
-1. **Regression review** — before a release, run the full nine-target suite and compare against the latest baseline (see [`../README.md`](../README.md), "What a release review looks like" → the full-compare step).
-2. **Pipeline-change parity gates** — e.g. the Phase-2 parallel-analysis path is gated on landing in the same RAISE bands as the latest *sequential* baseline (see `design/V2_HARVEST_PLAN.md`).
+Frozen runs of the **eleven** test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v0.6.3-sequential/`** — all eleven targets on the Praxa v0.6.3 skill, scanned cold against the intent-level Worker Remits. It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like").
 
 ## Layout
 
 ```
 baselines/
   README.md                 ← this file
-  v0.3-sequential/           ← CURRENT for the nine core targets — on Praxa v0.3.0 (schema 2.0; structured evidence + recommended_actions[])
-    BASELINE.md              ← summary table, per-target provenance, schema-shift check, how to re-render
+  v0.6.3-sequential/         ← CURRENT — all eleven targets, Praxa v0.6.3 (schema 2.0)
+    BASELINE.md              ← summary table, provenance, how to compare
     <target>/
-      <target>-findings-<date>.json
-      <target>-analysis-<date>.html
-      <target>-analysis-<date>.txt
-  v0.2-sequential/           ← PREVIOUS — the nine core targets on Praxa v0.2.0 (schema 1.0); kept as the "before" snapshot
-    BASELINE.md
-    <target>/ …
+      <target>-findings-<date>.json        ← the canonical record (the thing you diff)
+      <target>-analysis-<timestamp>.html   ← the rendered report
+      <target>-analysis-<timestamp>.txt    ← the plain-text summary
+  v0.4-parallel/             ← historical — the Phase-2 parallel-path evaluation gate
+    GATE-NOTES.md            ← the A/B record and the "drop the parallel path" verdict
 ```
 
-When a Praxa version bumps and the calibration legitimately moves (or the JSON schema changes), the suite is re-run and re-frozen under a new `vX.Y-sequential/` directory, and the "latest baseline" pointer in `../README.md` is updated. `v0.3-sequential/` was produced by Phase 1's gate in `design/V2_HARVEST_PLAN.md` (the merged `schema_version: "2.0"` skill) and is the current comparator for the nine core targets; `v0.2-sequential/` is retained as the "before" so Phase 1's schema change can be shown not to have moved calibration (see `v0.3-sequential/BASELINE.md` → "Schema-shift check"). A partial `v0.6-sequential/` baseline previously held the two MCP-coverage targets (`deepagents-cli`, `yaah`); it has been **retired** — the test-remit rewrite ([issue #40](https://github.com/Exabeam/deckard/issues/40)) superseded the remits those baselines quoted. All eleven targets are being re-frozen as a single `v0.6.3-sequential/` set against the rewritten remits.
+When a Praxa release legitimately moves the calibration (or the findings schema changes), the suite is re-run cold and re-frozen under a new `vX.Y-sequential/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The `v0.6.3-sequential/` set was produced by the re-baseline in [issue #40](https://github.com/Exabeam/deckard/issues/40): all eleven targets were re-scanned against the rewritten intent-level remits, retiring the earlier split — `v0.3-sequential/` (nine core targets, Praxa 0.3.0), `v0.2-sequential/` (schema 1.0), and the partial `v0.6-sequential/` MCP pair.
+
+`v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 
 ## Re-rendering the HTML/TXT from a baseline JSON
 
-The renderer is deterministic, so a baseline's committed HTML/TXT re-render byte-for-byte from its committed JSON **using the renderer/template of that era**:
+The renderer is deterministic — a baseline's committed HTML/TXT re-render byte-for-byte from its committed JSON, and `tests/render/test_render.py` enforces that on every run:
 
 ```bash
 python3 skills/behavior-verifier/render.py \
-  --findings tests/baselines/v0.3-sequential/<target>/<target>-findings-<date>.json \
+  --findings tests/baselines/v0.6.3-sequential/<target>/<target>-findings-<date>.json \
   --template skills/behavior-verifier/report_template.html \
   --out-html /tmp/<target>.html --out-txt /tmp/<target>.txt
 ```
 
-> **Note on the relicense (Unreleased):** the `v0.2-sequential/` and `v0.3-sequential/` HTML/TXT snapshots were rendered before the Apache-2.0 relicense, so they still carry the old `Copyright © 2026 Exabeam, Inc. … Confidential and Proprietary` report header. They're intentionally left as-is — they're frozen historical artifacts, and the *findings JSON* is the thing that actually gets diffed. Re-rendering them with the current template will not be byte-identical (the new template strips that header and uses the open-source footer); the next baseline cut will pick up the new template.
-
 ## What is *not* kept here
 
-Ad-hoc / mid-development re-run reports. They regenerate on every run and drift between analyses — only these named, version-pinned baselines are committed.
+Ad-hoc / mid-development re-run reports. They regenerate on every run and drift between analyses — only the named, version-pinned baseline set is committed.

@@ -9,6 +9,12 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 
 ---
 
+## [Unreleased]
+
+### Internal
+- **Test remits rewritten as intent-level Worker Remits; regression baselines re-frozen as `v0.6.3-sequential`** ([issue #40](https://github.com/Exabeam/deckard/issues/40), PRs #42 + the baseline freeze). The eleven `tests/remits/*.md` were rewritten from implementation-level documents (which named internal file paths, class names, config keys, pinned versions) into intent-level *policy* documents — matching the principle the skill itself states ("the remit states policy; you discover implementation"), and no longer brittle to upstream renames. All eleven targets were re-scanned cold against the new remits and frozen as `tests/baselines/v0.6.3-sequential/`, retiring the earlier `v0.2-sequential` / `v0.3-sequential` and partial `v0.6-sequential` sets. `tests/README.md` per-target bands and scope notes were updated — including the restructured `openhands` (the agentic core moved to separate packages) and the re-scoped `deepagents-cli` (now a deploy-only bundler).
+- **`SKILL.md` Step 6 — `rule_text` / `policy_rule_text` must be a *contiguous, verbatim* span of the remit** (the rule's operative sentence in full): no `...` elision, no spliced fragments, no added/changed punctuation. `test_render.py`'s baseline remit-quote check now compares modulo Markdown emphasis (`**`), since the quote is of the remit's policy text, not its markup. No change to `render.py` output, `schema.py`, the findings schema, or any released artifact.
+
 ## [0.6.3] — 2026-05-19
 
 **Draft manifest, plus two fixes from field testing.** The headline is the **draft manifest**: a long scan can exhaust the coding agent's context window and auto-compact mid-analysis, silently degrading the report — findings gathered early get summarized away before the JSON is written. The skill now checkpoints its full synthesis to disk before writing the report, so a compacted run is recoverable rather than silently incomplete (a partial mitigation for the single-pass "unsupported arc", [issue #27](https://github.com/Exabeam/deckard/issues/27)). Alongside it, two bugs that field scans surfaced: `praxa_version` was read from the *analyzed* agent's `plugin.json` instead of recording Praxa's own version, and `policy_rule_ids` / `policy_rule_text` were mandatory on every finding even when a finding doesn't trace to a remit rule. The findings schema is unchanged (still `"2.0"`).

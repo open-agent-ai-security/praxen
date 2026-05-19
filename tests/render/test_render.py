@@ -398,13 +398,20 @@ def main():
             if slug not in remit_cache:
                 remit_cache[slug] = read_text(remit_path)
             remit = remit_cache[slug]
+            # rule_text / policy_rule_text quote the remit's policy *text*; Markdown
+            # emphasis (** * `) is formatting, not content, and the skill strips it.
+            # Compare modulo emphasis markers and whitespace runs — but the quote must
+            # still be a contiguous verbatim span (no eliding the middle with "...").
+            def _norm(s):
+                return re.sub(r"\s+", " ", s.replace("**", "").replace("*", "").replace("`", "")).strip()
+            norm_remit = _norm(remit)
             quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
                       for rule in bdata["remit_coverage"]["rules"]]
             for f in bdata["findings"]:
                 for seg in (f.get("policy_rule_text") or "").split(" / "):
                     if seg.strip():
                         quoted.append(("policy_rule_text", f["id"], seg.strip()))
-            missing = [(kind, who, txt) for (kind, who, txt) in quoted if txt not in remit]
+            missing = [(kind, who, txt) for (kind, who, txt) in quoted if _norm(txt) not in norm_remit]
             check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from tests/remits/{slug}.md",
                   not missing,
                   "; ".join(f"{kind} of {who}: {txt[:60]!r}" for kind, who, txt in missing[:3]))
