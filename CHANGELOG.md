@@ -20,6 +20,9 @@ All notable changes to Praxa will be recorded here. Format roughly follows [Keep
 - **`docs/usage.md` — "Tips for large workspaces" reworked into "Large workspaces and context sizing"** — why mid-analysis compaction is a *silent* failure, and concrete guidance: use the largest context window available, start a fresh session, scope the input to the agent (not the whole repo). Adds a recovery section: if a run compacts, recover from the draft manifest or re-run.
 - **`PRAXA_SPEC.md` — the "context window pressure" section** now documents the draft-manifest checkpoint as the primary survive-compaction mechanism.
 
+### Fixed
+- **`praxa_version` in the findings JSON is now a fixed literal in `SKILL.md`, not read from `.claude-plugin/plugin.json`.** When the analyzed agent was itself a Claude Code plugin, the skill read the *target's* `.claude-plugin/plugin.json` and recorded the agent's version as `praxa_version` (a field-reported scan came out as `praxa_version: 1.21.1`). The skill cannot reliably locate its own `plugin.json` once installed, so Step 10 now states the version directly (`0.6.2`), and the Step 9.9 manifest does the same. Found via a tester scan of a plugin target.
+
 ## [0.6.2] — 2026-05-18
 
 **Plugin-marketplace install fix, plus the v0.6.1 field-review cheap wins.** `/plugin marketplace add Exabeam/deckard` was rejected by the Claude Code marketplace schema validator — `.claude-plugin/marketplace.json` declared the plugin `source` as a bare `"."` where the schema requires a `"./"`-prefixed relative path — so the marketplace-install path silently never worked for any tagged release (the unzip-the-release path was unaffected). 0.6.2 fixes that, and bundles in the small robustness and clarity fixes from the v0.6.1 field review (one executing-LLM ran the full pipeline against a workspace and wrote up what it hit). No changes to detection logic, RAISE scoring, the Worker Remit structure, or the findings schema (still `"2.0"`).

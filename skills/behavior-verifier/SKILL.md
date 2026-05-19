@@ -527,7 +527,7 @@ This is a hard gate, not a closing note. **Do not proceed to Step 10 until you h
 
 (Agent slug and `$TIMESTAMP` from Step 1.) This is a working artifact, not a deliverable — it does not need to validate against any schema. It must, however, be **complete enough that Step 10's canonical JSON could be written from this file alone, with no reliance on working memory.** Under clear markdown headings, include:
 
-- Agent name, slug, `praxa_version` (from `.claude-plugin/plugin.json`), `$SCAN_DATE`, `$SCAN_TS`, workspace path, artifact count — everything Step 10's `scan` block and version fields need, since `$SCAN_TS` in particular cannot be regenerated after a compaction.
+- Agent name, slug, `praxa_version` (the fixed literal from Step 10 — Praxa's own version, not the analyzed agent's), `$SCAN_DATE`, `$SCAN_TS`, workspace path, artifact count — everything Step 10's `scan` block and version fields need, since `$SCAN_TS` in particular cannot be regenerated after a compaction.
 - The Agent Remit summary (9.1) and Agent Structure summary (9.2).
 - The Behavior Summary narrative (9.3).
 - The six RAISE category scores, confidences, and rationales, plus the weighted overall and its rationale (9.4–9.5).
@@ -581,7 +581,7 @@ This file is the **complete behavioral record**: everything the HTML report show
 ```json
 {
   "schema_version": "2.0",
-  "praxa_version": "<the version in .claude-plugin/plugin.json, e.g. 0.6.2>",
+  "praxa_version": "0.6.2",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -659,6 +659,7 @@ This file is the **complete behavioral record**: everything the HTML report show
 
 Rules for the findings array and the JSON as a whole:
 
+- **`praxa_version` is a fixed literal.** It records the version of *Praxa* that produced the report — use the literal value shown in the template above; do **not** read it from a `.claude-plugin/plugin.json`. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxa's, and must not be used here.
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
 - **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (the deferred L&F revisit, `design/DEFERRED.md`, will surface the description). If you have nothing more to say than the summary, omit `description` entirely.
 - **`evidence` is structured: an array of `{ "file", "line", "snippet" }` objects** — *not* free-form strings. `file` is a workspace-relative path (or a workspace-relative identifier when there's no single file); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context — a short, specific piece of prose. The renderer formats each item as `file:line — snippet` in the report. Every finding needs at least one evidence item. Bad evidence ("No input validation found") is still bad — say *what* and *where*, e.g. `{ "file": "src/agent.py", "line": 34, "snippet": "fetch_message() returns the full body before the trust check at :67" }`. **Never reprint a secret value** in `snippet` (see the rule at the top of this skill).
