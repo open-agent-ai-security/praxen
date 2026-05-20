@@ -46,6 +46,7 @@ INCLUDE=(
   "skills"
   "docs"
   "examples"
+  "graphics"
 )
 
 # Note: tests/ is in the source repository but intentionally NOT included in the
