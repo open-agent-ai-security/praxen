@@ -5,7 +5,7 @@
 
 # The RAISE Framework
 
-Praxa evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, developed by Steve Wilson. To learn more about RAISE, see his book *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
+Praxen evaluates every AI agent against the **Responsible AI Software Engineering (RAISE)** framework — a six-category methodology for assessing AI system security, developed by Steve Wilson. To learn more about RAISE, see his book *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
 
 It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
 
@@ -13,7 +13,7 @@ It's a structured way to answer the question: *does this AI system have the cont
 
 ## The Six Categories
 
-Each Praxa scan scores an agent 0–5 in every category and reports a per-category rationale plus a weighted overall score.
+Each Praxen scan scores an agent 0–5 in every category and reports a per-category rationale plus a weighted overall score.
 
 ### Limit Your Domain
 
@@ -89,13 +89,13 @@ The weighted overall is computed as `Σ (category_score × category_weight)` acr
 
 ## Confidence Levels
 
-Alongside each category score, Praxa reports a **confidence level**:
+Alongside each category score, Praxen reports a **confidence level**:
 
 - **High** — the control, or its absence, is directly stated in observable artifacts (code, config, logs)
 - **Medium** — a reasonable conclusion from indirect evidence (architecture, file naming, imports)
 - **Low** — no direct evidence; scored from absence or heuristics alone
 
-Low confidence is valid and expected for categories where Praxa has limited visibility. It doesn't mean the score is wrong — it means more evidence would be useful.
+Low confidence is valid and expected for categories where Praxen has limited visibility. It doesn't mean the score is wrong — it means more evidence would be useful.
 
 ---
 
@@ -108,7 +108,7 @@ The scanner follows a small set of explicit anti-patterns:
 3. **Don't penalize disclosure.** A team that honestly documents gaps is not worse than one that obscures them. Score the control, not the communication.
 4. **Context matters.** No rate limiting on an internal dev tool is Medium severity; on a public API it is High or Critical.
 
-These principles are implemented in the scoring guidance Praxa loads from `knowledge/KB_RAISE_SCANNING.md`.
+These principles are implemented in the scoring guidance Praxen loads from `knowledge/KB_RAISE_SCANNING.md`.
 
 ---
 

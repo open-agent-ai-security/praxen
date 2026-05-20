@@ -4,13 +4,13 @@
 -->
 
 # Worker Remit
-*Praxa — Agent Policy*
+*Praxen — Agent Policy*
 
 This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxa evaluates the agent's code and configuration against.
+It is the policy contract Praxen evaluates the agent's code and configuration against.
 Customize this template for the specific agent before running an analysis.
 
-**The remit states policy; Praxa discovers implementation. Write rules about what the agent *does*, not how it does it.**
+**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
 
 ---
 
@@ -48,7 +48,7 @@ What this agent is supposed to do. Be specific — vague descriptions produce we
 
 ## Non-Goals (Out of Scope)
 
-Work this agent should never do, regardless of instruction. Praxa will flag any observed activity in these areas.
+Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
 
 - 
 - 
@@ -88,7 +88,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ### Allowed Tools (Known Good Baseline)
 
-*List every tool the agent is expected to have at runtime. Praxa will flag any tool that disappears from this list.*
+*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
 
 - 
 
@@ -98,7 +98,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ### Forbidden Tools
 
-*Praxa will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
+*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - 
 
@@ -111,7 +111,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxa will flag unexpected access or movement of these classes.*
+*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
 
 - 
 
@@ -126,15 +126,15 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 ## Action Boundaries
 
 > **Writing verifiable rules**
-> Every rule in this section should state a testable constraint on behavior — something Praxa can check against the agent's code or logs. Vague intent produces weak detection.
+> Every rule in this section should state a testable constraint on behavior — something Praxen can check against the agent's code or logs. Vague intent produces weak detection.
 >
 > - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
 > - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
 > - ✗ *"Handle email appropriately"*
 > - ✗ *"Be careful with sensitive data"*
 >
-> The first two rules give Praxa something to audit. The second two don't.
-> Praxa will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
+> The first two rules give Praxen something to audit. The second two don't.
+> Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
 
 ### Allowed Without Approval
 - 
@@ -144,7 +144,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ### Never Allowed
 
-*Praxa will emit a Critical finding for any of these.*
+*Praxen will emit a Critical finding for any of these.*
 
 - 
 
@@ -159,7 +159,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ### Expected Patterns
 
-*What normal work looks like. Praxa uses this to distinguish ordinary operation from drift.*
+*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
 
 - 
 
@@ -211,7 +211,7 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxa will apply lower thresholds for findings in these areas.*
+*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
 
 - 
 
@@ -219,9 +219,9 @@ Work this agent should never do, regardless of instruction. Praxa will flag any 
 
 ## Escalation Rules
 
-These rules drive Praxa's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
+These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
 
-*State each condition precisely — Praxa will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
+*State each condition precisely — Praxen will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
 
 ### Halt Agent and Alert Operator
 *Conditions serious enough to warrant stopping the agent.*
@@ -252,5 +252,5 @@ These rules drive Praxa's reporting layer. They determine whether a finding is l
 
 ---
 
-*Worker Remit — Praxa*
+*Worker Remit — Praxen*
 *Customized for: [Worker Name] | Version: [X.X] | [Date]*

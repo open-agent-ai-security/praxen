@@ -4,18 +4,18 @@
 -->
 
 # Knowledge Base: OWASP Top 10 for LLM Applications (2025)
-*Distilled for Praxa — behavioral and environmental scanning context*
+*Distilled for Praxen — behavioral and environmental scanning context*
 
 Source: OWASP Top 10 for LLM Applications 2025 (v2.0, November 2024)
 License: CC BY-SA 4.0 — genai.owasp.org
 
-This file is a Praxa knowledge base extract. It strips administrative content and retains only the signal relevant to detecting, classifying, and reasoning about LLM security risks in a running agent environment. Use it as context when evaluating agent behavior or scanning agent artifacts.
+This file is a Praxen knowledge base extract. It strips administrative content and retains only the signal relevant to detecting, classifying, and reasoning about LLM security risks in a running agent environment. Use it as context when evaluating agent behavior or scanning agent artifacts.
 
 ---
 
 ## How to Use This Knowledge Base
 
-When Praxa detects a behavioral or environmental signal, map it to the relevant LLM risk category below. Use the risk category to:
+When Praxen detects a behavioral or environmental signal, map it to the relevant LLM risk category below. Use the risk category to:
 - Name the finding correctly
 - Understand what an attacker could do with it
 - Know what evidence to look for
@@ -45,7 +45,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 
 **Risk if exploited:** Unauthorized data access, privilege escalation, execution of commands in connected systems, manipulation of decision-making, exfiltration via crafted outputs.
 
-**Praxa relevance:** Praxa — detect injection-vulnerable code patterns, flag external content entering the LLM context without sanitization, check for content-origin labeling in prompt construction.
+**Praxen relevance:** Praxen — detect injection-vulnerable code patterns, flag external content entering the LLM context without sanitization, check for content-origin labeling in prompt construction.
 
 ---
 
@@ -66,7 +66,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 
 **Risk if exploited:** Privacy violations, credential theft, intellectual property exposure, compliance failures.
 
-**Praxa relevance:** Praxa — detect credentials in unexpected locations, check system prompts and config files for embedded secrets, verify vault references are used instead of literal values.
+**Praxen relevance:** Praxen — detect credentials in unexpected locations, check system prompts and config files for embedded secrets, verify vault references are used instead of literal values.
 
 ---
 
@@ -87,7 +87,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - A new plugin appeared in the agent's tool inventory with no documented source
 - Library versions not pinned — susceptible to dependency confusion or version-swap attacks
 
-**Praxa relevance:** Praxa (supply chain category). Every new tool, plugin, or dependency that appears in the agent workspace is a supply chain event requiring evaluation.
+**Praxen relevance:** Praxen (supply chain category). Every new tool, plugin, or dependency that appears in the agent workspace is a supply chain event requiring evaluation.
 
 ---
 
@@ -105,7 +105,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - Agent behavior that shifts over time without obvious cause (slow drift in how it responds to similar inputs)
 - Agent consistently favoring certain outcomes, parties, or recommendations in ways not explained by its instructions
 
-**Praxa relevance:** Praxa — audit data source provenance, flag unvetted fine-tuning or RAG inputs, verify data sources are listed in the remit.
+**Praxen relevance:** Praxen — audit data source provenance, flag unvetted fine-tuning or RAG inputs, verify data sources are listed in the remit.
 
 ---
 
@@ -122,7 +122,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 
 **Why this matters for agents:** Agents execute tool calls based on their own outputs. If those outputs can be influenced via prompt injection, the injection → tool execution chain is direct. The model is a confused deputy between the attacker and the downstream system.
 
-**Praxa relevance:** Praxa (code patterns that pass LLM output to system functions without validation).
+**Praxen relevance:** Praxen (code patterns that pass LLM output to system functions without validation).
 
 ---
 
@@ -147,7 +147,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - Agent performing actions beyond the scope of the task it was given
 - Agent performing actions that were in its instructions as examples, not directives
 
-**Praxa relevance:** Praxa — capability audit against the remit is a named high-priority check. Flag every tool and permission present in code but absent from the remit. This is the highest-priority RAISE Zero Trust category.
+**Praxen relevance:** Praxen — capability audit against the remit is a named high-priority check. Flag every tool and permission present in code but absent from the remit. This is the highest-priority RAISE Zero Trust category.
 
 ---
 
@@ -165,7 +165,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - Agent revealing system prompt contents in response to user queries
 - Agent revealing operational details (tool names, endpoints, credentials) that were in its instructions
 
-**Praxa relevance:** Praxa — audit system prompt storage and contents, flag confidential operational details (tool names, endpoints, credentials) embedded in the prompt.
+**Praxen relevance:** Praxen — audit system prompt storage and contents, flag confidential operational details (tool names, endpoints, credentials) embedded in the prompt.
 
 ---
 
@@ -183,7 +183,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - Agent returning information that appears to come from another user's context
 - Agent behavior that changes after documents are added to the knowledge base in unexpected ways
 
-**Praxa relevance:** Praxa — audit RAG architecture and access controls, check whether retrieved content is validated before entering the prompt, verify the knowledge base write path requires authentication.
+**Praxen relevance:** Praxen — audit RAG architecture and access controls, check whether retrieved content is validated before entering the prompt, verify the knowledge base write path requires authentication.
 
 ---
 
@@ -199,7 +199,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 
 **Why this matters for agents:** An agent that hallucinates doesn't just give a wrong answer — it may take wrong actions. An agent that believes it completed a task when it didn't creates evidence-mismatch problems that only become visible when someone reviews the logs.
 
-**Praxa relevance:** Praxa — flag system prompt instructions that invite speculation (e.g., "be creative," "fill in missing details"), check whether the agent is instructed to confirm completion with verifiable output.
+**Praxen relevance:** Praxen — flag system prompt instructions that invite speculation (e.g., "be creative," "fill in missing details"), check whether the agent is instructed to confirm completion with verifiable output.
 
 ---
 
@@ -220,7 +220,7 @@ When Praxa detects a behavioral or environmental signal, map it to the relevant 
 - Session count or API cost spiking above baseline
 - Agent loop that appears to be running but not completing
 
-**Praxa relevance:** Praxa — verify rate limiting and cost controls are present in config, flag absent request-per-session caps, check for timeout configuration on LLM API calls.
+**Praxen relevance:** Praxen — verify rate limiting and cost controls are present in config, flag absent request-per-session caps, check for timeout configuration on LLM API calls.
 
 ---
 
@@ -240,4 +240,4 @@ These signals implicate multiple LLM risk categories and should raise compound f
 ---
 
 *Source: OWASP Top 10 for LLM Applications 2025 — genai.owasp.org — CC BY-SA 4.0*
-*Distilled for the Praxa knowledge base*
+*Distilled for the Praxen knowledge base*

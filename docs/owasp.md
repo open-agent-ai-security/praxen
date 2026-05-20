@@ -3,9 +3,9 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# OWASP Gen AI Security — the frameworks Praxa uses
+# OWASP Gen AI Security — the frameworks Praxen uses
 
-Every finding Praxa produces is tagged against industry-standard OWASP frameworks so the result lands in language your security team already speaks. This page explains where those frameworks come from and gives a one-line gloss on each risk so you can read a tag without leaving the report.
+Every finding Praxen produces is tagged against industry-standard OWASP frameworks so the result lands in language your security team already speaks. This page explains where those frameworks come from and gives a one-line gloss on each risk so you can read a tag without leaving the report.
 
 ---
 
@@ -15,21 +15,21 @@ The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.o
 
 ## OWASP Gen AI Security Project
 
-As LLM-based systems moved into production, OWASP spun up a dedicated effort: the **OWASP Gen AI Security Project** ([genai.owasp.org](https://genai.owasp.org/)). It maintains the AI-specific guidance Praxa relies on — currently three documents:
+As LLM-based systems moved into production, OWASP spun up a dedicated effort: the **OWASP Gen AI Security Project** ([genai.owasp.org](https://genai.owasp.org/)). It maintains the AI-specific guidance Praxen relies on — currently three documents:
 
-| Document | What it covers | Praxa tag prefix |
+| Document | What it covers | Praxen tag prefix |
 |---|---|---|
 | [OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/) | Risks in applications built on large language models | `LLM01`–`LLM10` |
 | [OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/) | Risks specific to autonomous, tool-using agents | `ASI01`–`ASI10` |
 | [A Practical Guide for Secure MCP Server Development 2026](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/) | Securing Model Context Protocol servers and the tools they expose | `mcp` (checklist items) |
 
-Praxa carries distilled extracts of all three in its knowledge base (`skills/behavior-verifier/knowledge/`), but the canonical, full-length versions live at the links above — go there for the complete write-ups, examples, and references.
+Praxen carries distilled extracts of all three in its knowledge base (`skills/behavior-verifier/knowledge/`), but the canonical, full-length versions live at the links above — go there for the complete write-ups, examples, and references.
 
 ---
 
 ## OWASP Top 10 for LLM Applications 2025
 
-The risk landscape for any system that puts an LLM in the loop. Each finding Praxa tags with one of these traces to a behavior or code pattern in the agent's evidence.
+The risk landscape for any system that puts an LLM in the loop. Each finding Praxen tags with one of these traces to a behavior or code pattern in the agent's evidence.
 
 | ID | Risk | One-line gloss |
 |---|---|---|
@@ -50,7 +50,7 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 
-Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of OpenClaw-style workers Praxa is built to verify.
+Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of OpenClaw-style workers Praxen is built to verify.
 
 | ID | Risk | One-line gloss |
 |---|---|---|
@@ -71,7 +71,7 @@ Risks that emerge once an LLM is wired to tools, memory, other agents, and the a
 
 ## A Practical Guide for Secure MCP Server Development 2026
 
-The Model Context Protocol (MCP) is how many agents discover and call external tools. MCP servers are unusual: they run with delegated user permissions, support dynamic tool loading, and can chain tool calls — so a single weakness amplifies. When Praxa finds an MCP configuration in the evidence (`.mcp.json`, `mcp.json`, or similar), it applies the guide's **minimum-bar checklist** across these areas:
+The Model Context Protocol (MCP) is how many agents discover and call external tools. MCP servers are unusual: they run with delegated user permissions, support dynamic tool loading, and can chain tool calls — so a single weakness amplifies. When Praxen finds an MCP configuration in the evidence (`.mcp.json`, `mcp.json`, or similar), it applies the guide's **minimum-bar checklist** across these areas:
 
 - **Architecture** — local (STDIO / loopback) vs. remote (TLS, authenticated) binding; session isolation between users and agents.
 - **Tool design** — least-privilege scopes; no destructive tools without confirmation; clear, non-deceptive tool descriptions.
@@ -89,12 +89,12 @@ Any "No" against the checklist is a finding; secrets in an MCP config file are a
 
 ## How this fits with RAISE
 
-The OWASP frameworks above answer *"what kind of risk is this finding?"* The [RAISE Framework](RAISE.md) answers *"how mature is this agent's security posture overall?"* — a six-category 0–5 score. Every Praxa finding carries both: a RAISE category tag and (where applicable) an OWASP LLM, OWASP Agentic, or MCP tag. See [Interpreting Reports](interpreting-reports.md) for how the tags appear on a finding card.
+The OWASP frameworks above answer *"what kind of risk is this finding?"* The [RAISE Framework](RAISE.md) answers *"how mature is this agent's security posture overall?"* — a six-category 0–5 score. Every Praxen finding carries both: a RAISE category tag and (where applicable) an OWASP LLM, OWASP Agentic, or MCP tag. See [Interpreting Reports](interpreting-reports.md) for how the tags appear on a finding card.
 
 ---
 
 ## See also
 
 - [The RAISE Framework](RAISE.md) — the maturity-scoring side of the analysis
-- [Interpreting Reports](interpreting-reports.md) — where these tags show up in a Praxa report
+- [Interpreting Reports](interpreting-reports.md) — where these tags show up in a Praxen report
 - [Challenging and Revising Findings](challenging-findings.md) — what to do when you disagree with a finding

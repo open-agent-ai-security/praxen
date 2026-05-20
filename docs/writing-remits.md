@@ -5,9 +5,9 @@
 
 # Writing Worker Remits
 
-The **Worker Remit** is the only artifact you customize per agent. Everything else in Praxa is generic. The quality of your remit directly determines the quality of Praxa's output: vague remits produce low-confidence findings; specific remits produce sharp, actionable ones.
+The **Worker Remit** is the only artifact you customize per agent. Everything else in Praxen is generic. The quality of your remit directly determines the quality of Praxen's output: vague remits produce low-confidence findings; specific remits produce sharp, actionable ones.
 
-This page covers what to put in a remit and how to write rules that Praxa can verify. The starting template is at [`WORKER_REMIT_template.md`](../WORKER_REMIT_template.md) at the repo root.
+This page covers what to put in a remit and how to write rules that Praxen can verify. The starting template is at [`WORKER_REMIT_template.md`](../WORKER_REMIT_template.md) at the repo root.
 
 ---
 
@@ -16,7 +16,7 @@ This page covers what to put in a remit and how to write rules that Praxa can ve
 A Worker Remit is a **policy document**, not a system description.
 
 - **Declare intent**: what the agent is for, what it's allowed to do, what it's forbidden to do, who it can communicate with, what requires your approval.
-- **Don't describe the implementation**: tool names, file paths, library versions, framework details. Praxa reads the actual code and compares it against the policy you've declared. You don't need to repeat what's already there.
+- **Don't describe the implementation**: tool names, file paths, library versions, framework details. Praxen reads the actual code and compares it against the policy you've declared. You don't need to repeat what's already there.
 
 A good remit is something an operator could write before the agent is built and use unchanged after the agent is deployed.
 
@@ -38,7 +38,7 @@ The template is a complete reference, but the load-bearing sections are:
 - **Behavioral Expectations** — normal cadence, expected patterns, retry behavior
 - **Escalation Rules** — what triggers halt, alert, log-only
 
-If a section doesn't apply to your agent, leave it minimal but explain why — Praxa will note vague or missing rules.
+If a section doesn't apply to your agent, leave it minimal but explain why — Praxen will note vague or missing rules.
 
 ---
 
@@ -46,9 +46,9 @@ If a section doesn't apply to your agent, leave it minimal but explain why — P
 
 Every actionable rule should state a **verifiable constraint on behavior**. The test:
 
-> Could Praxa read this rule, read the agent's evidence, and determine whether the rule is satisfied?
+> Could Praxen read this rule, read the agent's evidence, and determine whether the rule is satisfied?
 
-If yes, the rule is verifiable. If no, it's vague — and Praxa will mark it as **Vague Policy** in the Remit Coverage section of the report.
+If yes, the rule is verifiable. If no, it's vague — and Praxen will mark it as **Vague Policy** in the Remit Coverage section of the report.
 
 ### Verifiable rules
 
@@ -57,7 +57,7 @@ If yes, the rule is verifiable. If no, it's vague — and Praxa will mark it as 
 - *"The agent must not write to files outside `~/projects/`"*
 - *"Tool calls beyond 20 per session require operator confirmation"*
 
-These give Praxa something to check. The constraint is observable in code or behavior.
+These give Praxen something to check. The constraint is observable in code or behavior.
 
 ### Vague rules
 
@@ -66,7 +66,7 @@ These give Praxa something to check. The constraint is observable in code or beh
 - *"Use good judgment"*
 - *"Avoid unauthorized actions"*
 
-These are intentions, not constraints. Praxa cannot verify them and will flag them as policy gaps.
+These are intentions, not constraints. Praxen cannot verify them and will flag them as policy gaps.
 
 ---
 
@@ -82,7 +82,7 @@ A counterparty list of "the team's email addresses" is not enforceable without e
 
 ### Distinguish "must always" from "must never"
 
-Both are useful. *"Must always run fraud detection before approving an invoice"* and *"Must never approve invoices from vendors not in the registry"* describe different constraints and Praxa checks them differently.
+Both are useful. *"Must always run fraud detection before approving an invoice"* and *"Must never approve invoices from vendors not in the registry"* describe different constraints and Praxen checks them differently.
 
 ### Be explicit about approval requirements
 
@@ -95,7 +95,7 @@ Don't say *"sensitive actions require approval"*. List which actions, what "appr
 You will rarely write a perfect remit on the first pass. The expected workflow:
 
 1. Write the first draft from the template.
-2. Run Praxa.
+2. Run Praxen.
 3. Look at the **Remit Coverage** section of the report. Every rule marked **Vague Policy** is a place to tighten. Every rule marked **Gap** is either a real implementation gap (fix the agent) or a rule that doesn't quite match what the agent is meant to do (fix the remit).
 4. Update the remit. Bump the version and date in the Identity section.
 5. Re-run.
@@ -117,12 +117,12 @@ See [Challenging and Revising Findings](challenging-findings.md) for guidance on
 
 ## Self-authored remits
 
-If the agent is asked to write or update its own remit, treat that with caution. Praxa will surface a finding when the `Updated By` field of the remit names the agent itself rather than the operator. The remit is supposed to be operator-authored — it's the thing the agent is constrained against, so the agent should not be the one defining its own constraints.
+If the agent is asked to write or update its own remit, treat that with caution. Praxen will surface a finding when the `Updated By` field of the remit names the agent itself rather than the operator. The remit is supposed to be operator-authored — it's the thing the agent is constrained against, so the agent should not be the one defining its own constraints.
 
 ---
 
 ## Next steps
 
-- [Usage](usage.md) — how to run Praxa once you have a remit
+- [Usage](usage.md) — how to run Praxen once you have a remit
 - [Interpreting Reports](interpreting-reports.md) — how to read the Remit Coverage section
 - [Challenging and Revising Findings](challenging-findings.md) — when a finding means "fix the remit" vs "fix the code"

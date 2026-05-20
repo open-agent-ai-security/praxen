@@ -1,4 +1,4 @@
-# Praxa — V2 Harvest Plan
+# Praxen — V2 Harvest Plan
 
 **Status:** proposed — for review
 **Authors:** Steve Wilson, David Kennedy (consulted)
@@ -10,7 +10,7 @@
 
 Two parallel implementations of "replace the LLM-driven HTML assembly with a deterministic code pipeline" exist:
 
-- **`main` (= `v0.2.0`, tagged):** the implementation that landed — a template-engine renderer (`skills/behavior-verifier/render.py`) that substitutes a canonical findings JSON (`schema_version: "1.0"`, validated by `skills/behavior-verifier/schema.py`) into the existing Exabeam-brand `report_template.html`. Includes a full 9-target suite re-run + a two-step RAISE-scoring calibration pass, updated `PRAXA_SPEC.md` §6 / `docs/` / `examples/`, and the `tests/render/test_render.py` harness.
+- **`main` (= `v0.2.0`, tagged):** the implementation that landed — a template-engine renderer (`skills/behavior-verifier/render.py`) that substitutes a canonical findings JSON (`schema_version: "1.0"`, validated by `skills/behavior-verifier/schema.py`) into the existing Exabeam-brand `report_template.html`. Includes a full 9-target suite re-run + a two-step RAISE-scoring calibration pass, updated `PRAXEN_SPEC.md` §6 / `docs/` / `examples/`, and the `tests/render/test_render.py` harness.
 - **PR #1 (`feat/v2-deterministic-render-pipeline`, by davidkennedylr, open):** an alternative — builds the HTML in Python (`lib/render.py`, a "DEF/TAC OPS" dark theme, **+ PDF** via headless Chrome), a formal JSON-Schema file (`lib/praxa-findings-v2.schema.json`, "v2" / `2.0.0`) alongside a hand-written validator (`lib/schema.py`), a **parallel map-reduce analysis** variant (`lib/parallel.py` + `skills/behavior-verifier/SKILL-PARALLEL.md`), a snapshot-based test harness (`tests/test_harness.py`), and **GitHub Actions CI + release workflows**.
 
 The two share a merge base (`18d0799`) but diverged; `main` shipped first and is tagged `v0.2.0`, so PR #1 no longer merges cleanly. Steve and David have agreed: **keep `main` as the trunk and harvest the genuinely-additive parts of PR #1 into it**, in a specific order, deferring the look-and-feel reskin and PDF output.
@@ -26,12 +26,12 @@ This document is that plan. It's being PR'd for review; once approved, Phase 0 b
 | Trunk | `main` (= `v0.2.0`) stays the trunk. |
 | PR #1 | Will be **closed** (Phase 0) with a comment pointing at this plan and the harvest tracking, so the branch and its parked pieces remain recoverable — not discarded. |
 | Schema version after the merge | **`schema_version: "2.0"`** (aligns with PR #1's "v2" framing; clean break from the just-shipped `1.0`). |
-| Supported Python floor | **3.9+.** That's the macOS Command Line Tools system Python on Ventura / Sonoma / Sequoia, and the version this repo is developed and tested on. **3.8 is dropped** — it's been EOL since 2024-10-07 (no upstream security patches); we don't test or claim support for a dead interpreter. **Not** PR #1's 3.10 floor either — that would break stock macOS (which is on 3.9). CI matrix: **`3.9 / 3.12 / 3.13`** (floor / mid / latest). Phase 1 (or a quick standalone PR) bumps the `3.8+` strings in `PRAXA_SPEC.md` §2.6/§8 and `docs/installation.md` to `3.9+` to match. |
+| Supported Python floor | **3.9+.** That's the macOS Command Line Tools system Python on Ventura / Sonoma / Sequoia, and the version this repo is developed and tested on. **3.8 is dropped** — it's been EOL since 2024-10-07 (no upstream security patches); we don't test or claim support for a dead interpreter. **Not** PR #1's 3.10 floor either — that would break stock macOS (which is on 3.9). CI matrix: **`3.9 / 3.12 / 3.13`** (floor / mid / latest). Phase 1 (or a quick standalone PR) bumps the `3.8+` strings in `PRAXEN_SPEC.md` §2.6/§8 and `docs/installation.md` to `3.9+` to match. |
 | Harvest order | (1) JSON structure → (2) performance (parallel analysis) → (3) GitHub Actions + automated testing. |
 | Deferred | The "DEF/TAC OPS" look-and-feel reskin and the `--pdf` headless-Chrome output. Tracked in `design/DEFERRED.md`; PR #1's branch retains the code. |
 | Process | Every phase lands as **its own PR against `main`**, reviewed and CI-gated — no direct pushes. (Direct-pushing the `v0.2.0` work to `main` is what collided with PR #1; we don't repeat that.) |
 
-`praxa_version` (a field distinct from `schema_version`) bumps `0.2.0 → 0.3.0` (Phase 1) → `0.4.0` (Phase 2) → `0.5.0` (Phase 3); once all three phases are in and the look-and-feel call is made, `1.0.0`.
+`praxen_version` (a field distinct from `schema_version`) bumps `0.2.0 → 0.3.0` (Phase 1) → `0.4.0` (Phase 2) → `0.5.0` (Phase 3); once all three phases are in and the look-and-feel call is made, `1.0.0`.
 
 ---
 
@@ -62,7 +62,7 @@ Goal: a **merged schema** that adopts PR #1's better-structured findings model *
 | per-category `confidence` + `weight` (in `raise_posture.categories[]`) | **keep `main`'s — do not regress** | PR #1's schema drops these; the report shows "Confidence: High \| Weight: 15%" per RAISE card |
 | `footer.severity_counts`, `raise_posture.weighted_overall` (stored) | **keep `main`'s** store-and-validate | PR #1 computes these in the renderer; `main` keeps the "JSON is the complete record" property and the cross-field consistency checks |
 | formal JSON-Schema document | **add** `skills/behavior-verifier/findings.schema.json` | a published, machine-readable contract for downstream tooling, adapted from PR #1's `praxa-findings-v2.schema.json` to the merged shape. **`schema.py` stays the runtime validator** (hand-written, stdlib-only, with the cross-field invariants) — we don't take a `jsonschema` dependency. A test asserts the schema file and the validator agree on every fixture. |
-| versions | `schema_version: "2.0"`, `praxa_version: "0.3.0"` | |
+| versions | `schema_version: "2.0"`, `praxen_version: "0.3.0"` | |
 
 ### 4.2 — Implementation (each a commit on the Phase-1 branch)
 
@@ -72,11 +72,11 @@ Goal: a **merged schema** that adopts PR #1's better-structured findings model *
 4. Update `skills/behavior-verifier/SKILL.md` Step 10 (the canonical-JSON template and the field rules) to emit the merged schema. **The "Calibration anchors" guidance in Step 5 / 9.4 stays exactly as-is.**
 5. Update `tests/fixtures/finbot.canonical.json` to the merged shape and extend `tests/render/test_render.py` (structured-evidence assertions, the schema-file ↔ validator agreement test).
 6. Regenerate `examples/finbot` + `examples/helperbot` (one blind run each on the merged-schema skill); update `examples/README.md`.
-7. Update `PRAXA_SPEC.md` §6 and `docs/interpreting-reports.md` for the merged shape; add a "schema change in v0.3 / schema 2.0" note (the prior change was the v0.2 / schema 1.0 one).
+7. Update `PRAXEN_SPEC.md` §6 and `docs/interpreting-reports.md` for the merged shape; add a "schema change in v0.3 / schema 2.0" note (the prior change was the v0.2 / schema 1.0 one).
 
 ### 4.3 — Gate
 
-Re-run the **full 9-target** test suite — *sequentially*, on the merged-schema (Phase-1) skill — and **preserve the run** under `tests/baselines/v0.3-sequential/`, matching the layout of the existing [`tests/baselines/v0.2-sequential/`](../tests/baselines/v0.2-sequential/) (per-target subdirs with the three artifacts each + a top-level `BASELINE.md` summary). This is the canonical **pre-parallel baseline** that Phase 2's parity gate (§5.2 / §5.3) diffs against. The bar for this gate: every render exits 0, every JSON validates against `schema.py` and `findings.schema.json`, and weighted RAISE scores land in the (post-recalibration) `tests/README.md` bands with the same dominant themes as the v0.2-sequential baseline — **a diff of v0.3-sequential vs v0.2-sequential is the calibration-shift check** (Phase 1 only changes the JSON shape; semantic content is unchanged, so the scores shouldn't move). Then: CHANGELOG entry, `praxa_version` → `0.3.0`, tag `v0.3.0`, merge the PR.
+Re-run the **full 9-target** test suite — *sequentially*, on the merged-schema (Phase-1) skill — and **preserve the run** under `tests/baselines/v0.3-sequential/`, matching the layout of the existing [`tests/baselines/v0.2-sequential/`](../tests/baselines/v0.2-sequential/) (per-target subdirs with the three artifacts each + a top-level `BASELINE.md` summary). This is the canonical **pre-parallel baseline** that Phase 2's parity gate (§5.2 / §5.3) diffs against. The bar for this gate: every render exits 0, every JSON validates against `schema.py` and `findings.schema.json`, and weighted RAISE scores land in the (post-recalibration) `tests/README.md` bands with the same dominant themes as the v0.2-sequential baseline — **a diff of v0.3-sequential vs v0.2-sequential is the calibration-shift check** (Phase 1 only changes the JSON shape; semantic content is unchanged, so the scores shouldn't move). Then: CHANGELOG entry, `praxen_version` → `0.3.0`, tag `v0.3.0`, merge the PR.
 
 > **Two baselines, two roles** — `tests/baselines/v0.2-sequential/` (already in the repo as of PR #3) is the sequential snapshot on the current shipped skill + schema 1.0; it's the "before" for the calibration-shift check above. `tests/baselines/v0.3-sequential/` (produced here) is on the merged-schema skill — the same skill the Phase-2 parallel path runs against, so it's the parity comparator for §5.2/§5.3. Once both exist, every release diffs the new run against the latest baseline per [`tests/README.md`](../tests/README.md) — the test plan codifies that full compare.
 
@@ -107,7 +107,7 @@ PR #1's `lib/parallel.py` + `skills/behavior-verifier/SKILL-PARALLEL.md` — six
 
 Phase 2 is **time-boxed**: if the parallel path hasn't reached parity within ≈ 2 days of build-and-tune effort (i.e. the lower end of the 2–3 day estimate), we stop and decide — no open-ended tuning loop. The call is made once, after the ≥ 4-target sequential-vs-parallel comparison (parity *and* the §5.2 timed A/B), against three explicit outcomes:
 
-1. **Parity achieved *and* a real speedup** — parallel lands in the same `tests/README.md` RAISE bands as sequential across the comparison targets, surfaces the same dominant themes, *and* the controlled A/B shows a meaningful wall-clock win on the analysis phase (the claim is ≈ 4–5×; anything materially short of ~2× is not worth defaulting to). → **Ship parallel as the default path; sequential becomes the cost-sensitive fallback** (it's ~6× cheaper in tokens). CHANGELOG, `praxa_version` → `0.4.0`, tag `v0.4.0`, merge.
+1. **Parity achieved *and* a real speedup** — parallel lands in the same `tests/README.md` RAISE bands as sequential across the comparison targets, surfaces the same dominant themes, *and* the controlled A/B shows a meaningful wall-clock win on the analysis phase (the claim is ≈ 4–5×; anything materially short of ~2× is not worth defaulting to). → **Ship parallel as the default path; sequential becomes the cost-sensitive fallback** (it's ~6× cheaper in tokens). CHANGELOG, `praxen_version` → `0.4.0`, tag `v0.4.0`, merge.
 2. **Close but not there** — themes covered but scores drift outside the bands on some targets (traceable to category-isolated mappers lacking cross-category context by design), *or* parity holds but the speedup is marginal. → **Ship parallel as opt-in/experimental** (a `--parallel` flag or a clearly-labelled `SKILL-PARALLEL.md`), sequential stays the default; revisit in a future phase. Still `v0.4.0` + merge, but documented as experimental.
 3. **Fundamentally broken** — category isolation loses too much cross-signal context for parity to be reachable without re-introducing holistic analysis (which would defeat the point). → **Drop the parallel path entirely, close the phase, reclaim the effort.** Document why in `design/DEFERRED.md` (and `parallel.py` etc. stay recoverable in PR #1's branch). No `v0.4.0`; Phase 3 follows directly.
 
@@ -141,18 +141,18 @@ Keep `tests/render/test_render.py` (invariant checks, negative cases, determinis
 
 ### 6.2 — CI / release workflows
 
-Adapt PR #1's `.github/workflows/ci.yml`: on push and PR, run `schema.py validate` on all fixtures + the full test suite, on the agreed Python matrix — **`3.9 / 3.12 / 3.13`** (floor / mid / latest; 3.8 is dropped, EOL) — **not** PR #1's `3.10 / 3.11 / 3.12` (which omits the 3.9 macOS-system floor). Adapt `.github/workflows/release.yml`: on tag, run `build.sh` and attach `dist/praxa-*.zip` to the GitHub Release (`dist/` stays gitignored; the zip is a release asset, not a committed file).
+Adapt PR #1's `.github/workflows/ci.yml`: on push and PR, run `schema.py validate` on all fixtures + the full test suite, on the agreed Python matrix — **`3.9 / 3.12 / 3.13`** (floor / mid / latest; 3.8 is dropped, EOL) — **not** PR #1's `3.10 / 3.11 / 3.12` (which omits the 3.9 macOS-system floor). Adapt `.github/workflows/release.yml`: on tag, run `build.sh` and attach `dist/praxen-*.zip` to the GitHub Release (`dist/` stays gitignored; the zip is a release asset, not a committed file).
 
 ### 6.3 — Gate
 
-CI green on a fresh PR; release workflow dry-run produces the zip. CHANGELOG, `praxa_version` → `0.5.0`, tag `v0.5.0`, merge.
+CI green on a fresh PR; release workflow dry-run produces the zip. CHANGELOG, `praxen_version` → `0.5.0`, tag `v0.5.0`, merge.
 
 ---
 
 ## 7. Open decisions
 
 1. **Schema version label — RESOLVED:** `schema_version: "2.0"`.
-2. **Supported Python floor — RESOLVED:** **`3.9+`** — 3.8 is dropped (EOL since 2024-10-07); 3.9 is both the documented and the practical floor (macOS CLT system Python). CI matrix `3.9 / 3.12 / 3.13`; not 3.10. Phase 1 bumps the `3.8+` strings in `PRAXA_SPEC.md` / `docs/installation.md` to `3.9+`. *(Supersedes the earlier "must include 3.8" thread — David's right: change the floor, don't test a dead interpreter.)*
+2. **Supported Python floor — RESOLVED:** **`3.9+`** — 3.8 is dropped (EOL since 2024-10-07); 3.9 is both the documented and the practical floor (macOS CLT system Python). CI matrix `3.9 / 3.12 / 3.13`; not 3.10. Phase 1 bumps the `3.8+` strings in `PRAXEN_SPEC.md` / `docs/installation.md` to `3.9+`. *(Supersedes the earlier "must include 3.8" thread — David's right: change the floor, don't test a dead interpreter.)*
 3. **Layout** — keep `render.py` / `schema.py` / (new) `parallel.py` / `findings.schema.json` flat in `skills/behavior-verifier/` (where `main` has them, and what `build.sh` ships), or introduce a `skills/behavior-verifier/lib/` subdir (closer to PR #1's `lib/`)?
 4. **Parallel-path packaging** — a thin `SKILL-PARALLEL.md` orchestration wrapper (recommended) vs. a "parallel mode" section inside `SKILL.md`. Either way, **non-negotiable: the analysis logic (calibration anchors, detection patterns, the secrets rule, the empty-file / declared-but-never-consulted detectors) lives in `SKILL.md` only** — the parallel path quotes it at prompt-build time, never restates it, or the two modes drift.
 5. **The contested schema fields** — confirm or override the §4.1 table (especially: structured `evidence: [{file,line,snippet}]` ✔; keep per-category `confidence` / `weight` ✔; keep store-and-validate `severity_counts` / `weighted_overall` ✔; add `description` as optional ✔; ship `findings.schema.json` as a published contract with `schema.py` remaining the runtime validator ✔).

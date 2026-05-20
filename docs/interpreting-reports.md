@@ -5,7 +5,7 @@
 
 # Interpreting Reports
 
-Praxa produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume.
+Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume.
 
 This page walks through what each section of the HTML report means, how severities and confidence levels work, how the RAISE maturity score should be read, and what's in the JSON.
 
@@ -13,7 +13,7 @@ This page walks through what each section of the HTML report means, how severiti
 
 ## Report structure
 
-Every Praxa HTML report has the same sections, in the same order. Reading top-to-bottom, you progress from "what the agent is" → "what was found" → "overall posture verdict."
+Every Praxen HTML report has the same sections, in the same order. Reading top-to-bottom, you progress from "what the agent is" → "what was found" → "overall posture verdict."
 
 ### 1. Header
 
@@ -24,13 +24,13 @@ Agent name, analysis timestamp, and an overall **status badge** (CRITICAL / HIGH
 Two side-by-side blocks:
 
 - **Agent Remit (as declared)** — a 2–4 sentence summary of what the remit says the agent is for.
-- **Agent Structure (as observed)** — a 2–4 sentence summary of what Praxa found in the input. Whether this is source code, deployment state, or a behavioral transcript will be explicit here.
+- **Agent Structure (as observed)** — a 2–4 sentence summary of what Praxen found in the input. Whether this is source code, deployment state, or a behavioral transcript will be explicit here.
 
 If the input is unusual — a behavior-only chat transcript, a deployment-state log dump — that constraint is named here so the rest of the report can be read in context.
 
 ### 3. Behavior Summary
 
-The single most important paragraph in the report. **Two to four sentences naming the dominant pattern** the analysis surfaced. Examples of patterns Praxa surfaces:
+The single most important paragraph in the report. **Two to four sentences naming the dominant pattern** the analysis surfaced. Examples of patterns Praxen surfaces:
 
 - "Framework offers safe primitives, code uses none of them."
 - "Policy declared in prompt, no code-level enforcement."
@@ -70,11 +70,11 @@ Findings cite real evidence by default. If a finding is `[Inferred]` rather than
 
 ### 6. What's Working Well
 
-Controls Praxa verified during the analysis. This is not a participation trophy — only items with citable evidence appear here. A short or empty section is itself a signal.
+Controls Praxen verified during the analysis. This is not a participation trophy — only items with citable evidence appear here. A short or empty section is itself a signal.
 
 ### 7. Discovered Log Files
 
-Log files Praxa found in the input. Used to complement the static analysis with runtime context.
+Log files Praxen found in the input. Used to complement the static analysis with runtime context.
 
 ### 8. RAISE Maturity Posture (the wrap-up)
 
@@ -90,7 +90,7 @@ This section contains:
 
 ### 9. Footer
 
-Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxa version.
+Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxen version.
 
 ---
 
@@ -112,7 +112,7 @@ The status badge in the header reflects the highest severity present in the anal
 
 Each finding (and each RAISE category score) has a confidence level:
 
-- **High** — directly observed in an artifact Praxa read
+- **High** — directly observed in an artifact Praxen read
 - **Medium** — reasonable conclusion from indirect evidence
 - **Low** — no direct evidence; scored from absence or heuristics
 
@@ -126,7 +126,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 
 | Key | What's in it |
 |---|---|
-| `schema_version`, `praxa_version` | `"2.0"` and the Praxa version that produced the file |
+| `schema_version`, `praxen_version` | `"2.0"` and the Praxen version that produced the file |
 | `scan` | agent name and slug, scan date and timestamp, the analyzed workspace path, artifact count |
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |
@@ -146,9 +146,9 @@ Use the JSON for:
 - **Diffing** — compare two analyses to detect regressions or improvements between releases (the prose fields diff cleanly too)
 - **Risk reports** — filter findings by `severity`, `raise_category`, or OWASP tag for compliance reporting
 
-The full schema, with field types and the validator's invariants, is documented in [`PRAXA_SPEC.md`](../PRAXA_SPEC.md) §6 (and codified in `skills/behavior-verifier/schema.py`).
+The full schema, with field types and the validator's invariants, is documented in [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) §6 (and codified in `skills/behavior-verifier/schema.py`).
 
-> **Schema change in v0.3 (this release).** v2.0: `evidence[]` is now an array of `{ file, line, snippet }` objects (was `[string]`); `recommended_actions[]` is an array (was a single `recommended_action` string); a new optional `description` field carries a longer-form body for downstream consumers (the report card currently shows `summary` only). Tooling reading evidence/actions needs updating. A published JSON-Schema document at `skills/behavior-verifier/findings.schema.json` (in the Praxa distribution) is the machine-readable contract.
+> **Schema change in v0.3 (this release).** v2.0: `evidence[]` is now an array of `{ file, line, snippet }` objects (was `[string]`); `recommended_actions[]` is an array (was a single `recommended_action` string); a new optional `description` field carries a longer-form body for downstream consumers (the report card currently shows `summary` only). Tooling reading evidence/actions needs updating. A published JSON-Schema document at `skills/behavior-verifier/findings.schema.json` (in the Praxen distribution) is the machine-readable contract.
 >
 > **Schema change in v0.2.** The v1.0 object schema replaced the pre-0.2 bare-list-of-findings format (which had a trailing `-POSTURE` summary entry carrying the posture score). Both are legacy; the v0.3 renderer does not read either.
 

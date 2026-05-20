@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2026 Exabeam, Inc.
 # SPDX-License-Identifier: Apache-2.0
-"""Praxa canonical findings-JSON schema and validator.
+"""Praxen canonical findings-JSON schema and validator.
 
-Stage 1 of the Praxa pipeline (the behavior-verifier skill) emits a JSON
+Stage 1 of the Praxen pipeline (the behavior-verifier skill) emits a JSON
 conforming to this schema. Stage 2 (render.py) consumes it. This module owns
 the validation rules: shape, types, enumerations, required fields, and
 cross-field consistency (counts, anchor resolution, RAISE category set,
@@ -187,7 +187,7 @@ def _validate_version(data):
     if got_major != want_major:
         _err("$.schema_version",
              f"renderer understands schema {want_major}.x; got {sv!r}")
-    _nonempty_str(data, "praxa_version", "$")
+    _nonempty_str(data, "praxen_version", "$")
 
 
 def _validate_scan(data):

@@ -5,9 +5,9 @@
 
 # Usage
 
-Running a Praxa analysis takes two inputs: a **Worker Remit** (the agent's declared policy) and **evidence** (whatever the agent's code, deployment state, behavioral records, or development/governance docs can provide). Praxa produces three output files in `./reports/`.
+Running a Praxen analysis takes two inputs: a **Worker Remit** (the agent's declared policy) and **evidence** (whatever the agent's code, deployment state, behavioral records, or development/governance docs can provide). Praxen produces three output files in `./reports/`.
 
-This page covers the end-to-end run. For installing Praxa, see [Installation](installation.md). For authoring the Worker Remit, see [Writing Worker Remits](writing-remits.md).
+This page covers the end-to-end run. For installing Praxen, see [Installation](installation.md). For authoring the Worker Remit, see [Writing Worker Remits](writing-remits.md).
 
 ---
 
@@ -21,12 +21,12 @@ If you don't have one, your coding agent can help draft one before the analysis 
 
 ### Evidence
 
-Praxa accepts four input shapes — used individually or in combination:
+Praxen accepts four input shapes — used individually or in combination:
 
-| Shape | What you point Praxa at |
+| Shape | What you point Praxen at |
 |---|---|
 | **Source repository** | A directory containing the agent's code, configs, skill files, dependencies, prompts. Most common for repo-based agents. |
-| **Running deployment** | A directory containing live memory files (`MEMORY.md`, `SOUL.md`), operational logs (action reports, session JSONL, audit trails, escalation logs), and live config files. Pulled from a deployed instance of the agent — for example, point Praxa at an OpenClaw worker's `Workspace/` folder, which holds the `SOUL.md` and the other code and prompt artifacts that make up the agent's skillset, alongside its accumulated memory and logs. |
+| **Running deployment** | A directory containing live memory files (`MEMORY.md`, `SOUL.md`), operational logs (action reports, session JSONL, audit trails, escalation logs), and live config files. Pulled from a deployed instance of the agent — for example, point Praxen at an OpenClaw worker's `Workspace/` folder, which holds the `SOUL.md` and the other code and prompt artifacts that make up the agent's skillset, alongside its accumulated memory and logs. |
 | **Behavioral artifacts** | A chat transcript, email history, decision record, or any conversation log that captures how the agent has actually behaved. |
 | **Governance & methodology docs** | RAISE scores *maturity*, not just behavior — so development and operational practice documents count as evidence too. A red-team plan or its results, threat models, security review records, SDLC/runbook docs, incident retrospectives, dependency-management policy, monitoring/alerting design. These feed the maturity-oriented RAISE categories (**Build an AI Red Team**, **Monitor Continuously**, **Manage Your Supply Chain**) that source code alone can't speak to. |
 
@@ -42,7 +42,7 @@ From a Claude Code session (or any coding agent capable of running the skill):
 Please run the behavior-verifier skill to analyze [path to evidence]. Use the Worker Remit at [path to remit].
 ```
 
-Praxa reads the evidence, evaluates it against the RAISE framework and the Worker Remit, and writes three files to `./reports/`:
+Praxen reads the evidence, evaluates it against the RAISE framework and the Worker Remit, and writes three files to `./reports/`:
 
 | File | Purpose |
 |---|---|
@@ -56,7 +56,7 @@ The `.txt` summary is also printed to stdout during the analysis, so you can rea
 
 ## Where outputs land
 
-By default, Praxa writes to `./reports/` relative to the directory you started the coding agent in. If the directory doesn't exist, Praxa creates it.
+By default, Praxen writes to `./reports/` relative to the directory you started the coding agent in. If the directory doesn't exist, Praxen creates it.
 
 If you want outputs elsewhere, change directory before running, or instruct your coding agent to write to a specific path. The skill follows your instruction.
 
@@ -64,7 +64,7 @@ If you want outputs elsewhere, change directory before running, or instruct your
 
 ## Re-running after changes
 
-Praxa is stateless across analyses. Each run is independent. To re-analyze after the agent changes — or after you tighten the Worker Remit — invoke the skill again:
+Praxen is stateless across analyses. Each run is independent. To re-analyze after the agent changes — or after you tighten the Worker Remit — invoke the skill again:
 
 ```
 Please re-run the behavior-verifier skill against the same workspace and remit.
@@ -76,18 +76,18 @@ A new pair of timestamped files is written. Prior reports are not overwritten �
 
 ## Results tuning
 
-Praxa only scores what it can see. If you disagree with a finding — especially a RAISE category score that feels lower than reality — the usual cause is that the evidence you handed it didn't *show* a control that's actually in place: a review process, a deployment-time limit, an external guardrail, a monitoring pipeline, a red-team cadence. Praxa won't assume those exist; it scores absence of evidence as absence of control (see the calibration anchors — present-but-undocumented and present-but-defeated both land low).
+Praxen only scores what it can see. If you disagree with a finding — especially a RAISE category score that feels lower than reality — the usual cause is that the evidence you handed it didn't *show* a control that's actually in place: a review process, a deployment-time limit, an external guardrail, a monitoring pipeline, a red-team cadence. Praxen won't assume those exist; it scores absence of evidence as absence of control (see the calibration anchors — present-but-undocumented and present-but-defeated both land low).
 
-The fix is to give it more evidence and re-run. Add whatever artifact demonstrates the control — a runbook, a CI config, a policy doc, a red-team report, a ticket history, an exported dashboard config, even a written description of the process — and ask Praxa to factor it in:
+The fix is to give it more evidence and re-run. Add whatever artifact demonstrates the control — a runbook, a CI config, a policy doc, a red-team report, a ticket history, an exported dashboard config, even a written description of the process — and ask Praxen to factor it in:
 
 ```
 Here's our red-team report and the production alerting config. Please re-run the
 behavior-verifier skill against the same workspace and remit, and factor these in.
 ```
 
-Text artifacts are the most reliable channel and the only thing Praxa's automatic workspace sweep looks for. Image evidence (a screenshot of a dashboard or an alerting rule) works too **if your coding agent's `Read` tool is multimodal — Claude Code's is** — but the sweep won't go hunting for image files, so name the file explicitly when you ask for the re-run ("…and factor in `alerting-dashboard.png`"). If you're unsure, a written description of what the screenshot shows is always safe.
+Text artifacts are the most reliable channel and the only thing Praxen's automatic workspace sweep looks for. Image evidence (a screenshot of a dashboard or an alerting rule) works too **if your coding agent's `Read` tool is multimodal — Claude Code's is** — but the sweep won't go hunting for image files, so name the file explicitly when you ask for the re-run ("…and factor in `alerting-dashboard.png`"). If you're unsure, a written description of what the screenshot shows is always safe.
 
-Praxa will re-evaluate with the added context. This is the intended workflow: the first run tells you what the evidence supports; subsequent runs let you close the gap between *what's true* and *what's demonstrable*. If a score is still low after you've supplied the evidence, that gap is itself the finding — the control may be real but unverifiable to anyone who wasn't told, which is its own maturity problem.
+Praxen will re-evaluate with the added context. This is the intended workflow: the first run tells you what the evidence supports; subsequent runs let you close the gap between *what's true* and *what's demonstrable*. If a score is still low after you've supplied the evidence, that gap is itself the finding — the control may be real but unverifiable to anyone who wasn't told, which is its own maturity problem.
 
 For the fuller treatment — including when a finding means "fix the remit" or "fix the agent" rather than "add evidence", and how to record an accepted risk — see [Challenging and Revising Findings](challenging-findings.md).
 
@@ -95,27 +95,27 @@ For the fuller treatment — including when a finding means "fix the remit" or "
 
 ## Automating analyses
 
-Praxa does not include a scheduler. If you want recurring analyses, wrap the coding agent invocation in whatever scheduler your environment already uses:
+Praxen does not include a scheduler. If you want recurring analyses, wrap the coding agent invocation in whatever scheduler your environment already uses:
 
 - **CI hook** — run on every pull request that touches the agent's code.
 - **Cron / launchd** — run nightly against a deployed agent's exported state.
 - **GitHub Action** — run on a schedule and post the `.txt` summary as a comment.
 
-Because Praxa is stateless and produces deterministic outputs (modulo timestamp), CI integration is straightforward. The JSON output is the right format for automated downstream consumers.
+Because Praxen is stateless and produces deterministic outputs (modulo timestamp), CI integration is straightforward. The JSON output is the right format for automated downstream consumers.
 
 ---
 
 ## Large workspaces and context sizing
 
-A Praxa analysis is read-heavy: it loads the skill procedure, the knowledge bases, and every artifact in the workspace, holds the findings in working memory, and writes the report in a single synthesis pass. On a large target this can exceed the coding agent's context window, and the session **auto-compacts mid-analysis**. That failure is silent — you still get a report, but findings gathered early in the run can be lost or over-summarized by the compaction before the report is written. The goal is to keep the whole scan inside one context window.
+A Praxen analysis is read-heavy: it loads the skill procedure, the knowledge bases, and every artifact in the workspace, holds the findings in working memory, and writes the report in a single synthesis pass. On a large target this can exceed the coding agent's context window, and the session **auto-compacts mid-analysis**. That failure is silent — you still get a report, but findings gathered early in the run can be lost or over-summarized by the compaction before the report is written. The goal is to keep the whole scan inside one context window.
 
 **To keep a scan inside the window:**
 
 1. **Use the largest context window available.** This is the biggest lever. In Claude Code, run the analysis in the largest-context session you have access to — a 1M-context (Opus) session if you have one. A 200k-class window can compact partway through a non-trivial agent scan once the procedure, knowledge bases, file reads, and synthesis are all resident at once.
-2. **Start a fresh session for the scan.** Don't run Praxa at the tail of a long conversation that has already consumed most of the window — give the analysis the full budget.
-3. **Scope the input to the agent, not the whole repo.** Point Praxa at the agent's core surface — its prompts, skill files, code, config, and the Worker Remit — and leave out what isn't the agent: `node_modules` and vendored dependencies, `.git`, `dist` / `build` output, large data and log files, test fixtures. The Worker Remit defines what's in scope; the input path should match. (Praxa already samples large logs and lockfiles rather than reading them whole — but the cleanest fix is to not hand it the bulk in the first place.)
+2. **Start a fresh session for the scan.** Don't run Praxen at the tail of a long conversation that has already consumed most of the window — give the analysis the full budget.
+3. **Scope the input to the agent, not the whole repo.** Point Praxen at the agent's core surface — its prompts, skill files, code, config, and the Worker Remit — and leave out what isn't the agent: `node_modules` and vendored dependencies, `.git`, `dist` / `build` output, large data and log files, test fixtures. The Worker Remit defines what's in scope; the input path should match. (Praxen already samples large logs and lockfiles rather than reading them whole — but the cleanest fix is to not hand it the bulk in the first place.)
 
-**If a run compacts anyway:** Praxa checkpoints itself. Just before it writes the report, it saves a **draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — a complete record of the analysis (every finding, the RAISE scores, the remit audit). So if you see the auto-compaction notice during a run, or the final report looks thinner than the interim overview Praxa prints to stdout, you have two recovery options:
+**If a run compacts anyway:** Praxen checkpoints itself. Just before it writes the report, it saves a **draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — a complete record of the analysis (every finding, the RAISE scores, the remit audit). So if you see the auto-compaction notice during a run, or the final report looks thinner than the interim overview Praxen prints to stdout, you have two recovery options:
 
 - **Recover from the manifest.** Tell the agent: *"the session compacted — read `./reports/<agent-slug>-draft-<timestamp>.md` and finish the report from it."* It rebuilds the findings JSON and re-renders from the checkpoint, without re-analyzing the workspace.
 - **Re-run** the analysis with a tighter scope or a larger context window.
@@ -129,5 +129,5 @@ This is guidance, not a guarantee — a genuinely large workspace can still comp
 ## Next steps
 
 - [Writing Worker Remits](writing-remits.md) — the authoring guide for the policy document
-- [Interpreting Reports](interpreting-reports.md) — how to read what Praxa produces
+- [Interpreting Reports](interpreting-reports.md) — how to read what Praxen produces
 - [Challenging and Revising Findings](challenging-findings.md) — what to do when you disagree with the analysis

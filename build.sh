@@ -3,9 +3,9 @@
 # Copyright 2026 Exabeam, Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# build.sh — package the Praxa distributable zip.
+# build.sh — package the Praxen distributable zip.
 #
-# Produces: dist/praxa-<version>.zip
+# Produces: dist/praxen-<version>.zip
 #
 # The distribution contains only the files an operator needs to run an analysis.
 # Internal docs, deferred specs, build scripts, examples source files, and git
@@ -14,19 +14,19 @@
 
 set -euo pipefail
 
-# Read version from PRAXA_SPEC.md (line: "**Version:** X.Y.Z")
-VERSION="$(grep -m1 -E '^\*\*Version:\*\*' PRAXA_SPEC.md | sed -E 's/.*\*\*Version:\*\*[[:space:]]*//; s/[[:space:]]*$//')"
+# Read version from PRAXEN_SPEC.md (line: "**Version:** X.Y.Z")
+VERSION="$(grep -m1 -E '^\*\*Version:\*\*' PRAXEN_SPEC.md | sed -E 's/.*\*\*Version:\*\*[[:space:]]*//; s/[[:space:]]*$//')"
 
 if [[ -z "$VERSION" ]]; then
-  echo "error: could not read version from PRAXA_SPEC.md" >&2
+  echo "error: could not read version from PRAXEN_SPEC.md" >&2
   exit 1
 fi
 
 DIST_DIR="dist"
-STAGE_DIR="$DIST_DIR/praxa-$VERSION"
-ZIP_PATH="$DIST_DIR/praxa-$VERSION.zip"
+STAGE_DIR="$DIST_DIR/praxen-$VERSION"
+ZIP_PATH="$DIST_DIR/praxen-$VERSION.zip"
 
-echo "Building Praxa v$VERSION"
+echo "Building Praxen v$VERSION"
 
 # Clean any prior stage / output for this version
 rm -rf "$STAGE_DIR" "$ZIP_PATH"
@@ -37,7 +37,7 @@ mkdir -p "$STAGE_DIR"
 INCLUDE=(
   ".claude-plugin"
   "README.md"
-  "PRAXA_SPEC.md"
+  "PRAXEN_SPEC.md"
   "LICENSE"
   "NOTICE"
   "CHANGELOG.md"
@@ -74,7 +74,7 @@ find "$STAGE_DIR" -name '*.pyc' -delete
 rm -rf "$STAGE_DIR/local"
 
 # Produce the zip
-(cd "$DIST_DIR" && zip -rq "praxa-$VERSION.zip" "praxa-$VERSION")
+(cd "$DIST_DIR" && zip -rq "praxen-$VERSION.zip" "praxen-$VERSION")
 
 # Clean up stage
 rm -rf "$STAGE_DIR"

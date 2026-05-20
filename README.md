@@ -3,18 +3,18 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxa
+# Praxen
 **agent behavior verifier · Version 0.6.3**
 
 > *Make sure your agent does its job — and only its job.*
 
-*Praxa is a project sponsored by [Exabeam](https://www.exabeam.com/).*
+*Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*
 
 ---
 
-**Praxa** verifies an AI agent's intended vs observed behavior. It compares the agent's declared policy (a **Worker Remit**) against whatever evidence is available about that agent — source code in a repository, live memory and log files from a running deployment, or chat transcripts and behavioral records — and reports where observed behavior diverges from declared intent. Findings land in a local HTML report. Nothing phones home.
+**Praxen** verifies an AI agent's intended vs observed behavior. It compares the agent's declared policy (a **Worker Remit**) against whatever evidence is available about that agent — source code in a repository, live memory and log files from a running deployment, or chat transcripts and behavioral records — and reports where observed behavior diverges from declared intent. Findings land in a local HTML report. Nothing phones home.
 
-Praxa is **not just a source-code scanner.** Any artifact that reveals what the agent does, has done, or is configured to do is valid input.
+Praxen is **not just a source-code scanner.** Any artifact that reveals what the agent does, has done, or is configured to do is valid input.
 
 ---
 
@@ -24,12 +24,12 @@ The number one risk area for agentic security and safety is simple to state: **t
 
 That's why screening for prompt injections, or scanning code for known-bad patterns, isn't enough. Those are necessary but partial: they catch some inputs and some implementation flaws, not the question that actually matters — *is this agent going to do, or is it doing, the thing it was deployed to do, and nothing else?*
 
-Answering that requires two things Praxa makes first-class:
+Answering that requires two things Praxen makes first-class:
 
 1. **A wholesale way to define the agent's job** — its mission, authorized tools, approved channels, counterparties, and forbidden actions. That's the **Worker Remit**.
-2. **A way to test reality against that definition** — point Praxa at the agent's code, its live deployment state, or its behavioral history, and get back exactly where observed behavior diverges from declared intent.
+2. **A way to test reality against that definition** — point Praxen at the agent's code, its live deployment state, or its behavioral history, and get back exactly where observed behavior diverges from declared intent.
 
-Define the job. Test against the job. Everything else in Praxa serves those two steps.
+Define the job. Test against the job. Everything else in Praxen serves those two steps.
 
 ---
 
@@ -42,18 +42,18 @@ Full docs live in [`docs/`](docs/index.md). Quick links:
 - [Writing Worker Remits](docs/writing-remits.md) — authoring the policy document
 - [Interpreting Reports](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
 - [Challenging and Revising Findings](docs/challenging-findings.md) — what to do when you disagree with the analysis
-- [OWASP Gen AI Security](docs/owasp.md) — the OWASP frameworks Praxa tags findings against
+- [OWASP Gen AI Security](docs/owasp.md) — the OWASP frameworks Praxen tags findings against
 - [The RAISE Framework](docs/RAISE.md) — the maturity rubric in depth
 
 ---
 
-## How Praxa Works
+## How Praxen Works
 
-Praxa reduces agent security to a single comparison:
+Praxen reduces agent security to a single comparison:
 
 1. **You declare what the agent is supposed to do** — its mission, authorized tools, approved channels, counterparties, and forbidden actions — in a Worker Remit.
-2. **Praxa reads the available evidence** — code, deployment state, behavioral records — and treats it as the ground truth of what the agent actually is, has done, or is configured to do.
-3. **Praxa reports the gap.** Every finding answers a single question: *does the observed behavior match the declared intent?*
+2. **Praxen reads the available evidence** — code, deployment state, behavioral records — and treats it as the ground truth of what the agent actually is, has done, or is configured to do.
+3. **Praxen reports the gap.** Every finding answers a single question: *does the observed behavior match the declared intent?*
 
 This is policy-implementation divergence detection, end to end. The Worker Remit is the only artifact that needs to be customized per agent — everything else is generic.
 
@@ -61,20 +61,20 @@ This is policy-implementation divergence detection, end to end. The Worker Remit
 
 ## The Worker Remit
 
-The Worker Remit is a markdown policy document, not a system description. Declare the intent — what the agent is for, what it's allowed to do, what it's forbidden to do, who it can communicate with, what requires your approval. You don't list tool names, file paths, or implementation details — Praxa reads the actual code and compares it against the policy you've declared.
+The Worker Remit is a markdown policy document, not a system description. Declare the intent — what the agent is for, what it's allowed to do, what it's forbidden to do, who it can communicate with, what requires your approval. You don't list tool names, file paths, or implementation details — Praxen reads the actual code and compares it against the policy you've declared.
 
 What makes a rule good is that it states a verifiable constraint on behavior:
 
 - ✓ *"Message bodies must never be retrieved for senders not in the authorized counterparty list"*
 - ✗ *"Handle email appropriately"*
 
-The first rule gives Praxa something to check against the agent. The second doesn't. Write rules about what the agent *does*, not about how it does it.
+The first rule gives Praxen something to check against the agent. The second doesn't. Write rules about what the agent *does*, not about how it does it.
 
 A template is included in `WORKER_REMIT_template.md`.
 
 ---
 
-## What Praxa Verifies
+## What Praxen Verifies
 
 Every analysis runs these named verification patterns:
 
@@ -90,11 +90,11 @@ Every analysis runs these named verification patterns:
 
 ---
 
-## What Praxa Analyzes
+## What Praxen Analyzes
 
-Praxa accepts any artifact that reveals what the agent does, has done, or is configured to do. Three common input shapes — used individually or in combination:
+Praxen accepts any artifact that reveals what the agent does, has done, or is configured to do. Three common input shapes — used individually or in combination:
 
-| Shape | Example | What Praxa does with it |
+| Shape | Example | What Praxen does with it |
 |---|---|---|
 | **Source repository** | A GitHub repo, agent project directory, plugin source tree | Reads code, configs, skill files, dependencies, prompts; checks code against the remit; runs supply-chain and credential-exposure verification. |
 | **Running deployment** | Live memory and bootstrap files (`MEMORY.md`, `SOUL.md`), **operational logs** (action reports, session JSONL, audit trails, escalation logs), config files | Treats live state as the agent's autobiography; analyzes for behavioral drift, tool loops, missed escalations, half-wired controls, and session-loaded files audited as system prompts. |
@@ -106,14 +106,14 @@ The methodology adapts. A repo-only analysis covers code-level findings — Mana
 
 ## What You Need
 
-- **A coding agent** (tested against Claude Code). Praxa is distributed as a skill file the agent reads and executes — any coding agent capable of tool use and multi-step instruction-following should work.
+- **A coding agent** (tested against Claude Code). Praxen is distributed as a skill file the agent reads and executes — any coding agent capable of tool use and multi-step instruction-following should work.
 - **A Worker Remit** for the agent you're analyzing (or your coding agent can help you write one).
 
 ---
 
 ## Running an Analysis
 
-Praxa ships as a Claude Code plugin inside a plugin marketplace. You can install it through the marketplace mechanism or run it directly from an unzipped release — both paths work.
+Praxen ships as a Claude Code plugin inside a plugin marketplace. You can install it through the marketplace mechanism or run it directly from an unzipped release — both paths work.
 
 ### Option A — Install via Claude Code plugin marketplace
 
@@ -121,12 +121,12 @@ From your terminal (recommended — works regardless of how your interface handl
 in-session slash commands):
 
 ```bash
-claude plugin marketplace add Exabeam/deckard
-claude plugin install praxa@exabeam
+claude plugin marketplace add open-ai-security/praxen
+claude plugin install praxen@open-ai-security
 ```
 
 Or run the equivalent slash commands from within a Claude Code session
-(`/plugin marketplace add Exabeam/deckard`, then `/plugin install praxa@exabeam`,
+(`/plugin marketplace add open-ai-security/praxen`, then `/plugin install praxen@open-ai-security`,
 then `/reload-plugins`). The skill is now available as `behavior-verifier`. See
 [Installation](docs/installation.md) for details and troubleshooting.
 
@@ -162,11 +162,11 @@ Self-contained static HTML. Open directly in a browser — no server needed.
 
 ## Frameworks
 
-Every finding Praxa produces is classified against four industry-standard frameworks simultaneously, drawing on the curated [knowledge base](skills/behavior-verifier/knowledge/) that ships with Praxa:
+Every finding Praxen produces is classified against four industry-standard frameworks simultaneously, drawing on the curated [knowledge base](skills/behavior-verifier/knowledge/) that ships with Praxen:
 
 - **OWASP Top 10 for LLM Applications 2025** — every finding applicable to LLM-level risks is tagged with the correct `LLM0X` category and full name (e.g., `LLM01 — Prompt Injection`, `LLM02 — Sensitive Information Disclosure`). Source: [genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/).
 - **OWASP Top 10 for Agentic AI Applications 2026** — agentic-specific patterns are tagged with the correct `ASI0X` category (e.g., `ASI01 — Agent Goal Hijack`, `ASI06 — Memory and Context Poisoning`). Source: [genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/).
-- **OWASP Secure MCP Server Development Guide 2026** — when Praxa finds MCP server configuration in the workspace, it applies the full MCP minimum-bar checklist from the OWASP guide. Source: [genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/).
+- **OWASP Secure MCP Server Development Guide 2026** — when Praxen finds MCP server configuration in the workspace, it applies the full MCP minimum-bar checklist from the OWASP guide. Source: [genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/).
 - **Responsible AI Software Engineering (RAISE) Framework** — a six-category AI maturity model. Every analysis produces a 0–5 score per category plus a weighted overall posture. See [`docs/RAISE.md`](docs/RAISE.md) for the reference and maturity scale.
 
 ---
@@ -179,9 +179,9 @@ The [`examples/`](examples/) directory contains real analyses against deliberate
 
 ## Tests (source repository only)
 
-The [`tests/`](tests/) directory in the source repository is Praxa's pre-release regression suite. It lists nine test-target agents — ranging from intentionally-vulnerable CTF agents to mature production tools — along with the Worker Remit developed for each and the baseline findings a healthy analysis should produce. See [`tests/README.md`](tests/README.md) for the full test plan and release checklist.
+The [`tests/`](tests/) directory in the source repository is Praxen's pre-release regression suite. It lists nine test-target agents — ranging from intentionally-vulnerable CTF agents to mature production tools — along with the Worker Remit developed for each and the baseline findings a healthy analysis should produce. See [`tests/README.md`](tests/README.md) for the full test plan and release checklist.
 
-The test suite exists so that every Praxa release can be validated against the same agent posture spectrum (intentionally-broken → defense-conscious) and any regression — a missed critical theme, a dropped coverage area, an unexplained weighted-score shift — is visible before the release ships.
+The test suite exists so that every Praxen release can be validated against the same agent posture spectrum (intentionally-broken → defense-conscious) and any regression — a missed critical theme, a dropped coverage area, an unexplained weighted-score shift — is visible before the release ships.
 
 *`tests/` is not included in the distribution zip — users of the shipped verifier don't need the regression harness. Contributors and maintainers work from the source repository.*
 
@@ -190,12 +190,12 @@ The test suite exists so that every Praxa release can be validated against the s
 ## Files
 
 ```
-praxa/
+praxen/
   README.md                   ← You are here
   LICENSE                     ← Apache License 2.0
   NOTICE                      ← Attribution notices (bundled OWASP material, CC BY-SA 4.0)
   CONTRIBUTING.md             ← How to contribute (DCO sign-off)
-  PRAXA_SPEC.md               ← Full specification
+  PRAXEN_SPEC.md               ← Full specification
   CHANGELOG.md                ← Release notes
   WORKER_REMIT_template.md    ← Starting point for writing your own remit
   .claude-plugin/
@@ -215,7 +215,7 @@ praxa/
 
 ## License
 
-Praxa is licensed under the [Apache License, Version 2.0](LICENSE).
+Praxen is licensed under the [Apache License, Version 2.0](LICENSE).
 
 Portions of the knowledge base (`skills/behavior-verifier/knowledge/`) are
 distilled from OWASP Gen AI Security Project publications and are used under
@@ -225,4 +225,4 @@ for the attribution details.
 Contributions are welcome under the same license, with a DCO sign-off — see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-*Praxa is a project sponsored by [Exabeam](https://www.exabeam.com/).*
+*Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*

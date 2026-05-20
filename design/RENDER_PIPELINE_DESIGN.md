@@ -1,6 +1,6 @@
-# Praxa Render Pipeline — Design Note
+# Praxen Render Pipeline — Design Note
 
-**Status:** Phases 1–3 done (2026-05-11). Phase 4 (clean break in `PRAXA_SPEC.md` §6 / `docs/`, note Python 3 as a runtime dep, version bump, tag) is the remaining work.
+**Status:** Phases 1–3 done (2026-05-11). Phase 4 (clean break in `PRAXEN_SPEC.md` §6 / `docs/`, note Python 3 as a runtime dep, version bump, tag) is the remaining work.
 **Author:** internal
 **Date:** 2026-05-02 (initial), revised 2026-05-03 after first-survey discovery, updated 2026-05-11 on implementation + Phase-3 calibration.
 
@@ -20,7 +20,7 @@ Deviations from the design as written:
 - **Rich-text allow-list = `<code>` everywhere + `<strong>`/`<em>` everywhere + `<p>` in `behavior_summary`.** The design §5.6 listed three fields, `<code>` only; the synthesis step naturally reaches for `<strong>`/`<em>` emphasis, so those are allowed (rendered as real emphasis in the HTML, dropped in the TXT) rather than escaped to literal `&lt;strong&gt;`.
 - **`{{FINDING_LINK}}` replaces `{{FINDING_ANCHOR}}` / `{{FINDING_ID}}` in the remit row** — cleaner than the design's "leave the cell empty" instruction; the renderer composes the cell HTML (anchor or `&mdash;`).
 - **`LOG_STATUS_LABEL`** is a derived value (`active` → "Active", `new` → "New"); the template's log table needs a label as well as a class.
-- **Literal `{{...}}` in JSON-derived strings is neutralised** (`{{` → `&#123;&#123;`) by `esc()`/`render_rich()` — so a finding citing Jinja/Mustache/k8s/Compose template code (`{{DATABASE_URL}}`) can never collide with a Praxa template placeholder. Not in the design; surfaced in self-review.
+- **Literal `{{...}}` in JSON-derived strings is neutralised** (`{{` → `&#123;&#123;`) by `esc()`/`render_rich()` — so a finding citing Jinja/Mustache/k8s/Compose template code (`{{DATABASE_URL}}`) can never collide with a Praxen template placeholder. Not in the design; surfaced in self-review.
 
 ## Phase 3 — suite re-run & calibration (2026-05-11)
 
@@ -36,7 +36,7 @@ Takeaway baked into `tests/README.md`: **blind-run scoring varies ±0.3–0.5** 
 
 ## 1. Problem
 
-Today the Praxa skill produces three artifacts at the end of an analysis:
+Today the Praxen skill produces three artifacts at the end of an analysis:
 
 - `<agent>-findings-<date>.json`
 - `<agent>-analysis-<timestamp>.html`
@@ -87,7 +87,7 @@ The original design assumed the findings JSON contains everything the HTML rende
 | Maturity rubric table | Hardcoded in template | n/a |
 | Footer: severity counts | LLM-derived from findings array | ❌ |
 | Footer: artifact count | LLM-derived from workspace | ❌ |
-| Footer: praxa version | Substituted from `--version` arg | n/a |
+| Footer: praxen version | Substituted from `--version` arg | n/a |
 
 **Implication:** A renderer reading the current JSON has nothing to put in roughly half the report. The "JSON is the data, HTML is presentation" architecture only works if we **expand the JSON schema** to capture every prose field the HTML displays.
 
@@ -133,7 +133,7 @@ The renaming/expansion of the JSON is the core architectural change. Proposed sh
 ```json
 {
   "schema_version": "1.0",
-  "praxa_version": "0.1.0",
+  "praxen_version": "0.1.0",
   "scan": {
     "agent": "HelperBot",
     "agent_slug": "helperbot",
@@ -238,7 +238,7 @@ python render.py \
   --out-txt  <path>/analysis.txt
 ```
 
-The Praxa version comes from the JSON's `praxa_version` field, not a CLI arg (single source of truth).
+The Praxen version comes from the JSON's `praxen_version` field, not a CLI arg (single source of truth).
 
 All paths absolute. Exit code 0 on success; non-zero with diagnostic on any error.
 
@@ -289,7 +289,7 @@ The renderer matches these forms verbatim. Custom mini-engine, ~430 LOC (revised
   - `{{AGENT_NAME}}` → `scan.agent`
   - `{{SCAN_DATE}}` → `scan.scan_date`
   - `{{SCAN_TIMESTAMP}}` → `scan.scan_timestamp`
-  - `{{PRAXA_VERSION}}` → `praxa_version`
+  - `{{PRAXEN_VERSION}}` → `praxen_version`
   - `{{ARTIFACT_COUNT}}` → `scan.artifact_count`
   - `{{AGENT_REMIT_SUMMARY}}` → `intro_band.agent_remit_summary`
   - `{{AGENT_STRUCTURE_SUMMARY}}` → `intro_band.agent_structure_summary`
@@ -486,7 +486,7 @@ The Step 11 substitution rules and marker conventions move from `SKILL.md` into 
 1. **Phase 1 — Schema + skill update.** Define `schema.py` with the canonical shape. Rewrite `SKILL.md` Steps 9–11 to produce the new JSON. Validate by running the skill against one target end-to-end and inspecting the JSON manually for completeness.
 2. **Phase 2 — Renderer build.** Implement `render.py` against the schema. Test against the Phase 1 JSON. Iterate until the rendered HTML is byte-equivalent (or close enough for hand-diff approval) to a reference HTML produced the old way.
 3. **Phase 3 — Suite validation.** Run all 9 targets with the new skill + renderer. Confirm baselines still hold (no calibration regression). Confirm wall-clock improvement.
-4. **Phase 4 — Clean break.** Remove legacy substitution rules from `SKILL.md`. Update `PRAXA_SPEC.md` §6 with the new schema. Update `docs/interpreting-reports.md` to describe the JSON sections. Tag a v0.2.0 release.
+4. **Phase 4 — Clean break.** Remove legacy substitution rules from `SKILL.md`. Update `PRAXEN_SPEC.md` §6 with the new schema. Update `docs/interpreting-reports.md` to describe the JSON sections. Tag a v0.2.0 release.
 
 Phase 1 gates Phase 2 — no point implementing the renderer until the schema is tested. Phase 2 gates Phase 3 — no point running the suite until the renderer works.
 
@@ -500,7 +500,7 @@ Phase 1 gates Phase 2 — no point implementing the renderer until the schema is
 | Backward incompatibility with the v0.1.0 JSONs we just shipped in `examples/`. | Acceptable — `examples/` regenerates with the new pipeline. We're a 0.x project; schema break is allowed. Document in CHANGELOG. |
 | JSON schema drift between skill versions over time. | `schema_version` field; renderer asserts compatibility; bumping major version requires explicit renderer support. |
 | Python not on the operator's machine. | Python 3 is on every macOS/Linux dev box. Windows: document `py -3`. PyInstaller binary as Phase 5 if customers hit this. |
-| Behavioral drift: Praxa user expects to hand-edit HTML. | The HTML was always generated; hand-editing was never supported. No-op risk. |
+| Behavioral drift: Praxen user expects to hand-edit HTML. | The HTML was always generated; hand-editing was never supported. No-op risk. |
 | Hand-diffing rendered HTML in Phase 2 is brittle. | Accept "semantically equivalent" parity, not byte-equivalent. Use HTML pretty-print + structural diff for the comparison. |
 
 ## 11. Effort Estimate (revised)
@@ -513,7 +513,7 @@ Phase 1 gates Phase 2 — no point implementing the renderer until the schema is
 - Test harness + 3 golden fixtures: ~half a day
 - Skill ↔ renderer parity validation (Phase 2): ~half a day
 - Suite re-run (Phase 3): ~1 hour wall-clock + ~half a day to review and update baselines
-- Documentation (PRAXA_SPEC.md §6, RAISE.md, interpreting-reports.md): ~half a day
+- Documentation (PRAXEN_SPEC.md §6, RAISE.md, interpreting-reports.md): ~half a day
 
 **Total: ~5–7 person-days.** Up from the revised 4-5 estimate after the gap analysis in §5.5–5.9. The win is unchanged on the runtime side (>10× faster, eliminates timeout-stall failure mode) and bigger on the architectural side: JSON consumers get the complete report content, not just the findings list.
 

@@ -4,12 +4,12 @@
 -->
 
 # Knowledge Base: RAISE Scanning Heuristics and Patterns
-*Distilled for Praxa calibration*
+*Distilled for Praxen calibration*
 
 Source: RAISE Security Review Skill (RUBRIC.md, HEURISTICS.md, INTAKE_PATTERNS.md)
 RAISE framework: developed by Steve Wilson. To learn more: *[The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/)*.
 
-This file gives the Praxa its calibration: how to read different artifact types, what signals map to which risks, how to score with confidence, and what mistakes to avoid. It is the RAISE framework's analytical methodology adapted for continuous agent scanning rather than one-time review.
+This file gives the Praxen its calibration: how to read different artifact types, what signals map to which risks, how to score with confidence, and what mistakes to avoid. It is the RAISE framework's analytical methodology adapted for continuous agent scanning rather than one-time review.
 
 ---
 
@@ -34,7 +34,7 @@ The most important scan a RAISE-based scanner can perform is comparing what a po
 
 ### Specificity produces signal
 
-Vague policies produce vague findings. When a Worker Remit or policy document is specific — "message bodies MUST NEVER be retrieved for unknown senders" — Praxa can verify compliance in code. When it says "handle email appropriately," it cannot. Flag vague policy as a finding in its own right: a policy that can't be verified can't be enforced.
+Vague policies produce vague findings. When a Worker Remit or policy document is specific — "message bodies MUST NEVER be retrieved for unknown senders" — Praxen can verify compliance in code. When it says "handle email appropriately," it cannot. Flag vague policy as a finding in its own right: a policy that can't be verified can't be enforced.
 
 ### Artifacts are snapshots, not ground truth
 
@@ -450,4 +450,4 @@ Recognition of positive posture belongs in every scanner report. It gives operat
 
 *Source: RAISE Security Review Skill — RUBRIC.md, HEURISTICS.md, INTAKE_PATTERNS.md*
 *RAISE framework developed by Steve Wilson. Learn more: [The Developer's Playbook for Large Language Model Security](https://www.oreilly.com/library/view/the-developers-playbook/9781098162191/).*
-*Distilled for the Praxa knowledge base*
+*Distilled for the Praxen knowledge base*

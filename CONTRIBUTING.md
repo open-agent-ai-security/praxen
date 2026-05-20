@@ -3,14 +3,14 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Contributing to Praxa
+# Contributing to Praxen
 
-Thanks for your interest in improving Praxa. Contributions are welcome via pull
+Thanks for your interest in improving Praxen. Contributions are welcome via pull
 request.
 
 ## License
 
-Praxa is licensed under the [Apache License, Version 2.0](LICENSE). By
+Praxen is licensed under the [Apache License, Version 2.0](LICENSE). By
 contributing, you agree that your contributions will be licensed under the same
 terms.
 

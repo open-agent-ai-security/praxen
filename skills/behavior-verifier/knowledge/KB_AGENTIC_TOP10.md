@@ -4,12 +4,12 @@
 -->
 
 # Knowledge Base: OWASP Top 10 for Agentic Applications (2026)
-*Distilled for Praxa — behavioral and environmental scanning context*
+*Distilled for Praxen — behavioral and environmental scanning context*
 
 Source: OWASP Top 10 for Agentic Applications 2026 (v2026, December 2025)
 License: CC BY-SA 4.0 — genai.owasp.org
 
-This file is a Praxa knowledge base extract. Unlike the LLM Top 10, which addresses LLM applications broadly, the Agentic Top 10 is specifically about autonomous agents that plan, decide, and act across multiple steps and systems. These are the highest-relevance risks for what Praxa analyzes.
+This file is a Praxen knowledge base extract. Unlike the LLM Top 10, which addresses LLM applications broadly, the Agentic Top 10 is specifically about autonomous agents that plan, decide, and act across multiple steps and systems. These are the highest-relevance risks for what Praxen analyzes.
 
 ---
 
@@ -46,7 +46,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent treats all inputs (user, tool output, retrieved content, external email) with equal trust
 - Orchestration logic that can be redirected by model output alone, without deterministic guardrails
 
-**Praxa relevance:** Praxa — inspect system prompt for goal guardrails, check for validation on config fields that can modify agent goals or identity (e.g., `custom_goals`, `persona_override`), confirm the remit declares a single authorized mission.
+**Praxen relevance:** Praxen — inspect system prompt for goal guardrails, check for validation on config fields that can modify agent goals or identity (e.g., `custom_goals`, `persona_override`), confirm the remit declares a single authorized mission.
 
 ---
 
@@ -73,7 +73,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Tool producing output that is inconsistent with the stated action (evidence mismatch)
 - High-impact tool (send, delete, exec) called without evidence of approval
 
-**Praxa relevance:** Praxa — audit tool definitions, compare permission scope against the remit, flag high-impact tools (send, delete, exec) lacking approval gates.
+**Praxen relevance:** Praxen — audit tool definitions, compare permission scope against the remit, flag high-impact tools (send, delete, exec) lacking approval gates.
 
 ---
 
@@ -100,7 +100,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - New counterparty appearing in agent's trust graph without operator approval
 - Agent responding to a requester whose identity doesn't match the authorized list in the Worker Remit
 
-**Praxa relevance:** Praxa — check credential storage, audit trust-check implementation in code, verify counterparty list from remit is enforced before sensitive actions.
+**Praxen relevance:** Praxen — check credential storage, audit trust-check implementation in code, verify counterparty list from remit is enforced before sensitive actions.
 
 ---
 
@@ -125,7 +125,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Tool behavior that diverges from its description (tool claims to search but sends data)
 - New capability appearing in the agent's effective behavior without a corresponding new tool in the authorized list
 
-**Praxa relevance:** Praxa (supply chain category, tool inventory change detection, rug pull detection). The log registry update is a direct defense against silent rug pulls.
+**Praxen relevance:** Praxen (supply chain category, tool inventory change detection, rug pull detection). The log registry update is a direct defense against silent rug pulls.
 
 ---
 
@@ -152,7 +152,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Exec called with parameters that include network tools (curl, wget, nc), credential paths, or archive creation
 - Repeated exec attempts with slight variations
 
-**Praxa relevance:** Praxa — exec config audit is a named high-priority check. Flag auto-approved shell exec, absent per-command policies, and exec capabilities that exceed the remit.
+**Praxen relevance:** Praxen — exec config audit is a named high-priority check. Flag auto-approved shell exec, absent per-command policies, and exec capabilities that exceed the remit.
 
 ---
 
@@ -179,7 +179,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent referencing context or instructions that don't appear in the current session's inputs
 - Agent acting on a "remembered" instruction that was inserted by an external party
 
-**Praxa relevance:** Praxa — inspect persistent memory files for external-origin content, check whether memory writes are validated, confirm memory contents do not include instruction-like text that could act on the agent.
+**Praxen relevance:** Praxen — inspect persistent memory files for external-origin content, check whether memory writes are validated, confirm memory contents do not include instruction-like text that could act on the agent.
 
 ---
 
@@ -203,7 +203,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent receiving instructions from an unexpected source (another agent, not the operator)
 - Agent behavior that changes after interaction with a sub-agent or external agent
 
-**Praxa relevance:** Praxa — audit inter-agent channel configuration, confirm identity verification for messages received from other agents, flag trust-without-verification patterns in A2A handlers.
+**Praxen relevance:** Praxen — audit inter-agent channel configuration, confirm identity verification for messages received from other agents, flag trust-without-verification patterns in A2A handlers.
 
 ---
 
@@ -228,7 +228,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Same error appearing across multiple tool calls in sequence
 - Agent that keeps retrying a failed or misdirected action without halting
 
-**Praxa relevance:** Praxa — check for tool-loop detection, retry caps, and rate limits in config. Flag missing circuit breakers on capabilities that can fire in a loop (search, tool calls, retries).
+**Praxen relevance:** Praxen — check for tool-loop detection, retry caps, and rate limits in config. Flag missing circuit breakers on capabilities that can fire in a loop (search, tool calls, retries).
 
 ---
 
@@ -253,7 +253,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent taking actions at the request of a party not in the authorized counterparty list
 - Trust relationship expanding unexpectedly — new sender treated as trusted
 
-**Praxa relevance:** Praxa — confirm the remit declares explicit counterparty and trust-scope lists, verify code enforces them, flag trust-expansion paths (e.g., any message sender becoming "known" through history).
+**Praxen relevance:** Praxen — confirm the remit declares explicit counterparty and trust-scope lists, verify code enforces them, flag trust-expansion paths (e.g., any message sender becoming "known" through history).
 
 ---
 
@@ -261,7 +261,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **What it is:** An agent begins operating outside its intended goals, constraints, or authorization — whether through compromise, goal drift, capability expansion, or failure of oversight. The agent is no longer the agent that was deployed.
 
-**This is the category Praxa exists to address.**
+**This is the category Praxen exists to address.**
 
 **Common patterns:**
 - Agent that was compromised via ASI01 and is now pursuing an attacker's goals
@@ -271,13 +271,13 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent running without any oversight mechanism
 
 **What to look for:**
-- Behavior outside the Worker Remit — this is the primary Praxa detection
+- Behavior outside the Worker Remit — this is the primary Praxen detection
 - Tool inventory that exceeds the Known Good Baseline
 - Memory or context that contains instructions not from the authorized operator
 - Monitoring or logging that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
-**Praxa relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxa's mission is to detect the drift toward ASI10 before it becomes irreversible.
+**Praxen relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxen's mission is to detect the drift toward ASI10 before it becomes irreversible.
 
 ---
 
@@ -293,9 +293,9 @@ These multi-step patterns appear in documented real-world agent incidents:
 | Cascade loop | First action fails → retry loop → amplified impact across tool chain | ASI08, LLM10 |
 | Trust expansion | New sender impersonates known party → trust granted → data exfiltrated | ASI03, ASI09, ASI01 |
 
-**Praxa compound finding rule:** When findings from two or more of these steps appear together, escalate the combined severity one level above the highest individual finding. Note the chain in `related_findings`.
+**Praxen compound finding rule:** When findings from two or more of these steps appear together, escalate the combined severity one level above the highest individual finding. Note the chain in `related_findings`.
 
 ---
 
 *Source: OWASP Top 10 for Agentic Applications 2026 — genai.owasp.org — CC BY-SA 4.0*
-*Distilled for the Praxa knowledge base*
+*Distilled for the Praxen knowledge base*
