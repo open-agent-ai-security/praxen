@@ -39,7 +39,7 @@ If GitHub Security Advisories are unavailable to you for any reason, email **ste
 
 - **Initial acknowledgement:** within 3 business days of your report.
 - **First substantive reply** (we understand the issue, we agree on scope and severity, here is the plan): within 10 business days.
-- **Fix timeline:** depends on severity and complexity. Critical issues are prioritised; expect a fix in the next release, not the next minor cycle.
+- **Fix timeline:** depends on severity and complexity. Critical issues are prioritised; expect a fix in an immediate patch release, rather than waiting for the next scheduled minor release.
 - **Coordinated disclosure:** we prefer to ship the fix in a tagged release, publish a [GitHub Security Advisory](https://github.com/open-ai-security/praxen/security/advisories) (with credit to you unless you ask otherwise), and request a CVE if the issue warrants one. We will coordinate the public-disclosure timing with you.
 
 If you do not hear back from us within the windows above, please nudge the thread or escalate via the email address above.
