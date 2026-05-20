@@ -5,7 +5,7 @@
 
 # Changelog
 
-All notable changes to Praxen will be recorded here. Format roughly follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/). Entries for versions prior to `0.7.0` describe the project under its former name, **Praxa**, and at its former home, `github.com/Exabeam/deckard`.
+All notable changes to Praxen will be recorded here. Format roughly follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/). Entries for versions prior to `0.7.0` describe the project under its former name, **Praxa**, and at its former home, `github.com/Exabeam/deckard`. Issue references in those entries link back to `Exabeam/deckard` because that is where the issues themselves live — the `0.7.0` rename was a fresh-repo cutover, not a transfer.
 
 ---
 
@@ -24,20 +24,20 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Moved
 
-- **Repository moved `github.com/Exabeam/deckard` → `github.com/open-ai-security/praxen`.** GitHub's transfer-redirect keeps old URLs resolving, but every in-repo reference (docs, README, CHANGELOG including historical entries, plugin manifest, JSON schema `$id`, rendered report footers) now points at the new home. Issue numbers were preserved by the transfer, so links like `#27` and `#40` keep referring to the same items they always did.
+- **Repository moved `github.com/Exabeam/deckard` → `github.com/open-ai-security/praxen`.** This is the new public home. Every in-repo reference (docs, README, plugin manifest, JSON schema `$id`, rendered report footers) points at the new home. The move was done as a fresh-repo cutover (not a GitHub transfer), so a few historical artifacts stayed at the original repo: the issue tracker (this release's `#27` / `#40` and earlier — the CHANGELOG links them back to `Exabeam/deckard` where they actually live), the merged PR history, and the pre-`0.7.0` GitHub release pages (with their `praxa-0.6.x.zip` artifacts).
 
 ### Internal
 
-- **Test remits rewritten as intent-level Worker Remits** ([issue #40](https://github.com/open-ai-security/praxen/issues/40), PR #42). The eleven `tests/remits/*.md` were rewritten from implementation-level documents (which named internal file paths, class names, config keys, pinned versions) into intent-level *policy* documents — matching the principle the skill itself states ("the remit states policy; you discover implementation"), and no longer brittle to upstream renames.
-- **Regression baselines re-frozen as `tests/baselines/v0.7.0-sequential/`** (PR #43, then this release). All eleven targets were re-scanned cold against the rewritten intent-level remits; the runs were originally committed as `v0.6.3-sequential/` under the old name and were migrated to `v0.7.0-sequential/` by this release's field rename + branding re-render (no scan content changes). Retires the earlier `v0.2-sequential` / `v0.3-sequential` / partial `v0.6-sequential` / interim `v0.6.3-sequential` sets. `tests/README.md` per-target bands and scope notes were updated — including the restructured `openhands` (the agentic core moved to separate packages) and the re-scoped `deepagents-cli` (now a deploy-only bundler).
+- **Test remits rewritten as intent-level Worker Remits** ([issue #40](https://github.com/Exabeam/deckard/issues/40), [PR #42](https://github.com/Exabeam/deckard/pull/42)). The eleven `tests/remits/*.md` were rewritten from implementation-level documents (which named internal file paths, class names, config keys, pinned versions) into intent-level *policy* documents — matching the principle the skill itself states ("the remit states policy; you discover implementation"), and no longer brittle to upstream renames.
+- **Regression baselines re-frozen as `tests/baselines/v0.7.0-sequential/`** ([PR #43](https://github.com/Exabeam/deckard/pull/43), then this release). All eleven targets were re-scanned cold against the rewritten intent-level remits; the runs were originally committed as `v0.6.3-sequential/` under the old name and were migrated to `v0.7.0-sequential/` by this release's field rename + branding re-render (no scan content changes). Retires the earlier `v0.2-sequential` / `v0.3-sequential` / partial `v0.6-sequential` / interim `v0.6.3-sequential` sets. `tests/README.md` per-target bands and scope notes were updated — including the restructured `openhands` (the agentic core moved to separate packages) and the re-scoped `deepagents-cli` (now a deploy-only bundler).
 - **`SKILL.md` Step 6 — `rule_text` / `policy_rule_text` must be a *contiguous, verbatim* span of the remit** (the rule's operative sentence in full): no `...` elision, no spliced fragments, no added/changed punctuation. `test_render.py`'s baseline remit-quote check now compares modulo Markdown emphasis (`**`), since the quote is of the remit's policy text, not its markup.
 
 ## [0.6.3] — 2026-05-19
 
-**Draft manifest, plus two fixes from field testing.** The headline is the **draft manifest**: a long scan can exhaust the coding agent's context window and auto-compact mid-analysis, silently degrading the report — findings gathered early get summarized away before the JSON is written. The skill now checkpoints its full synthesis to disk before writing the report, so a compacted run is recoverable rather than silently incomplete (a partial mitigation for the single-pass "unsupported arc", [issue #27](https://github.com/open-ai-security/praxen/issues/27)). Alongside it, two bugs that field scans surfaced: `praxa_version` was read from the *analyzed* agent's `plugin.json` instead of recording Praxa's own version, and `policy_rule_ids` / `policy_rule_text` were mandatory on every finding even when a finding doesn't trace to a remit rule. The findings schema is unchanged (still `"2.0"`).
+**Draft manifest, plus two fixes from field testing.** The headline is the **draft manifest**: a long scan can exhaust the coding agent's context window and auto-compact mid-analysis, silently degrading the report — findings gathered early get summarized away before the JSON is written. The skill now checkpoints its full synthesis to disk before writing the report, so a compacted run is recoverable rather than silently incomplete (a partial mitigation for the single-pass "unsupported arc", [issue #27](https://github.com/Exabeam/deckard/issues/27)). Alongside it, two bugs that field scans surfaced: `praxa_version` was read from the *analyzed* agent's `plugin.json` instead of recording Praxa's own version, and `policy_rule_ids` / `policy_rule_text` were mandatory on every finding even when a finding doesn't trace to a remit rule. The findings schema is unchanged (still `"2.0"`).
 
 ### Added
-- **`SKILL.md` Step 9.9 now writes a draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — a markdown record of the full synthesis (every finding, the RAISE posture, the remit-coverage audit, positives, log files), complete enough that Step 10's canonical JSON can be rebuilt from it alone. It's written before the report, alongside the existing interim-overview stdout print. Step 10 gained a recovery instruction: if the session compacted (or the synthesis can't be precisely recalled), build the JSON from the manifest rather than from degraded working memory — and an operator resuming a compacted run can point the skill straight at the manifest. This is the partial mitigation for the single-pass "unsupported arc" — the full intermediate-representation refactor is still tracked in [issue #27](https://github.com/open-ai-security/praxen/issues/27). Two independent testers had hit the compaction failure (the v0.6.1 field review and a 0.6.2 plugin scan); the manifest converts it from a silent failure into a recoverable one.
+- **`SKILL.md` Step 9.9 now writes a draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — a markdown record of the full synthesis (every finding, the RAISE posture, the remit-coverage audit, positives, log files), complete enough that Step 10's canonical JSON can be rebuilt from it alone. It's written before the report, alongside the existing interim-overview stdout print. Step 10 gained a recovery instruction: if the session compacted (or the synthesis can't be precisely recalled), build the JSON from the manifest rather than from degraded working memory — and an operator resuming a compacted run can point the skill straight at the manifest. This is the partial mitigation for the single-pass "unsupported arc" — the full intermediate-representation refactor is still tracked in [issue #27](https://github.com/Exabeam/deckard/issues/27). Two independent testers had hit the compaction failure (the v0.6.1 field review and a 0.6.2 plugin scan); the manifest converts it from a silent failure into a recoverable one.
 
 ### Changed
 - **`docs/usage.md` — "Tips for large workspaces" reworked into "Large workspaces and context sizing"** — why mid-analysis compaction is a *silent* failure, and concrete guidance: use the largest context window available, start a fresh session, scope the input to the agent (not the whole repo). Adds a recovery section: if a run compacts, recover from the draft manifest or re-run.
@@ -49,7 +49,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Notes
 - `praxa_version` / plugin version bumps `0.6.2` → `0.6.3`. Release bundle: `praxa-0.6.3.zip`.
-- **Smoke + subset validation.** The changed skill was re-run cold against `yaah` (×2), `langchain-sql`, and `openhands` to confirm it executes end-to-end — the draft manifest wrote on every run, the renderer validated, `praxa_version` resolved correctly, and the new null-`policy_rule_ids` path was exercised on real targets (`langchain-sql`, `openhands`). No skill bugs. Scoring on those targets came in *in-band* but shifted against the committed regression baselines, which predate this work — the baselines are due a re-freeze, tracked in [issue #40](https://github.com/open-ai-security/praxen/issues/40).
+- **Smoke + subset validation.** The changed skill was re-run cold against `yaah` (×2), `langchain-sql`, and `openhands` to confirm it executes end-to-end — the draft manifest wrote on every run, the renderer validated, `praxa_version` resolved correctly, and the new null-`policy_rule_ids` path was exercised on real targets (`langchain-sql`, `openhands`). No skill bugs. Scoring on those targets came in *in-band* but shifted against the committed regression baselines, which predate this work — the baselines are due a re-freeze, tracked in [issue #40](https://github.com/Exabeam/deckard/issues/40).
 
 ## [0.6.2] — 2026-05-18
 
@@ -68,7 +68,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - **`SKILL.md` Step 10 — added a "Common validation errors" checklist** (severity/stat-count miscounts, RAISE weight / category-name strings, dangling `finding_id` / `related_findings` ids, escalation-vs-severity, non-canonical `owasp_*` codes) so the most frequent strict-validator round-trips can be caught before running the renderer. Tag-label format spelled out explicitly: `CODE — Name` with an em dash, copied from the KB rather than retyped.
 
 ### Fixed
-- **`.claude-plugin/marketplace.json` — `plugins[0].source` is now `"./"` instead of `"."`** so the marketplace passes the Claude Code schema validator. The bare `"."` form was rejected by `/plugin marketplace add open-ai-security/praxen` with `Invalid schema: plugins.0.source: Invalid input`, blocking install. Per the [marketplace docs](https://code.claude.com/docs/en/plugin-marketplaces#relative-paths), relative plugin sources must start with `./`. (Reported and fixed by an external first-time contributor — PR #32.)
+- **`.claude-plugin/marketplace.json` — `plugins[0].source` is now `"./"` instead of `"."`** so the marketplace passes the Claude Code schema validator. The bare `"."` form was rejected by `/plugin marketplace add open-ai-security/praxen` with `Invalid schema: plugins.0.source: Invalid input`, blocking install. Per the [marketplace docs](https://code.claude.com/docs/en/plugin-marketplaces#relative-paths), relative plugin sources must start with `./`. (Reported and fixed by an external first-time contributor — [PR #32](https://github.com/Exabeam/deckard/pull/32).)
 
 ### Internal
 - **`build.sh` strips `__pycache__` / `*.pyc` from the staged distribution** before zipping (these appear in `skills/` once the test suite has run on the build machine). The published `praxa-0.6.1.zip` was already clean; this prevents a future rebuild from a post-test working tree shipping bytecode.
@@ -78,7 +78,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 ### Notes
 - `praxa_version` / plugin version bumps `0.6.1` → `0.6.2`. Release bundle: `praxa-0.6.2.zip`.
 - With the marketplace fix, `/plugin marketplace add open-ai-security/praxen` + `/plugin install praxa@exabeam` works against a tagged release for the first time — installation had effectively been zip-only in practice.
-- Field-review follow-ups not in this release are tracked as low-priority RFEs — issues [#27](https://github.com/open-ai-security/praxen/issues/27)–[#31](https://github.com/open-ai-security/praxen/issues/31).
+- Field-review follow-ups not in this release are tracked as low-priority RFEs — issues [#27](https://github.com/Exabeam/deckard/issues/27)–[#31](https://github.com/Exabeam/deckard/issues/31).
 
 ## [0.6.1] — 2026-05-12
 
@@ -95,7 +95,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Notes
 - `praxa_version` / plugin version bumps `0.6.0` → `0.6.1`. There is a release bundle for this version (`praxa-0.6.1.zip`).
-- A standing-config layer (durable per-org settings that survive scans/updates) was considered and **deferred** — see [issue #23](https://github.com/open-ai-security/praxen/issues/23).
+- A standing-config layer (durable per-org settings that survive scans/updates) was considered and **deferred** — see [issue #23](https://github.com/Exabeam/deckard/issues/23).
 
 ## [0.6.0] — 2026-05-12
 
@@ -127,13 +127,13 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 **Phase 1 of the V2 harvest: merged findings schema (`schema_version: "2.0"`).**
 
-First implementation phase of [`design/V2_HARVEST_PLAN.md`](design/V2_HARVEST_PLAN.md) — adopts the better-structured findings model from PR #1 onto the v0.2.0 pipeline, while keeping the parts of the v0.2.0 schema PR #1 dropped. Substance of detection / RAISE scoring / Worker Remit structure / the report's section order is unchanged; this is a JSON-shape release.
+First implementation phase of [`design/V2_HARVEST_PLAN.md`](design/V2_HARVEST_PLAN.md) — adopts the better-structured findings model from [PR #1](https://github.com/Exabeam/deckard/pull/1) onto the v0.2.0 pipeline, while keeping the parts of the v0.2.0 schema [PR #1](https://github.com/Exabeam/deckard/pull/1) dropped. Substance of detection / RAISE scoring / Worker Remit structure / the report's section order is unchanged; this is a JSON-shape release.
 
 ### Added
 
 - **`skills/behavior-verifier/findings.schema.json`** — the machine-readable JSON-Schema contract (draft-07) for the canonical findings JSON. `schema.py` stays the runtime validator (stdlib only, no `jsonschema` dep); a test asserts the schema file's enums and the validator's Python constants agree.
 - **Optional `description` field on findings** — a short paragraph of longer-form context for downstream consumers. Carried in the JSON; the report card still shows only `summary` (the L&F revisit in `design/DEFERRED.md` will surface description).
-- `design/DEFERRED.md` — tracking note for the parts of PR #1 explicitly parked (the "DEF/TAC OPS" look-and-feel reskin and the `--pdf` headless-Chrome output).
+- `design/DEFERRED.md` — tracking note for the parts of [PR #1](https://github.com/Exabeam/deckard/pull/1) explicitly parked (the "DEF/TAC OPS" look-and-feel reskin and the `--pdf` headless-Chrome output).
 
 ### Changed (BREAKING — see migration note below)
 
