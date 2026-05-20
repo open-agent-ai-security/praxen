@@ -19,7 +19,7 @@
 
 *Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*
 
-> **📦 Install** with Claude Code: `/plugin marketplace add open-ai-security/praxen` then `/plugin install praxen@open-ai-security` &nbsp;·&nbsp; full guide in [`docs/installation.md`](docs/installation.md).
+> **📦 Install** with Claude Code: <code>/plugin marketplace add open-ai-security/praxen</code> then <code>/plugin install praxen@open-ai-security</code> &nbsp;·&nbsp; full guide in [<code>docs/installation.md</code>](docs/installation.md).
 
 ---
 
