@@ -3,12 +3,23 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
+<p align="center">
+  <img src="graphics/praxen-banner.png" alt="Praxen — AI agent behavior verifier. Make sure your agent does its job, and only its job." width="720">
+</p>
+
 # Praxen
 **agent behavior verifier · Version 0.7.0**
+
+[![CI](https://github.com/open-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-ai-security/praxen/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/open-ai-security/praxen?sort=semver)](https://github.com/open-ai-security/praxen/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 
 > *Make sure your agent does its job — and only its job.*
 
 *Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*
+
+> **📦 Install** with Claude Code: <code>/plugin marketplace add open-ai-security/praxen</code> then <code>/plugin install praxen@open-ai-security</code> &nbsp;·&nbsp; full guide in [<code>docs/installation.md</code>](docs/installation.md).
 
 ---
 
