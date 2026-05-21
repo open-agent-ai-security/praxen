@@ -33,10 +33,10 @@ A real first scan would use *your* agent's source plus a remit you wrote. We're 
 
 ## 2. Get the FinBot source
 
-The example was developed against the OWASP Agentic AI CTF's finbot agent. Clone it next to the example so Praxen has a real workspace to read:
+The example was developed against the **CineFlow Productions finbot** from the OWASP Agentic AI CTF (see [`examples/README.md`](../examples/README.md) for the full provenance). Clone the source so Praxen has a real workspace to read:
 
 ```bash
-git clone https://github.com/genai-security/owasp-agentic-ai-ctf.git /tmp/finbot-src
+git clone https://github.com/OWASP-ASI/finbot-ctf-demo.git /tmp/finbot-src
 ```
 
 (Any directory will do — `/tmp` keeps it out of your tree.)
@@ -46,7 +46,7 @@ git clone https://github.com/genai-security/owasp-agentic-ai-ctf.git /tmp/finbot
 From a Claude Code session in the `praxen` repo directory, ask the agent:
 
 ```
-Please run the behavior-verifier skill against /tmp/finbot-src/finbot.
+Please run the behavior-verifier skill against /tmp/finbot-src.
 Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
 to ./reports/finbot-quickstart/.
 ```
@@ -54,7 +54,7 @@ to ./reports/finbot-quickstart/.
 That's the whole prompt. Praxen will:
 
 1. Read the Worker Remit
-2. Sweep the workspace at `/tmp/finbot-src/finbot`
+2. Sweep the workspace at `/tmp/finbot-src`
 3. Score the six RAISE categories
 4. Audit every remit rule
 5. Surface compound attack chains

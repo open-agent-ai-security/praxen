@@ -71,7 +71,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 ## Get started
 
 - [**Installation**](docs/installation.md) — plugin marketplace install or unzipped release
-- [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in three commands
+- [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
 - [**Interpreting Reports**](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs

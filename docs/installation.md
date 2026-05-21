@@ -49,19 +49,15 @@ Then point your coding agent at `skills/behavior-verifier/SKILL.md` when running
 
 ## Verifying the install
 
-Run an analysis against one of the bundled examples. The `examples/` directory contains pre-staged Worker Remits for FinBot and HelperBot — both deliberately vulnerable agents. From a Claude Code session:
+Run:
 
+```bash
+claude plugin list
 ```
-Please run the behavior-verifier skill against examples/finbot/. Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs to a temporary reports directory.
-```
 
-A successful analysis produces three files in the reports directory:
+If `praxen@open-ai-security` appears at `v0.7.0` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
-- `finbot-findings-<date>.json` — the canonical record (written by the skill)
-- `finbot-analysis-<timestamp>.html` — the report (rendered from the JSON by `render.py`)
-- `finbot-analysis-<timestamp>.txt` — a plain-text summary (also from `render.py`)
-
-If the renderer step printed `render.py: wrote .../finbot-analysis-...html` and exited cleanly, the JSON passed schema validation and the HTML is marker-free. Open the HTML in a browser: if it renders with the Praxen header, six RAISE category cards, and a Findings Register populated with cited evidence, the install is working.
+For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
 
 ---
 
@@ -97,5 +93,6 @@ The marketplace is removed by its registered name (`open-ai-security`, from `.cl
 
 ## Next steps
 
-- [Usage](usage.md) — running your first analysis
+- [Quickstart](quickstart.md) — first end-to-end report against the bundled `finbot` example
 - [Writing Worker Remits](writing-remits.md) — authoring the policy document Praxen verifies against
+- [Usage](usage.md) — the full running-an-analysis reference
