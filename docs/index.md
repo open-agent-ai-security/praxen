@@ -39,13 +39,14 @@ The output is a self-contained HTML analysis report, a machine-readable JSON fin
 
 ---
 
-## Three Input Shapes
+## Four Input Shapes
 
 Praxen is **not just a source-code analyzer.** Any of these — alone or in combination — are valid input:
 
 - **Source repository** — a project directory, GitHub repo, or plugin source tree.
 - **Running deployment** — live memory and bootstrap files (`MEMORY.md`, `SOUL.md`), operational logs (action reports, session JSONL, audit trails, escalation logs), live config.
 - **Behavioral artifacts** — chat transcripts, email histories, conversation logs, decision records.
+- **Governance & methodology docs** — red-team reports, threat models, runbooks, incident retrospectives, dependency-management policy. These feed the maturity-oriented RAISE categories (Build an AI Red Team, Monitor Continuously, Manage Your Supply Chain) that source code alone can't speak to.
 
 The methodology adapts. Categories the input doesn't cover are scored at lower confidence and explicitly noted in the report. See [Usage](usage.md) for how to point Praxen at each type.
 

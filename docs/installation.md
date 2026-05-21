@@ -58,12 +58,6 @@ claude plugin list
 You should see `praxen@open-ai-security` (with version `0.7.0` or later), `enabled`. The
 in-session equivalent is `/plugin list`.
 
-> **Note:** the GitHub repository is currently named `open-ai-security/praxen`. The
-> repository rename to match the project name is a separate administrative task.
-> Use the name above as-is — the marketplace itself registers as `exabeam`
-> (defined in the repo's `.claude-plugin/marketplace.json`), which is why the
-> install target is `praxen@open-ai-security`.
-
 ---
 
 ## Option B — Use directly from an unzipped release
@@ -103,11 +97,11 @@ If the renderer step printed `render.py: wrote .../finbot-analysis-...html` and 
 ### Plugin marketplace install
 
 ```bash
-claude plugin marketplace update exabeam
+claude plugin marketplace update open-ai-security
 claude plugin update praxen@open-ai-security
 ```
 
-The in-session equivalents are `/plugin marketplace update exabeam` and
+The in-session equivalents are `/plugin marketplace update open-ai-security` and
 `/plugin update praxen@open-ai-security`. A restart is required to apply the update.
 
 ### Unzipped release
@@ -122,12 +116,13 @@ Download the new release zip and replace the unzipped directory. There is no mig
 
 ```bash
 claude plugin uninstall praxen@open-ai-security
-claude plugin marketplace remove exabeam
+claude plugin marketplace remove open-ai-security
 ```
 
 The in-session equivalents are `/plugin uninstall praxen@open-ai-security` and
-`/plugin marketplace remove exabeam`. Note the marketplace is removed by its
-registered name, `exabeam` — not the `open-ai-security/praxen` repo path used to add it.
+`/plugin marketplace remove open-ai-security`. Note the marketplace is removed
+by its registered name (`open-ai-security`, from `.claude-plugin/marketplace.json`)
+— which here matches the repo owner used to add it.
 
 ### Unzipped release
 
