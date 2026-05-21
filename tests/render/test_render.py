@@ -103,11 +103,15 @@ def main():
     #   render.py: wrote <path> (N findings, 0 schema errors)
     # so the operator has an explicit confirmation of the file written, the
     # finding count, and the validator's (silent) all-clear in one place.
+    # Match against the set of stdout lines (not substrings of `r.stdout`) so
+    # the expected line has to be a *whole* line — catches format drift that
+    # a substring check would miss (e.g. a preamble warning prepended later).
     n_findings_fixture = len(load_json(FIXTURE)["findings"])
     expected_summary = f"({n_findings_fixture} findings, 0 schema errors)"
+    stdout_lines = set(r.stdout.splitlines())
     check("stdout has one summary line per output file with count + schema status",
-          (f"render.py: wrote {out_html} {expected_summary}" in r.stdout
-           and f"render.py: wrote {out_txt} {expected_summary}" in r.stdout),
+          (f"render.py: wrote {out_html} {expected_summary}" in stdout_lines
+           and f"render.py: wrote {out_txt} {expected_summary}" in stdout_lines),
           f"got: {r.stdout!r}")
     html = text_or_empty(out_html)
     txt = text_or_empty(out_txt)

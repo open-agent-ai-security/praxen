@@ -528,7 +528,7 @@ Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Ph
 
 **Tally explicitly — do not eyeball.** Manual counting across 5 statuses and 10–20+ rules is where this step most often goes wrong. Walk the `rules[]` array you just wrote and tally each status into its own running counter; then write `stat_counts` from the counters. The schema requires **all five status keys** — `verified`, `gap`, `partial`, `vague`, `enp` — to be present at all times, including those with a count of zero. (`vague: 0` is a valid and common case.) A missing zero-count key is a schema validation failure in Step 11.
 
-> **`Counter`-equality is not a self-check.** If you build a `collections.Counter` of the actual statuses and compare it to the dict you wrote into `stat_counts`, the check is unreliable: `Counter` *silently omits keys with a count of 0*. A scan with zero `vague` rules has `Counter({...})` *without* a `vague` key, while the JSON correctly carries `"vague": 0` — they compare unequal even though both are right. If you must validate before writing, build a plain dict over the full five-status key set (e.g., `{k: sum(1 for r in rules if r["status"] == k) for k in ("verified","gap","partial","vague","enp")}`) and compare *that*. The renderer (Step 11) re-checks the counts authoritatively; this self-check just shortens the round trip.
+> **`Counter`-equality is not a self-check.** If you build a `collections.Counter` of the actual statuses and compare it to the dict you wrote into `stat_counts`, the check is unreliable: `Counter` *silently omits keys with a count of 0*. A scan with zero `vague` rules has `Counter({...})` *without* a `vague` key, while the JSON correctly carries `"vague": 0` — they compare unequal even though both are right. If you must validate before writing, build a plain dict over the full five-status key set **plus `total`** (e.g., `{**{k: sum(1 for r in rules if r["status"] == k) for k in ("verified","gap","partial","vague","enp")}, "total": len(rules)}`) and compare *that*. The renderer (Step 11) re-checks the counts authoritatively; this self-check just shortens the round trip.
 
 ### 9.7 Positives → `positives[]`
 
@@ -558,7 +558,7 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON coul
 ## scan
 - agent: <agent name>
 - agent_slug: <slug>
-- schema_version: 2.0
+- schema_version: "2.0"                              (the quotes matter — this is a JSON string, not a number; carry the quotes into Step 10)
 - praxen_version: <fixed literal from Step 10 — Praxen's version, not the analyzed agent's>
 - scan_date: <$SCAN_DATE — YYYY-MM-DD>
 - scan_timestamp: <$SCAN_TS — ISO 8601 UTC>   (cannot be regenerated after a compaction)
@@ -613,7 +613,7 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
 - severity: <Critical | High | Medium | Low | Informational>
 - summary: <one-sentence card header>
 - description: <OPTIONAL longer-form paragraph, or omit the bullet entirely>
-- tags:                                              (one sub-bullet per tag — never comma-joined; this becomes a separate JSON object per tag in `tags[]`)
+- tags:                                              (one sub-bullet per tag — never comma-joined. Each `kind=K, label=L` sub-bullet translates to `{"kind": "K", "label": "L"}` in `tags[]` in Step 10's JSON.)
   - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
   - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
@@ -691,7 +691,15 @@ and continue from Step 10. Writing the findings JSON and rendering now...
 
 ## Step 10 — Write the Canonical Findings JSON
 
-Write a single JSON file — the canonical record of this analysis — to:
+**Gate — confirm the draft manifest exists before you start.** Step 9.9's draft manifest is what makes this analysis survive a context-window compaction; it is also the source of truth Step 10 reads from when the synthesis can't be precisely recalled (see the recovery paragraph below). Run this first and only proceed when the file is present:
+
+```bash
+ls -l ./reports/<agent-slug>-draft-<TIMESTAMP>.md
+```
+
+If the file does not exist on disk, **stop, go back to Step 9.9, and write it before continuing.** Do not approximate the manifest and do not skip ahead — a Step 10 run with no manifest on disk has no recovery path if the session compacts mid-write, and that failure is silent.
+
+Once the manifest is on disk, write a single JSON file — the canonical record of this analysis — to:
 
 ```
 ./reports/<agent-slug>-findings-<YYYY-MM-DD>.json
