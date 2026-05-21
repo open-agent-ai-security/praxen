@@ -37,6 +37,16 @@ Praxen reduces agent verification to a single comparison:
 2. **You point Praxen at evidence about the agent** — its source code, live deployment files, conversation logs, or any combination.
 3. **Praxen reads, compares, reports.** Every finding traces to a specific rule in the Worker Remit it violates, with evidence cited from the input.
 
+```mermaid
+flowchart LR
+  WR["Worker Remit<br/>(declared policy)"] --> P{{"behavior-verifier<br/>skill"}}
+  EV["Evidence<br/>(source · deployment · behavior · governance)"] --> P
+  P --> JSON["findings.json<br/>(canonical)"]
+  JSON --> R["render.py"]
+  R --> HTML["analysis.html"]
+  R --> TXT["analysis.txt"]
+```
+
 The output is a self-contained HTML analysis report, a machine-readable JSON findings file, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
 
 ---

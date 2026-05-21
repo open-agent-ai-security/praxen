@@ -72,7 +72,17 @@ Most production AI agents today score between **Ad hoc (1)** and **Established (
 
 ## Weighted Overall Score
 
-Each category contributes to the overall score with a fixed weight:
+Each category contributes to the overall score with a fixed weight. **Implement Zero Trust counts double** because it covers the broadest attack surface and the most immediately exploitable gaps; the other five each carry 15%.
+
+```mermaid
+pie title "RAISE category weights (Σ = 100%)"
+  "Implement Zero Trust (25%)" : 25
+  "Limit Your Domain (15%)" : 15
+  "Balance Your Knowledge Base (15%)" : 15
+  "Manage Your Supply Chain (15%)" : 15
+  "Build an AI Red Team (15%)" : 15
+  "Monitor Continuously (15%)" : 15
+```
 
 | Category | Weight | Why |
 |---|:-:|---|

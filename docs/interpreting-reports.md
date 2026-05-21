@@ -7,6 +7,23 @@
 
 Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume.
 
+```mermaid
+flowchart LR
+  subgraph S1["Stage 1 — LLM (your coding agent)"]
+    direction TB
+    SK["SKILL.md<br/>12-step procedure"] --> CJ["findings.json<br/>(canonical record)"]
+  end
+  subgraph S2["Stage 2 — deterministic render (Python)"]
+    direction TB
+    SC["schema.py<br/>validator"] --> RN["render.py"]
+    RN --> HT["analysis.html"]
+    RN --> TX["analysis.txt"]
+  end
+  CJ --> SC
+```
+
+The split matters in practice: the synthesis is an LLM job (judgement, calibration, prose), the rendering is mechanical (deterministic, no LLM call, byte-identical re-render from the same JSON). The JSON is the *canonical record*; the HTML and TXT are derived views.
+
 This page walks through what each section of the HTML report means, how severities and confidence levels work, how the RAISE maturity score should be read, and what's in the JSON.
 
 ---
