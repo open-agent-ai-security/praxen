@@ -21,42 +21,15 @@ That's the entire dependency surface.
 
 ## Option A — Install via Claude Code plugin marketplace
 
-This is the recommended path for Claude Code users. There are two equivalent ways
-to run the marketplace commands — they manage the same plugin configuration.
-
-**From your terminal (recommended).** The `claude plugin` subcommand is
-non-interactive and accepts arguments directly, so it works the same regardless
-of how your Claude Code interface handles in-session slash commands:
+This is the recommended path for Claude Code users. From your terminal:
 
 ```bash
 claude plugin marketplace add open-ai-security/praxen
 claude plugin install praxen@open-ai-security
+claude plugin list      # confirm: praxen@open-ai-security, enabled, v0.7.0+
 ```
 
-**Or from within a Claude Code session.** Type each as a slash command at the
-prompt:
-
-```
-/plugin marketplace add open-ai-security/praxen
-/plugin install praxen@open-ai-security
-```
-
-> **If the slash commands don't execute** — i.e. they get sent as an ordinary
-> message instead of running — use the terminal form above instead. The
-> `claude plugin ...` commands are the most reliable path and do exactly the
-> same thing.
-
-The skill registers as `behavior-verifier`. After installing from within a
-session, run `/reload-plugins` (or restart Claude Code) to activate it.
-
-Confirm it's installed:
-
-```bash
-claude plugin list
-```
-
-You should see `praxen@open-ai-security` (with version `0.7.0` or later), `enabled`. The
-in-session equivalent is `/plugin list`.
+The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
 
 ---
 
@@ -94,39 +67,31 @@ If the renderer step printed `render.py: wrote .../finbot-analysis-...html` and 
 
 ## Updating
 
-### Plugin marketplace install
+**Plugin marketplace install:**
 
 ```bash
 claude plugin marketplace update open-ai-security
 claude plugin update praxen@open-ai-security
 ```
 
-The in-session equivalents are `/plugin marketplace update open-ai-security` and
-`/plugin update praxen@open-ai-security`. A restart is required to apply the update.
+Restart Claude Code to apply. (In-session equivalents are the same commands as `/plugin …`.)
 
-### Unzipped release
-
-Download the new release zip and replace the unzipped directory. There is no migration step — Praxen is stateless across analyses.
+**Unzipped release:** download the new release zip and replace the unzipped directory. There is no migration step — Praxen is stateless across analyses.
 
 ---
 
 ## Uninstalling
 
-### Plugin marketplace install
+**Plugin marketplace install:**
 
 ```bash
 claude plugin uninstall praxen@open-ai-security
 claude plugin marketplace remove open-ai-security
 ```
 
-The in-session equivalents are `/plugin uninstall praxen@open-ai-security` and
-`/plugin marketplace remove open-ai-security`. Note the marketplace is removed
-by its registered name (`open-ai-security`, from `.claude-plugin/marketplace.json`)
-— which here matches the repo owner used to add it.
+The marketplace is removed by its registered name (`open-ai-security`, from `.claude-plugin/marketplace.json`) — which here matches the repo owner used to add it.
 
-### Unzipped release
-
-Delete the directory. No system state is left behind.
+**Unzipped release:** delete the directory. No system state is left behind.
 
 ---
 

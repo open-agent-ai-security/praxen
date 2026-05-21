@@ -67,7 +67,7 @@ Do not edit the JSON or HTML output to "correct" the finding — those are the a
 
 If the finding is correct but you've decided the risk is acceptable:
 
-- **Annotate the JSON with a `risk_acceptance` block** alongside the finding ID, recording who accepted the risk, when, and why. Most ticketing/audit pipelines support this pattern. Praxen does not strip or modify finding entries you've annotated.
+- **Record the acceptance outside the Praxen JSON.** The findings schema is closed by design — `additionalProperties: false`, validated by `schema.py` — so adding fields to a committed findings file would fail the next time anything re-validates it. Track risk acceptances in the consumer of choice: a sidecar `<agent>-risk-acceptances.md`, your ticketing system (Jira / Linear / GitHub issues with the `PRAX-…` finding ID in the title), or your governance / compliance register. Record who accepted, when, and why.
 - **Update the Worker Remit** if the acceptance is permanent. For example, if you've decided that "no rate limiting" is acceptable for an internal-only deployment, the remit should reflect that scope (a public deployment of the same agent would need rate limiting, and a remit for that deployment would say so).
 - **Record the decision in your change log.** Risk acceptances accumulate over time and become invisible if not tracked. The remit + change log together should explain *why* the agent looks the way it does.
 
