@@ -99,6 +99,16 @@ def main():
     r = run_render(["--findings", FIXTURE, "--template", TEMPLATE,
                     "--out-html", out_html, "--out-txt", out_txt])
     check("render exits 0 on the fixture", r.returncode == 0, r.stderr.strip())
+    # On success render.py emits one summary line per output file:
+    #   render.py: wrote <path> (N findings, 0 schema errors)
+    # so the operator has an explicit confirmation of the file written, the
+    # finding count, and the validator's (silent) all-clear in one place.
+    n_findings_fixture = len(load_json(FIXTURE)["findings"])
+    expected_summary = f"({n_findings_fixture} findings, 0 schema errors)"
+    check("stdout has one summary line per output file with count + schema status",
+          (f"render.py: wrote {out_html} {expected_summary}" in r.stdout
+           and f"render.py: wrote {out_txt} {expected_summary}" in r.stdout),
+          f"got: {r.stdout!r}")
     html = text_or_empty(out_html)
     txt = text_or_empty(out_txt)
     check("HTML has no unsubstituted {{PLACEHOLDER}}",

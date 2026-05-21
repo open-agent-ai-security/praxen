@@ -9,6 +9,24 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [Unreleased]
+
+**Field-feedback polish from a first post-rename operator scan.** No scan logic, schema shape, or scoring behaviour changed — all changes are documentation and a small renderer tweak. The eleven regression baselines re-render byte-identical from their JSON (the renderer change is stdout-only).
+
+### Added
+- **`SKILL.md` opens with a quick-start (TL;DR) block** — what the skill does, the two inputs it needs (Worker Remit + workspace path), what it writes (three files in `./reports/` plus the Step 9.9 checkpoint), and a one-paragraph map of the 12-step pipeline. Sits above the existing intro so operators don't need to read the 700-line procedure before understanding what they're invoking. Reported by a field tester.
+- **`render.py` exit-0 prints a one-line summary per output file** — `render.py: wrote <path> (N findings, 0 schema errors)`, with equivalent lines for both the HTML and the TXT. Explicit confirmation that schema validation passed (which is silent today) and that the finding count matches expectations, before the operator opens the HTML. `tests/render/test_render.py` asserts the new format.
+
+### Changed
+- **`SKILL.md` Step 9.9 — the draft manifest is now schema-mirrored.** The Step 9.9 checkpoint was free-form markdown; if a session compacted during the scan, post-compaction Step 10 had to *interpret* prose back into the canonical JSON shape. The manifest template now uses the same section headings and field names as the canonical findings JSON (`scan`, `intro_band`, `behavior_summary`, `raise_posture` → `weighted_overall` / `weighted_rationale` / `categories`, `remit_coverage` → `stat_counts` / `rules`, `findings` with every per-finding field, `positives`, `log_files`, `footer.severity_counts`), so the recovery path is a mechanical translation, not interpretive synthesis. Reported by a field tester.
+- **`SKILL.md` Step 9.6 — explicit tally for `remit_coverage.stat_counts`, plus the `Counter`-omits-zero gotcha called out.** Manual counting across 5 statuses and 10–20+ rules is where this step most often goes wrong; the step now states that the schema requires all five status keys to be present even at zero (`vague: 0` is valid and common) and warns that `collections.Counter`-equality silently misses missing zero-count keys, so it's an unreliable self-check. The same gotcha is added to Step 10's "Common validation errors" with the explicit-five-key recipe. Reported by a field tester (who shipped a `gap: 7` count when the correct value was `8` and discovered the Counter blind spot during their own pre-render validation).
+- **`SKILL.md` Step 10 + `findings.schema.json` — explicit rule for multi-category findings on `owasp_llm` / `owasp_agentic`.** The scalar fields are single codes; when a finding spans two ASI (or two LLM) categories, the primary classification goes in the scalar field and any secondary code goes in `tags[]` only — never comma-separated, never a list, never the secondary code in the scalar. Reported by a field tester who hit an ASI03 + ASI09 finding and had no documented guidance on which became the primary.
+
+### Notes
+- These changes are docs and a stdout-only tweak to the renderer; no breaking changes for downstream consumers and no migration needed. The Python validator and the published JSON Schema are unchanged in shape.
+
+---
+
 ## [0.7.0] — 2026-05-20
 
 **First public soft-launch release. The project has been renamed Praxa → Praxen and moved to its new home at `github.com/open-ai-security/praxen`.** No scan logic, schema shape, or scoring behaviour changed — this release is the rename + relocation + a small batch of pre-launch test-suite improvements that arrived alongside it. The eleven regression baselines were re-frozen under the new name (same cold runs, same findings).
