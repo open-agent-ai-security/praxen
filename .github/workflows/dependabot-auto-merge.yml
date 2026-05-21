@@ -1,0 +1,64 @@
+# Copyright 2026 Exabeam, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Enables GitHub's native auto-merge on Dependabot patch- and minor-version
+# update PRs. Major updates are deliberately left alone — they're more likely
+# to introduce breaking changes and warrant a human glance at the upstream
+# release notes before merging.
+#
+# Why this exists: gemini-code-assist (our review bot) skips bot-authored PRs
+# by policy, so Dependabot PRs never receive a review and would otherwise
+# block on the project's "Gemini review + Steve approval" merge gate forever.
+# Routine patch/minor bumps are exactly the kind of low-risk change that
+# should ship on green CI alone.
+#
+# Mechanism: this fires on `pull_request_target` (which runs with the base
+# branch's secrets and the GITHUB_TOKEN's default repository write scopes —
+# safer than `pull_request` for actions that need write access). The
+# `dependabot/fetch-metadata` action parses the Dependabot PR body for the
+# `update-type` semver classification; only patch and minor pass the filter.
+# `gh pr merge --auto --squash` enables GitHub's native auto-merge, which
+# holds the PR until every required status check goes green, then squashes
+# (matching the repo's squash-only policy).
+name: Dependabot auto-merge
+
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # Only act on PRs Dependabot opened. A non-bot author with the literal
+    # string "dependabot[bot]" as their username is impossible — that suffix
+    # is reserved for GitHub Apps' installation actors.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge (patch / minor only)
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Note that majors are left for a human
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "$PR_URL" --body \
+            "Auto-merge skipped: this is a **major-version** update. \
+            A human reviewer should glance at the upstream release notes \
+            before merging. (Patch and minor updates auto-merge once CI \
+            is green; see .github/workflows/dependabot-auto-merge.yml.)"
