@@ -573,17 +573,24 @@ def main(argv=None) -> int:
     except SchemaError as e:
         sys.exit(f"render.py: schema validation failed — {e}")
 
+    # Schema validation passed — `schema.validate` raises on any failure, so
+    # reaching this point means zero schema errors. The summary line below
+    # reports that explicitly so the operator has a positive confirmation
+    # without having to re-read the validator's silence.
+    n_findings = len(data["findings"])
+    summary = f"{n_findings} findings, 0 schema errors"
+
     if args.out_html:
         try:
             html_out = render_html(_read_template(args.template), data)
         except RenderError as e:
             sys.exit(f"render.py: HTML render error — {e}")
         _write(args.out_html, html_out)
-        print(f"render.py: wrote {args.out_html}")
+        print(f"render.py: wrote {args.out_html} ({summary})")
 
     if args.out_txt:
         _write(args.out_txt, render_txt(data))
-        print(f"render.py: wrote {args.out_txt}")
+        print(f"render.py: wrote {args.out_txt} ({summary})")
 
     return 0
 
