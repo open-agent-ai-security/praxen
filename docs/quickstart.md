@@ -13,7 +13,7 @@ If you haven't installed yet, do [Installation](installation.md) first (one comm
 
 ## 1. Get a copy of the example workspace
 
-From the source repository (or an unzipped release):
+If you don't have a local copy of the Praxen repository yet, clone it (or unzip a release):
 
 ```bash
 git clone https://github.com/open-ai-security/praxen.git
@@ -36,17 +36,17 @@ A real first scan would use *your* agent's source plus a remit you wrote. We're 
 The example was developed against the **CineFlow Productions finbot** from the OWASP Agentic AI CTF (see [`examples/README.md`](../examples/README.md) for the full provenance). Clone the source so Praxen has a real workspace to read:
 
 ```bash
-git clone https://github.com/OWASP-ASI/finbot-ctf-demo.git /tmp/finbot-src
+git clone https://github.com/OWASP-ASI/finbot-ctf-demo.git ../finbot-src
 ```
 
-(Any directory will do — `/tmp` keeps it out of your tree.)
+(Any directory will do — `../finbot-src` keeps the clone outside the Praxen tree and works the same on macOS, Linux, and Windows.)
 
 ## 3. Run the analysis
 
 From a Claude Code session in the `praxen` repo directory, ask the agent:
 
 ```
-Please run the behavior-verifier skill against /tmp/finbot-src.
+Please run the behavior-verifier skill against ../finbot-src.
 Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
 to ./reports/finbot-quickstart/.
 ```
@@ -54,7 +54,7 @@ to ./reports/finbot-quickstart/.
 That's the whole prompt. Praxen will:
 
 1. Read the Worker Remit
-2. Sweep the workspace at `/tmp/finbot-src`
+2. Sweep the workspace at `../finbot-src`
 3. Score the six RAISE categories
 4. Audit every remit rule
 5. Surface compound attack chains
