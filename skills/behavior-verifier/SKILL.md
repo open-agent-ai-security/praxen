@@ -613,9 +613,11 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
 - severity: <Critical | High | Medium | Low | Informational>
 - summary: <one-sentence card header>
 - description: <OPTIONAL longer-form paragraph, or omit the bullet entirely>
-- tags: <each as `kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>`>
+- tags:                                              (one sub-bullet per tag — never comma-joined; this becomes a separate JSON object per tag in `tags[]`)
+  - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
+  - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
-- policy_rule_text: <verbatim remit quote, or null>   (null exactly when policy_rule_ids is null)
+- policy_rule_text: <verbatim remit quote, or null>   (null exactly when policy_rule_ids is null; for a multi-rule finding, concatenate the quotes with ` / ` exactly as Step 10 — `"<rule R-NN text> / <rule R-MM text>"`)
 - evidence: <one bullet per item, formatted `file:line — snippet` (or `file — snippet` for file-level)>
 - recommended_actions: <one bullet per action>
 - raise_category: <one of the six keys>
