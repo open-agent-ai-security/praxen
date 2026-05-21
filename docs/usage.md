@@ -126,6 +126,53 @@ This is guidance, not a guarantee — a genuinely large workspace can still comp
 
 ---
 
+## Troubleshooting
+
+A short list of first-run snags and how to clear them.
+
+### "behavior-verifier skill not found" / the agent doesn't recognise the skill
+
+The plugin is installed but the current session hasn't picked it up.
+
+- From within Claude Code: run `/reload-plugins`, or restart Claude Code.
+- From the terminal: `claude plugin list` should show `praxen@open-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen@open-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
+- Using an unzipped release directly (no marketplace): point the agent at `skills/behavior-verifier/SKILL.md` explicitly rather than naming the skill.
+
+### `render.py` errored at the end of the run
+
+The LLM wrote a `findings.json` that didn't pass schema validation, so the deterministic render step refused to produce an HTML report. The error message names the offending JSON path (e.g. `$.findings[3].evidence: expected array, got string`).
+
+This is usually a context-pressure symptom — the analysis was synthesised under stress and the JSON came out malformed. Options:
+
+- **Re-run** in a larger context window or with a tighter input scope. See *Large workspaces and context sizing* above.
+- **Recover from the draft manifest** if Praxen wrote one (`./reports/<agent>-draft-<timestamp>.md` — Step 9.9 writes this before the JSON). Tell the agent: *"the canonical JSON failed validation — read the draft manifest and rebuild from it."*
+
+If the same JSON-shape error reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-ai-security/praxen/issues/new/choose) with the schema error and the agent slug.
+
+### "Worker Remit not found" / "no remit at that path"
+
+The skill couldn't find the path you named. Most common causes:
+
+- **Relative paths are relative to where the coding agent is running**, not to your terminal. From a Claude Code session, you can check with a quick `pwd` before the analysis.
+- **A typo in the filename** — Praxen looks for the exact path you provide; it does not search.
+- **The agent's working directory isn't where you think it is** — re-`cd` and start fresh, or pass an absolute path.
+
+### Mid-analysis context auto-compaction (silent quality loss)
+
+Long scans on agents with a lot of evidence can exceed the coding agent's context window. Auto-compaction is *silent* — the run keeps going, but findings gathered early get summarised away before the report is written. Symptoms:
+
+- The interim overview Praxen prints to stdout names findings the final HTML doesn't include.
+- The HTML report looks suspiciously thin compared to the workspace's complexity.
+- The agent suddenly switches to ad-hoc Python to "fix up" the JSON near the end of the run.
+
+What to do is in *Large workspaces and context sizing* above — the short version is: re-run in a larger window with a tighter scope, or recover from the draft manifest. A report produced through a mid-synthesis compaction should be treated as possibly incomplete until you've done one of those.
+
+### Scores look lower than reality
+
+The most common operator surprise — *"my agent is more careful than this report suggests."* In nearly every case, the cause is that the evidence you handed Praxen didn't *show* a control that's actually in place (a review process, a deployment-time limit, an external guardrail, a monitoring pipeline, a red-team cadence). See *Results tuning* above for the additive-evidence workflow.
+
+---
+
 ## Next steps
 
 - [Writing Worker Remits](writing-remits.md) — the authoring guide for the policy document
