@@ -30,22 +30,23 @@ This page walks through what each section of the HTML report means, how severiti
 
 ## Report structure
 
-Every Praxen HTML report has the same sections, in the same order. Reading top-to-bottom, you progress from "what the agent is" → "what was found" → "overall posture verdict."
+Every Praxen HTML report has the same sections, in the same order. The masthead gives the verdict at a glance; below it you read top-to-bottom from "what the agent is" → "what was found" → the maturity wrap-up.
 
-### 1. Header
+### 1. Masthead
 
-Agent name, analysis timestamp, and an overall **status badge** (CRITICAL / HIGH / ADVISORY / CLEAN). The status badge reflects the **highest finding severity present** — it is *not* the maturity score. A CRITICAL badge means at least one Critical finding; it does not mean the agent failed overall.
+The dark band at the top, carrying three things:
 
-### 2. Intro band
+- **Brand** — the Praxen wordmark and tagline.
+- **Report identity** — `<Agent> Analysis Report` and the completion date.
+- **Verdict at a glance** — the overall **status badge** (CRITICAL / HIGH / ADVISORY / CLEAN), the **finding counts by severity**, and the **RAISE maturity score**.
 
-Two side-by-side blocks:
+The status badge reflects the **highest finding severity present** — it is *not* the maturity score. A CRITICAL badge means at least one Critical finding; it does not mean the agent failed overall.
 
-- **Agent Remit (as declared)** — a 2–4 sentence summary of what the remit says the agent is for.
-- **Agent Structure (as observed)** — a 2–4 sentence summary of what Praxen found in the input. Whether this is source code, deployment state, or a behavioral transcript will be explicit here.
+### 2. Agent Remit (as declared)
 
-If the input is unusual — a behavior-only chat transcript, a deployment-state log dump — that constraint is named here so the rest of the report can be read in context.
+A 2–4 sentence summary of what the Worker Remit says the agent is *for* — its declared intent, restated faithfully. This is the baseline everything below is measured against.
 
-### 3. Behavior Summary
+### 3. Behavior Summary (as observed)
 
 The single most important paragraph in the report. **Two to four sentences naming the dominant pattern** the analysis surfaced. Examples of patterns Praxen surfaces:
 
@@ -56,7 +57,11 @@ The single most important paragraph in the report. **Two to four sentences namin
 
 If you read nothing else, read this section.
 
-### 4. Remit Coverage
+### 4. Scope of Analysis
+
+A 2–4 sentence summary of what Praxen actually examined — whether the input is source code, deployment state, or a behavioral transcript is made explicit here. If the input is unusual (a behavior-only chat transcript, a deployment-state log dump), that constraint is named so the rest of the report can be read in context.
+
+### 5. Remit Coverage
 
 A systematic audit of every actionable rule in the Worker Remit. Each rule appears in the table with its status:
 
@@ -72,28 +77,28 @@ The stat-pill bar at the top sums: Verified + Gap + Partial + Vague + ENP = Tota
 
 A high **Gap** count means the agent's policy is more aspirational than enforced. A high **Vague Policy** count means the remit needs tightening — see [Writing Worker Remits](writing-remits.md).
 
-### 5. Findings Register
+### 6. Findings Register
 
 The detailed findings, ordered Critical → High → Medium → Low → Informational. Each finding card contains:
 
 - **Severity badge + finding ID** (e.g., `PRAX-2026-04-28-001`)
 - **One-line summary**
-- **Tags** — RAISE category, OWASP LLM, OWASP Agentic, MCP (when applicable). Each tag includes the full category name.
+- **Tags** — RAISE category, OWASP LLM, OWASP Agentic, MCP (when applicable); each tag is a **link** to that entry in Praxen's framework docs (`owasp.html` / `RAISE.html` on the project's GitHub Pages).
 - **Policy Rule** — the exact quoted text from the Worker Remit that the finding violates
 - **Evidence** — file paths, line numbers, observed values (with secrets redacted)
 - **Recommended Action** — a specific change to make, naming the file and the modification
 
 Findings cite real evidence by default. If a finding is `[Inferred]` rather than `[Verified]`, the evidence is indirect — read it with that label in mind.
 
-### 6. What's Working Well
+### 7. What's Working Well
 
 Controls Praxen verified during the analysis. This is not a participation trophy — only items with citable evidence appear here. A short or empty section is itself a signal.
 
-### 7. Discovered Log Files
+### 8. Discovered Log Files
 
 Log files Praxen found in the input. Used to complement the static analysis with runtime context.
 
-### 8. RAISE Maturity Posture (the wrap-up)
+### 9. RAISE Maturity Posture (the wrap-up)
 
 The maturity scorecard appears at the **end** of the report on purpose: after you've seen the specific findings, the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
 
@@ -105,9 +110,9 @@ This section contains:
 
 **This is a maturity model, not a school grade.** A score of 3 / 5 means *Established*, not 60 percent. Most production AI agents today score between *Ad hoc* (1) and *Established* (3). A score of 2.5 places an agent in the *Partial → Established* maturity band — that is accurate reporting of current industry norms, not a failing grade. See [The RAISE Framework](RAISE.md) for the full rubric.
 
-### 9. Footer
+### 10. Footer
 
-Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxen version.
+Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxen version. (The headline counts and score also appear in the masthead; the footer is the provenance recap.)
 
 ---
 
