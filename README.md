@@ -15,11 +15,11 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 
-> *Make sure your agent does its job — and only its job.*
+*Make sure your agent does its job — and only its job.*
 
-> **📦 Install** with Claude Code: <code>/plugin marketplace add open-ai-security/praxen</code> then <code>/plugin install praxen@open-ai-security</code> &nbsp;·&nbsp; full guide in [<code>docs/installation.md</code>](docs/installation.md).
->
-> **👀 See a real report** before you install: view the [**live FinBot analysis report**](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
+**📦 Install** with Claude Code — `/plugin marketplace add open-ai-security/praxen` then `/plugin install praxen@open-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
+
+**👀 See a real report** first — the [live FinBot analysis report](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
 
 ---
 
