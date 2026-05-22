@@ -31,7 +31,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 Praxen is the open-source reference implementation of **Agent Behavior Verification (ABV)** — a proactive control model for AI agents and digital workers. The premise is the same one identity and access management applies to human employees: every actor has an authorized role, and the controls have to actually enforce it.
 
-The number one risk area for agentic security and safety is simple to state: **the agent doesn't do its job.** A malfunctioning agent, a misaligned agent, an agent that's been adversarially subverted — from the outside they look the same, and what matters in every case is the *behavior*, measured as its deviation from intent.
+And a misbehaving agent is hard to catch: whatever the cause, it surfaces the same way — as wrong behavior. So the only reliable signal is the *behavior* itself, measured as its deviation from declared intent.
 
 That's why screening for prompt injections, or scanning code for known-bad patterns, isn't enough. Those are necessary but partial: they catch some inputs and some implementation flaws, not the question that actually matters — *is this agent going to do, or is it doing, the thing it was deployed to do, and nothing else?*
 
