@@ -46,7 +46,7 @@ Define the job. Test against the job. Everything else in Praxen serves those two
 
 ## How it works (30 seconds)
 
-- You write a **Worker Remit** — a markdown policy document declaring what the agent is allowed to do — by hand, or have Praxen draft one from your description, docs, or code. ([authoring guide](docs/writing-remits.md))
+- You write a **Worker Remit** — a markdown policy document declaring what the agent is allowed to do — by hand, or have Praxen draft one from your description or docs. ([authoring guide](docs/writing-remits.md))
 - You point Praxen at **evidence** — source code, deployment state, behavioral logs, governance docs, or any mix. ([usage](docs/usage.md))
 - Praxen reports the **gap**. Every finding answers a single question: *does observed behavior match declared intent?* ([reading reports](docs/interpreting-reports.md))
 
