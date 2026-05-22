@@ -41,6 +41,7 @@ import os
 import re
 import sys
 import textwrap
+from datetime import datetime
 
 # render.py and schema.py ship together in skills/behavior-verifier/.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -250,6 +251,47 @@ def assert_fully_rendered(tpl: str) -> None:
             raise RenderError(f"unresolved template marker remains: <!-- {marker} ...")
 
 
+# ── timestamp formatting ─────────────────────────────────────────────────────
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July",
+           "August", "September", "October", "November", "December")
+
+
+def _format_date(iso_date: str) -> str:
+    """``2026-05-11`` -> ``May 11, 2026``. Fixed month names (not strftime ``%B``)
+    so the renderer stays byte-deterministic regardless of the host locale."""
+    try:
+        y, m, d = (int(p) for p in iso_date.split("-"))
+        return f"{_MONTHS[m - 1]} {d}, {y}"
+    except (ValueError, IndexError) as e:
+        raise RenderError(f"unparseable scan_date {iso_date!r}: {e}")
+
+
+def _format_timestamp(iso_ts: str) -> str:
+    """Display an ISO-8601 scan timestamp in the timezone the value itself carries.
+
+    ``2026-05-11T22:49:16Z`` -> ``May 11, 2026, 22:49 UTC``; an offset-bearing
+    value ``...T15:49:16-07:00`` -> ``May 11, 2026, 15:49 UTC-07:00``. The zone
+    comes from the stored value, never from the host running render.py — using the
+    render host's clock would be the wrong machine and would break byte-identical
+    re-rendering. Seconds are dropped. Locale-independent for determinism.
+
+    (Today the skill writes UTC ``Z``, so this shows UTC; once the skill records a
+    local offset, the same code shows the scan's local time with no change here.)"""
+    norm = iso_ts[:-1] + "+00:00" if iso_ts.endswith("Z") else iso_ts
+    try:
+        dt = datetime.fromisoformat(norm)
+    except ValueError as e:
+        raise RenderError(f"unparseable scan_timestamp {iso_ts!r}: {e}")
+    base = f"{_MONTHS[dt.month - 1]} {dt.day}, {dt.year}, {dt.hour:02d}:{dt.minute:02d}"
+    off = dt.utcoffset()
+    if off is None or off.total_seconds() == 0:
+        return f"{base} UTC"
+    total = int(off.total_seconds())
+    sign = "+" if total >= 0 else "-"
+    hh, mm = divmod(abs(total) // 60, 60)
+    return f"{base} UTC{sign}{hh:02d}:{mm:02d}"
+
+
 # ── per-block contexts ───────────────────────────────────────────────────────
 def _remit_row_ctx(rule, _idx):
     fid = rule.get("finding_id")
@@ -359,6 +401,22 @@ def _raise_card_ctx(cat, _idx):
     }
 
 
+_MH_SEV_TOKENS = [("critical", "C", "mh-crit"), ("high", "H", "mh-high"),
+                  ("medium", "M", "mh-med"), ("low", "L", "mh-low"),
+                  ("info", "I", "mh-info")]
+
+
+def _severity_summary(sc, total):
+    """Build the masthead metric line: ``<total> findings`` followed by a
+    severity breakdown — ``4C · 6H · 3M`` — with zero-count tiers omitted and
+    each token wrapped in its severity color class. Returns ready HTML."""
+    noun = "finding" if total == 1 else "findings"
+    parts = [f'<span class="{cls}">{sc[key]}{abbr}</span>'
+             for key, abbr, cls in _MH_SEV_TOKENS if sc[key] > 0]
+    breakdown = (" &middot; " + " &middot; ".join(parts)) if parts else ""
+    return f"{total} {noun}{breakdown}"
+
+
 def _overall_status(findings):
     present = {f["severity"] for f in findings}
     for sev, cls, label in _OVERALL_STATUS_RULES:
@@ -378,12 +436,13 @@ def _global_ctx(data):
     ib = data["intro_band"]
     return {
         "AGENT_NAME": esc(scan["agent"]),
-        "SCAN_DATE": esc(scan["scan_date"]),
-        "SCAN_TIMESTAMP": esc(scan["scan_timestamp"]),
+        "SCAN_DATE": esc(_format_date(scan["scan_date"])),
+        "SCAN_TIMESTAMP": esc(_format_timestamp(scan["scan_timestamp"])),
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
+        "SEVERITY_SUMMARY": _severity_summary(sc, len(data["findings"])),
         "AGENT_REMIT_SUMMARY": render_rich(ib["agent_remit_summary"],
                                            allow=_RICH_FIELDS["agent_remit_summary"]),
         "AGENT_STRUCTURE_SUMMARY": render_rich(ib["agent_structure_summary"],
@@ -465,7 +524,7 @@ def render_txt(data: dict) -> str:
     out.append(bar)
     out.append("PRAXEN — AGENT BEHAVIOR VERIFIER")
     out.append(f"Agent:    {scan['agent']}")
-    out.append(f"Analysis: {scan['scan_timestamp']}")
+    out.append(f"Analysis: {_format_timestamp(scan['scan_timestamp'])}")
     out.append(f"Praxen v{data['praxen_version']}")
     out.append(bar)
     out.append("")
