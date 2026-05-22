@@ -306,8 +306,31 @@ def _remit_row_ctx(rule, _idx):
     }
 
 
+_DOCS_BASE = "https://open-ai-security.github.io/praxen/docs/"
+_MCP_ANCHOR = "a-practical-guide-for-secure-mcp-server-development-2026"
+
+
+def _tag_href(tag) -> str:
+    """Resolve a finding tag to the exact entry in Praxen's own framework docs
+    on GitHub Pages — derived from the tag's kind + label, so no schema field is
+    needed. OWASP LLM/Agentic tags lead with their code (``LLM02``/``ASI05``) →
+    ``owasp.html#llm02``; MCP tags → the MCP-guide section (no per-entry granularity);
+    RAISE tags carry the category name → its ``RAISE.html`` heading anchor."""
+    kind, label = tag["kind"], tag["label"]
+    if kind in ("owasp_llm", "owasp_agentic"):
+        m = re.match(r"\s*([A-Za-z]+\d+)", label)
+        return f"{_DOCS_BASE}owasp.html#{m.group(1).lower()}" if m else f"{_DOCS_BASE}owasp.html"
+    if kind == "mcp":
+        return f"{_DOCS_BASE}owasp.html#{_MCP_ANCHOR}"
+    if kind == "raise":
+        slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+        return f"{_DOCS_BASE}RAISE.html#{slug}"
+    return _DOCS_BASE  # unreachable: kinds are schema-constrained
+
+
 def _finding_tag_ctx(tag, _idx):
-    return {"TAG_CLASS": _TAG_CLASS[tag["kind"]], "TAG_LABEL": esc(tag["label"])}
+    return {"TAG_CLASS": _TAG_CLASS[tag["kind"]], "TAG_LABEL": esc(tag["label"]),
+            "TAG_HREF": esc(_tag_href(tag))}
 
 
 def _policy_ctx(finding, _idx):
