@@ -31,8 +31,6 @@ Hand-authoring is the ideal path — you understand the agent's intended behavio
 
 Ask Claude Code to *"draft a Worker Remit for this agent"* with the description or docs available, and the skill walks the `WORKER_REMIT_template.md` structure to produce a complete first draft. Treat the result as a starting point, not a finished remit: review every section, tighten anything vague (see [the specificity test](#the-specificity-test)), and make sure the **forbidden** actions reflect *your* intent — a drafted remit is only as good as what it had to work from.
 
-> **Draft from intent — not from the code.** Praxen's whole job is to test the implementation against an *independent* statement of what the agent should do. If the remit is derived from the code itself, the two agree by construction and every analysis comes back clean — a meaningless pass. Draft from what the agent is *meant* to do (your description or spec); never read the code back into the policy it's supposed to be judged against.
-
 ---
 
 ## Required sections
