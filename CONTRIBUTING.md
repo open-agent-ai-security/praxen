@@ -74,6 +74,17 @@ By making a contribution to this project, I certify that:
     involved.
 ```
 
+## Branching
+
+Branch from and target **`dev`**, not `main`. `main` is the release branch that
+downstream teams install from via the Claude Code plugin marketplace — a fresh
+`plugin marketplace add` pulls `main` at HEAD — so it only receives release PRs
+at version-bump time. Everyday work lands on `dev` first and reaches `main` as
+part of a deliberate, re-verified release.
+
+When you open a PR, GitHub pre-selects the base branch as the repository default
+(`main`); switch it to `dev` unless you are specifically cutting a release.
+
 ## Before you open a PR
 
 - Run the test suite: `python3 tests/render/test_render.py` — it should report all checks passing.

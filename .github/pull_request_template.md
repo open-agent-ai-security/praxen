@@ -1,6 +1,10 @@
 <!--
   Thanks for sending a PR to Praxen.
 
+  Base branch: target `dev`, not `main`. `main` is the release branch and only
+  receives release PRs. If GitHub defaulted the base to `main`, switch it to
+  `dev` (unless you are specifically cutting a release).
+
   Please fill in the sections below. If a section truly does not apply
   (e.g. a docs-only change has no functional testing), say so explicitly
   rather than deleting the heading — it signals to reviewers that you
