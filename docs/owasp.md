@@ -33,16 +33,16 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 | ID | Risk | One-line gloss |
 |---|---|---|
-| **LLM01** | Prompt Injection | Untrusted input (direct or smuggled in via external content) overrides the model's instructions. |
-| **LLM02** | Sensitive Information Disclosure | The model leaks PII, secrets, or proprietary data through its outputs. |
-| **LLM03** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
-| **LLM04** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
-| **LLM05** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
-| **LLM06** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
-| **LLM07** | System Prompt Leakage | The system prompt — and any secrets or logic baked into it — is exposed. |
-| **LLM08** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
-| **LLM09** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
-| **LLM10** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
+| <a id="llm01"></a>**LLM01** | Prompt Injection | Untrusted input (direct or smuggled in via external content) overrides the model's instructions. |
+| <a id="llm02"></a>**LLM02** | Sensitive Information Disclosure | The model leaks PII, secrets, or proprietary data through its outputs. |
+| <a id="llm03"></a>**LLM03** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
+| <a id="llm04"></a>**LLM04** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
+| <a id="llm05"></a>**LLM05** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
+| <a id="llm06"></a>**LLM06** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
+| <a id="llm07"></a>**LLM07** | System Prompt Leakage | The system prompt — and any secrets or logic baked into it — is exposed. |
+| <a id="llm08"></a>**LLM08** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
+| <a id="llm09"></a>**LLM09** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
+| <a id="llm10"></a>**LLM10** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
 
 → Full document: **[OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/)**
 
@@ -54,16 +54,16 @@ Risks that emerge once an LLM is wired to tools, memory, other agents, and the a
 
 | ID | Risk | One-line gloss |
 |---|---|---|
-| **ASI01** | Agent Goal Hijack | An attacker redirects the agent's objective so it pursues their goal instead of yours. |
-| **ASI02** | Tool Misuse and Exploitation | The agent is steered into using its legitimate tools for illegitimate ends. |
-| **ASI03** | Identity and Privilege Abuse | The agent's identity, tokens, or delegated permissions are abused or over-broad. |
-| **ASI04** | Agentic Supply Chain Vulnerabilities | Malicious or compromised plugins, MCP servers, skills, or sub-agents enter the agent's stack. |
-| **ASI05** | Unexpected Code Execution (RCE) | The agent runs attacker-influenced code on the host or in connected systems. |
-| **ASI06** | Memory and Context Poisoning | Persistent memory or retrieved context is seeded with content that corrupts future behavior. |
-| **ASI07** | Insecure Inter-Agent Communication | Messages between agents are unauthenticated, unvalidated, or trusted blindly. |
-| **ASI08** | Cascading Failures | One bad action or output propagates through a chain of agents/tools and amplifies. |
-| **ASI09** | Human-Agent Trust Exploitation | The agent's perceived authority is used to manipulate the humans who rely on it (or vice versa). |
-| **ASI10** | Rogue Agents | An agent operates outside its remit — compromised, misconfigured, or deliberately planted. |
+| <a id="asi01"></a>**ASI01** | Agent Goal Hijack | An attacker redirects the agent's objective so it pursues their goal instead of yours. |
+| <a id="asi02"></a>**ASI02** | Tool Misuse and Exploitation | The agent is steered into using its legitimate tools for illegitimate ends. |
+| <a id="asi03"></a>**ASI03** | Identity and Privilege Abuse | The agent's identity, tokens, or delegated permissions are abused or over-broad. |
+| <a id="asi04"></a>**ASI04** | Agentic Supply Chain Vulnerabilities | Malicious or compromised plugins, MCP servers, skills, or sub-agents enter the agent's stack. |
+| <a id="asi05"></a>**ASI05** | Unexpected Code Execution (RCE) | The agent runs attacker-influenced code on the host or in connected systems. |
+| <a id="asi06"></a>**ASI06** | Memory and Context Poisoning | Persistent memory or retrieved context is seeded with content that corrupts future behavior. |
+| <a id="asi07"></a>**ASI07** | Insecure Inter-Agent Communication | Messages between agents are unauthenticated, unvalidated, or trusted blindly. |
+| <a id="asi08"></a>**ASI08** | Cascading Failures | One bad action or output propagates through a chain of agents/tools and amplifies. |
+| <a id="asi09"></a>**ASI09** | Human-Agent Trust Exploitation | The agent's perceived authority is used to manipulate the humans who rely on it (or vice versa). |
+| <a id="asi10"></a>**ASI10** | Rogue Agents | An agent operates outside its remit — compromised, misconfigured, or deliberately planted. |
 
 → Full document: **[OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/)**
 
