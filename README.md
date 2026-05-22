@@ -21,7 +21,7 @@
 
 > **📦 Install** with Claude Code: <code>/plugin marketplace add open-ai-security/praxen</code> then <code>/plugin install praxen@open-ai-security</code> &nbsp;·&nbsp; full guide in [<code>docs/installation.md</code>](docs/installation.md).
 >
-> **👀 See a real report** before you install: [<code>examples/finbot/finbot-analysis.html</code>](examples/finbot/finbot-analysis.html) (open in a browser).
+> **👀 See a real report** before you install: view the [**live FinBot analysis report**](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
 
 ---
 

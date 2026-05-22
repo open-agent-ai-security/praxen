@@ -24,7 +24,7 @@ For each example we followed the standard Praxen analysis workflow:
 Praxen produced 15 findings (5 Critical, 5 High, 3 Medium, 1 Low, 1 Informational), weighted RAISE posture 0.45 / 5.0 (Absent) — including unauthenticated goal injection via `POST /api/admin/finbot/goals` writing attacker text straight into the agent's system prompt (the writable `finbot_config.custom_goals` column), an `_approve_invoice` path that sets `payment_processed=True` with no gate on amount, the manual-review threshold, the fraud result, or the caller, vendor-supplied invoice description text flowing verbatim into the LLM context, a `fraud_detection_enabled` flag toggleable from an unauthenticated endpoint, and the canonical goal-hijack → autonomous-payment chain with no logging to catch it.
 
 - [`finbot/WORKER_REMIT.md`](finbot/WORKER_REMIT.md) — intended-scope policy
-- [`finbot/finbot-analysis.html`](finbot/finbot-analysis.html) — human-readable analysis report
+- [`finbot-analysis.html`](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`finbot/finbot-findings.json`](finbot/finbot-findings.json) — machine-readable findings (preferred for automated ingestion)
 
 ---
@@ -36,5 +36,5 @@ Praxen produced 15 findings (5 Critical, 5 High, 3 Medium, 1 Low, 1 Informationa
 A general-purpose assistant whose remit assumes path-scoped `read_file`/`write_file`, untrusted-input handling, prompt-injection refusal, system-prompt confidentiality, per-tool-call audit logging, and a 20-call/session cap — every one of which is either unimplemented or actively contradicted in the code. Praxen produced 13 findings (5 Critical, 4 High, 3 Medium, 1 Informational), weighted RAISE posture 0.60 / 5.0 (Absent) — including `read_file`/`write_file` with no path confinement, user input reaching the model with no validation or prompt-injection handling, an LLM-mode system prompt that embeds a literal internal API key and instructs the agent to disclose its own configuration, every feature flag (`inputValidation`/`outputFiltering`/`toolApproval`/`rateLimiting`/`auditLogging`) set to `false`, the request handler rewarding prompt-injection keywords with attacker-favorable responses, and the injection → `write_file` chain with no audit trail.
 
 - [`helperbot/WORKER_REMIT.md`](helperbot/WORKER_REMIT.md) — intended-scope policy
-- [`helperbot/helperbot-analysis.html`](helperbot/helperbot-analysis.html) — human-readable analysis report
+- [`helperbot-analysis.html`](https://open-ai-security.github.io/praxen/examples/helperbot/helperbot-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`helperbot/helperbot-findings.json`](helperbot/helperbot-findings.json) — machine-readable findings (preferred for automated ingestion)

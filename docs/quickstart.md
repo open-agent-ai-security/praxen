@@ -86,7 +86,7 @@ What you should see, top to bottom:
 - A **Findings Register** — Critical first, then High, Medium, Low, Informational, each with evidence and a recommended action
 - A **RAISE Maturity Posture** wrap-up — a 0–5 weighted score across six categories
 
-You can compare your fresh report against the committed [`examples/finbot/finbot-analysis.html`](../examples/finbot/finbot-analysis.html). It won't be byte-identical (LLM analyses have run-to-run variance) but the dominant Critical themes, the broad RAISE shape, and the remit-coverage counts should be close. See [tests/README.md](../tests/README.md) for what "close" actually means for this target.
+You can compare your fresh report against the [published FinBot example report](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html) (rendered on GitHub Pages). It won't be byte-identical (LLM analyses have run-to-run variance) but the dominant Critical themes, the broad RAISE shape, and the remit-coverage counts should be close. See [tests/README.md](../tests/README.md) for what "close" actually means for this target.
 
 ## 5. Now try your own agent
 
