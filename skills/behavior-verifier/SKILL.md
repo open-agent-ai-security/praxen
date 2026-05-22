@@ -499,6 +499,8 @@ Praxen produces three artifacts per analysis: a canonical findings JSON (Step 10
 
 Synthesize 9.1–9.8 now, in order, and hold them in working memory. Then **9.9 is a mandatory action, not a held item** — you write the draft manifest to disk and print the interim overview before you write anything in Step 10. The draft manifest is what lets the analysis survive a context-window compaction during a long scan; do not skip it.
 
+**Across all three summaries below: cite files and functions, never line numbers.** A summary names *what* and *where* at the file/function level (`src/index.js`, `process_invoice()`) — the precise `file:line` coordinates (`index.js:374-457`) belong in each finding's evidence block, not these overviews. Repeating them here is noise the reader already gets below; keep the summaries pattern-level.
+
 ### 9.1 Agent Remit summary (intro band — left block) → `intro_band.agent_remit_summary`
 
 Two to four sentences describing **what the remit says the agent is for** — a faithful restatement of declared intent, not analysis. Cover: the agent's stated purpose and role; its authorized tools or capability categories (in prose, not a list); its authorized counterparties and data scope; optionally, a standout forbidden action or approval requirement that defines its shape. Plain prose, no lists, no headings. You may use `<code>` tags for literal tool names or identifiers.
