@@ -77,8 +77,8 @@ By making a contribution to this project, I certify that:
 ## Branching
 
 Branch from and target **`dev`**, not `main`. `main` is the release branch that
-downstream teams install from via the Claude Code plugin marketplace — a fresh
-`plugin marketplace add` pulls `main` at HEAD — so it only receives release PRs
+downstream teams install via the Claude Code plugin marketplace — a fresh
+`/plugin marketplace add` pulls `main` at HEAD — so it only receives release PRs
 at version-bump time. Everyday work lands on `dev` first and reaches `main` as
 part of a deliberate, re-verified release.
 
