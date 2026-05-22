@@ -371,17 +371,18 @@ Every finding carries both a RAISE category and, where applicable, OWASP LLM and
 
 Each analysis produces a self-contained HTML report from a canonical template (`skills/behavior-verifier/report_template.html`). The template is brand-compliant and not subject to per-analysis redesign. Praxen does **not** render the HTML with the LLM: the skill (Step 11) runs `render.py`, a bundled deterministic Python script (standard library only) that substitutes the canonical findings JSON (§6) into the template — same JSON in, byte-identical HTML out, every time. The renderer also writes the `.txt` summary. The template, the renderer (`render.py`), and the schema validator (`schema.py`) are version-locked and ship together.
 
-**Sections, in order** (the flow walks the reader from specifics to verdict):
+**Sections, in order** (the masthead gives the verdict at a glance; below it the flow walks from "what the agent is" to the maturity verdict):
 
-1. **Header** — navy bar with Exabeam-green accent, agent name, analysis timestamp, overall status badge (`CRITICAL` / `HIGH` / `ADVISORY` / `CLEAN` — the highest finding severity present, *not* the maturity score)
-2. **Intro band** — Agent Remit (as declared) and Agent Structure (as observed): two short prose summaries
-3. **Behavior Summary** — the dominant finding pattern, 2–4 sentences of synthesis
-4. **Remit Coverage** — every actionable remit rule with quoted text, status (Verified / Gap / Partial / Vague Policy / Enforcement Not Possible), and a link to the linked finding
-5. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags, quoted policy rule, evidence block, and recommended action
-6. **What's Working Well** — verified positive controls
-7. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
-8. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
-9. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxen version
+1. **Masthead** — navy band with Exabeam-green accent, carrying the Praxen wordmark + tagline, the report identity (`<Agent> Analysis Report` and the completion date), and an at-a-glance verdict cluster: the overall status badge (`CRITICAL` / `HIGH` / `ADVISORY` / `CLEAN` — the highest finding severity present, *not* the maturity score), finding counts by severity, and the RAISE maturity score
+2. **Agent Remit (as declared)** — a short prose summary of the agent's declared intent, the baseline everything below is measured against
+3. **Behavior Summary (as observed)** — the dominant finding pattern, 2–4 sentences of synthesis
+4. **Scope of Analysis** — a short prose summary of what was actually examined (source code, deployment state, or behavioral transcript — named explicitly)
+5. **Remit Coverage** — every actionable remit rule with quoted text, status (Verified / Gap / Partial / Vague Policy / Enforcement Not Possible), and a link to the linked finding
+6. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags (each a link to that entry in the framework docs), quoted policy rule, evidence block, and recommended action
+7. **What's Working Well** — verified positive controls
+8. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
+9. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
+10. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxen version
 
 The page renders correctly as `file://` — all CSS is inline, no external scripts, no external fonts beyond the declared Arial/Lausanne stack.
 
