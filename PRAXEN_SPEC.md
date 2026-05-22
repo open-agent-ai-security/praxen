@@ -238,7 +238,7 @@ The remit is a policy document, not a system description. It declares intent —
 | Human approval requirements | Actions that require sign-off |
 | Escalation and scope boundaries | Where the agent must halt or decline |
 
-A template ships with the skill at `skills/behavior-verifier/WORKER_REMIT_template.md` (beside `SKILL.md`, which reads it when authoring a remit).
+A template, `WORKER_REMIT_template.md`, ships at the Praxen package root — write a remit from it by hand (the primary path), or have the skill help draft one.
 
 ### Specificity requirement
 
