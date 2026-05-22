@@ -42,7 +42,6 @@ INCLUDE=(
   "NOTICE"
   "CHANGELOG.md"
   "CONTRIBUTING.md"
-  "WORKER_REMIT_template.md"
   "skills"
   "docs"
   "examples"
