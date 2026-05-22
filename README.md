@@ -17,7 +17,9 @@
 
 *Make sure your agent does its job — and only its job.*
 
-**Praxen** is named for **praxis** (Ancient Greek *πρᾶξις*) — the act of turning theory into practice. That's the job: verify that an agent's *declared* intent (the theory) actually shows up in its *observed* behavior (the practice).
+That's where the risk actually lives: most agentic security and safety failures come down to an agent **not doing its job** — malfunctioning, misaligned, or adversarially subverted.
+
+**Praxen** is named for **praxis** (Ancient Greek *πρᾶξις*), the act of turning theory into practice — which is exactly its job: verifying that an agent's *declared* intent (the theory) actually shows up in its *observed* behavior (the practice).
 
 **📦 Install** with Claude Code — `/plugin marketplace add open-ai-security/praxen` then `/plugin install praxen@open-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
 
