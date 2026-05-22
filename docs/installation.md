@@ -26,7 +26,7 @@ This is the recommended path for Claude Code users. From your terminal:
 ```bash
 claude plugin marketplace add open-ai-security/praxen
 claude plugin install praxen@open-ai-security
-claude plugin list      # confirm: praxen@open-ai-security, enabled, v0.7.1+
+claude plugin list      # confirm: praxen@open-ai-security, enabled, v0.7.2+
 ```
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
@@ -38,9 +38,9 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 If you can't or don't want to use the plugin marketplace flow, unzip the release archive somewhere your coding agent can see it. There's no install step.
 
 ```bash
-curl -L -o praxen-0.7.1.zip <release-URL>
-unzip praxen-0.7.1.zip
-cd praxen-0.7.1
+curl -L -o praxen-0.7.2.zip <release-URL>
+unzip praxen-0.7.2.zip
+cd praxen-0.7.2
 ```
 
 Then point your coding agent at `skills/behavior-verifier/SKILL.md` when running an analysis. See [Usage](usage.md).
@@ -55,7 +55,7 @@ Run:
 claude plugin list
 ```
 
-If `praxen@open-ai-security` appears at `v0.7.1` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
+If `praxen@open-ai-security` appears at `v0.7.2` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
 For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
 
