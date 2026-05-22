@@ -29,7 +29,7 @@ Usage:
 --template is required whenever --out-html is given. All paths absolute.
 Exit code 0 on success; non-zero with a diagnostic on any error.
 
-Python 3.8+ stdlib only. No third-party dependencies.
+Python 3.9+ stdlib only. No third-party dependencies.
 """
 from __future__ import annotations
 
