@@ -7,7 +7,7 @@
 
 The **Worker Remit** is the only artifact you customize per agent. Everything else in Praxen is generic. The quality of your remit directly determines the quality of Praxen's output: vague remits produce low-confidence findings; specific remits produce sharp, actionable ones.
 
-This page covers what to put in a remit and how to write rules that Praxen can verify. The starting template is [`WORKER_REMIT_template.md`](../WORKER_REMIT_template.md) at the repo root — copy it and fill it in by hand (the ideal path), or have the Praxen skill help you draft one.
+This page covers what to put in a remit and how to write rules that Praxen can verify. The starting template is [`WORKER_REMIT_template.md`](../WORKER_REMIT_template.md) at the repo root — copy it and fill it in by hand (the ideal path), or have the Praxen skill draft one for you (see [Letting the skill draft one for you](#letting-the-skill-draft-one-for-you) below).
 
 ---
 
@@ -19,6 +19,20 @@ A Worker Remit is a **policy document**, not a system description.
 - **Don't describe the implementation**: tool names, file paths, library versions, framework details. Praxen reads the actual code and compares it against the policy you've declared. You don't need to repeat what's already there.
 
 A good remit is something an operator could write before the agent is built and use unchanged after the agent is deployed.
+
+---
+
+## Letting the skill draft one for you
+
+Hand-authoring is the ideal path — you understand the agent's intended behavior better than any tool does. But if you'd rather start from a draft, the Praxen skill can author one for you. Point it at whatever best captures what the agent *should* do:
+
+- **A prose description** — just tell it, in plain language, what the agent is for and what it should and shouldn't do.
+- **Documentation** — a design doc, product spec, README, or any write-up of the agent's intended behavior.
+- **The agent's source code** — it'll infer the *apparent* intent from the implementation (useful when an agent already exists but was never given a remit).
+
+Ask Claude Code to *"draft a Worker Remit for this agent"* with the description, docs, or code available, and the skill walks the `WORKER_REMIT_template.md` structure to produce a complete first draft. Treat the result as a starting point, not a finished remit: review every section, tighten anything vague (see [the specificity test](#the-specificity-test)), and make sure the **forbidden** actions reflect *your* intent — a drafted remit is only as good as what it had to work from.
+
+> **One caveat when drafting from source code:** authoring a remit is not the same as *verifying* against one. A remit the skill inferred from the code will, by construction, resemble the code — so verifying *that* remit against *that* code tells you little (it'll mostly come back clean). The remit's value is in encoding what the agent **should** do, which is yours to confirm and correct. Inferring from code is a convenience for getting a skeleton fast, not a substitute for stating intent.
 
 ---
 
