@@ -17,6 +17,8 @@
 
 *Make sure your agent does its job — and only its job.*
 
+**Praxen** is named for **praxis** — where theory becomes practice. That's the job: verify that an agent's *declared* intent (the theory) actually shows up in its *observed* behavior (the practice).
+
 **📦 Install** with Claude Code — `/plugin marketplace add open-ai-security/praxen` then `/plugin install praxen@open-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
 
 **👀 See a real report** first — the [live FinBot analysis report](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
