@@ -7,7 +7,7 @@
 
 The **Worker Remit** is the only artifact you customize per agent. Everything else in Praxen is generic. The quality of your remit directly determines the quality of Praxen's output: vague remits produce low-confidence findings; specific remits produce sharp, actionable ones.
 
-This page covers what to put in a remit and how to write rules that Praxen can verify. The starting template ships with the skill at [`skills/behavior-verifier/WORKER_REMIT_template.md`](../skills/behavior-verifier/WORKER_REMIT_template.md).
+This page covers what to put in a remit and how to write rules that Praxen can verify. The starting template is [`WORKER_REMIT_template.md`](../WORKER_REMIT_template.md) at the repo root — copy it and fill it in by hand (the ideal path), or have the Praxen skill help you draft one.
 
 ---
 
