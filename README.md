@@ -17,8 +17,6 @@
 
 > *Make sure your agent does its job — and only its job.*
 
-*Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*
-
 > **📦 Install** with Claude Code: <code>/plugin marketplace add open-ai-security/praxen</code> then <code>/plugin install praxen@open-ai-security</code> &nbsp;·&nbsp; full guide in [<code>docs/installation.md</code>](docs/installation.md).
 >
 > **👀 See a real report** before you install: view the [**live FinBot analysis report**](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
@@ -99,6 +97,12 @@ The [`examples/`](examples/) directory contains real analyses against deliberate
 - [`tests/`](tests/) — pre-release regression suite (eleven targets, source repo only — not in the distribution zip)
 - [`CHANGELOG.md`](CHANGELOG.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`PRAXEN_SPEC.md`](PRAXEN_SPEC.md) — full technical specification
+
+---
+
+## Project sponsor
+
+Praxen is sponsored by [Exabeam](https://www.exabeam.com/). Exabeam contributed the initial code and continues to provide ongoing support and contributions to the project as part of its commitment to security in an increasingly agentic world.
 
 ---
 
