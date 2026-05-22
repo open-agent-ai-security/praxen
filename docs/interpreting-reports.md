@@ -38,9 +38,9 @@ The dark band at the top, carrying three things:
 
 - **Brand** — the Praxen wordmark and tagline.
 - **Report identity** — `<Agent> Analysis Report` and the completion date.
-- **Verdict at a glance** — the overall **status badge** (CRITICAL / HIGH / ADVISORY / CLEAN), the **finding counts by severity**, and the **RAISE maturity score**.
+- **Metrics at a glance** — the **finding counts by severity** and the **RAISE maturity score**.
 
-The status badge reflects the **highest finding severity present** — it is *not* the maturity score. A CRITICAL badge means at least one Critical finding; it does not mean the agent failed overall.
+These headline numbers let you size up the report before scrolling; the per-finding detail and the full maturity breakdown follow below.
 
 ### 2. Agent Remit (as declared)
 
@@ -126,7 +126,7 @@ Brand mark, project sponsor attribution, agent name, finding counts, framework r
 | **Low** | Weak signal or early warning. Single isolated event, minor drift. |
 | **Informational** | Baseline observation — scope note, positive posture, or neutral environmental fact. |
 
-The status badge in the header reflects the highest severity present in the analysis.
+Severity is surfaced two ways: the masthead's finding counts are colored by tier, and each finding card carries its own severity badge.
 
 ---
 
