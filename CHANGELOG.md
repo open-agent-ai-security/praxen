@@ -9,9 +9,9 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [Unreleased]
+## [0.7.1] — 2026-05-22
 
-**Two batches of operator field feedback rolled in pre-release.** No scan logic, schema shape, or scoring behaviour changed — all changes are documentation and a small renderer tweak. The eleven regression baselines re-render byte-identical from their JSON (the renderer change is stdout-only).
+**Three batches of operator field feedback rolled in as a single patch release.** No scan logic, schema shape, or scoring behaviour changed — all changes are documentation and a small renderer tweak. The eleven regression baselines re-render byte-identical from their JSON (the renderer change is stdout-only). Patches against `0.7.0`; same plugin name, same install path, same canonical findings JSON.
 
 ### Added
 - **`SKILL.md` opens with a quick-start (TL;DR) block** — what the skill does, the two inputs it needs (Worker Remit + workspace path), what it writes (three files in `./reports/` plus the Step 9.9 checkpoint), and a one-paragraph map of the 12-step pipeline. Sits above the existing intro so operators don't need to read the 700-line procedure before understanding what they're invoking. Reported by the Lobot field tester.
