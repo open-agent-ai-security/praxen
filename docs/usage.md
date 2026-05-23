@@ -205,6 +205,16 @@ Long scans on agents with a lot of evidence can exceed the coding agent's contex
 
 What to do is in *Large workspaces and context sizing* above — the short version is: re-run in a larger window with a tighter scope, or recover from the draft manifest. A report produced through a mid-synthesis compaction should be treated as possibly incomplete until you've done one of those.
 
+### Scan stopped emitting output for several minutes (streaming hiccup)
+
+Praxen scans typically take 8–15 minutes of wallclock; larger codebases scoped to a subdirectory sit at the high end. If a scan goes quiet for ~10 minutes with no progress messages or tool activity, you've likely hit a streaming hiccup — usually during the long-form drafting of the findings JSON. Symptoms:
+
+- The agent emitted an analysis plan and started drafting findings, then went silent mid-document.
+- No new files appear in the output directory; any partial JSON on disk is still valid but incomplete.
+- The CLI shows the agent as still running but with no recent tool calls.
+
+What to do: cancel the run and re-invoke against the same target. The chunked-emission protocol the skill follows means the skeleton + early findings persist on disk after each Edit — you won't lose the analysis the agent built up, and a fresh invocation can resume cleanly. Most retries succeed on the first try.
+
 ### Scores look lower than reality
 
 The most common operator surprise — *"my agent is more careful than this report suggests."* In nearly every case, the cause is that the evidence you handed Praxen didn't *show* a control that's actually in place (a review process, a deployment-time limit, an external guardrail, a monitoring pipeline, a red-team cadence). See *Results tuning* above for the additive-evidence workflow.
