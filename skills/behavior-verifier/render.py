@@ -424,20 +424,21 @@ def _raise_card_ctx(cat, _idx):
     }
 
 
-_MH_SEV_TOKENS = [("critical", "C", "mh-crit"), ("high", "H", "mh-high"),
-                  ("medium", "M", "mh-med"), ("low", "L", "mh-low"),
-                  ("info", "I", "mh-info")]
+_MH_SEV_TIERS = [("critical", "Critical", "mh-crit"), ("high", "High", "mh-high"),
+                 ("medium", "Medium", "mh-med"), ("low", "Low", "mh-low"),
+                 ("info", "Info", "mh-info")]
 
 
-def _severity_summary(sc, total):
-    """Build the masthead metric line: ``<total> findings`` followed by a
-    severity breakdown — ``4C · 6H · 3M`` — with zero-count tiers omitted and
-    each token wrapped in its severity color class. Returns ready HTML."""
-    noun = "finding" if total == 1 else "findings"
-    parts = [f'<span class="{cls}">{sc[key]}{abbr}</span>'
-             for key, abbr, cls in _MH_SEV_TOKENS if sc[key] > 0]
-    breakdown = (" &middot; " + " &middot; ".join(parts)) if parts else ""
-    return f"{total} {noun}{breakdown}"
+def _severity_blocks(sc, total):
+    """Build the masthead metric strip: a ``Findings`` total followed by one block
+    per non-zero severity tier — a big count over a small label, colored by tier.
+    Zero-count tiers are omitted. Returns ready HTML (a run of ``mh-metric`` divs)."""
+    noun = "Finding" if total == 1 else "Findings"
+    blocks = [f'<div class="mh-metric"><b>{total}</b><span>{noun}</span></div>']
+    for key, label, cls in _MH_SEV_TIERS:
+        if sc[key] > 0:
+            blocks.append(f'<div class="mh-metric {cls}"><b>{sc[key]}</b><span>{label}</span></div>')
+    return "".join(blocks)
 
 
 def _overall_status(findings):
@@ -465,7 +466,7 @@ def _global_ctx(data):
         "PRAXEN_VERSION": esc(data["praxen_version"]),
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
-        "SEVERITY_SUMMARY": _severity_summary(sc, len(data["findings"])),
+        "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
         "AGENT_REMIT_SUMMARY": render_rich(ib["agent_remit_summary"],
                                            allow=_RICH_FIELDS["agent_remit_summary"]),
         "AGENT_STRUCTURE_SUMMARY": render_rich(ib["agent_structure_summary"],
@@ -484,6 +485,7 @@ def _global_ctx(data):
         "N_LOW": str(sc["low"]),
         "N_INFO": str(sc["info"]),
         "WEIGHTED_SCORE": f"{wo:.2f}",
+        "RAISE_PCT": str(round(wo / 5 * 100)),
         "MATURITY_LABEL": maturity_label(wo),
         "WEIGHTED_RATIONALE": esc(posture["weighted_rationale"]),
         "NO_LOGS_NOTE": esc(lf["no_logs_note"]) if not lf["present"] else "",
