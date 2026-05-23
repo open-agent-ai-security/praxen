@@ -44,6 +44,42 @@ From a Claude Code session (or any coding agent capable of running the skill):
 Please run the behavior-verifier skill to analyze [path to evidence]. Use the Worker Remit at [path to remit].
 ```
 
+### Invoking by evidence type
+
+Concrete prompts you can copy and adapt — pick the shape that matches what you have, or combine.
+
+**Source repository.**
+
+```
+Please run the behavior-verifier skill against ./my-agent-repo/.
+Use the Worker Remit at ./WORKER_REMIT.md.
+```
+
+**Running deployment (exported workspace — memory files, action logs, live config).**
+
+```
+Please run the behavior-verifier skill against ./agent-workspace/.
+Use the Worker Remit at ./WORKER_REMIT.md.
+```
+
+**Behavioral artifacts (chat transcript / email history / decision log).**
+
+```
+Please run the behavior-verifier skill against ./agent-session-2026-05-23.jsonl
+(this is a chat transcript, not source code). Use the Worker Remit at
+./WORKER_REMIT.md.
+```
+
+**Mixed evidence (the strongest case — combine multiple inputs in one run).**
+
+```
+Please run the behavior-verifier skill against ./my-agent-repo/ plus the
+red-team report at ./redteam-q1.md and the session log at ./logs/session.jsonl.
+Use the Worker Remit at ./WORKER_REMIT.md.
+```
+
+Coverage and confidence increase with each additional input shape — see the [Evidence](#evidence) table above for what each contributes.
+
 Praxen reads the evidence, evaluates it against the RAISE framework and the Worker Remit, and writes three files to `./reports/`:
 
 | File | Purpose |
