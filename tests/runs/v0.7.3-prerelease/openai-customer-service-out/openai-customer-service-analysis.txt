@@ -1,0 +1,108 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenAI Customer Service Example
+Analysis: May 23, 2026, 19:02 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is framework offers safe primitives, the example wires
+none of them. The openai-agents-python SDK ships InputGuardrail,
+OutputGuardrail, ToolInputGuardrail, per-tool needs_approval, and tracing —
+exactly the controls the airline remit calls for — yet
+examples/customer_service/main.py configures zero guardrails, zero approval
+gates, and no audit logging. As a result every behavioral rule that requires
+runtime enforcement (identity verification before mutation,
+confirmation-number validation against an authoritative record, refusal of
+out-of-scope flows, prompt-injection resistance, durable seat-change audit) is
+enforced only by instructions in an LLM system prompt — and update_seat trusts
+caller-supplied confirmation_number and new_seat directly, while
+on_seat_booking_handoff fabricates a flight number with random.randint in
+place of looking it up. A reader copying this example into production inherits
+a system whose stated invariants exist only as English in a prompt.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 5   Medium: 3   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 2   Gap: 14   Partial: 4   Vague: 0   Enforcement-not-possible: 2   (of 22 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  No customer identity verification anywhere in the agent
+            pipeline before <code>update_seat</code> mutates reservation
+            state.
+      Action 1: Before constructing AirlineAgentContext, authenticate the
+                customer (session token, OIDC, etc.) and seed
+                context.passenger_name from the verified identity claim —
+                never from tool arguments or user input.
+      Action 2: Add an InputGuardrail on triage_agent that halts when
+                context.passenger_name is None, and route the halt to the
+                remit's human-escalation path.
+      Action 3: Inside update_seat, fetch the reservation from the
+                authoritative reservation system and assert it belongs to
+                context.passenger_name before any context write.
+
+  PRAX-2026-05-23-002  <code>update_seat</code> trusts caller-supplied
+            <code>confirmation_number</code> with no lookup against the
+            authoritative reservation record.
+      Action 1: Replace the body of update_seat with a reservation-system
+                lookup (e.g., reservation =
+                reservations.get(confirmation_number)) and raise a tool error
+                if the record is missing or does not belong to
+                context.passenger_name.
+      Action 2: Add a ToolInputGuardrail on update_seat that enforces the same
+                precondition and returns RejectContentBehavior when the
+                confirmation number is unknown.
+
+  PRAX-2026-05-23-003  <code>update_seat</code> performs no existence or
+            availability check on the requested seat.
+      Action 1: Inside update_seat, fetch the flight's seat map from the
+                authoritative reservation system and reject the call if
+                new_seat is not in the map or is currently assigned to another
+                passenger.
+      Action 2: Wrap the validation in a ToolInputGuardrail that returns
+                RejectContentBehavior with a model-readable rejection reason
+                so the LLM can ask the customer for another seat.
+
+  PRAX-2026-05-23-004  No durable audit log is written for seat changes — the
+            remit-mandated record (time, identity, confirmation number,
+            old/new seat, agent) does not exist.
+      Action 1: Inside update_seat, after a successful reservation-system
+                update, append a structured record — {timestamp,
+                passenger_name, confirmation_number, old_seat, new_seat,
+                agent_name} — to a durable store (append-only DB table, signed
+                JSONL log).
+      Action 2: Add the same record on the rejection path so attempted
+                unauthorised changes are also captured.
+
+  PRAX-2026-05-23-005  <code>on_seat_booking_handoff</code> fabricates a
+            flight number with <code>random.randint(100, 999)</code> instead
+            of looking it up.
+      Action 1: Replace the body of on_seat_booking_handoff with a
+                reservation-system lookup keyed on the authenticated customer
+                (and, once collected, the confirmation number) — and raise an
+                exception that triggers a human escalation if no flight record
+                is found.
+      Action 2: Remove import random from main.py — it has no legitimate use
+                in this agent.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

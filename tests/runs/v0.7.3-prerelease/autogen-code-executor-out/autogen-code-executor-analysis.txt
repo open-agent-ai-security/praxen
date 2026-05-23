@@ -1,0 +1,122 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: May 23, 2026, 16:09 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The framework provides isolation primitives (Docker, Azure dynamic sessions,
+Jupyter kernels) but the executor implementations leave the key controls the
+remit demands either off-by-default or missing entirely:
+LocalCommandLineCodeExecutor runs LLM-generated code in the host process's OS
+account with os.environ.copy(), the Docker executor creates containers with no
+user/cap_drop/read_only/network_mode/resource limits and accepts unrestricted
+host extra_volumes, no executor writes an execution audit log of any kind, and
+the local executor's docstring describes a regex-based 'dangerous command'
+sanitizer that does not exist in the code. The compound chain is decisive —
+create_default_code_executor() silently falls back from Docker to the local
+executor on a warnings.warn, so an operator who believes they are running the
+containerized path will instead execute LLM-generated code directly on the
+host with no audit trail and no approval gate.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.30 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 7   Medium: 3   Low: 1   Informational: 1
+  Total: 17
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 10   Partial: 3   Vague: 0   Enforcement-not-possible: 1   (of 18 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  No execution audit log is written by any executor
+            backend — the remit's required per-execution audit record
+            (timestamp, executor kind, language, source agent, work_dir,
+            timeout, exit_code, code digest) does not exist anywhere in the
+            subsystem.
+      Action 1: Add a module-level audit_logger (e.g.,
+                logging.getLogger("autogen_ext.code_executors.audit")) and
+                emit one structured record per execute_code_blocks entry/exit
+                in each backend, with at minimum ts_utc, executor_kind,
+                language, source (caller-supplied tag), work_dir, timeout,
+                exit_code, and sha256(code)[:16] — never the code body itself.
+      Action 2: In
+                python/packages/autogen-ext/src/autogen_ext/code_executors/_common.py,
+                add a small emit_audit_record(executor_kind, code_block,
+                work_dir, timeout, exit_code) helper so every backend writes
+                the same shape.
+      Action 3: Document the audit logger name and JSON schema in the public
+                docs so operators can route it to their SIEM/syslog.
+
+  PRAX-2026-05-23-002  LocalCommandLineCodeExecutor copies the parent
+            process's full environment (os.environ.copy()) into every spawned
+            subprocess, breaking the remit's host-isolation requirement and
+            handing all parent-process credentials to LLM-generated code.
+      Action 1: Replace os.environ.copy() with a minimal explicit environment
+                ({"PATH": ..., "HOME": work_dir, "LANG":
+                os.environ.get("LANG", "C.UTF-8")}) by default, and expose an
+                opt-in pass_env: Optional[List[str]] parameter on
+                LocalCommandLineCodeExecutor so the operator must name each
+                variable they want passed through.
+      Action 2: Document the behavior change in the executor's docstring and
+                in the framework release notes — silent credential leakage is
+                the failure mode this rule exists to prevent.
+
+  PRAX-2026-05-23-003  DockerCommandLineCodeExecutor creates containers with
+            no user, no cap_drop, no read_only, no network_mode, no mem_limit,
+            and no pids_limit — the 'containerized' production path runs
+            LLM-generated code as root inside an unrestricted container with
+            full host-network access.
+      Action 1: Pass safe defaults to containers.create: user="nobody" (or a
+                non-root uid configured at image build), cap_drop=["ALL"],
+                read_only=True (with the work_dir as the only rw mount),
+                network_mode="none" (with an opt-in network_mode="bridge"
+                requiring an explicit approval flag, per R-14),
+                mem_limit="512m", pids_limit=128, nofile ulimit.
+      Action 2: Add these as fields on DockerCommandLineCodeExecutorConfig so
+                operators can tune them but the defaults are conservative.
+
+  PRAX-2026-05-23-004  create_default_code_executor silently falls back from
+            DockerCommandLineCodeExecutor to LocalCommandLineCodeExecutor on a
+            warnings.warn whenever Docker is unavailable — turning the remit's
+            'local-executor needs approval' rule into a runtime no-op.
+      Action 1: Change the fallback to raise a RuntimeError by default
+                ("Docker is required for the default code executor — set
+                AUTOGEN_ALLOW_LOCAL_EXECUTOR=1 to acknowledge running
+                LLM-generated code on the host"), so the downgrade is an
+                explicit operator decision, not a silent default.
+      Action 2: Document this in the public API: create_default_code_executor
+                should fail closed.
+
+  PRAX-2026-05-23-005  LocalCommandLineCodeExecutor docstring claims commands
+            are 'sanitized using regular expression match against a list of
+            dangerous commands' — no such sanitizer exists in the code; the
+            documented control is fictional.
+      Action 1: Either implement the documented control (a DANGEROUS_PATTERNS
+                list applied to bash/shell blocks before they are written to
+                disk — rm -rf /, dd if=/dev/, fork bombs, mass-delete patterns
+                — and reject with a clear error), or delete the docstring
+                claim and replace it with the truthful statement that the
+                local executor does not inspect code before running it.
+      Action 2: If implementing, mirror the same primitive into the Docker
+                executor for consistency — but treat it as defence in depth,
+                never as the primary boundary.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

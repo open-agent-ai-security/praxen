@@ -5,15 +5,32 @@
 
 # Praxen Pre-Release Test Plan
 
-Praxen's regression test suite. Before every release, run the full eleven-target suite below, then **diff every target against the latest frozen baseline in `baselines/`** and against the per-target bands in this document (see *[What a release review looks like](#what-a-release-review-looks-like)*). Ad-hoc / mid-development re-run reports are **not** kept here — they regenerate and drift; the only committed runs are the named, version-pinned baselines under `baselines/`.
+Praxen's regression test suite. Three named tiers — pick the one that matches what you're doing (see *[Test tiers](#test-tiers)* below). Before every `dev → main` release PR, run the **Full Suite Run** (all eleven targets sequential, ~3 hours wallclock), then **diff every target against the latest frozen baseline in `baselines/`** and against the per-target bands in this document (see *[What a release review looks like](#what-a-release-review-looks-like)*). Ad-hoc mid-development re-run reports are **not** kept here — they regenerate and drift. The committed runs are: the named, version-pinned **frozen baselines** under [`baselines/`](baselines/) (the reference a release is graded against), and the named **pre-release Full Suite Runs** under [`runs/`](runs/) (the evidence a specific release-candidate cleared the bar).
 
 ## Directory contents
 
 - `README.md` — this file
 - `remits/` — the Worker Remits developed for each test agent. Reusable; do not change between analyses.
 - `baselines/` — frozen, committed runs. **The current set is [`baselines/v0.7.0-sequential/`](baselines/v0.7.0-sequential/BASELINE.md)** — all eleven targets on the Praxen v0.7.0 skill, scanned cold against the intent-level Worker Remits. It is the comparison point for the release review. (`baselines/v0.4-parallel/` keeps the historical Phase-2 parallel-path gate record; the earlier `v0.2-sequential/` / `v0.3-sequential/` / `v0.6.3-sequential/` sets were retired in successive re-baselines — see [issue #40](https://github.com/open-ai-security/praxen/issues/40) and the `[0.7.0]` changelog entry.) See [`baselines/README.md`](baselines/README.md).
+- `runs/` — committed **pre-release Full Suite Runs**, the evidence-of-validation for each release. Named by the release the run validated (e.g. [`runs/v0.7.3-prerelease/`](runs/v0.7.3-prerelease/SUITE_RUN.md)), each containing a `SUITE_RUN.md` verdict report (timing table, per-target sanity verdicts, patterns surfaced) plus every target's findings JSON / HTML / TXT. Diff future Full Suite Runs against the latest entry here **in addition to** the active baseline — run-to-run drift is more sensitive than run-to-baseline drift. See [`runs/README.md`](runs/README.md).
 - `fixtures/`, `render/` — the `render.py`/`schema.py` smoke harness (`python3 tests/render/test_render.py`): the canonical-JSON fixture (`finbot.canonical.json`), the committed **golden render output** (`finbot.golden.html` / `finbot.golden.txt` — byte-compared on every run; the test header comments say how to regenerate them when output changes intentionally), the entity-normalisation checks, the negative-case mutations, and a sweep over **every committed baseline under `baselines/`** — each schema-2.0 baseline JSON must validate against `schema.py`; each post-relicense one must re-render byte-for-byte from its JSON and (from `praxen_version` 0.6.0 on) quote its `tests/remits/<slug>.md` verbatim. So a renderer change that silently desyncs a committed report, or a baseline whose `rule_text` drifts from its remit, fails CI.
 - CI runs `tests/render/test_render.py` + `build.sh` on every push and PR across Python **3.9 / 3.12 / 3.13** (`.github/workflows/ci.yml`); pushing a `v*` tag runs the suite, builds the zip, and cuts a GitHub release (`.github/workflows/release.yml` — it also checks the tag matches `PRAXEN_SPEC.md`'s version).
+
+## Test tiers
+
+Three named tiers, escalating in scope and wallclock. Pick the one that matches what you're doing.
+
+### Smoke harness — `python3 tests/render/test_render.py` (~30 s, runs in CI)
+
+Renderer + schema validator + golden-byte checks. Sweeps every committed baseline JSON through `schema.py`, re-renders each post-relicense baseline byte-for-byte from its JSON, validates the canonical FinBot fixture's golden HTML/TXT outputs, and exercises entity normalisation + negative-case mutations. CI runs this on every push and PR across Python 3.9 / 3.12 / 3.13 (`.github/workflows/ci.yml`). A failure here means a renderer change silently desynced a committed report, or a baseline's `rule_text` drifted from its remit. **No Praxen analysis runs — this tier doesn't scan any agents.**
+
+### Single-target scan (~10 min)
+
+One Praxen analysis against one target, end-to-end. The fastest way to sanity-check a skill edit. **HelperBot** is the suite's most stable score and the fastest to scan; **FinBot** is the canonical "deliberately vulnerable" anchor. See [How to run a single-target scan](#how-to-run-a-single-target-scan) below for the procedure.
+
+### Full Suite Run (~3 hours)
+
+All eleven targets, sequential, against the release candidate, with timing data captured and every target's findings preserved. **Mandatory before every `dev → main` release PR**; recommended before any substantial change to `SKILL.md`, `schema.py`, or the knowledge base. Produces a verdict report (timing table + per-target sanity-vs-baseline + patterns surfaced) committed as a named `runs/<release>-prerelease/` directory. See [Full Suite Run protocol](#full-suite-run-protocol) below.
 
 ## Calibration posture
 
@@ -31,7 +48,7 @@ Blind-run scoring carries inherent variance — the *same target* re-analyzed fr
 4. **Full compare against the baseline.** For every target, diff the new findings JSON against `baselines/<latest>-sequential/<target>/…-findings-*.json`: weighted RAISE within ±0.3–0.5 of the baseline *and* inside the per-target band below; severity counts in the same neighbourhood; **dominant pattern / themes still covered (no Critical theme dropped)** — this last one is the hard gate. (See *[What a release review looks like](#what-a-release-review-looks-like)* for the per-report checks.)
 5. Any regression — a material finding dropped, a critical theme missed, a weighted score well outside the band, a target that drifts far from the baseline with no Praxen change to explain it — blocks the release. An in-band shift, or a deliberate calibration/detection change that moves the numbers, is fine: note it in the release notes **and re-freeze a new `baselines/<next-version>-sequential/`** (and update the "Latest" pointer above + the affected bands below).
 
-## How to run an analysis
+## How to run a single-target scan
 
 For each target:
 
@@ -43,14 +60,51 @@ For each target:
 6. Instruct Claude Code to read `skills/behavior-verifier/SKILL.md` and analyze the workspace path.
 7. Review `<target>-analysis-<timestamp>.html` in `reports/`.
 
-### Running the full suite
+## Full Suite Run protocol
 
-The eleven scans are independent and can be run in parallel — e.g. as concurrent Claude Code subagent scans — but two practices keep that reliable:
+The Full Suite Run validates a release candidate against all eleven targets. **Typical wallclock: 8–15 min per scan** (median ~9, observed range 7.5–16.0 in the v0.7.3 prerelease run), roughly **2 hours of model time** for the 11 scans, **~3 hours end-to-end** if subagent retries are needed.
 
-- **Cap concurrency at roughly 4–8 scans at once.** Each scan clones a target repo and runs a full analysis; launching all eleven together has overloaded the environment and tripped per-agent no-progress watchdogs.
-- **Write each run's outputs to a durable path, not `/tmp`.** A scan's `/tmp` working directory can be reaped mid-run; copy the four output files to a stable location (e.g. a gitignored `local/` directory) as the final step, so a stall *after* the analysis completes doesn't lose the work.
+### When to run
+
+- **Mandatory** before every `dev → main` release PR.
+- **Recommended** before any substantial change to `SKILL.md`, `schema.py`, or the knowledge base.
+- **Not needed** for renderer-only changes (the smoke harness covers those), documentation changes, or refactors that don't touch the analysis path.
+
+### How to invoke
+
+Two paths:
+- **Foreground** — open eleven separate Claude Code sessions (one per target), each pointed at the target source and the corresponding remit. Slowest in wallclock but no subagent watchdog to worry about.
+- **Subagent (parallelizable)** — launch each scan as a background general-purpose agent. The scans are independent and can run concurrently, **capped at 4–8 at a time** (more has overloaded the environment and tripped no-progress watchdogs). Write each run's outputs to a **durable path, not `/tmp`** — a scan's `/tmp` working directory can be reaped mid-run; a gitignored `local/<run-name>/` is the canonical pattern.
 
 A single scan on its own — one target, one session — needs neither precaution.
+
+### Stream-health protocol (subagent runs)
+
+Background subagent scans can hit a no-progress watchdog at ~600 s when the model goes silent during a long internal composition (the Step 9 findings JSON, in particular). The following protocol — discovered while running the v0.7.3 prerelease suite — recovers reliably:
+
+1. **Bash primer first.** Agent's very first action is `Bash: date -u +%Y-%m-%dT%H:%M:%SZ`, with no preamble text. Captures `scan_timestamp` *and* primes the stream.
+2. **Skeleton-first findings JSON.** Write a minimal valid skeleton (top-level fields, empty `findings: []`, empty `remit_coverage.rules: []`, zero `stat_counts`). Render it. Confirm 0 schema errors before drafting any actual finding.
+3. **Append findings one at a time** via `Edit` (`replace_all: false`), anchored on the closing `]` of the findings array. Never compose a multi-finding JSON in one `Write`.
+4. **Render every 2 findings.** Catches schema drift early, keeps the tool-call stream busy, makes any interrupted run partially recoverable.
+5. **One-line text heartbeat before each Edit**: `"Drafting finding N/M — <one-line theme>"`. Keeps the stream alive during the model's composition pauses.
+
+If a scan stalls anyway: retry the same target with the same brief. In the v0.7.3 prerelease run, ~60 % of stalled targets succeeded on first retry; all eventually completed within two retries. Half the stalls happen before any tool call (subagent-runtime hiccups, not anything the protocol can prevent) — straight retries fix those.
+
+### Verdict report (`SUITE_RUN.md`)
+
+Each Full Suite Run produces a `SUITE_RUN.md` in the run's output directory. The expected shape:
+
+- **Header**: STATUS line (PASS / FAIL / blocked-on-flag), one-line summary, the release this run validated.
+- **Inputs**: skill state under test, tolerance spec reference, source map (target → workspace path + scope).
+- **Per-target table**: `# | target | baseline (n · C/H/M/L/I · RAISE) | run (same) | duration | verdict`.
+- **Detailed notes per target**: duration, severity-count delta, RAISE delta, per-category RAISE breakdown, dominant Critical themes vs baseline, remit-coverage stat counts, any sanity flags.
+- **Suite verdict & timing summary** (closing block): per-scan timing table (range / median / mean), sanity table (Δ count, Δ RAISE, verdict per target), patterns surfaced (rule-count drift, calibration drift, stalls), bottom-line judgment.
+
+The committed copy from the v0.7.3 prerelease run — [`runs/v0.7.3-prerelease/SUITE_RUN.md`](runs/v0.7.3-prerelease/SUITE_RUN.md) — is the reference template.
+
+### After the run
+
+Commit the run as a named `tests/runs/<release>-prerelease/` directory: `SUITE_RUN.md` at the root, plus one `<target>-out/` subdirectory per target containing the three canonical outputs (`*-findings.json`, `*-analysis.html`, `*-analysis.txt`). See [`runs/README.md`](runs/README.md) for the layout convention.
 
 ## Test targets
 

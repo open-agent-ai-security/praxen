@@ -1,0 +1,138 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Devika
+Analysis: May 23, 2026, 17:49 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is sandbox-shaped-but-not-substantive compounded with
+policy declared in prose, zero code-level enforcement. The architecture
+document and the remit both describe a sandboxed runner that confines
+LLM-produced command execution; the actual implementation in
+src/agents/runner/runner.py executes those commands through raw subprocess.run
+with no allowlist, no approval prompt, and no isolation, while
+src/sandbox/code_runner.py and src/sandbox/firejail.py are 1-line stub files.
+The remit also forbids production deployment and forbids action on
+instructions embedded in user or web content, yet src/services/netlify.py
+wires a deploy capability directly into the action loop and not a single agent
+prompt or code path performs injection screening on the user message or the
+formatted web-search results before they enter LLM context or drive a tool
+decision. A reader opening the workspace should start in
+src/agents/runner/runner.py, src/sandbox/, src/agents/agent.py (the deploy
+branch in subsequent_execute), and the WebSocket handler in devika.py: those
+four files together establish that the agent has an unauthenticated WebSocket
+ingress, no instruction-injection screening on inbound content, raw shell
+execution of LLM-produced commands, and an outbound deploy path the remit
+forbids.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.45 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 6   High: 6   Medium: 3   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 9   Partial: 0   Vague: 0   Enforcement-not-possible: 0   (of 9 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  LLM-produced shell commands execute on the host via raw
+            <code>subprocess.run</code> with no sandbox, allowlist, or
+            approval gate
+      Action 1: Wire src/agents/runner/runner.py to invoke a real sandbox —
+                either implement the empty src/sandbox/firejail.py module to
+                wrap each command in firejail with a read-write bind only to
+                project_path, or run the runner inside a Docker container with
+                the workspace mounted
+      Action 2: Add a per-command allowlist driven by config and reject any
+                command (or interpreter argument like -c) that is not on it
+      Action 3: Insert a synchronous human-approval gate before each
+                subprocess.run — surface the proposed command to the UI and
+                require explicit user confirmation
+
+  PRAX-2026-05-23-002  Sandbox modules <code>code_runner.py</code> and
+            <code>firejail.py</code> are 1-line stubs — the
+            architecture-claimed sandbox does not exist
+      Action 1: Either implement src/sandbox/firejail.py as a real isolation
+                wrapper (firejail-net-none / firejail-private with bind-mount
+                of project_path only) and route every Runner subprocess
+                through it, or delete src/sandbox/ entirely and correct the
+                architecture doc and the remit to state explicitly that no
+                sandbox exists
+      Action 2: Until isolation lands, gate the Runner agent behind a
+                kill-switch in src/config.py that defaults to disabled
+
+  PRAX-2026-05-23-003  Netlify deployment capability is wired into the agent's
+            action loop in direct violation of the remit's
+            no-production-deploy clause
+      Action 1: Remove src/services/netlify.py and the action == 'deploy'
+                branch from src/agents/agent.py:219-229 entirely
+      Action 2: Strike 'deploy - Deploy the project' from
+                src/agents/action/prompt.jinja2 so the Action sub-agent cannot
+                select that intent
+      Action 3: If deployment is a desired future capability, surface it only
+                behind an explicit, separate human-driven UI flow with audit
+                logging and an out-of-band confirmation — not as an
+                LLM-inferred action
+
+  PRAX-2026-05-23-004  No instruction-injection screening on user prompts or
+            web-retrieved content before they enter LLM context or drive a
+            tool decision
+      Action 1: Insert an injection-screening pass between user input ingress
+                (devika.py handle_message line 79) and the first LLM call:
+                classify the message, reject or quarantine inputs that contain
+                instruction-shaped content, and log the decision
+      Action 2: Apply the same screen to Formatter output and browser_content
+                before either reaches another LLM prompt — quote untrusted
+                content with clear delimiters and a system-level instruction
+                that delimited content is data, not commands
+      Action 3: Block the Runner pipeline entirely when the originating
+                message or any retrieved content failed the injection screen
+
+  PRAX-2026-05-23-005  Package installs run through the unsandboxed Runner
+            with no user-confirmation gate and from unpinned versions
+      Action 1: Add a command-verb classifier in src/agents/runner/runner.py
+                that flags any command beginning with pip / pip3 / apt /
+                apt-get / npm install / yarn add / pnpm add / curl | sh / wget
+                | sh, suspends the run, and requires explicit user
+                confirmation before proceeding
+      Action 2: Pin every dependency in requirements.txt to an exact version
+                with a hash and migrate to a lockfile-based install workflow
+                (uv or pip-tools)
+      Action 3: Maintain a small pre-approved package allowlist in config so
+                well-known dependencies of the user-provided project can
+                install without prompting, but anything outside it triggers
+                the gate
+
+  PRAX-2026-05-23-006  Unauthenticated WebSocket bound to
+            <code>0.0.0.0:1337</code> accepts <code>user-message</code> events
+            that drive the full plan-research-code-execute pipeline —
+            external-input-to-RCE in one hop
+      Action 1: Bind the SocketIO server to 127.0.0.1 instead of 0.0.0.0 at
+                devika.py:209, matching the localhost-only assumption baked
+                into the remit ('a locally run application')
+      Action 2: Add a per-connection token check in the user-message handler —
+                a shared secret loaded from config that the front-end attaches
+                to every event, rejected at the handler if missing or
+                mismatched
+      Action 3: Introduce a rate limit on user-message events (e.g. via
+                Flask-Limiter on the connection-id) so even an authorized
+                client cannot drive the agent into a runaway loop
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

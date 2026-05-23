@@ -1,0 +1,113 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: May 23, 2026, 19:56 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Sweep's declared isolation model — "treat all issue/PR text as untrusted;
+never execute arbitrary shell; never communicate outside GitHub and the LLM
+provider; never merge" — is contradicted at the code level by a chain of
+un-gated execution and exfiltration primitives reachable from issue/comment
+text. The codegen pipeline is full of subprocess.run(" ".join([...query...]),
+shell=True) wrappers (core/context_pruning.py:186,
+agents/question_answerer.py:270, config/client.py:338,
+utils/code_validators.py:303/512/585) whose query/filename arguments originate
+in untrusted LLM output or repository paths — direct command injection from
+the same channels the remit names as untrusted. The WEBHOOK_SECRET path
+silently bypasses signature verification when the env var is unset
+(utils/hash.py:22-24, returns True), the /jira endpoint and the
+/update_sweep_prs_v2 GET both take untrusted input with no auth, and there is
+no code-level prompt-injection screening of issue/comment bodies before they
+enter the model context — every "MUST be screened for instruction injection"
+clause in the remit lacks a corresponding control. Outbound destinations
+(PostHog, Loki, Sentry, Discord, Keygen) expand well beyond the remit's
+GitHub-plus-LLM allowance.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.85 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 9   Medium: 2   Low: 0   Informational: 1
+  Total: 16
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 11   Partial: 4   Vague: 0   Enforcement-not-possible: 3   (of 21 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  LLM-controlled query is concatenated into a
+            shell-interpreted ripgrep command with no escaping — direct
+            command injection from a tool the agent exposes to itself.
+      Action 1: Switch the call to subprocess.run(["rg", "-n", "-i", "-C=5",
+                "--heading", "--sort-files", "--", query], shell=False,
+                cwd=cloned_repo.repo_dir, ...) — argv form removes the
+                shell-interpretation step entirely.
+      Action 2: Reject queries containing shell metacharacters (;|&`$()<>\n)
+                at the tool boundary before the subprocess call, and log the
+                rejection.
+      Action 3: Audit every other @tool()-decorated function in
+                sweepai/agents/ for the same shape (search_agent,
+                modify_utils, rg_extractor).
+
+  PRAX-2026-05-23-002  Repository filenames are interpolated into a
+            shell-interpreted <code>github-linguist</code> command — a crafted
+            filename in a PR or issue-referenced repo is a direct
+            command-injection path.
+      Action 1: Replace with subprocess.run(["github-linguist", "--",
+                file_name, "-j"], shell=False, ...) (argv form).
+      Action 2: Refuse any file_name containing characters outside
+                [A-Za-z0-9._/-] before invoking the subprocess; treat the file
+                as 'unknown language' rather than executing on it.
+
+  PRAX-2026-05-23-003  GitHub webhook signature verification returns
+            <code>True</code> when <code>WEBHOOK_SECRET</code> is unset — the
+            entire authenticity gate fails open by default.
+      Action 1: Change the unset branch to return False (or raise) so missing
+                config fails closed; the renderer / FastAPI lifespan should
+                also assert WEBHOOK_SECRET is non-empty at startup and refuse
+                to serve traffic otherwise.
+      Action 2: Add a startup-time check in sweepai/config/server.py alongside
+                the existing assert OPENAI_API_KEY assertions — assert
+                WEBHOOK_SECRET, "WEBHOOK_SECRET is required for production
+                deployments".
+      Action 3: Document the change in the project README so self-hosted
+                operators know the contract changed.
+
+  PRAX-2026-05-23-004  No code-level prompt-injection screening on any of the
+            input channels the remit calls out — issue bodies, comments, file
+            contents, and diffs all flow into LLM context unmodified.
+      Action 1: Add an explicit instruction-injection screening step in
+                handlers/on_ticket.py and handlers/on_comment.py that scans
+                issue title/body/comment text for known attack-pattern
+                signatures ("ignore previous", "new task:", system-prompt
+                mimicry, role-play preambles, escape-out-of-XML-tag attempts)
+                before the body reaches any LLM call.
+      Action 2: Wrap all untrusted input in fenced quote blocks at the
+                prompt-template level — every {summary}, {comment},
+                {file_contents} substitution in core/prompts.py should be
+                inside an explicit <untrusted_input>…</untrusted_input>
+                wrapper that the system prompt teaches the model to
+                ignore-as-policy.
+      Action 3: Add a system-prompt clause explicitly forbidding the agent
+                from following any instruction-shaped text that appears inside
+                an <untrusted_input> block.
+      Action 4: Log every detected injection-pattern hit so the operator can
+                review.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

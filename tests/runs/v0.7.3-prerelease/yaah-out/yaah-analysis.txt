@@ -1,0 +1,99 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    YAAH
+Analysis: May 23, 2026, 20:13 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+yaah's central promise — that every generated coding-agent configuration
+carries the same set of protective hooks — is contradicted in code:
+pkg/generator/hookmap.go has no Codex entry for PreToolUse, so the
+CommandGuard that blocks rm -rf / / force-pushes / DROP TABLE is silently
+dropped from generated Codex configs, and TestCodex_GenerateHooks_NoSupported
+codifies that behavior as intended. The README acknowledges the gap ("Codex:
+Hooks limited to SessionStart/Stop — linting and security checks available via
+yaah MCP tools"), but a defense surfaced only as an opt-in MCP tool the model
+may or may not call is not the same control as a deterministic Block: true on
+PreToolUse. Two further structural patterns compound this: the controls that
+are wired are bypassable on close inspection (the command-guard regexes
+hard-code --force, rm -rf, and a small fixed pattern set — git push -f,
+--force-with-lease, rm -r -f, and many destructive variants slip through), and
+the harness itself ships zero adversarial test fixtures and no SECURITY.md /
+disclosure policy, which the remit's Escalation section explicitly calls for.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.60 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 5   Medium: 2   Low: 0   Informational: 0
+  Total: 10
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 4   Partial: 4   Vague: 0   Enforcement-not-possible: 1   (of 12 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  Codex generator strips PreToolUse — the command-guard
+            hook is silently absent from one of the four agent targets the
+            remit promises uniform protections for
+      Action 1: Decide whether Codex is a supported target for the protections
+                promise. If yes: refuse to generate a Codex config (or emit a
+                hard warning) when PreToolUse rules are present and Codex does
+                not expose an equivalent gate — do not silently drop them.
+      Action 2: Update the remit, README, and docs to either (a) carve Codex
+                out of the protections-uniform-across-agents promise
+                explicitly, naming the missing hook events, or (b) implement a
+                Codex-native pre-exec gate (Notify + halt, or a bash-wrapper
+                approach) and wire CommandGuard / SecretScanner through it.
+
+  PRAX-2026-05-23-002  CommandGuard regex set is so narrow that obvious
+            catastrophic-command variants pass the gate (git push -f /
+            --force-with-lease, rm -r -f, rm with paths beyond `/`, fork
+            bombs, curl|sh)
+      Action 1: Rewrite the catastrophic-command guard as a parsed-AST or
+                strict allowlist policy rather than a regex denylist: parse
+                the bash command, walk arguments, and flag any `rm -r`/`rm -R`
+                variant regardless of flag order or path, any `git push
+                --force*` or `git push -f` to any branch the operator has not
+                explicitly opted in to, and any destructive-DDL/DML statement
+                (TRUNCATE, DELETE without WHERE, DROP, ALTER…DROP).
+      Action 2: Add adversarial test fixtures in
+                `pkg/hooks/handlers/guard_test.go` that exercise the bypass
+                list from this finding's evidence — each variant must return
+                Block:true. Wire the test into CI as a regression gate so a
+                future regex rewrite cannot silently lose coverage.
+      Action 3: Publish a narrowly-scoped "what this guard catches and what it
+                does not" doc that the README's protections promise links to,
+                so operators do not assume the seven regexes are equivalent to
+                the remit's class-level guarantee.
+
+  PRAX-2026-05-23-003  No human-checkpoint gate on file writes or
+            write/send/execute MCP tools — the approval-requirement rule is
+            unenforced in code
+      Action 1: Add a high-impact gate handler that runs on PreToolUse for
+                Edit/Write/MultiEdit and for any MCP tool whose name matches a
+                write/send/execute pattern; the default behavior should be
+                Block + emit an operator-visible prompt (or honor an explicit
+                per-tool allow list signed by the operator at session start).
+      Action 2: For the built-in MCP tools, classify them in
+                `pkg/mcpserver/tools.go` as `read_only` vs
+                `write_caller_workspace` and refuse to expose the
+                write-capable set when an approval handler is not registered
+                on the harness.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

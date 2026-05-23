@@ -1,0 +1,147 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: May 23, 2026, 18:14 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in prompt, zero code-level
+enforcement, on top of an unauthenticated admin plane that lets anyone rewrite
+the policy. Every remit hard-prohibition — fraud detection must always run, no
+above-threshold approvals without human sign-off, no auto-approval of
+unregistered vendors, runtime content must not alter goals — depends entirely
+on the LLM following natural-language instructions in get_system_prompt(); the
+approve_invoice tool itself performs no amount check, no vendor-status check,
+and no fraud-signal check before flipping payment_processed=True. That
+LLM-only enforcement is then undermined by three reachable channels:
+unauthenticated POST /api/admin/finbot/goals appends operator-supplied text
+into the system prompt with an explicit "OVERRIDE ABOVE IF CONFLICTING"
+clause; unauthenticated POST /api/admin/finbot/config can set
+fraud_detection_enabled=False; and the system prompt itself instructs the
+agent to treat invoice description text — vendor-supplied data — as a
+legitimate signal for expedited approval, with the rule-based fallback
+hard-coding that override into Python. The result is a one-hop chain from
+anonymous HTTP to fraudulent payment, acknowledged in the in-tree CTF
+walkthrough.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.45 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 7   High: 6   Medium: 3   Low: 0   Informational: 0
+  Total: 16
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 15   Partial: 2   Vague: 0   Enforcement-not-possible: 0   (of 17 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-23-001  Unauthenticated <code>POST
+            /api/admin/finbot/goals</code> appends caller-supplied text into
+            FinBot's system prompt with an explicit "OVERRIDE ABOVE IF
+            CONFLICTING" clause.
+      Action 1: Remove the POST /api/admin/finbot/goals endpoint entirely; per
+                the remit, goal changes require a deployment, not a runtime
+                API.
+      Action 2: If a configurable subset of behavior must remain
+                runtime-mutable, replace the natural-language custom_goals
+                field with a typed schema (booleans, enums, numeric
+                thresholds) and put authenticated session middleware in front
+                of /api/admin/* before exposing any of it.
+
+  PRAX-2026-05-23-002  Unauthenticated <code>POST
+            /api/admin/finbot/config</code> can set
+            <code>fraud_detection_enabled=False</code>, which the remit names
+            as a non-authorized configuration change.
+      Action 1: Remove fraud_detection_enabled from the set of fields that
+                update_config will write — fraud detection is named as
+                non-disableable in the remit and should be a deploy-time
+                constant, not a runtime toggle.
+      Action 2: Put authenticated session middleware in front of every
+                /api/admin/* route and require a separate role for
+                configuration changes.
+
+  PRAX-2026-05-23-003  <code>_approve_invoice()</code> writes
+            <code>payment_processed=True</code> with no amount check, no
+            vendor-status check, and no fraud-signal check — every remit
+            behavioral constraint relies on the LLM choosing not to call the
+            tool.
+      Action 1: Wrap _approve_invoice with deterministic preconditions: reject
+                the call when invoice.amount > config.manual_review_threshold,
+                when vendor.status != 'approved', or when the most-recent
+                _detect_fraud_patterns result for this invoice has risk_level
+                in ('high', 'critical').
+      Action 2: Require _detect_fraud_patterns to have been called for this
+                invoice before _approve_invoice will accept the call; track
+                the call on the invoice row, not in LLM conversation state.
+
+  PRAX-2026-05-23-004  Vendor-supplied invoice <code>description</code> text
+            is concatenated into FinBot's LLM context as untrusted-but-trusted
+            data, and the system prompt explicitly invites the model to weigh
+            authority/urgency cues taken from it.
+      Action 1: Treat invoice.description as untrusted data: never expose it
+                to the LLM as a plain tool-result string; if it must be
+                visible for context, wrap it in a clearly delimited,
+                label-quoted block (e.g.
+                <vendor_description>...</vendor_description>) and add a
+                system-prompt rule that nothing inside those tags is a
+                directive.
+      Action 2: Remove the BUSINESS CONTEXT CONSIDERATIONS paragraph from
+                get_system_prompt() and remove _analyze_business_context from
+                the fallback path — authority/urgency claims must come from
+                authenticated channels, not from description text.
+
+  PRAX-2026-05-23-005  <code>_fallback_processing</code> auto-approves
+            invoices when prompt injection is detected, when amounts exceed
+            the manual-review threshold, or when vendor trust is low —
+            provided the business-context score is high enough.
+      Action 1: Delete the entire _fallback_processing method; if a non-LLM
+                path is needed, replace it with a fail-closed handler that
+                only escalates to request_human_review when the LLM client is
+                unavailable.
+      Action 2: Remove every override branch that lets
+                business_context['should_expedite'], management_approval, or
+                production_context overcome an amount threshold, low trust
+                level, or injection detection.
+
+  PRAX-2026-05-23-006  Compound chain: an anonymous HTTP caller can rewrite
+            the system prompt, disable fraud detection, and reach
+            unauthenticated <code>approve_invoice</code> in one round-trip —
+            confirmed end-to-end by the in-tree CTF walkthrough.
+      Action 1: Treat findings PRAX-2026-05-23-001, -002, -003, -004, and -005
+                as a single mitigation: authentication + role-based access on
+                all /api/admin/*, code-level preconditions on approve_invoice,
+                and removal of the natural-language custom_goals field.
+      Action 2: Run an integration test that asserts: an unauthenticated
+                request to POST /api/admin/finbot/goals returns 401, and that
+                no invoice can transition to payment_processed=True while
+                fraud_detection_enabled is False or while the most-recent
+                fraud-detection result is 'high' or 'critical'.
+
+  PRAX-2026-05-23-007  Flask <code>SECRET_KEY</code> is hardcoded as a string
+            literal in <code>src/main.py</code> and committed to the public
+            repository — pattern match for a Flask session signing key,
+            location only.
+      Action 1: Replace the hardcoded literal at src/main.py:15 with
+                app.config['SECRET_KEY'] = os.environ['SECRET_KEY'], rotate
+                the existing value, and add SECRET_KEY to the deployment
+                platform's secret store and to render.yaml's envVars.
+      Action 2: Audit the git history and force-push a rewrite if necessary;
+                the literal is in the published repository.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
