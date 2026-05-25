@@ -769,7 +769,7 @@ This file is the **complete behavioral record**: everything the HTML report show
 ```json
 {
   "schema_version": "2.0",
-  "praxen_version": "0.7.2",
+  "praxen_version": "0.7.3",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
