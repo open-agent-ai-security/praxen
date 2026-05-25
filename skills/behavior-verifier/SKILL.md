@@ -177,9 +177,11 @@ Read the following knowledge base files from the `knowledge/` directory alongsid
 
 3. `knowledge/KB_LLM_TOP10.md` — LLM-specific vulnerability patterns. Use this for finding classification.
 
-If you find MCP server configuration in the workspace (Step 4), additionally read:
+After completing Step 4, if any MCP server configuration was found in the workspace, return here and read:
 
 4. `knowledge/KB_MCP_SECURITY.md` — MCP minimum bar checklist and scan priorities.
+
+(Step 4 is the discovery pass that finds MCP configuration; you cannot know whether to load this KB until then. Step 4's closing paragraph reminds you to return here if needed.)
 
 ---
 
@@ -247,6 +249,8 @@ Sweep the workspace for files that appear to be logs. Identify them by:
 - Content structure: repeated timestamped entries, JSON lines format, append-only patterns
 
 For each discovered log file, record: full path, apparent source, content type, apparent purpose, and last modified timestamp. You will serialize this list in Step 9.8.
+
+**Before continuing to Step 4b: if any MCP server configuration was found in this step**, return to Step 3 and read `knowledge/KB_MCP_SECURITY.md` now. You need that calibration before Step 6's MCP Server Evaluation runs.
 
 ---
 
@@ -473,6 +477,8 @@ When a compound pattern matches:
 2. Set `related_findings` to the IDs of the contributing individual findings
 3. The summary should describe the chain, not just the individual signals
 
+**The compound finding IS the deliverable — write it as one finding spanning the chain, not as N independent findings with cross-references.** Splitting a compound into independent halves defeats the escalation: each half on its own typically doesn't trigger the escalation row, so the chain lands at the contributing-signal severity rather than at Critical. The chain's evidence array can exceed the Step 10 prose-discipline two-span soft cap when the chain genuinely spans more sites — name every site in the chain that's load-bearing to the escalation, not a truncated subset.
+
 ---
 
 ## Step 8 — Positive Posture Recognition
@@ -563,6 +569,8 @@ Compute the weighted overall: Σ(score × weight) across the six categories, whe
 
 Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Phase 1 + Phase 2). For each rule, in document order: `rule_id` (`R-NN`), `section` (the remit section heading it came from), `rule_text` (the rule's operative sentence — a contiguous, verbatim quote from the remit, never elided or trimmed mid-sentence; see Step 6 Phase 1), `status` (`verified` | `gap` | `partial` | `vague` | `enp`), and `finding_id` (the `PRAX-...` id of the finding documenting this gap, or `null` for `verified` / `vague` / `enp` rules — every `gap` should normally point at one). Then count the statuses into `stat_counts` (the counts must match the rows, and `total` must equal the number of rows).
 
+**`finding_id` by status:** `gap` and `partial` rules carry the `PRAX-...` id of the finding that documents the specific code-side gap. `verified` rules carry `null` (the rule has no gap to point at, by construction). `vague` rules carry `null` (the rule is too imprecise to violate, by construction). `enp` rules carry `null` (enforcement-not-possible — there is no code finding to link, by definition; the rule is behavioral or cultural and lives outside the scan's visibility). A `gap` or `partial` rule with `finding_id: null` is a hole in the audit — either the finding wasn't written or the rule should be `verified` / `vague` / `enp` instead.
+
 **Tally explicitly — do not eyeball.** Manual counting across 5 statuses and 10–20+ rules is where this step most often goes wrong. Walk the `rules[]` array you just wrote and tally each status into its own running counter; then write `stat_counts` from the counters. The schema requires **all five status keys** — `verified`, `gap`, `partial`, `vague`, `enp` — to be present at all times, including those with a count of zero. (`vague: 0` is a valid and common case.) A missing zero-count key is a schema validation failure in Step 11.
 
 > **`Counter`-equality is not a self-check.** If you build a `collections.Counter` of the actual statuses and compare it to the dict you wrote into `stat_counts`, the check is unreliable: `Counter` *silently omits keys with a count of 0*. A scan with zero `vague` rules has `Counter({...})` *without* a `vague` key, while the JSON correctly carries `"vague": 0` — they compare unequal even though both are right. If you must validate before writing, build a plain dict over the full five-status key set **plus `total`** (e.g., `{**{k: sum(1 for r in rules if r["status"] == k) for k in ("verified","gap","partial","vague","enp")}, "total": len(rules)}`) and compare *that*. The renderer (Step 11) re-checks the counts authoritatively; this self-check just shortens the round trip.
@@ -631,6 +639,8 @@ For each of the six RAISE categories — in this fixed order: limit_your_domain,
 - weight: <0.25 for implement_zero_trust; 0.15 for the other five>
 - rationale: <9.4 prose, 1–2 sentences>
 
+(Weights for `weighted_overall` above: implement_zero_trust = 0.25; each of the other five = 0.15. Compute Σ(score × weight) explicitly here in the manifest — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
+
 ## remit_coverage
 ### stat_counts
 - verified: <int>
@@ -652,13 +662,14 @@ For each rule, in document order:
 For each finding, in canonical order (Critical → High → Medium → Low → Informational, then by id within a tier):
 - id: PRAX-YYYY-MM-DD-NNN
 - severity: <Critical | High | Medium | Low | Informational>
-- summary: <one-sentence card header>
-- description: <OPTIONAL longer-form paragraph, or omit the bullet entirely>
+- summary: <one-sentence card header — ≤ 25 words, final-form prose>
+- description: <OPTIONAL longer-form paragraph — at most three sentences, final-form prose, or omit the bullet entirely>
 - tags:                                              (one sub-bullet per tag — never comma-joined. Each `kind=K, label=L` sub-bullet translates to `{"kind": "K", "label": "L"}` in `tags[]` in Step 10's JSON.)
   - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
   - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
-- policy_rule_text: <verbatim remit quote, or null>   (null exactly when policy_rule_ids is null; for a multi-rule finding, concatenate the quotes with ` / ` exactly as Step 10 — `"<rule R-NN text> / <rule R-MM text>"`)
+- policy_rule_text: <verbatim remit quote, or null — null exactly when policy_rule_ids is null>
+  - **Multi-rule findings:** concatenate the verbatim quotes with ` / ` (space-slash-space) — e.g. `"<rule R-NN text> / <rule R-MM text>"`. The Step 11 renderer relies on this exact separator to display the rules; no other delimiter is accepted.
 - evidence: <one bullet per item, formatted `file:line — snippet` (or `file — snippet` for file-level)>
 - recommended_actions: <one bullet per action>
 - raise_category: <one of the six keys>
@@ -696,7 +707,8 @@ For each log file (empty exactly when present=false):
 - medium: <int>
 - low: <int>
 - info: <int>
-(Must equal the per-severity counts of `findings` above.)
+
+**Tally explicitly.** After writing every `findings:` block above, walk the array and count each severity into its own running counter — do not rely on memory or scroll-and-eyeball. The five counters must sum to the total number of finding blocks, and each per-severity count must match the actual contents of `findings[]`. The Step 11 renderer re-checks this authoritatively; a mismatch is a validation failure named at `$.footer.severity_counts`.
 ```
 
 These section headings and field names match the canonical JSON in Step 10 one-to-one. If the session compacts before the JSON is written, post-compaction Step 10 reads this file and translates each section into its JSON counterpart with no semantic decisions to re-litigate.
@@ -886,6 +898,7 @@ Rules for the findings array and the JSON as a whole:
 - **Wrong RAISE weight or category name.** `weight` is `0.25` for `implement_zero_trust` and `0.15` for the other five — exactly, no rounding. `name` must be the exact display string for the `key` (`limit_your_domain` → `"Limit Your Domain"`, etc.). And `weighted_overall` must equal Σ(score × weight) to two decimals.
 - **A `finding_id` / `related_findings` id that doesn't exist.** Every non-null `rule.finding_id` and every entry in any `related_findings` array must be the `id` of a finding actually present in `findings[]`. No self-references in `related_findings`.
 - **A finding violates a rule whose status says it isn't violated.** Walk every `findings[].policy_rule_ids` and look it up in `remit_coverage.rules[]`: the matching rule's `status` must be `gap` or `partial` — never `verified`, and rarely `vague` (a vague rule is too imprecise to violate by construction) or `enp` (enforcement-not-possible findings shouldn't usually trace to a remit rule). A finding citing a `verified` rule is a logical contradiction and almost always means the rule's status was assessed under one understanding of the code and the finding written under another — re-read the cited line and either downgrade the rule to `partial` (control exists but is bypassable in the case the finding describes) or drop the rule link from the finding (set `policy_rule_ids` / `policy_rule_text` to `null` and explain the connection in the finding's `description`).
+- **A `partial` rule linked to an unrelated finding.** The mirror of the `verified`-contradiction check above. Every `partial` rule's `finding_id` must point at the finding describing the *specific gap that makes this rule incomplete* — not just any finding in the vicinity. A `partial` rule linked to an unrelated finding (e.g. a logging-gap finding bolted onto a trust-rule's `partial` slot because both happened to land in the same scan) produces a misleading coverage picture: the audit table claims the rule is partially audited when it isn't audited at all. Walk every `partial` rule and confirm the linked finding's content actually describes the rule's gap; if it doesn't, either set the rule to the correct status (`gap` if no finding exists, `verified` if the gap was a misread) or correct the link to the finding that does describe the gap.
 - **`escalation` inconsistent with `severity`.** `alert` for Critical and High; `log_only` for Medium, Low, Informational. The validator cross-checks this.
 - **`owasp_llm` / `owasp_agentic` not in canonical form.** These are `LLM01`–`LLM10` / `ASI01`–`ASI10` (or `null`) — not free text, not the full label (the label goes in `tags`).
 - **Multiple ASI categories on one finding.** `owasp_agentic` is a single code — pick the **primary** ASI classification (the dominant attack pattern the finding represents) for that field. Any secondary ASI tags go into `tags[]` only, each as a separate `{ "kind": "owasp_agentic", "label": "<CODE — Name>" }` entry, and *do not* set `owasp_agentic` to a comma-separated string or to a secondary code. The same rule applies to `owasp_llm` if a finding spans two LLM categories: primary in the scalar field, any secondaries in `tags[]` only. The validator and renderer both expect this shape.
@@ -898,7 +911,7 @@ After writing the file, re-read it and confirm it parses as valid JSON and the c
 
 If you are executing this skill as a **background subagent**, the harness's no-progress watchdog will kill the run after ~600 s without a tool call — and the riskiest pause is the Write for this Step 10 JSON, because a complete multi-finding document is a long internal composition with nothing emitted to the stream until the Write fires. The following emission pattern keeps the stream alive and makes an interrupted run partially recoverable from disk:
 
-1. **Write the complete skeleton.** Top-level fields populated, all required arrays present and empty (`findings: []`, `remit_coverage.rules: []`, `positives: []`, `log_files.rows: []`), all required objects present with their required keys (`raise_posture.categories` with all six entries; `footer.severity_counts` with all five keys at zero; `remit_coverage.stat_counts` with all five status keys at zero; `log_files` with `present: false` and `no_logs_note: ""`). Do **not** render the skeleton — the schema requires `remit_coverage.rules` to have at least one entry, so a `rules: []` skeleton is intentionally non-renderable. The skeleton is a scaffold for the chunked Edits below; the first render is the final Step 11 render, after counts are reconciled.
+1. **Write the complete skeleton.** Required top-level arrays — **all four must appear, even if empty:** `findings: []`, `positives: []`, `log_files.rows: []`, `remit_coverage.rules: []`. (`raise_posture.categories` has all six entries from the start — it is never empty.) Required top-level objects with their required keys: `raise_posture.categories` populated; `footer.severity_counts` with all five keys at zero; `remit_coverage.stat_counts` with all five status keys at zero; `log_files` with `present: false` and `no_logs_note: ""`. Top-level fields (`schema_version`, `praxen_version`, `scan`, `intro_band`, `behavior_summary`) populated from the manifest. Do **not** render the skeleton — the schema requires `remit_coverage.rules` to have at least one entry, so a `rules: []` skeleton is intentionally non-renderable. The skeleton is a scaffold for the chunked Edits below; the first render is the final Step 11 render, after counts are reconciled.
 2. **Append findings one at a time** via `Edit` (`replace_all: false`), anchoring on the closing `]` of the findings array. Each finding object is one Edit. Never compose a multi-finding JSON in one Write — that is the canonical stall site.
 3. **One-line text heartbeat before each Edit** — `"Drafting finding N/M — <one-line theme>"`. Keeps the stream alive during the model's composition pauses *between* tool calls.
 4. **Same pattern for `remit_coverage.rules`** — empty array in the skeleton, `Edit`-append one rule at a time, heartbeat before each.
