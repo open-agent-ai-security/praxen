@@ -1,0 +1,92 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Aider
+Analysis: May 25, 2026, 20:25 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a real human-in-the-loop safety model with several
+discrete gaps where a single primitive removes the human from the loop.
+InputOutput.confirm_ask is wired into every destructive path — new-file
+creation, edits to files not yet added, shell-command execution (with
+explicit_yes_required=True and allow_never=True), and lint-fix retries — and
+the auto-commit, auto-lint, and gitignore-respecting edit flow back this with
+a durable on-disk record. The gaps are concentrated: Coder.abs_root_path does
+not enforce repo containment so /read-only and /add accept absolute and
+~-expanded paths outside the repo (violating the remit's hard "MUST NOT read
+files outside the repository root" clause); the --watch-files flow turns an #
+ai! comment in any tracked file into an LLM turn with no per-trigger
+confirmation, opening a one-hop indirect-injection path from any tool or
+process that can write into the working tree; and there is no secret-scanner
+over file contents going into LLM context, no instruction-content
+neutralization on comments/docstrings, and --git-commit-verify defaults to
+False (i.e. git commit --no-verify is the default for aider edits, violating
+the remit's "MUST NOT alter version-control internals" intent in spirit even
+though hook files are not edited).
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 5   Medium: 4   Low: 1   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 5   Partial: 7   Vague: 0   Enforcement-not-possible: 0   (of 16 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  abs_root_path does not enforce repo containment —
+            /read-only and /add accept absolute and ~-expanded paths outside
+            the repository.
+      Action 1: In aider/coders/base_coder.py abs_root_path, after
+                safe_abs_path, raise (or return None and have callers refuse)
+                when os.path.commonpath([res, self.root]) != self.root;
+                centralize the containment check there.
+      Action 2: In aider/commands.py cmd_read_only, refuse expanduser-expanded
+                or is_absolute() paths that do not resolve inside
+                self.coder.root, mirroring the check cmd_add already does at
+                commands.py:850.
+
+  PRAX-2026-05-25-002  File content reaching LLM context has no
+            injection-detection or neutralization, despite the remit requiring
+            exactly that on comments, docstrings, and documentation.
+      Action 1: Add a neutralization pass before any file-content /
+                web-content / dependency-metadata string is appended to chat
+                messages: collapse imperative-mood instruction patterns in
+                comments and docstrings, mark untrusted spans with a stable
+                boundary, and document the trust boundary in the system
+                prompt.
+      Action 2: Subject # ai! / # ai? triggers in aider/watch.py
+                process_changes to an additional confirmation prompt that
+                names the file, the line, and the comment text before
+                constructing the LLM turn.
+
+  PRAX-2026-05-25-003  auto_commit after every LLM edit has no diff-accept
+            gate, so a successful prompt-injection commits to git without the
+            developer reviewing the diff.
+      Action 1: Insert a self.io.confirm_ask('Apply these edits and commit?',
+                subject=<diff>, explicit_yes_required=True) between
+                apply_updates and auto_commit in
+                aider/coders/base_coder.py:1585; gate by auto_commits and a
+                new --review-diffs flag that defaults True.
+      Action 2: Switch the --show-diffs default to True so the existing
+                display-only path at minimum prints the diff during the turn
+                even when the new confirm gate is bypassed.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

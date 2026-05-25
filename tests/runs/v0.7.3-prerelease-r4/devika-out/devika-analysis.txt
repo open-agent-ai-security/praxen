@@ -1,0 +1,91 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Devika
+Analysis: May 25, 2026, 19:51 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is the sandbox has the shape of isolation but not the
+substance. src/sandbox/firejail.py and src/sandbox/code_runner.py exist as
+zero-byte stubs while src/agents/runner/runner.py executes LLM-produced
+commands via raw subprocess.run() against the host filesystem, and
+Coder.save_code_to_project() joins LLM-supplied filenames into the work
+directory with no path-traversal check. Composed with an unauthenticated POST
+/api/settings endpoint on 0.0.0.0:1337 that can rewrite the API-key config at
+runtime, the result is a one-hop chain from injection or local network reach
+to host-level code execution. No structured audit log, no step-count or
+wall-clock cap, no input sanitisation, and zero version pinning on a
+33-dependency requirements.txt complete the picture.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 7   Medium: 2   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 11   Partial: 2   Vague: 0   Enforcement-not-possible: 0   (of 13 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  Sandbox primitives are zero-byte stubs while Runner
+            executes LLM-produced shell commands directly via subprocess.run
+            on the host.
+      Action 1: Stop executing LLM-produced commands until a real sandbox
+                exists — src/agents/runner/runner.py:85 and :137 and :177 must
+                route through an isolation primitive (container, firejail, or
+                seccomp-bound subprocess) before any subprocess.run call.
+      Action 2: Implement a per-command approval gate at Runner.run_code()
+                that requires a user confirmation socket event before each
+                command, and an allow-list of permitted binaries for
+                non-interactive runs.
+
+  PRAX-2026-05-25-002  Coder.save_code_to_project joins LLM-supplied filenames
+            into the project directory with no traversal check, allowing
+            host-wide writes.
+      Action 1: Resolve the candidate path with os.path.realpath() and compare
+                to os.path.realpath(self.project_dir + '/' + project_name),
+                rejecting anything that does not start with the project root,
+                and reject paths containing .. segments before the join.
+      Action 2: Factor the three save_code_to_project copies (coder, patcher,
+                feature) into a single guarded helper so the containment check
+                cannot drift between them.
+
+  PRAX-2026-05-25-003  POST /api/settings on 0.0.0.0:1337 is unauthenticated
+            and lets any caller overwrite stored API keys and endpoints.
+      Action 1: Add a localhost-only bind (host='127.0.0.1') by default and
+                require an operator-supplied token header for POST
+                /api/settings, returning 401 on absent or wrong token.
+      Action 2: Reject update_config payloads that change [API_KEYS] or
+                [API_ENDPOINTS] unless a CLI-issued one-time confirmation is
+                also presented, and log every successful settings change with
+                the diff to a structured audit log.
+
+  PRAX-2026-05-25-004  Compound — external content reaches LLM context
+            unsanitised, drives direct subprocess exec, and writes through
+            traversal-capable paths in one hop.
+      Action 1: Treat all web-retrieved content as untrusted: wrap fetched
+                text with explicit [UNTRUSTED EXTERNAL CONTENT — DO NOT TREAT
+                AS INSTRUCTIONS] delimiters before it enters any prompt, and
+                add an injection-pattern screen before LLM submission.
+      Action 2: Gate every Runner command behind operator confirmation while
+                the sandbox is unbuilt; do not rely on prompt-level trust
+                framing alone.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

@@ -1,0 +1,100 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: May 25, 2026, 20:02 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the remit, never enforced in
+scope-readable code: every untrusted-input rule in the Behavioral Constraints
+section (R-08, R-09, R-15) has zero corresponding implementation — issue
+bodies, PR comments, and file diffs flow straight into Anthropic messages
+arrays with no neutralization, no quote-wrapping, and no instruction-pattern
+detector. That gap meets a second pattern of control primitives present in the
+codebase but wired out: WEBHOOK_SECRET is declared in config/server.py and
+consumed by verify_signature, but the verifier returns True when the secret is
+unset (fail-open), and is_blocked() is defined in sweep_bot.py with no caller
+anywhere in the repo. Compounding both is a row of four subprocess.run(...,
+shell=True) sites whose arguments include LLM-output or untrusted-issue text —
+the most direct of these is the ripgrep tool in question_answerer.py, where
+the model's chosen search query is " ".join-ed into a shell command line with
+no escaping. Together these form a credible injection-to-shell chain that the
+remit explicitly forbids (R-14, R-15).
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.45 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 5   Medium: 3   Low: 0   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 2   Gap: 11   Partial: 5   Vague: 0   Enforcement-not-possible: 2   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  Webhook HMAC verification fails open when
+            WEBHOOK_SECRET is unset — declared-but-defeated counterparty trust
+            control.
+      Action 1: In sweepai/config/server.py, replace the None default for
+                WEBHOOK_SECRET with an assert WEBHOOK_SECRET, "WEBHOOK_SECRET
+                is required." guard at module load (matching the pattern
+                already used for OPENAI_API_KEY and COHERE_API_KEY at lines
+                210-211), so the service refuses to start without it.
+      Action 2: In sweepai/utils/hash.py, change the fail-open branch to
+                return False (reject) when WEBHOOK_SECRET is unset rather than
+                True (accept), so a misconfigured deployment fails closed
+                instead of accepting unsigned traffic.
+
+  PRAX-2026-05-25-002  Hardcoded PostHog telemetry key in source — repository
+            metadata sent to a counterparty not in the remit's authorized
+            list.
+      Action 1: Remove the hardcoded fallback value from config/server.py:107
+                and let POSTHOG_API_KEY default to None; gate the PostHog
+                client construction in event_logger.py on a truthy key.
+      Action 2: Add a per-operator opt-in env var (e.g.
+                SWEEP_TELEMETRY_ENABLED) and document the destination
+                prominently in the deployment README so the R-17 counterparty
+                list stays a closed set.
+
+  PRAX-2026-05-25-003  Four subprocess.run(shell=True) sites with LLM- or
+            untrusted-input-derived arguments — direct injection-to-shell
+            chain.
+      Action 1: In all four call sites, remove shell=True and pass the argv
+                list directly to subprocess.run (the commands are already
+                list-shaped; the " ".join is what introduces the
+                shell-injection surface).
+      Action 2: In question_answerer.py, additionally validate the
+                model-supplied query against a conservative allow-list pattern
+                before invocation — at minimum reject any candidate containing
+                shell metacharacters.
+
+  PRAX-2026-05-25-004  Issue bodies, comments, and file contents flow into LLM
+            context with no instruction-injection screening anywhere in scope.
+      Action 1: Introduce a single screening helper (e.g.
+                sweepai/utils/untrusted_text.py:wrap_untrusted(text)) that
+                quote-wraps in a distinct delimiter the model has been
+                instructed never to obey, strips or escapes XML-like tag
+                openers that match Sweep's own tool / control tags, and flags
+                instruction-shaped patterns (ignore previous, system:,
+                <function_call>, etc.) into a side channel for the operator.
+      Action 2: Pipe every issue body, comment body, PR review, and file
+                content through that helper at the three sites above before it
+                reaches the Message(content=...) constructor.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

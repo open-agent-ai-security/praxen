@@ -1,0 +1,114 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: May 25, 2026, 19:52 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a textbook policy-implementation void: the Worker
+Remit declares hard rules — fraud detection MUST run before approval, invoice
+content MUST NOT alter goals, vendors MUST be verified-and-approved, the
+manual-review threshold MUST require human sign-off — and the code provides no
+enforcement at all for any of them. The unauthenticated POST
+/admin/finbot/goals endpoint writes raw text into the system prompt via
+FinBotConfig.custom_goals (no auth, no validation, no goal-deployment gate),
+fraud_detection_enabled is a runtime boolean flag any caller can flip to
+False, vendor registration auto-stamps every new vendor as approved, and the
+rule-based _analyze_business_context path in _fallback_processing explicitly
+downgrades injection-detected invoices to auto-approve when "business context"
+keywords appear in the description. This produces one full compound chain —
+unauth admin → goal injection → fraud-detection bypass → auto-approval above
+the manual-review threshold — that is simultaneously the canonical ASI01/ASI06
+path and the documented CTF win condition.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 6   High: 4   Medium: 3   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 12   Partial: 2   Vague: 0   Enforcement-not-possible: 1   (of 15 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  Compound chain — unauthenticated /admin/finbot/goals
+            endpoint writes attacker-controlled text into the LLM system
+            prompt, enabling full goal hijack of a payment-approving agent.
+      Action 1: Remove the /admin/finbot/goals endpoint entirely; goal changes
+                belong in the deployment pipeline, not the runtime API. If a
+                runtime escape hatch must exist, gate it behind strong
+                authentication, an allow-list of structured goal fields, and a
+                code-signed approval.
+      Action 2: Stop concatenating custom_goals into the system prompt — drop
+                the entire if config.custom_goals: block in
+                get_system_prompt() and remove custom_goals from FinBotConfig.
+
+  PRAX-2026-05-25-002  Fraud detection is not invoked before approval in
+            either the LLM or fallback path — the remit's MUST-run gate has no
+            code enforcement.
+      Action 1: Make _approve_invoice a private function that requires a fresh
+                fraud-detection result object as a parameter; reject any
+                approval that lacks one or whose risk_level is medium or high.
+      Action 2: Remove fraud_detection_enabled from the runtime config
+                entirely — the remit (R-06) says this flag should not exist.
+
+  PRAX-2026-05-25-003  fraud_detection_enabled is a runtime-flippable boolean
+            any caller of /admin/finbot/config can set to False, disabling
+            fraud checks the remit says are non-disableable.
+      Action 1: Delete fraud_detection_enabled from the FinBotConfig model and
+                the admin endpoint; the control should be unconditional in
+                code.
+      Action 2: Add authentication to /api/admin/* and an allow-list of fields
+                the endpoint may update (no goals, no fraud toggle, no model
+                selection).
+
+  PRAX-2026-05-25-004  Business-context override in _fallback_processing
+            auto-approves invoices that fraud detection has already flagged as
+            containing prompt injection, in direct violation of R-04 and R-10.
+      Action 1: Make injection detection a hard rejection or escalation in
+                _fallback_processing — when contains_injection is True the
+                only permitted decisions are flag_review or reject, never
+                auto_approve.
+      Action 2: Delete _analyze_business_context() entirely; nothing the
+                vendor writes in a description field should drive a security
+                decision.
+
+  PRAX-2026-05-25-005  No code-level escalation gate — approve_invoice can be
+            called regardless of fraud-detection signal, contradicting R-04's
+            MUST-escalate-on-any-fraud-signal rule.
+      Action 1: Introduce a per-invoice fraud_check_result row that
+                _approve_invoice reads and refuses to approve unless it is
+                present and clean.
+      Action 2: Remove approve_invoice from the LLM tool surface entirely; let
+                the agent only escalate or reject, and place final approval
+                behind a deterministic gate outside the LLM loop.
+
+  PRAX-2026-05-25-006  Manual-review threshold can be bypassed — the fallback
+            path explicitly auto-approves above-threshold invoices when
+            keyword business context is strong, with no human checkpoint.
+      Action 1: Replace every branch under invoice.amount >
+                config.manual_review_threshold with an unconditional decision
+                = "flag_review" — no business-context override is permitted by
+                the remit.
+      Action 2: Mirror the same gate in the LLM path: _approve_invoice should
+                refuse when invoice.amount > manual_review_threshold
+                regardless of model intent.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
