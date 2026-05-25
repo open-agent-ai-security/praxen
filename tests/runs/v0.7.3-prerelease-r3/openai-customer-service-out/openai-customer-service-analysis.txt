@@ -1,0 +1,106 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenAI Agents SDK — Customer Service Example
+Analysis: May 25, 2026, 04:19 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is framework ships safe primitives; example wires in none
+of them. The OpenAI Agents SDK provides InputGuardrail, OutputGuardrail,
+ToolInputGuardrail, ToolOutputGuardrail, FunctionTool.needs_approval,
+FunctionTool.is_enabled, and Handoff.input_filter — every one is set to its
+permissive default in examples/customer_service/main.py. The result is a
+customer-facing seat-mutation tool (update_seat) that accepts any confirmation
+number the LLM emits and writes it straight into the shared context with no
+ownership check, an on_seat_booking_handoff hook that fabricates a flight
+number with random.randint(100, 999) in direct violation of the remit's
+prohibition on agent-generated identifiers, and zero durable audit log for
+seat changes despite the remit requiring one for every mutation. Underneath
+that, the agents' identity and scope live entirely in prompt strings — the
+triage agent's "you can use your tools to delegate" instruction is the only
+constraint on its behaviour, and there is no code-level enforcement that
+customer-supplied input cannot reach the FAQ tool's keyword switch or override
+an agent's role.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.00 / 5.0   (Ad hoc)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 4   Medium: 4   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 11   Partial: 3   Vague: 0   Enforcement-not-possible: 1   (of 16 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  <code>update_seat</code> mutates reservation state with
+            no authenticated-customer identity check and no ownership
+            verification of the supplied confirmation number.
+      Action 1: Add a customer-identity check before any reservation mutation
+                — load the authenticated principal from a session/auth source
+                and refuse the tool call if absent.
+      Action 2: Set needs_approval=True (or a callable that fires when the
+                principal cannot be verified) on the update_seat
+                @function_tool and use RunState.approve() / RunState.reject()
+                to gate the mutation.
+      Action 3: Verify the supplied confirmation_number belongs to the
+                authenticated principal against an authoritative reservation
+                lookup before any write.
+
+  PRAX-2026-05-25-002  Confirmation number is taken from LLM-relayed customer
+            input and written into the reservation context with no
+            verification against an authoritative source.
+      Action 1: Look up the supplied confirmation number against the
+                authoritative reservation system and refuse the call if it is
+                not present, not in confirmed state, or not bound to the
+                authenticated principal.
+      Action 2: Wrap update_seat with a ToolInputGuardrail that runs the
+                lookup before invocation and triggers the tripwire on
+                mismatch.
+
+  PRAX-2026-05-25-003  <code>update_seat</code> writes any seat string the LLM
+            produces with no availability or existence check.
+      Action 1: Resolve the seat map for the verified flight and reject
+                new_seat if it does not exist, is in a class the booking does
+                not permit, or is already assigned.
+      Action 2: Return a structured error (or raise) on a rejected seat so the
+                calling agent surfaces it to the customer instead of silently
+                confirming.
+
+  PRAX-2026-05-25-004  Seat changes are not recorded to any durable audit log
+            capturing time, customer identity, confirmation number, old/new
+            seat, and acting agent.
+      Action 1: Add a durable audit-log write inside update_seat that captures
+                time, customer_identity, confirmation_number, old_seat,
+                new_seat, and agent_name, and refuses to commit the mutation
+                if the write fails.
+      Action 2: Persist the log to a system separate from the agent's own
+                state (e.g., an append-only store) so it survives process
+                restarts and cannot be silently rewritten by the agent.
+
+  PRAX-2026-05-25-005  <code>on_seat_booking_handoff</code> fabricates a
+            flight number with <code>random.randint(100, 999)</code> and
+            writes it into reservation context.
+      Action 1: Replace random.randint(100, 999) with a lookup against the
+                authenticated customer's reservation record and abort the
+                handoff if no confirmed reservation is in scope.
+      Action 2: Remove the import random line if no other call site needs it,
+                to eliminate any future reuse of this anti-pattern.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

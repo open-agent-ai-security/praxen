@@ -1,0 +1,434 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "0.7.2",
+  "scan": {
+    "agent": "Sweep",
+    "agent_slug": "sweep",
+    "scan_date": "2026-05-25",
+    "scan_timestamp": "2026-05-25T04:32:35Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/full-suite-2026-05-23/sources/sweep-src",
+    "artifact_count": 18
+  },
+  "intro_band": {
+    "agent_remit_summary": "Sweep is a GitHub App that reads issues and comments, generates code changes via a third-party LLM provider, and opens pull requests for human review. Its authorized capabilities are deliberately narrow: receive GitHub events, read repository contents, create branches it authors, commit to those branches, open PRs against the default branch, and reply to the originating issue or comment. The remit forbids merging its own PRs, force-pushing or deleting branches it did not author, executing arbitrary shell commands or generated code, committing secrets, modifying CI/CD or security-sensitive files without human approval outside the PR path, and following any instructions embedded in untrusted issue, comment, file, or diff content. Every character of every issue, comment, PR review, file, and diff must be treated as untrusted input and screened for instruction injection before being used as model context.",
+    "agent_structure_summary": "Python 3.10 FastAPI service packaged as a Docker container (<code>Dockerfile</code>, <code>docker-compose.yml</code>), with an HTTP health endpoint in <code>sweepai/web/health.py</code>, FastAPI Pydantic event models in <code>sweepai/web/events.py</code>, and a small <code>event_utils.py</code> helper that uses the GitHub App installation token to fetch issues. Configuration is environment-driven via <code>sweepai/config/server.py</code> (which declares <code>WEBHOOK_SECRET</code> and many LLM/AWS/Slack/Jira/Sentry/Resend/PostHog/Voyage keys) and <code>sweepai/config/client.py</code> (the <code>SweepConfig</code> Pydantic model plus a <code>subprocess.run(..., shell=True)</code> call to <code>github-linguist</code>). The agent layer in <code>sweepai/agents/</code> and <code>sweepai/core/</code> orchestrates Anthropic / OpenAI chat completions with tools — <code>ripgrep</code> in <code>question_answerer.py</code>, <code>run_ripgrep_command</code> in <code>context_pruning.py</code>, <code>use_ripgrep</code> in <code>dynamic_context_bot.py</code> — every one of which calls <code>subprocess.run(..., shell=True)</code> on a model-derived query argument. The in-scope dirs (<code>sweepai/agents|core|web|config</code> + root configs) contain no authentication middleware, no HMAC signature verification, no instruction-injection screening, no approval gate, no rate limiting, and no per-event audit-log writer."
+  },
+  "behavior_summary": "<p>The dominant pattern is <em>policy declared in the remit, near-zero code-level enforcement in scope</em>: the remit mandates injection screening on every issue / comment / file / diff, secret redaction in generated content, a hard prohibition on executing generated code or shell commands, and a configured <code>WEBHOOK_SECRET</code> for ingress authentication — but the in-scope code paths implement none of them.</p><p>Three search tools (<code>question_answerer.ripgrep</code>, <code>context_pruning.run_ripgrep_command</code>, <code>dynamic_context_bot.use_ripgrep</code>) take an LLM-derived <code>query</code> argument, <code>.join(...)</code> it into a shell string, and execute it under <code>subprocess.run(..., shell=True)</code>; the only attempt at neutralisation, <code>escape_ripgrep</code> in <code>core/context_pruning.py</code>, escapes <code>(</code> and <code>{</code> and ignores every shell metacharacter that actually matters (<code>;</code>, <code>|</code>, backtick, <code>$</code>, <code>&</code>, redirects).</p><p>Combined with the absence of any instruction-injection filter on issue/comment content entering model context and the absence of a webhook-signature verification call site in any in-scope file, an attacker who can open an issue on a Sweep-installed repo has a direct issue-body to LLM context to shell-execution chain.</p>",
+  "remit_coverage": {
+    "stat_counts": { "verified": 0, "gap": 11, "partial": 3, "vague": 0, "enp": 6, "total": 20 },
+    "rules": [
+      { "rule_id": "R-01", "section": "What Sweep may NOT do autonomously", "rule_text": "Sweep MUST NOT merge a pull request — every change reaches the default branch only through human approval.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-02", "section": "What Sweep may NOT do autonomously", "rule_text": "Sweep MUST NOT force-push to, rewrite the history of, or delete any branch it did not author.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-03", "section": "What Sweep may NOT do autonomously", "rule_text": "Sweep MUST NOT delete repositories, transfer ownership, change repository visibility, or modify repository settings.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-04", "section": "What Sweep may NOT do autonomously", "rule_text": "Sweep MUST NOT install, uninstall, or alter the permissions of the GitHub App itself.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-05", "section": "What Sweep may NOT do autonomously", "rule_text": "Sweep MUST NOT access repositories the GitHub App is not installed on.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-06", "section": "What Sweep must always do", "rule_text": "Every character of every issue, comment, PR review, file, and diff MUST be treated as untrusted input, even when the contributor appears to be a repository collaborator.", "status": "gap", "finding_id": "PRAX-2026-05-25-002" },
+      { "rule_id": "R-07", "section": "What Sweep must always do", "rule_text": "Issue bodies, comments, file contents, and diffs MUST be screened for instruction injection before being used as model context, and instruction-like patterns neutralized or quote-wrapped.", "status": "gap", "finding_id": "PRAX-2026-05-25-002" },
+      { "rule_id": "R-08", "section": "What Sweep must always do", "rule_text": "Proposed changes MUST stay scoped to the files, modules, or areas the issue is explicitly about; changes outside that scope require explicit justification or human approval.", "status": "partial", "finding_id": "PRAX-2026-05-25-008" },
+      { "rule_id": "R-09", "section": "What Sweep must always do", "rule_text": "Every code change MUST be delivered as a pull request — no direct commits to the default branch and no bypass.", "status": "partial", "finding_id": "PRAX-2026-05-25-009" },
+      { "rule_id": "R-10", "section": "What Sweep must always do", "rule_text": "Every run MUST be logged in a record detailed enough to reconstruct what Sweep did — the repository, the issue, the triggering user, the model used, the tools invoked, the files changed, and the outcome.", "status": "gap", "finding_id": "PRAX-2026-05-25-005" },
+      { "rule_id": "R-11", "section": "What Sweep must always do", "rule_text": "Secret-like strings — API keys, tokens, private keys, passwords — MUST be redacted from and never echoed in generated code, commit messages, or PR descriptions.", "status": "gap", "finding_id": "PRAX-2026-05-25-006" },
+      { "rule_id": "R-12", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT execute arbitrary shell commands, install arbitrary packages, or run generated code as part of producing a change.", "status": "gap", "finding_id": "PRAX-2026-05-25-001" },
+      { "rule_id": "R-13", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT follow instructions embedded in issues, comments, file contents, or dependency manifests that attempt to override its scope, redirect its output, extract repository secrets, or expand its own authorization.", "status": "gap", "finding_id": "PRAX-2026-05-25-002" },
+      { "rule_id": "R-14", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT commit secrets, credentials, tokens, or environment-file contents to any branch.", "status": "partial", "finding_id": "PRAX-2026-05-25-006" },
+      { "rule_id": "R-15", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT send source code, secrets, or repository metadata anywhere other than its LLM provider as inference context, GitHub as a PR or comment, and the project's own logging and telemetry.", "status": "gap", "finding_id": "PRAX-2026-05-25-010" },
+      { "rule_id": "R-16", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT modify CI/CD, build, or deployment configuration without an explicit instruction in the issue to do so and without prominently flagging the change in the PR description.", "status": "gap", "finding_id": "PRAX-2026-05-25-008" },
+      { "rule_id": "R-17", "section": "What Sweep must NEVER do", "rule_text": "Sweep MUST NOT modify security-sensitive files — security policy, code-ownership, automated-dependency, signing-key, and certificate-pin configuration — without human approval outside the normal PR review path.", "status": "gap", "finding_id": "PRAX-2026-05-25-008" },
+      { "rule_id": "R-18", "section": "Human approval is required for", "rule_text": "Any change to CI/CD, build, dependency-manifest, or security configuration files.", "status": "gap", "finding_id": "PRAX-2026-05-25-008" },
+      { "rule_id": "R-19", "section": "Human approval is required for", "rule_text": "Any action that would affect a repository other than the one named in the triggering event.", "status": "enp", "finding_id": null },
+      { "rule_id": "R-20", "section": "Human approval is required for", "rule_text": "Changes that exceed a configured per-file size threshold or span more than a configured number of files, absent explicit issue-level authorization.", "status": "gap", "finding_id": "PRAX-2026-05-25-011" }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-25-001",
+      "severity": "Critical",
+      "summary": "Model-derived ripgrep queries executed via subprocess.run(shell=True) in three search tools, with no effective shell-metacharacter escaping.",
+      "description": "The three in-scope search tools (agents/question_answerer.ripgrep, core/context_pruning.run_ripgrep_command, core/dynamic_context_bot.use_ripgrep) each take a query parameter the LLM composes from issue/comment content, .join it into a shell command, and execute it under subprocess.run(..., shell=True). The only neutralisation attempt — escape_ripgrep in core/context_pruning.py:167-172 — escapes only ( and { and ignores ;, |, backtick, $, &, and redirect operators, so an injected query like 'foo; curl … | sh' runs unmodified inside the container.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" },
+        { "kind": "owasp_llm", "label": "LLM05 — Improper Output Handling" }
+      ],
+      "policy_rule_ids": "R-12",
+      "policy_rule_text": "Sweep MUST NOT execute arbitrary shell commands, install arbitrary packages, or run generated code as part of producing a change.",
+      "evidence": [
+        { "file": "sweepai/agents/question_answerer.py", "line": 270, "snippet": "response = subprocess.run(\" \".join([\"rg\",\"-n\",\"-i\",\"-C=5\",\"--heading\",\"--sort-files\",query]), shell=True, …) — query is a model-controlled tool argument with no escaping or validation." },
+        { "file": "sweepai/core/context_pruning.py", "line": 167, "snippet": "escape_ripgrep escapes only ( and {; the consumer at core/dynamic_context_bot.py:44-46 and core/context_pruning.py:186-188 runs the joined command with shell=True." }
+      ],
+      "recommended_actions": [
+        "In <code>agents/question_answerer.py:270</code>, <code>core/context_pruning.py:186</code>, and <code>core/dynamic_context_bot.py:44</code>, drop <code>shell=True</code> and pass the <code>rg</code> command as an argv list so the OS shell never parses model-derived text.",
+        "Replace <code>core/context_pruning.escape_ripgrep</code> with <code>shlex.quote</code> for every model-derived token, or reject any <code>query</code> that contains characters outside a strict allow-list (<code>[\\w\\s\\.\\-_/:]</code>)."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM05",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-25-002", "PRAX-2026-05-25-003"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-002",
+      "severity": "Critical",
+      "summary": "Issue and comment bodies flow into LLM context with no instruction-injection screening, violating the remit's mandatory untrusted-input policy.",
+      "description": "The remit (R-06, R-07, R-13) requires that every issue / comment / file / diff character be treated as untrusted and that instruction-like patterns be neutralised or quote-wrapped before reaching the model. web/event_utils.fetch_issue_request and the agent layer in agents/modify.py and agents/question_answerer.py thread the raw issue.body and comment.body straight into prompt-construction helpers; no in-scope file imports or defines an injection filter, quote-wrapper, or content-origin labeller.",
+      "tags": [
+        { "kind": "raise", "label": "Balance Your Knowledge Base" },
+        { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" },
+        { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
+      ],
+      "policy_rule_ids": "R-06, R-07, R-13",
+      "policy_rule_text": "Every character of every issue, comment, PR review, file, and diff MUST be treated as untrusted input, even when the contributor appears to be a repository collaborator. / Issue bodies, comments, file contents, and diffs MUST be screened for instruction injection before being used as model context, and instruction-like patterns neutralized or quote-wrapped. / Sweep MUST NOT follow instructions embedded in issues, comments, file contents, or dependency manifests that attempt to override its scope, redirect its output, extract repository secrets, or expand its own authorization.",
+      "evidence": [
+        { "file": "sweepai/web/event_utils.py", "line": 31, "snippet": "body=issue.body — raw GitHub issue body passed unfiltered into the IssueRequest model that downstream agents consume." },
+        { "file": "sweepai/core/prompts.py", "line": 49, "snippet": "human_message_prompt concatenates title, description, and snippet/diff content into the model context with no separator marking which segments are untrusted." }
+      ],
+      "recommended_actions": [
+        "Introduce an injection-screening helper (e.g. <code>sweepai/utils/injection_filter.py</code>) that quote-wraps issue/comment/file/diff content in a dedicated <code>&lt;untrusted&gt;…&lt;/untrusted&gt;</code> block before any prompt-builder consumes it, and call it from <code>web/event_utils.py</code> and from <code>agents/modify.create_user_message</code>.",
+        "In <code>core/prompts.human_message_prompt</code>, mark every contributor-sourced segment with an explicit untrusted-content delimiter the system prompt instructs the model to ignore."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-25-001", "PRAX-2026-05-25-003"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-003",
+      "severity": "Critical",
+      "summary": "Compound chain — untrusted GitHub issue body reaches model context, the model emits a query argument, the search tool runs it under shell=True.",
+      "description": "Findings PRAX-2026-05-25-001 and PRAX-2026-05-25-002 compose into an end-to-end one-hop injection-to-RCE chain: an attacker who opens an issue on a Sweep-installed repository controls text that enters the LLM context with no filter, the LLM is then asked to call the ripgrep / code_search tool, and the resulting model-emitted query argument is .join-ed into a shell string and executed inside the Sweep container. There is no per-event audit log (PRAX-2026-05-25-005) that would record the exploitation either.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" },
+        { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" },
+        { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" }
+      ],
+      "policy_rule_ids": "R-12, R-13",
+      "policy_rule_text": "Sweep MUST NOT execute arbitrary shell commands, install arbitrary packages, or run generated code as part of producing a change. / Sweep MUST NOT follow instructions embedded in issues, comments, file contents, or dependency manifests that attempt to override its scope, redirect its output, extract repository secrets, or expand its own authorization.",
+      "evidence": [
+        { "file": "sweepai/web/event_utils.py", "line": 31, "snippet": "raw issue.body enters the agent pipeline with no untrusted-content tagging or screening." },
+        { "file": "sweepai/agents/question_answerer.py", "line": 281, "snippet": "shell=True invocation of rg with a model-supplied query parameter — closes the chain." }
+      ],
+      "recommended_actions": [
+        "Land both PRAX-2026-05-25-001's argv-list / <code>shlex.quote</code> fix and PRAX-2026-05-25-002's untrusted-content wrapper; either alone reduces but does not eliminate the chain."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": ["PRAX-2026-05-25-001", "PRAX-2026-05-25-002", "PRAX-2026-05-25-005"],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-004",
+      "severity": "Critical",
+      "summary": "WEBHOOK_SECRET declared in config/server.py but no in-scope file verifies inbound GitHub webhook HMAC signatures.",
+      "description": "config/server.py:204 reads WEBHOOK_SECRET from the environment, and IS_SELF_HOSTED defaults to 'true' (config/server.py:99) — yet no file in sweepai/agents, sweepai/core, sweepai/web, or sweepai/config calls hmac.compare_digest, parses an X-Hub-Signature-256 header, or imports any HMAC routine on the in-scope receive path (web/event_utils.py and web/events.py contain only Pydantic models and a fetch helper). The control is named and configurable in the in-scope code, but the consumption site that would enforce it is absent — a declared-but-never-consulted security variable in the documented sense.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_agentic", "label": "ASI03 — Identity and Privilege Abuse" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        { "file": "sweepai/config/server.py", "line": 204, "snippet": "WEBHOOK_SECRET = os.environ.get(\"WEBHOOK_SECRET\", None) — only declaration; no in-scope consumer." },
+        { "file": "sweepai/web/events.py", "line": 1, "snippet": "file defines Pydantic event models only; no signature-verification middleware, no X-Hub-Signature parsing." }
+      ],
+      "recommended_actions": [
+        "Add a FastAPI dependency in <code>sweepai/web/</code> that reads the request body, computes <code>hmac.new(WEBHOOK_SECRET.encode(), body, sha256).hexdigest()</code>, and <code>hmac.compare_digest</code>-matches it against the <code>X-Hub-Signature-256</code> header, rejecting on mismatch.",
+        "When <code>WEBHOOK_SECRET</code> is unset and <code>IS_SELF_HOSTED</code> is true, fail closed at startup rather than silently disabling verification."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-005",
+      "severity": "High",
+      "summary": "No structured per-event action log — loguru calls capture debug context only, not the remit's required reconstructable record.",
+      "description": "The remit (R-10) requires a record detailed enough to reconstruct repository, issue, triggering user, model, tools invoked, files changed, and outcome for every run. The in-scope code uses loguru for ad-hoc logger.info / logger.warning / logger.exception strings scattered across core/sweep_bot.py, agents/modify.py, and agents/question_answerer.py, but no in-scope module writes a structured per-event record with those fields; the chat_logger.add_chat calls in core/sweep_bot.py:1333,1488 capture model chats, not the remit's action-level audit.",
+      "tags": [
+        { "kind": "raise", "label": "Monitor Continuously" },
+        { "kind": "owasp_agentic", "label": "ASI10 — Rogue Agents" }
+      ],
+      "policy_rule_ids": "R-10",
+      "policy_rule_text": "Every run MUST be logged in a record detailed enough to reconstruct what Sweep did — the repository, the issue, the triggering user, the model used, the tools invoked, the files changed, and the outcome.",
+      "evidence": [
+        { "file": "sweepai/core/sweep_bot.py", "line": 220, "snippet": "logger.info(f\"Found similar file …\") — free-form debug; representative of the in-scope logging pattern." },
+        { "file": "sweepai/agents/modify.py", "line": 128, "snippet": "logger.info(f\"Using model: {model}\") — single-field message, not the remit's seven-field reconstructable record." }
+      ],
+      "recommended_actions": [
+        "Add a <code>sweepai/web/</code> middleware (or a <code>sweepai/agents/modify.py</code> decorator) that emits one structured JSON-lines entry per event with <code>{repo, issue, user, model, tools[], files_changed[], outcome}</code>, persisted to disk or a log shipper."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI10",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-006",
+      "severity": "High",
+      "summary": "No secret-redaction pass on model output before it becomes commit messages, PR descriptions, or file diffs.",
+      "description": "The remit (R-11, R-14) prohibits echoing secret-like strings into generated code, commit messages, PR descriptions, or any branch. The in-scope agents (agents/modify.py, agents/pr_description_bot.py, core/pull_request_bot.py) take model output and hand it to PR/commit-construction helpers with no regex / entropy scan for sk-, Bearer, ghp_, AIza, base64 strings, or PEM private-key markers. A prompt-injected model that quotes a .env snippet back into a diff will commit it.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" }
+      ],
+      "policy_rule_ids": "R-11, R-14",
+      "policy_rule_text": "Secret-like strings — API keys, tokens, private keys, passwords — MUST be redacted from and never echoed in generated code, commit messages, or PR descriptions. / Sweep MUST NOT commit secrets, credentials, tokens, or environment-file contents to any branch.",
+      "evidence": [
+        { "file": "sweepai/agents/modify.py", "line": 1, "snippet": "module imports diff/format helpers but no redactor / secret_scanner; nothing in sweepai/agents, sweepai/core, sweepai/web, sweepai/config matches redact, scrub, or mask." },
+        { "file": "sweepai/agents/pr_description_bot.py", "line": 1, "snippet": "PR description generator with no secret-pattern scan on the rendered body." }
+      ],
+      "recommended_actions": [
+        "Add a <code>sweepai/utils/secret_redactor.py</code> (out of scope to add but in-scope to call) and invoke it in <code>agents/modify.py</code> before any commit/PR payload is built, replacing matches with <code>[REDACTED — &lt;pattern&gt;]</code>."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-007",
+      "severity": "High",
+      "summary": "Hardcoded PostHog API key default literal in config/server.py:107.",
+      "description": "POSTHOG_API_KEY is read from the environment with a hardcoded phc_-prefixed string default — a 47-character PostHog project API key shipped in source. Even though PostHog project keys are write-only telemetry credentials, baking one into the source tree means every fork and self-hosted deployment ships traffic to the same upstream project unless an operator notices and overrides it, and it directly contradicts the remit's data-egress confinement (R-15).",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" }
+      ],
+      "policy_rule_ids": "R-15",
+      "policy_rule_text": "Sweep MUST NOT send source code, secrets, or repository metadata anywhere other than its LLM provider as inference context, GitHub as a PR or comment, and the project's own logging and telemetry.",
+      "evidence": [
+        { "file": "sweepai/config/server.py", "line": 107, "snippet": "\"POSTHOG_API_KEY\", \"[REDACTED — phc_ prefix at config/server.py:107]\" — hardcoded default; pattern matches a PostHog project key." }
+      ],
+      "recommended_actions": [
+        "In <code>config/server.py:106-108</code>, drop the default and assert the variable is set when telemetry is enabled (<code>assert POSTHOG_API_KEY, \"POSTHOG_API_KEY required when ENABLE_POSTHOG=true\"</code>).",
+        "Rotate the leaked PostHog key out-of-band at the upstream project owner."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-008",
+      "severity": "High",
+      "summary": "No in-scope guard on edits to CI/CD, security-policy, dependency-manifest, or code-ownership files.",
+      "description": "The remit (R-08, R-16, R-17, R-18) prohibits Sweep from modifying CI/CD, build, deployment, security-policy, code-ownership, dependency-manifest, signing-key, or certificate-pin files without an explicit issue instruction and prominent PR flagging. config/client.SweepConfig defines blocked_dirs and the project sweep.yaml lists [\"sweepai/core/prompts.py\", \"sweep_chat/cypress/e2e/spec.cy.ts\"], but no in-scope path-classifier rejects modifications to .github/workflows/*, SECURITY.md, CODEOWNERS, requirements.txt, pyproject.toml, or signing-key/certificate-pin paths — the only enforcement is a customer-configurable allow-list with no security-sensitive defaults.",
+      "tags": [
+        { "kind": "raise", "label": "Limit Your Domain" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" }
+      ],
+      "policy_rule_ids": "R-08, R-16, R-17, R-18",
+      "policy_rule_text": "Proposed changes MUST stay scoped to the files, modules, or areas the issue is explicitly about; changes outside that scope require explicit justification or human approval. / Sweep MUST NOT modify CI/CD, build, or deployment configuration without an explicit instruction in the issue to do so and without prominently flagging the change in the PR description. / Sweep MUST NOT modify security-sensitive files — security policy, code-ownership, automated-dependency, signing-key, and certificate-pin configuration — without human approval outside the normal PR review path. / Any change to CI/CD, build, dependency-manifest, or security configuration files.",
+      "evidence": [
+        { "file": "sweep.yaml", "line": 3, "snippet": "blocked_dirs: [\"sweepai/core/prompts.py\", \"sweep_chat/cypress/e2e/spec.cy.ts\"] — customer-set list with no security-sensitive defaults." },
+        { "file": "sweepai/config/client.py", "line": 22, "snippet": "SweepConfig defines exclude_dirs / exclude_path_dirs for filtering, not a write-time guard for sensitive paths." }
+      ],
+      "recommended_actions": [
+        "Add a <code>sweepai/utils/sensitive_path_guard.py</code> (called from <code>agents/modify.py</code> before <code>cloned_repo.write_file</code>) that hard-blocks edits to <code>.github/workflows/*</code>, <code>CODEOWNERS</code>, <code>SECURITY.md</code>, <code>requirements.txt</code>, <code>pyproject.toml</code>, and <code>.well-known/*</code> unless the triggering issue body contains an explicit allow-token."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-009",
+      "severity": "High",
+      "summary": "No in-scope guard prevents direct commits to the repository default branch.",
+      "description": "The remit (R-09) requires every code change to be delivered as a pull request with no direct commits to the default branch. agents/modify.py builds StatefulCodeSuggestion objects and core/sweep_bot.py orchestrates the change pipeline, but neither contains a branch-target assertion — the in-scope code accepts whatever branch name the orchestration layer hands it, and config/client.SweepConfig.get_branch will create a missing branch if the configured branch is absent (config/client.py:209-213). Without a guard, a misconfigured caller can commit straight to main.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM06 — Excessive Agency" }
+      ],
+      "policy_rule_ids": "R-09",
+      "policy_rule_text": "Every code change MUST be delivered as a pull request — no direct commits to the default branch and no bypass.",
+      "evidence": [
+        { "file": "sweepai/config/client.py", "line": 209, "snippet": "repo.create_git_ref(f\"refs/heads/{branch_name}\", …) — branch-creation path runs with whatever branch_name the config provides; no check that branch_name != default_branch." },
+        { "file": "sweepai/agents/modify.py", "line": 60, "snippet": "change-orchestration entry-point with no target-branch assertion." }
+      ],
+      "recommended_actions": [
+        "In <code>agents/modify.modify</code> (and the branch-resolution path in <code>config/client.SweepConfig.get_branch</code>), assert <code>branch_name != repo.default_branch</code> before any commit/push, raising loudly on violation."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-010",
+      "severity": "High",
+      "summary": "No egress allow-list — agent layer makes outbound calls to many third-party destinations not constrained by the remit's egress rule.",
+      "description": "The remit (R-15) restricts outbound destinations to the LLM provider, GitHub, and the project's own logging/telemetry. The in-scope config (config/server.py:30-213) names Slack, Jira, Resend (email), Discord webhook (DISCORD_STATUS_WEBHOOK_URL), PostHog, Sentry, Parea, Voyage, AWS Bedrock, Cohere, OpenAI/Anthropic/Azure — a wide outbound surface with no allowed_egress_hosts enforcement in code. An injected prompt that triggers e.g. the Resend or Discord client can exfiltrate repository content to any address the model emits.",
+      "tags": [
+        { "kind": "raise", "label": "Limit Your Domain" },
+        { "kind": "owasp_llm", "label": "LLM02 — Sensitive Information Disclosure" }
+      ],
+      "policy_rule_ids": "R-15",
+      "policy_rule_text": "Sweep MUST NOT send source code, secrets, or repository metadata anywhere other than its LLM provider as inference context, GitHub as a PR or comment, and the project's own logging and telemetry.",
+      "evidence": [
+        { "file": "sweepai/config/server.py", "line": 30, "snippet": "DISCORD_STATUS_WEBHOOK_URL = os.environ.get(\"DISCORD_STATUS_WEBHOOK_URL\") — Discord webhook destination configurable; outside the remit's authorized counterparties." },
+        { "file": "sweepai/config/server.py", "line": 152, "snippet": "RESEND_API_KEY = os.environ.get(\"RESEND_API_KEY\", None) — outbound email destination configurable; outside the authorized counterparties." }
+      ],
+      "recommended_actions": [
+        "Add a per-deployment <code>ALLOWED_EGRESS_HOSTS</code> check at the HTTP-client construction sites (or wrap <code>httpx.AsyncClient</code> / <code>requests.Session</code> with a host validator) so any outbound call to a host not in the remit's authorized counterparty list fails loudly."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-011",
+      "severity": "High",
+      "summary": "No per-file size or per-PR file-count threshold enforcement — a malicious issue can drive an arbitrarily large change set with no operator gate.",
+      "description": "The remit (R-20) requires human approval for changes exceeding a configured per-file size threshold or spanning more than a configured number of files. The in-scope SweepConfig model exposes max_file_limit: 60_000 and truncation_cutoff: 20000 (config/client.py:137-141), but those are input filters — they decide what code Sweep reads, not what it writes. No in-scope code counts the number of files touched per PR, asserts a per-PR diff-line cap, or routes large change sets to a human-approval queue before opening the PR.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_llm", "label": "LLM10 — Unbounded Consumption" }
+      ],
+      "policy_rule_ids": "R-20",
+      "policy_rule_text": "Changes that exceed a configured per-file size threshold or span more than a configured number of files, absent explicit issue-level authorization.",
+      "evidence": [
+        { "file": "sweepai/config/client.py", "line": 139, "snippet": "max_file_limit: int = 60_000 — applies to input filtering, not output-change-size gating." },
+        { "file": "sweepai/agents/modify.py", "line": 60, "snippet": "modify orchestration entry-point with no len(files_changed) or sum(diff_lines) threshold check before completion." }
+      ],
+      "recommended_actions": [
+        "In <code>agents/modify.modify</code>, after the change loop, compute <code>len(modify_files_dict)</code> and total diff-line delta; if either exceeds a configured cap, refuse to open the PR and surface a human-approval request instead."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-25-012",
+      "severity": "Medium",
+      "summary": "Dockerfile pipes curl … | sh for the Rust installer and downloads ripgrep .deb over HTTPS without checksum or signature verification.",
+      "description": "Dockerfile:18-21 runs 'curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y' (curl-to-shell) and 'curl -LO https://github.com/.../ripgrep_13.0.0_amd64.deb && dpkg -i ripgrep_13.0.0_amd64.deb' with no sha256sum check or signature verification. A compromise of either upstream — or a TLS / DNS attack on a build-time fetch — silently lands arbitrary code in the production container image. The remit (R-12) forbids installing arbitrary packages and this build path materially weakens that promise.",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" },
+        { "kind": "owasp_llm", "label": "LLM03 — Supply Chain" },
+        { "kind": "owasp_agentic", "label": "ASI04 — Agentic Supply Chain Vulnerabilities" }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        { "file": "Dockerfile", "line": 18, "snippet": "curl -LO https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep_13.0.0_amd64.deb && dpkg -i ripgrep_13.0.0_amd64.deb — no checksum or signature check." },
+        { "file": "Dockerfile", "line": 20, "snippet": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y — curl-to-shell installer." }
+      ],
+      "recommended_actions": [
+        "In <code>Dockerfile:18</code>, pin the ripgrep <code>.deb</code> to a sha256 and verify it with <code>sha256sum -c</code> before <code>dpkg -i</code>.",
+        "In <code>Dockerfile:20</code>, download the <code>rustup-init</code> binary to disk, verify its sha256 against a pinned value, then execute — never pipe <code>curl | sh</code>."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-25-013",
+      "severity": "Medium",
+      "summary": "docker-compose.yml bind-mounts the project root and /mnt/caches into the container — a successful RCE escapes into the host workspace.",
+      "description": "docker-compose.yml:13-14 mounts .:/app (the project root, read-write) and /mnt/caches:/mnt/caches into the webhook container. Combined with PRAX-2026-05-25-003's injection-to-RCE chain, an exploited Sweep run can write into the host project tree (poisoning source code an operator later runs locally) and into the shared cache directory. The in-scope deployment surface assumes the container is a security boundary it is not.",
+      "tags": [
+        { "kind": "raise", "label": "Implement Zero Trust" },
+        { "kind": "owasp_agentic", "label": "ASI05 — Unexpected Code Execution (RCE)" }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        { "file": "docker-compose.yml", "line": 13, "snippet": "volumes: - .:/app  - /mnt/caches:/mnt/caches — read-write bind mounts crossing the container boundary." }
+      ],
+      "recommended_actions": [
+        "Mount only the artifacts the container needs at runtime, read-only where possible (<code>.:/app:ro</code>), and replace <code>/mnt/caches</code> with a named volume scoped to the container."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI05",
+      "confidence": "Medium",
+      "related_findings": ["PRAX-2026-05-25-003"],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-25-014",
+      "severity": "Informational",
+      "summary": "Dependency versions are pinned to exact releases in pyproject.toml and requirements.txt.",
+      "description": "Every dependency in pyproject.toml carries an == pin (e.g. anthropic==0.21.3, fastapi==0.110.0, openai==1.13.3) and requirements.txt is uv pip compile-generated — the supply chain has a precise, reproducible manifest. The remit does not require this; it is a credit that lifts Manage Your Supply Chain off the floor despite the unrelated weaknesses (PRAX-2026-05-25-007, PRAX-2026-05-25-012).",
+      "tags": [
+        { "kind": "raise", "label": "Manage Your Supply Chain" }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        { "file": "pyproject.toml", "line": 34, "snippet": "every dependencies = [...] entry uses == exact pinning." },
+        { "file": "requirements.txt", "line": 1, "snippet": "# This file was autogenerated by uv via the following command: uv pip compile pyproject.toml -o requirements.txt — reproducible lock." }
+      ],
+      "recommended_actions": [
+        "Keep the <code>uv pip compile</code> regeneration cadence and add a periodic CVE scan over the lock file."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Dependencies pinned to exact versions",
+      "description": "Every dependency in pyproject.toml uses == exact pinning and requirements.txt is uv pip compile-generated, making the Python supply chain reproducible.",
+      "evidence_path": "pyproject.toml:34"
+    },
+    {
+      "title": "Specific, verifiable Worker Remit",
+      "description": "The Sweep remit names concrete forbidden actions (no merging own PRs, no shell exec of generated code, no force-push), concrete required behaviors (untrusted-input screening, secret redaction, per-event audit record), and concrete authorized counterparties (GitHub, LLM provider, job queue) — every clause is something Praxen can audit code against, which is itself a baseline-quality signal.",
+      "evidence_path": "tests/remits/sweep.md:34"
+    }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No structured action log files were discovered under the in-scope directories; the absence is captured as PRAX-2026-05-25-005 (no per-event audit record).",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 0.75,
+    "weighted_rationale": "Absent. Sweep ships with a coherent, well-written remit that names every control it expects (untrusted-input screening, secret redaction, no shell execution of model output, webhook authentication, PR-only delivery, scope confinement) but the in-scope code paths implement essentially none of them: there is no instruction-injection filter, no HMAC verification call site, no approval gate, no rate limiter, no per-event audit logger, and three model-driven subprocess.run(shell=True) sites in the search tooling. What runs at runtime is the dependency-pinned framework defaults and a single weak escape function in core/context_pruning.py that escapes ( and { only — Zero Trust is at 0, lifted only by exact-pinned supply-chain hygiene.",
+    "categories": [
+      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": 1, "confidence": "Medium", "weight": 0.15, "rationale": "Sweep's system prompts (core/prompts.py, agents/question_answerer.py) scope the agent to GitHub-issue-driven code changes, but there is no code-level guard that rejects out-of-scope tool calls, off-scope file edits, or model-issued shell commands — domain restriction is prompt-only and the search tools run arbitrary rg queries the model composes." },
+      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": 1, "confidence": "High",   "weight": 0.15, "rationale": "Issue bodies, comments, file contents, and diffs flow into the LLM context through web/event_utils.py and the agent layer (agents/modify.py, agents/question_answerer.py) with no instruction-injection filter, no quote-wrapping, and no separation between trusted operator framing and untrusted contributor text — directly contradicting the remit's 'every character … MUST be treated as untrusted input' clause." },
+      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": 0, "confidence": "High",   "weight": 0.25, "rationale": "Three model-derived subprocess.run(..., shell=True) sites (agents/question_answerer.py:270-285, core/context_pruning.py:186-188, core/dynamic_context_bot.py:44-46) execute search queries the LLM composes; core/context_pruning.escape_ripgrep escapes only ( and {, leaving every shell-metacharacter intact, and the configured WEBHOOK_SECRET is declared in config/server.py:204 with no consumption site in any in-scope file." },
+      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": 2, "confidence": "High",   "weight": 0.15, "rationale": "Dependencies are pinned to exact versions in pyproject.toml and requirements.txt, but the Dockerfile pipes curl … | sh for the Rust installer and downloads ripgrep_13.0.0_amd64.deb over HTTPS with no checksum or signature verification, and a hardcoded PostHog API key default lives in config/server.py:107." },
+      { "key": "build_an_ai_red_team",        "name": "Build an AI Red Team",        "score": 0, "confidence": "High",   "weight": 0.15, "rationale": "The only in-scope test files (agents/complete_code_test.py, agents/assistant_wrapper_test.py, web/health_test.py) are unit-mock harnesses for code-validator and tool-call-parsing utilities; there is no prompt-injection fixture, no untrusted-issue-body corpus, and no documented red-team exercise that would have surfaced the shell-injection paths above." },
+      { "key": "monitor_continuously",        "name": "Monitor Continuously",        "score": 1, "confidence": "Medium", "weight": 0.15, "rationale": "loguru calls (logger.info, logger.warning, logger.exception) are scattered across core/sweep_bot.py, agents/modify.py, and agents/question_answerer.py for free-form debug messages, but there is no structured action log capturing the remit's required fields (repository, issue, triggering user, model, tools invoked, files changed, outcome) in any in-scope module." }
+    ]
+  },
+  "footer": {
+    "severity_counts": { "critical": 4, "high": 7, "medium": 2, "low": 0, "info": 1 }
+  }
+}

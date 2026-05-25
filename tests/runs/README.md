@@ -28,8 +28,9 @@ These are distinct from the frozen comparison baselines under [`../baselines/`](
 
 ## Current entries
 
-- [`v0.7.3-prerelease/`](v0.7.3-prerelease/SUITE_RUN.md) — 2026-05-23. Validated the dev→main 0.7.3 release (report-redesign + audit fixes + README polish). All 11 targets in-band on the Critical-theme gate; two RAISE-divergences flagged as defensible (openhands −0.85, yaah −0.60) under stricter Phase-2 calibration.
+- [`v0.7.3-prerelease/`](v0.7.3-prerelease/SUITE_RUN.md) — 2026-05-23. First-attempt validation of the dev→main 0.7.3 release (report-redesign + audit fixes + README polish). All 11 targets in-band on the Critical-theme gate; two RAISE-divergences flagged as defensible (openhands −0.85, yaah −0.60) under stricter Phase-2 calibration. **Three targets needed foreground rescue after subagent stalls** (langchain-sql, openai-customer-service, openhands) — the stall pattern that motivated the `b733a45` / `88dd690` SKILL fixes.
+- [`v0.7.3-prerelease-r3/`](v0.7.3-prerelease-r3/SUITE_RUN.md) — 2026-05-25. **Authoritative 0.7.3 validation, post-SKILL-fix.** Re-ran the full suite against dev @ `88dd690` (Step 9.9 full-prose manifest + Step 10 mechanical-translation requirement). 11/11 targets completed via subagent (10) + foreground (1) with **zero watchdog stalls at SKILL level**. Three RAISE band drifts flagged (langchain-sql +0.10, autogen-code-executor −0.20, sweep −0.25) — all calibration variance, all themes preserved. Four batch-1 subagents died with `API socket connection was closed unexpectedly` in a 38 s window (transient API event, not SKILL-related); all 4 retried clean.
 
 ## When to add an entry
 
-A **Full Suite Run** is mandatory before any `dev → main` release PR and recommended before any substantial skill-methodology change. See the [Full Suite Run protocol](../README.md#full-suite-run-protocol) in the parent README for the run procedure, the stream-health protocol that keeps subagent scans from stalling, and the verdict-report template.
+A **Full Suite Run** is mandatory before any `dev → main` release PR and recommended before any substantial skill-methodology change. See the [Full Suite Run protocol](../README.md#full-suite-run-protocol) in the parent README for the two invocation paths (parallel subagent / sequential foreground) and the verdict-report template.

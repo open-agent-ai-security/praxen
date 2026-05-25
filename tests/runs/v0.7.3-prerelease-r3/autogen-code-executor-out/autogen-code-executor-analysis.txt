@@ -1,0 +1,109 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: May 25, 2026, 04:20 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is sandbox has the shape of isolation but not the
+substance. The remit declares six MUST clauses every executor must enforce —
+work-directory confinement, timeout, full output capture, host isolation,
+session-state non-leakage, and a structured audit log — and code in
+autogen-ext/code_executors implements only the second (timeout) consistently.
+LocalCommandLineCodeExecutor copies os.environ wholesale into the child
+process (local/__init__.py:397), gating safety on a one-shot warnings.warn
+with no approval path; DockerCommandLineCodeExecutor creates its container
+with no user=, no read_only=, no cap_drop=, no mem_limit=, no pids_limit=, and
+no network isolation (docker/_docker_code_executor.py:537-550);
+create_default_code_executor() silently downgrades to the local path on any
+Docker failure (code_executors/__init__.py:58-80); DockerJupyterServer chmod
+0o777s the bind mount (docker_jupyter/_jupyter_server.py:328); and no executor
+anywhere in the tree writes an audit-log entry of any kind. Defaults the remit
+treats as forbidden are the defaults the code ships with.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.00 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 6   Medium: 4   Low: 1   Informational: 1
+  Total: 17
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 11   Partial: 7   Vague: 0   Enforcement-not-possible: 0   (of 19 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  LocalCommandLineCodeExecutor copies the parent
+            process's full os.environ into the executed subprocess, leaking
+            credentials and configuration to LLM-generated code.
+      Action 1: Replace the unconditional os.environ.copy() with an explicit
+                allow-list of harmless variables (PATH, HOME, LANG, TERM,
+                USER) and require operators to opt in additional variables via
+                a constructor parameter.
+      Action 2: Document the allow-list in the executor's docstring and emit a
+                one-time warning when the operator passes additional
+                variables.
+
+  PRAX-2026-05-25-002  DockerCommandLineCodeExecutor creates containers with
+            no user, capability, filesystem, memory, pid, or network hardening
+            — the container runs as root with full default capabilities.
+      Action 1: Pass safe defaults to containers.create: user="1000:1000",
+                read_only=True, cap_drop=["ALL"], mem_limit="512m",
+                pids_limit=256, network_disabled=True,
+                security_opt=["no-new-privileges"]; make each one a
+                constructor parameter so operators can relax individually, not
+                all-or-nothing.
+      Action 2: Add a constructor parameter network (default "none") that maps
+                to network_mode, and require explicit opt-in for non-isolated
+                networking.
+
+  PRAX-2026-05-25-003  create_default_code_executor silently downgrades from
+            Docker to LocalCommandLineCodeExecutor when Docker is unavailable,
+            emitting only a UserWarning with no approval gate.
+      Action 1: Add a constructor parameter allow_local_fallback: bool =
+                False; when False (the default), raise RuntimeError("Docker
+                unavailable; refusing to downgrade to local executor") instead
+                of falling back.
+      Action 2: When the operator explicitly opts in to local fallback,
+                require them to also pass i_understand_local_execution=True so
+                the decision is auditable in their own code.
+
+  PRAX-2026-05-25-004  JupyterCodeExecutor and DockerJupyterCodeExecutor
+            execute arbitrary LLM-supplied code in a kernel with no
+            work-directory confinement check — get_file_name_from_content is
+            never called on these paths.
+      Action 1: For JupyterCodeExecutor, configure the NotebookClient with a
+                resources={'metadata': {'path': str(self.work_dir)}} argument
+                and additionally chdir via a pre-cell so the kernel cannot
+                trivially escape; document that JupyterCodeExecutor is
+                non-isolation and direct callers to the Docker variant for
+                untrusted code.
+      Action 2: For DockerJupyterCodeExecutor, ensure the underlying
+                DockerJupyterServer mounts only the configured work_dir into
+                the container and rejects any extra bind via the same
+                approval-gated parameter as DockerCommandLineCodeExecutor.
+
+  PRAX-2026-05-25-005  DockerJupyterServer chmods the operator-supplied bind
+            directory to 0o777 — world-writable — on every server start.
+      Action 1: Remove the os.chmod(bind_dir, 0o777) entirely; let the
+                operator manage permissions on a directory they own.
+      Action 2: If the kernel user inside the container needs to write the
+                directory, run the container with user="$(id -u):$(id -g)"
+                matching the host user instead of widening host permissions.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

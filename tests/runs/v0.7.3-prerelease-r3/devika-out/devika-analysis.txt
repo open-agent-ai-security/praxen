@@ -1,0 +1,131 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Devika
+Analysis: May 25, 2026, 04:20 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is sandbox-shaped-but-not-substantive: the remit and the
+architecture document both declare a sandboxed runner as the control that
+confines LLM-produced code, but the src/sandbox/ directory ships only two
+0-byte files (firejail.py, code_runner.py) and the actual Runner in
+src/agents/runner/runner.py bypasses them entirely — it calls
+subprocess.run(command.split(" "), cwd=project_path) directly on shell strings
+the LLM emits, with a 2-retry self-heal loop and zero approval. Composed with
+two adjacent gaps — web search results flowing through the formatter into LLM
+context with no injection screening, and an unauthenticated /api/settings on
+0.0.0.0:1337 that rewrites config.toml in place — Devika offers a
+one-injection-away path from a crafted search result to host shell execution
+under the operator's user. The remit's required compensating controls
+(per-action audit log, wall-clock / step-count caps, approval gate for writes
+outside touched files) are absent from the codebase.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 7   High: 6   Medium: 3   Low: 0   Informational: 0
+  Total: 16
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 7   Gap: 11   Partial: 2   Vague: 0   Enforcement-not-possible: 0   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  Empty sandbox stub <code>src/sandbox/firejail.py</code>
+            — declared isolation primitive is a 0-byte file
+      Action 1: Implement firejail.py as a real firejail wrapper (firejail
+                --net=none --private --read-only=/ --read-write=<project_path>
+                -- <cmd>) and route every subprocess.run() call in
+                src/agents/runner/runner.py through it
+      Action 2: Until the sandbox lands, disable the "run" action in
+                src/agents/agent.py:209 behind a feature flag that defaults to
+                false
+
+  PRAX-2026-05-25-002  Empty sandbox stub
+            <code>src/sandbox/code_runner.py</code> — declared in-process
+            runner isolation is a 0-byte file
+      Action 1: Implement code_runner.py as the in-process command boundary
+                (allowlist of binaries, per-command timeout, resource caps via
+                resource.setrlimit) and wire it into Runner.run_code
+      Action 2: Add a CI check that fails if either src/sandbox/firejail.py or
+                src/sandbox/code_runner.py is empty
+
+  PRAX-2026-05-25-003  <code>Runner</code> executes LLM-emitted shell strings
+            via <code>subprocess.run()</code> with no sandbox, no allowlist,
+            no approval gate
+      Action 1: Replace every subprocess.run call in
+                src/agents/runner/runner.py with a call into a real sandbox
+                (see PRAX-2026-05-25-001 and PRAX-2026-05-25-002)
+      Action 2: Add a mandatory operator-approval prompt before
+                Runner.run_code is invoked, mediated through the existing
+                SocketIO channel
+      Action 3: Constrain commands to an allowlist (python/node/pytest/npm
+                etc.) and refuse anything else
+
+  PRAX-2026-05-25-004  Path traversal in <code>save_code_to_project</code> —
+            LLM-emitted file names joined into the project path with no escape
+            check
+      Action 1: Add a helper in src/filesystem/ that resolves the candidate
+                file path with os.path.realpath and rejects anything where
+                os.path.commonpath([resolved, project_root_real]) is not
+                project_root_real
+      Action 2: Apply the helper at all three save_code_to_project sites and
+                add a unit test for ../, absolute paths, and symlink escapes
+      Action 3: Refuse the entire response (do not write any file) when one
+                file in the set fails the check — the LLM should not be
+                allowed to write some-but-not-all files
+
+  PRAX-2026-05-25-005  Unauthenticated <code>POST /api/settings</code> on
+            <code>0.0.0.0:1337</code> rewrites <code>config.toml</code> in
+            place — Devika modifies its own configuration with no caller check
+      Action 1: Bind the listener to 127.0.0.1 by default; require an explicit
+                --host 0.0.0.0 flag to override
+      Action 2: Require an operator-set API token (loaded from env, never
+                written to config.toml) on every /api/* request; reject
+                without it
+      Action 3: Remove POST /api/settings entirely — settings should be edited
+                by hand on the operator's machine, not via an unauthenticated
+                REST call
+
+  PRAX-2026-05-25-006  <code>GET /api/settings</code> returns plaintext LLM
+            provider API keys to any caller
+      Action 1: Redact the API_KEYS block before returning it from GET
+                /api/settings — return masked tokens (last 4 chars) at most
+      Action 2: Better: remove the GET endpoint entirely; the UI should not
+                need to read credentials it never displays
+      Action 3: Move credential storage to OS keyring or an env-loaded vault
+                reference, not a workspace TOML file (see PRAX-2026-05-25-015)
+
+  PRAX-2026-05-25-007  Compound chain — untrusted web content -> Formatter ->
+            Coder/Runner -> host shell execution in one hop
+      Action 1: Tag every piece of context with provenance (operator / search
+                / KB) in prompt construction and instruct the model explicitly
+                to ignore instructions from non-operator content
+      Action 2: Add an injection-detection pre-filter on retrieved web content
+                (regex + a small classifier) before Formatter forwards it;
+                refuse pages that contain instruction-like patterns ("ignore
+                prior", "you are now", role headers)
+      Action 3: Add an explicit operator approval prompt between code
+                generation and Runner.execute — the operator must see and
+                approve the command set before any subprocess fires
+      Action 4: Implement the sandbox (PRAX-2026-05-25-001,
+                PRAX-2026-05-25-002) so that even an approved command runs in
+                a constrained jail
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

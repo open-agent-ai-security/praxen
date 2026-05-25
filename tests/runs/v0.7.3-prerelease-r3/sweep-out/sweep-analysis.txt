@@ -1,0 +1,94 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: May 25, 2026, 04:32 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the remit, near-zero code-level
+enforcement in scope: the remit mandates injection screening on every issue /
+comment / file / diff, secret redaction in generated content, a hard
+prohibition on executing generated code or shell commands, and a configured
+WEBHOOK_SECRET for ingress authentication — but the in-scope code paths
+implement none of them. Three search tools (question_answerer.ripgrep,
+context_pruning.run_ripgrep_command, dynamic_context_bot.use_ripgrep) take an
+LLM-derived query argument, .join(...) it into a shell string, and execute it
+under subprocess.run(..., shell=True); the only attempt at neutralisation,
+escape_ripgrep in core/context_pruning.py, escapes ( and { and ignores every
+shell metacharacter that actually matters (;, |, backtick, $, &, redirects).
+Combined with the absence of any instruction-injection filter on issue/comment
+content entering model context and the absence of a webhook-signature
+verification call site in any in-scope file, an attacker who can open an issue
+on a Sweep-installed repo has a direct issue-body to LLM context to
+shell-execution chain.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.75 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 7   Medium: 2   Low: 0   Informational: 1
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 11   Partial: 3   Vague: 0   Enforcement-not-possible: 6   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-25-001  Model-derived ripgrep queries executed via
+            subprocess.run(shell=True) in three search tools, with no
+            effective shell-metacharacter escaping.
+      Action 1: In agents/question_answerer.py:270,
+                core/context_pruning.py:186, and
+                core/dynamic_context_bot.py:44, drop shell=True and pass the
+                rg command as an argv list so the OS shell never parses
+                model-derived text.
+      Action 2: Replace core/context_pruning.escape_ripgrep with shlex.quote
+                for every model-derived token, or reject any query that
+                contains characters outside a strict allow-list
+                ([\w\s\.\-_/:]).
+
+  PRAX-2026-05-25-002  Issue and comment bodies flow into LLM context with no
+            instruction-injection screening, violating the remit's mandatory
+            untrusted-input policy.
+      Action 1: Introduce an injection-screening helper (e.g.
+                sweepai/utils/injection_filter.py) that quote-wraps
+                issue/comment/file/diff content in a dedicated
+                <untrusted>…</untrusted> block before any prompt-builder
+                consumes it, and call it from web/event_utils.py and from
+                agents/modify.create_user_message.
+      Action 2: In core/prompts.human_message_prompt, mark every
+                contributor-sourced segment with an explicit untrusted-content
+                delimiter the system prompt instructs the model to ignore.
+
+  PRAX-2026-05-25-003  Compound chain — untrusted GitHub issue body reaches
+            model context, the model emits a query argument, the search tool
+            runs it under shell=True.
+      Action: Land both PRAX-2026-05-25-001's argv-list / shlex.quote fix and
+              PRAX-2026-05-25-002's untrusted-content wrapper; either alone
+              reduces but does not eliminate the chain.
+
+  PRAX-2026-05-25-004  WEBHOOK_SECRET declared in config/server.py but no
+            in-scope file verifies inbound GitHub webhook HMAC signatures.
+      Action 1: Add a FastAPI dependency in sweepai/web/ that reads the
+                request body, computes hmac.new(WEBHOOK_SECRET.encode(), body,
+                sha256).hexdigest(), and hmac.compare_digest-matches it
+                against the X-Hub-Signature-256 header, rejecting on mismatch.
+      Action 2: When WEBHOOK_SECRET is unset and IS_SELF_HOSTED is true, fail
+                closed at startup rather than silently disabling verification.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
