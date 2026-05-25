@@ -5,7 +5,7 @@
 
 # Praxen Pre-Release Test Plan
 
-Praxen's regression test suite. Three named tiers — pick the one that matches what you're doing (see *[Test tiers](#test-tiers)* below). Before every `dev → main` release PR, run the **Full Suite Run** (all eleven targets sequential, ~3 hours wallclock), then **diff every target against the latest frozen baseline in `baselines/`** and against the per-target bands in this document (see *[What a release review looks like](#what-a-release-review-looks-like)*). Ad-hoc mid-development re-run reports are **not** kept here — they regenerate and drift. The committed runs are: the named, version-pinned **frozen baselines** under [`baselines/`](baselines/) (the reference a release is graded against), and the named **pre-release Full Suite Runs** under [`runs/`](runs/) (the evidence a specific release-candidate cleared the bar).
+Praxen's regression test suite. Three named tiers — pick the one that matches what you're doing (see *[Test tiers](#test-tiers)* below). Before every `dev → main` release PR, run the **Full Suite Run** — all eleven targets, either via parallel subagent (4–8 concurrent, ~90 min end-to-end) or sequential foreground (~3–4 hours end-to-end) — then **diff every target against the latest frozen baseline in `baselines/`** and against the per-target bands in this document (see *[What a release review looks like](#what-a-release-review-looks-like)*). Ad-hoc mid-development re-run reports are **not** kept here — they regenerate and drift. The committed runs are: the named, version-pinned **frozen baselines** under [`baselines/`](baselines/) (the reference a release is graded against), and the named **pre-release Full Suite Runs** under [`runs/`](runs/) (the evidence a specific release-candidate cleared the bar).
 
 ## Directory contents
 
@@ -28,9 +28,9 @@ Renderer + schema validator + golden-byte checks. Sweeps every committed baselin
 
 One Praxen analysis against one target, end-to-end. The fastest way to sanity-check a skill edit. **HelperBot** is the suite's most stable score and the fastest to scan; **FinBot** is the canonical "deliberately vulnerable" anchor. See [How to run a single-target scan](#how-to-run-a-single-target-scan) below for the procedure.
 
-### Full Suite Run (~3 hours)
+### Full Suite Run (~90 min parallel subagent, ~3–4 hr sequential foreground)
 
-All eleven targets, sequential, against the release candidate, with timing data captured and every target's findings preserved. **Mandatory before every `dev → main` release PR**; recommended before any substantial change to `SKILL.md`, `schema.py`, or the knowledge base. Produces a verdict report (timing table + per-target sanity-vs-baseline + patterns surfaced) committed as a named `runs/<release>-prerelease/` directory. See [Full Suite Run protocol](#full-suite-run-protocol) below.
+All eleven targets against the release candidate, with timing data captured and every target's findings preserved. **Mandatory before every `dev → main` release PR**; recommended before any substantial change to `SKILL.md`, `schema.py`, or the knowledge base. Produces a verdict report (timing table + per-target sanity-vs-baseline + patterns surfaced) committed as a named `runs/<release>-prerelease/` directory. See [Full Suite Run protocol](#full-suite-run-protocol) below for the two invocation paths (parallel subagent, sequential foreground).
 
 ## Calibration posture
 
@@ -62,7 +62,7 @@ For each target:
 
 ## Full Suite Run protocol
 
-The Full Suite Run validates a release candidate against all eleven targets. **Typical wallclock: 8–15 min per scan** (median ~9, observed range 7.5–16.0 in the v0.7.3 prerelease run), roughly **2 hours of model time** for the 11 scans, **~3 hours end-to-end** if subagent retries are needed.
+The Full Suite Run validates a release candidate against all eleven targets. **Typical wallclock: 8–15 min per scan**, ~2 hours of model time across the 11 scans. End-to-end: ~90 min via parallel subagent (4–8 concurrent), ~3–4 hours via sequential foreground.
 
 ### When to run
 
@@ -72,23 +72,19 @@ The Full Suite Run validates a release candidate against all eleven targets. **T
 
 ### How to invoke
 
-Two paths:
-- **Foreground** — open eleven separate Claude Code sessions (one per target), each pointed at the target source and the corresponding remit. Slowest in wallclock but no subagent watchdog to worry about.
-- **Subagent (parallelizable)** — launch each scan as a background general-purpose agent. The scans are independent and can run concurrently, **capped at 4–8 at a time** (more has overloaded the environment and tripped no-progress watchdogs). Write each run's outputs to a **durable path, not `/tmp`** — a scan's `/tmp` working directory can be reaped mid-run; a gitignored `local/<run-name>/` is the canonical pattern.
+**Two paths, both supported.**
+
+- **Parallel subagent (canonical for full-suite throughput)** — launch each scan as a background general-purpose agent. The scans are independent and run concurrently, **capped at 4–8 at a time** (more has overloaded the environment and tripped no-progress watchdogs in past runs). Write each run's outputs to a **durable path, not `/tmp`** — a scan's `/tmp` working directory can be reaped mid-run; a gitignored `local/<run-name>/<target>-out/` is the canonical pattern. End-to-end ~90 min for the 11 scans on a quiet system.
+
+- **Sequential foreground** — open one Claude Code session per target and drive each scan to completion before moving to the next. Slowest in wallclock (~3–4 hr end-to-end) but the most observable; useful for debugging a single target, validating a SKILL change one scan at a time, or runs where you want to watch each scan live. No watchdog concerns.
 
 A single scan on its own — one target, one session — needs neither precaution.
 
-### Stream-health protocol (subagent runs)
+For each target in either path: working directory under a durable, gitignored path (`local/<run-name>/<target>-out/`, never `/tmp`); CWD = that directory; copy the remit from `tests/remits/<target>.md` to `WORKER_REMIT.md`; clone or extract the target source to a sibling path; instruct the session (or subagent) to read `skills/behavior-verifier/SKILL.md` and analyse the workspace. When the three canonical outputs (`*-findings-*.json`, `*-analysis-*.html`, `*-analysis-*.txt`) are present and `render.py` exited clean, the scan is done.
 
-Background subagent scans can hit a no-progress watchdog at ~600 s when the model goes silent during a long internal composition (the Step 9 findings JSON, in particular). The following protocol — discovered while running the v0.7.3 prerelease suite — recovers reliably:
+### Subagent watchdog — addressed at root cause
 
-1. **Bash primer first.** Agent's very first action is `Bash: date -u +%Y-%m-%dT%H:%M:%SZ`, with no preamble text. Captures `scan_timestamp` *and* primes the stream.
-2. **Skeleton-first findings JSON.** Write a minimal valid skeleton (top-level fields, empty `findings: []`, empty `remit_coverage.rules: []`, zero `stat_counts`). Render it. Confirm 0 schema errors before drafting any actual finding.
-3. **Append findings one at a time** via `Edit` (`replace_all: false`), anchored on the closing `]` of the findings array. Never compose a multi-finding JSON in one `Write`.
-4. **Render every 2 findings.** Catches schema drift early, keeps the tool-call stream busy, makes any interrupted run partially recoverable.
-5. **One-line text heartbeat before each Edit**: `"Drafting finding N/M — <one-line theme>"`. Keeps the stream alive during the model's composition pauses.
-
-If a scan stalls anyway: retry the same target with the same brief. In the v0.7.3 prerelease run, ~60 % of stalled targets succeeded on first retry; all eventually completed within two retries. Half the stalls happen before any tool call (subagent-runtime hiccups, not anything the protocol can prevent) — straight retries fix those.
+Subagent runs have a no-progress watchdog (~600 s) that historically killed scans when the worker silently composed long Step 10 findings prose. The SKILL changes that landed for 0.7.3 — Step 9.9's full-prose-manifest discipline and Step 10's mechanical-translation requirement — eliminate the burst at root cause. With pre-composed manifest prose, Step 10 Edits become pure mechanical transcription (~13 s/op per the anchor-test) rather than composition (~55 s/op with high variance that occasionally spiked past 600 s). If you observe stalls after this fix, that is a SKILL regression to investigate, not a subagent-infrastructure flake — the protocol's earlier "stream-health workaround" (skeleton-first + heartbeats + render-every-N) was a 0.7.2-era patch the SKILL itself now subsumes.
 
 ### Verdict report (`SUITE_RUN.md`)
 
