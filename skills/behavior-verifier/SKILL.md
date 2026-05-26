@@ -241,8 +241,6 @@ Check every file under directories with names like `sandbox*`, `guard*`, `policy
 - **High** finding if the stub is a logging, audit, or monitoring surface.
 - Name the file path and line count (0 lines or N lines of stub) as evidence.
 
-Name-based heuristics miss this — a 0-line `firejail.py` looks like any other empty file until you notice its name says "this is supposed to sandbox things." The scanner is the last line of defense against stub-for-planned-control gaps.
-
 **Log file discovery:**
 
 Sweep the workspace for files that appear to be logs. Identify them by:
@@ -258,9 +256,7 @@ For each discovered log file, record: full path, apparent source, content type, 
 
 ## Step 4b — Secondary Prompt Discovery (Session-Loaded Files)
 
-Before you move to RAISE scoring, take a dedicated pass to identify **every file that enters the agent's LLM context at session startup**. These files function as secondary system prompts regardless of what they are named or what they look like — `SOUL.md`, `AGENTS.md`, `MEMORY.md`, `USER.md`, `IDENTITY.md`, `HEARTBEAT.md`, `RULES_*.md`, daily-log files, and similar bootstrap artifacts are all in scope.
-
-**Why this step exists separately from the main artifact scan.** Session-loaded files look like documentation. The main scan pass is calibrated to find operational risk in code and config; a file named `SOUL.md` containing `"I am a helpful assistant who values honesty"` will naturally get classified as flavor text. The security-relevant content ("*this file is yours to evolve, update it freely*" — buried on line 32) is easy to miss without explicit guidance to read these files **as system prompts**.
+Before you move to RAISE scoring, take a dedicated pass to identify **every file that enters the agent's LLM context at session startup**. These files function as secondary system prompts regardless of what they are named or what they look like — `SOUL.md`, `AGENTS.md`, `MEMORY.md`, `USER.md`, `IDENTITY.md`, `HEARTBEAT.md`, `RULES_*.md`, daily-log files, and similar bootstrap artifacts are all in scope. Read them **as system prompts** — the security-relevant content (e.g., *"this file is yours to evolve, update it freely"*) is often buried inside otherwise-flavor-text files.
 
 ### Part 1 — Discovery
 
@@ -402,7 +398,7 @@ Severity for each status:
 - An audit/observability gap that doesn't break detection but narrows it (lint findings surfaced but not recorded to the structured session log; per-component event types missing from a structured logger that captures session lifecycle)
 - A surface that exceeds the remit's scope without enabling an attack chain (an unused provider in the codebase that's never wired into the runtime, an extra capability advertised in tool inventory but with no handler)
 
-**Don't promote-to-justify the Edit, don't drop-to-maintain-pace.** Under the Step 9.9 chunked-write discipline, every finding is one Edit with a heartbeat — but that should not bias the severity assignment. A finding warrants its own Edit because it is *real*, not because it is *Critical*. If the finding is Medium, write it at Medium. If a finding fits at Medium and feels too "small" to write next to a Critical, that is the tier-compression you should resist: report it at Medium and move on.
+**Severity is what the finding is, not what the Edit cadence pulls it toward.** If the finding is Medium, write it at Medium — even when it feels small alongside a Critical.
 
 For every finding, capture the exact quoted rule text — the finding must be traceable back to the specific sentence in the remit.
 
@@ -433,7 +429,7 @@ Examples worth calling out explicitly (any of these is a **Critical** finding):
 - `ALLOWED_ORIGINS` declared but CORS middleware uses `*` or is absent
 - `APPROVED_TOOLS` list declared but the agent loads all tools regardless
 
-A declared-but-never-consulted security variable is strictly worse than no variable at all — it gives operators and auditors a false sense that the control exists. Call it out with both the declaration site and the absence of a consumption site as evidence.
+Call it out with both the declaration site and the absence of a consumption site as evidence.
 
 ### Planned-But-Not-Deployed Controls
 
@@ -595,7 +591,7 @@ If you found log files in Step 4: set `present` to true and, for each, record `p
 
 This is a hard gate, not a closing note. **Do not proceed to Step 10 until you have done both halves of this step.** A long scan can exhaust the context window and auto-compact somewhere between here and the finished report; this step is what makes the analysis survive that — without it, a compaction silently discards the synthesis and the report is rebuilt from degraded memory.
 
-**Severity-tier completeness check — before you start writing.** Walk the findings you've assembled in Steps 6-8 and look at the severity distribution. A Praxen scan of a real agent normally produces a *spread* across tiers, not a binary Critical/High pile. Concrete expectation: most scans land **2-5 Medium findings** alongside their Criticals and Highs — the security-hygiene gaps, partial-control narrowness, configuration mismatches, and audit/observability gaps catalogued in Step 6's "Don't tier-compress" examples. **If your set has zero or one Medium, pause and ask whether you triaged Mediums out under the chunked-write discipline below** (each finding is one Edit, and that can bias toward "is this worth a slot?" reasoning that drops the long tail). Re-read the Medium examples in Step 6 against the workspace and add what you missed. *A clean Medium tier is a calibration signal, not noise.* (This expectation is descriptive, not a hard schema rule — a genuinely-Critical-saturated target like a deliberately-vulnerable demo agent legitimately may have zero Mediums. But for most real agents, "zero Mediums" is an under-coverage signal worth investigating before you proceed.)
+**Severity-tier completeness check.** Most real agents land **2-5 Medium findings**. If your set has zero or one, re-read Step 6's "Don't tier-compress" examples against the workspace and add what you missed. Deliberately-vulnerable demo agents are the legitimate exception.
 
 **First — write the draft manifest.** Write everything you synthesized in 9.1–9.8 to a markdown file at:
 
@@ -609,7 +605,7 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 
 **This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, each rule's `rule_text` (the verbatim remit quote — once, in `remit_coverage.rules`), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. The Step 10 script performs JSON-shape translation only: it walks the manifest top-down, parses each field, and emits the corresponding JSON record. No re-composition, no wordsmithing, no analytical refinement — and no LLM in the loop.
 
-**Block patterns at a glance — the manifest uses two.** Repeated blocks named with their own `###` or `####` heading (each finding, each rule) place flat depth-0 field bullets *between* heading lines: `### PRAX-…` then `- id: …`, `- severity: …`, etc.; `#### R-NN` then `- section: …`, `- rule_text: …`, etc. Repeated blocks that live *inside* a section without their own heading (raise categories under `### categories`, positives entries, log-file rows) start with a depth-0 `- key:`-style bullet and continue with depth-2 field lines (no bullet) until the next `- ` at depth 0. The template below uses both patterns side by side; once you see them once they generalize.
+**Block patterns at a glance — the manifest uses two.** Repeated blocks named with their own `###` or `####` heading (each finding, each rule) place flat depth-0 field bullets *between* heading lines: `### PRAX-…` then `- id: …`, `- severity: …`, etc.; `#### R-NN` then `- section: …`, `- rule_text: …`, etc. Repeated blocks that live *inside* a section without their own heading (raise categories under `### categories`, positives entries, log-file rows) start with a depth-0 `- key:`-style bullet and continue with depth-2 field lines (no bullet) until the next `- ` at depth 0.
 
 ```markdown
 # Praxen draft manifest
@@ -718,7 +714,7 @@ For each log file (empty exactly when `present=false` — in that case write a s
 
 **Format conventions the parser enforces.** Sections appear in any order (the parser re-orders the JSON to canonical key order on emission); fields within a section may appear in any order; values are single-line (prose blocks under `### intro_band` subsections, `## behavior_summary`, and `### weighted_rationale` may wrap, joined by single spaces on parse). Indentation is meaningful: flat fields at depth 0, nested array items at depth 2 (with `- ` bullet), continuation fields at depth 4 (no bullet). The parser refuses tabs, unknown fields, malformed bullets, and any structural surprise.
 
-**Manifest emission discipline — staying under the no-progress watchdog.** If you are executing this skill as a **background subagent**, the harness's no-progress watchdog kills the run after ~600 s without a tool call. Composing this entire manifest internally before the first `Write` fires can exceed that window — the prose for every finding, rule, category, and summary is in final form, and the synthesis phase is internal until the tool call lands. The following pattern keeps every tool call inside the budget by spreading manifest emission across many small calls:
+**Manifest emission discipline — background subagents.** Don't write the whole manifest in one big `Write` — compose it across many small tool calls so the watchdog never sees a >600 s gap:
 
 1. **Write the skeleton first.** `Write` the manifest file with every authored `## section` heading present, the small sections fully populated:
 
@@ -735,9 +731,9 @@ For each log file (empty exactly when `present=false` — in that case write a s
 
 3. **Edit-append each finding** under `## findings`, anchoring on the `## findings` heading line. Each finding is one `Edit`. Heartbeat before each — `"Drafting finding N/M — <one-line theme>"`.
 
-Foreground (operator-driven) runs don't have the watchdog and can ignore this discipline. The pattern costs nothing extra on those runs, and following it is cheap insurance against a per-section compose burst exceeding a tool-call gap.
+Foreground (operator-driven) runs don't have the watchdog and can ignore this discipline.
 
-**Then — print the interim overview to stdout**, so the operator sees the synthesis even if the session is truncated before the final summary. The renderer does not read this block; it is for the operator only, so column-aligned formatting is welcome but close-enough spacing is fine:
+**Then — print the interim overview to stdout**, so the operator sees the synthesis even if the session is truncated before the final summary:
 
 ```
 Praxen — interim behavior analysis overview
@@ -792,7 +788,7 @@ That is the whole of Step 10's tool work — one `Bash` invocation. The script r
 
 **If the script fails.** The diagnostic names either a manifest line (parser error — e.g. `manifest_to_findings.py: line 47: 'finding': unknown field 'foo'`) or a JSON path (schema validation error — e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`). Both errors point at the same recovery: go to the manifest, fix the offending bullet/block, rerun the script. The "Common validation errors" checklist below is the field guide for the schema-validation class.
 
-The canonical JSON the script writes is the **complete behavioral record**: everything the HTML report shows is derived from it by `render.py`, and it is also what downstream consumers (dashboards, ticketing, compliance pipelines) ingest. Its shape is defined by `findings.schema.json` (the published JSON-Schema contract) and enforced at runtime by `schema.py`. You do not write this file by hand; the rules below tell you what to put in the manifest so the script's output passes validation.
+The canonical JSON the script writes is the **complete behavioral record**: everything the HTML report shows is derived from it. Its shape is defined by `findings.schema.json` and enforced at runtime by `schema.py`. You do not write this file by hand; the rules below tell you what to put in the manifest so the script's output passes validation.
 
 Rules for the finding manifest and the JSON it produces:
 
@@ -811,7 +807,7 @@ Rules for the finding manifest and the JSON it produces:
   Long prose isn't more rigorous — it's just harder for the operator to triage.
 - **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Unexpected Code Execution (RCE)`, not `ASI05`. The exact format is `<CODE> — <Name>`: the code (`LLM01`, `ASI05`), a space, an **em dash** (`—`, not a hyphen `-`, not an en dash `–`), a space, then the canonical name exactly as written in the KB. For an **MCP-checklist finding** — one produced by Step 6's MCP Server Evaluation against `knowledge/KB_MCP_SECURITY.md`'s minimum-bar checklist — add `{ "kind": "mcp", "label": "<the MCP checklist item the finding violates>" }`. **A finding whose primary classification is a different pattern but happens to involve MCP-shaped evidence does NOT carry the `mcp` tag** — e.g. an `LLM03 — Supply Chain` finding about an `npx -y @some/mcp-server` install lacking a version pin is a supply-chain finding; an `LLM06 — Excessive Agency` finding about a write-without-approval tool that happens to be exposed through MCP is an agency finding. Their evidence makes the MCP context clear, and their OWASP / RAISE tags carry the primary classification. Attach `kind=mcp` *only* when the finding is itself the violation of a specific MCP-checklist item from the KB.
 
-  **Quick-reference labels (copy-paste verbatim).** The KB files (`knowledge/KB_LLM_TOP10.md`, `knowledge/KB_AGENTIC_TOP10.md`) remain authoritative; this table is a copy-paste aid so the labels don't drift across findings and you don't have to grep the KB for every tag. If this table ever diverges from the KB headings, the KB wins.
+  **Quick-reference labels (copy-paste verbatim).** The KB files (`knowledge/KB_LLM_TOP10.md`, `knowledge/KB_AGENTIC_TOP10.md`) remain authoritative; this table is a copy-paste aid so the labels don't drift across findings.
 
   | Code | Label string for the `tags[].label` field |
   |---|---|
@@ -865,11 +861,11 @@ python3 "<SKILL_DIR>/render.py" \
   --out-txt   ./reports/<agent-slug>-analysis-<TIMESTAMP>.txt
 ```
 
-`<SKILL_DIR>` is the absolute path of the directory that contains this `SKILL.md` (the same directory you read `report_template.html` and `knowledge/` from). Use the agent slug, `$SCAN_DATE`, and `$TIMESTAMP` from Step 1 so the three files share a base name. If `python3` is not on the path, try `python`.
+`<SKILL_DIR>` is the absolute path of the directory that contains this `SKILL.md` (the same directory you read `report_template.html` and `knowledge/` from). Use the agent slug, `$SCAN_DATE`, and `$TIMESTAMP` from Step 1 so the three files share a base name.
 
 The renderer guarantees: zero unsubstituted placeholders, zero leftover template markers, footer/remit counts that match the findings data, finding anchors that resolve, the fixed RAISE category order, and byte-identical output for the same input. It exits `0` on success and prints the paths it wrote.
 
-**If it exits non-zero**, it prints exactly what is wrong — almost always a missing or inconsistent field in the JSON, named by path (e.g., `$.behavior_summary: required field is missing`, or `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`). Fix the JSON from Step 10 and re-run. **Do not hand-edit the HTML or the TXT — they are generated output.** Do not redesign the report, edit the template, or post-process the output: the template, the renderer, and the schema are version-locked and ship together.
+**If it exits non-zero**, it prints exactly what is wrong — almost always a missing or inconsistent field in the JSON, named by path (e.g., `$.behavior_summary: required field is missing`, or `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`). Fix the JSON from Step 10 and re-run. **Do not hand-edit the HTML or the TXT — they are generated output**, and the template, renderer, and schema are version-locked together.
 
 ---
 
@@ -889,7 +885,7 @@ Files written:
   Draft:    ./reports/<agent-slug>-draft-<TIMESTAMP>.md  (Step 9.9 checkpoint; working artifact, safe to delete)
 ```
 
-That is the end of the analysis. (The summary file already exists on disk regardless of session state — if stdout is truncated, the operator still has it.)
+That is the end of the analysis.
 
 ---
 
