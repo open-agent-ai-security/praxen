@@ -80,11 +80,11 @@ The Full Suite Run validates a release candidate against all eleven targets. **T
 
 A single scan on its own — one target, one session — needs neither precaution.
 
-For each target in either path: working directory under a durable, gitignored path (`local/<run-name>/<target>-out/`, never `/tmp`); CWD = that directory; copy the remit from `tests/remits/<target>.md` to `WORKER_REMIT.md`; clone or extract the target source to a sibling path; instruct the session (or subagent) to read `skills/behavior-verifier/SKILL.md` and analyse the workspace. When the three canonical outputs (`*-findings-*.json`, `*-analysis-*.html`, `*-analysis-*.txt`) are present and `render.py` exited clean, the scan is done.
+For each target in either path: working directory under a durable, gitignored path (`local/<run-name>/<target>-out/`, never `/tmp`); CWD = that directory; copy the remit from `tests/remits/<target>.md` to `WORKER_REMIT.md`; clone or extract the target source to a sibling path; instruct the session (or subagent) to read `skills/behavior-verifier/SKILL.md` and analyse the workspace. When the four canonical outputs (`*-draft-*.md` working artifact + `*-findings-*.json`, `*-analysis-*.html`, `*-analysis-*.txt` deliverables) are present and both `manifest_to_findings.py` and `render.py` exited clean, the scan is done.
 
-### Subagent watchdog — addressed at root cause
+### Subagent watchdog — where stalls can still happen
 
-Subagent runs have a no-progress watchdog (~600 s) that historically killed scans when the worker silently composed long Step 10 findings prose. The SKILL changes that landed for 0.7.3 — Step 9.9's full-prose-manifest discipline and Step 10's mechanical-translation requirement — eliminate the burst at root cause. With pre-composed manifest prose, Step 10 Edits become pure mechanical transcription (~13 s/op per the anchor-test) rather than composition (~55 s/op with high variance that occasionally spiked past 600 s). If you observe stalls after this fix, that is a SKILL regression to investigate, not a subagent-infrastructure flake — the protocol's earlier "stream-health workaround" (skeleton-first + heartbeats + render-every-N) was a 0.7.2-era patch the SKILL itself now subsumes.
+Subagent runs have a no-progress watchdog (~600 s) that kills the run when no tool call fires inside the window. Step 10 is no longer a stall site (it's a single deterministic script invocation), but Step 9.9's manifest emission is — composing the full manifest internally before the first Write fires can exceed the budget on a large scan. The SKILL's Step 9.9 prescribes the mitigation: write a skeleton, then `Edit`-append each rule and each finding with a one-line text heartbeat between Edits. If you observe stalls in a Full Suite Run, check whether the worker followed that discipline before treating it as an infrastructure issue.
 
 ### Verdict report (`SUITE_RUN.md`)
 

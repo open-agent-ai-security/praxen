@@ -102,9 +102,18 @@ The skill file gives Claude a calibrated framework for these judgments — what 
 │   signal reasoning, OWASP classification)│
 │              │                          │
 │              ▼                          │
+│      Parser-grade draft manifest        │
+│  ./reports/<agent>-draft-<ts>.md        │
+│   (working artifact — Step 9.9)         │
+│              │                          │
+│              ▼                          │
+│  manifest_to_findings.py                │
+│   (deterministic, stdlib — Step 10)     │
+│              │                          │
+│              ▼                          │
 │      Canonical findings JSON            │
 │  ./reports/<agent>-findings-<date>.json │
-│   (the complete record — Step 10)       │
+│   (the complete record)                 │
 │              │                          │
 │              ▼                          │
 │  render.py  (deterministic, stdlib)     │
@@ -113,7 +122,7 @@ The skill file gives Claude a calibrated framework for these judgments — what 
 └─────────────────────────────────────────┘
 ```
 
-Praxen runs once per invocation: the skill reads, analyzes, and writes one canonical findings JSON, then a bundled deterministic Python renderer (`render.py`, standard library only) turns that JSON into the HTML report and a plain-text summary. No daemon, no scheduler, no persistent state between runs. If continuous analysis is desired, wrap the invocation in whatever scheduler the operator already uses (cron, launchd, CI, GitHub Action).
+Praxen runs once per invocation: the skill reads and analyzes the workspace, writes a parser-grade draft manifest, then chains two bundled deterministic Python scripts (`manifest_to_findings.py` translates the manifest into the canonical findings JSON; `render.py` turns that JSON into the HTML report and plain-text summary). Both scripts are pure standard library. No daemon, no scheduler, no persistent state between runs. If continuous analysis is desired, wrap the invocation in whatever scheduler the operator already uses (cron, launchd, CI, GitHub Action).
 
 ---
 
@@ -130,7 +139,7 @@ Praxen is a Claude Code skill. The operator runs it by opening a Claude Code ses
 | Worker Remit | `WORKER_REMIT.md` in the current directory or alongside the skill file |
 | Agent workspace | Path supplied by the operator at invocation time |
 | Knowledge base | `knowledge/` directory alongside the skill file |
-| Report template + renderer | `report_template.html`, `render.py`, `schema.py` alongside the skill file in `skills/behavior-verifier/` |
+| Bundled scripts and template | `manifest_to_findings.py` (Step 10 converter), `render.py` (Step 11 renderer), `schema.py` (shared validator), `report_template.html` — all alongside the skill file in `skills/behavior-verifier/` |
 
 ### Outputs
 
@@ -138,7 +147,7 @@ All written to `./reports/` relative to the current working directory. The direc
 
 | Output | Filename | Produced by |
 |--------|----------|-------------|
-| Findings JSON | `<agent-slug>-findings-<YYYY-MM-DD>.json` | the skill, Step 10 — the canonical record |
+| Findings JSON | `<agent-slug>-findings-<YYYY-MM-DD>.json` | `manifest_to_findings.py`, Step 10 — translated mechanically from the Step 9.9 draft manifest |
 | HTML report | `<agent-slug>-analysis-<YYYY-MM-DD-HHMMSS>.html` | `render.py`, Step 11 — rendered from the JSON |
 | Plain-text summary | `<agent-slug>-analysis-<YYYY-MM-DD-HHMMSS>.txt` | `render.py`, Step 11 — rendered from the JSON |
 
@@ -255,7 +264,7 @@ A remit with vague rules produces Low-confidence findings across the board. A re
 
 ## 6. Canonical Findings JSON
 
-Every analysis emits one JSON file — the **canonical, complete record** of the analysis. The HTML report and the `.txt` summary are rendered deterministically from it (§7); downstream consumers (ticketing, dashboards, compliance pipelines, run-to-run diffing) ingest the JSON directly. It is a single top-level object — *not* a list — and the bundled `schema.py` validator, which `render.py` runs before rendering, checks its shape, enumerations, and cross-field consistency; an analysis that produces a malformed JSON does not render. The same contract is published as a machine-readable JSON Schema at `skills/behavior-verifier/findings.schema.json` for downstream tooling.
+Every analysis emits one JSON file — the **canonical, complete record** of the analysis. It is produced deterministically by `manifest_to_findings.py` (Step 10), which translates the Step 9.9 parser-grade draft manifest into JSON; the HTML report and the `.txt` summary are then rendered deterministically from the JSON (§7). Downstream consumers (ticketing, dashboards, compliance pipelines, run-to-run diffing) ingest the JSON directly. It is a single top-level object — *not* a list — and the bundled `schema.py` validator, which both `manifest_to_findings.py` and `render.py` run, checks its shape, enumerations, and cross-field consistency; a manifest that produces a malformed JSON does not validate and the converter exits non-zero with the offending path. The same contract is published as a machine-readable JSON Schema at `skills/behavior-verifier/findings.schema.json` for downstream tooling.
 
 ```json
 {
@@ -371,7 +380,7 @@ Every finding carries both a RAISE category and, where applicable, OWASP LLM and
 
 ## 7. HTML Report
 
-Each analysis produces a self-contained HTML report from a canonical template (`skills/behavior-verifier/report_template.html`). The template is brand-compliant and not subject to per-analysis redesign. Praxen does **not** render the HTML with the LLM: the skill (Step 11) runs `render.py`, a bundled deterministic Python script (standard library only) that substitutes the canonical findings JSON (§6) into the template — same JSON in, byte-identical HTML out, every time. The renderer also writes the `.txt` summary. The template, the renderer (`render.py`), and the schema validator (`schema.py`) are version-locked and ship together.
+Each analysis produces a self-contained HTML report from a canonical template (`skills/behavior-verifier/report_template.html`). The template is brand-compliant and not subject to per-analysis redesign. Praxen does **not** render the HTML with the LLM: the skill (Step 11) runs `render.py`, a bundled deterministic Python script (standard library only) that substitutes the canonical findings JSON (§6) into the template — same JSON in, byte-identical HTML out, every time. The renderer also writes the `.txt` summary. The template, the renderer (`render.py`), the Step 10 converter (`manifest_to_findings.py`), and the schema validator (`schema.py`) are version-locked and ship together. `render.py` and `manifest_to_findings.py` are parallel in shape: both pure stdlib, both deterministic, both refuse to write malformed output — the LLM does judgment, code does the mechanical substitution.
 
 **Sections, in order** (the masthead gives the verdict at a glance; below it the flow walks from "what the agent is" to the maturity verdict):
 
@@ -409,7 +418,7 @@ No scheduler, daemon, installer, or configuration file is required.
 3. Open a Claude Code session in the Praxen directory (or any parent).
 4. Tell Claude Code:
    > *"Please read and run skills/behavior-verifier/SKILL.md to analyze [agent workspace path]."*
-5. Praxen reads the workspace, analyzes it, writes the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — three files in `./reports/`.
+5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — four files in `./reports/` (the draft manifest is a working artifact that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
 6. Open the HTML report in a browser.
 
 ### Re-running
@@ -424,7 +433,7 @@ Praxen does not ship a scheduler. If recurring scans are desired, wrap the Claud
 
 An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the Claude Code session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
 
-- Before the report is written (Step 9.9), Praxen checkpoints the full synthesis — every finding, the RAISE posture, the remit audit — to a **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md`. If the session compacts, Step 10 rebuilds the canonical findings JSON from the manifest rather than from degraded working memory, and an operator resuming a compacted run can point the skill straight at the manifest to recover. The manifest is a working artifact — no schema, not a deliverable.
+- At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived.
 - The same Step 9.9 prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout — before any file is written — so the operator sees the synthesis even if the session later truncates.
 - Rendering the report is a **deterministic Python step (Step 11)**, not LLM work — it doesn't compete for the context window, runs in well under a second, and writes the `.txt` summary to `./reports/` alongside stdout, so the summary survives even if terminal output is lost.
 
@@ -466,7 +475,7 @@ Detection quality is directly proportional to remit specificity. A remit that sa
 Praxen is operating well when:
 
 1. An analysis against an intentionally misconfigured test agent produces at least one Critical or High finding with specific file:line evidence and a recommended action.
-2. `render.py` exits 0 (which guarantees the findings JSON validated against `schema.py` and the HTML/TXT contain no unresolved markers), and the HTML report renders correctly in a browser opened directly from `./reports/`.
+2. `manifest_to_findings.py` exits 0 (guaranteeing the manifest parsed and the produced JSON validated against `schema.py`) and `render.py` exits 0 (guaranteeing the HTML/TXT contain no unresolved markers), and the HTML report renders correctly in a browser opened directly from `./reports/`.
 3. The findings JSON is the v2.0 canonical object and is suitable for direct ingestion into downstream systems (no HTML parsing needed for the summary, posture score, or counts).
 4. Every actionable remit rule appears in the Remit Coverage section with a status (Verified / Gap / Partial / Vague Policy / Enforcement Not Possible).
 
@@ -481,7 +490,7 @@ The Praxen operationalizes the **RAISE Security Review Skill** — a structured 
 The key design decisions in Praxen's synthesis:
 - A single Worker Remit serves as the policy baseline — Praxen's primary signal is divergence between declared policy and observed implementation.
 - A unified canonical findings JSON with dual RAISE + OWASP classification is the complete record; it carries every prose field the report shows, so JSON-only consumers see the same content as humans.
-- A canonical HTML template *plus* a deterministic Python renderer (`render.py`): the LLM does judgment, code does the mechanical substitution — so every report looks identical, byte-for-byte, regardless of which model produced the findings, and a malformed analysis fails loudly at the schema validator rather than producing a broken report.
+- A canonical HTML template *plus* two deterministic Python scripts in sequence (`manifest_to_findings.py` translates the Step 9.9 draft manifest into the canonical findings JSON; `render.py` substitutes the JSON into the template): the LLM does judgment, code does the mechanical substitution — so every report looks identical, byte-for-byte, regardless of which model produced the findings, and a malformed analysis fails loudly at the schema validator rather than producing a broken report.
 - The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state. (Python 3 is the one runtime besides Claude Code — stdlib only.)
 
 ---
