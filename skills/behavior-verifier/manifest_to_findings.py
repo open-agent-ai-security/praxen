@@ -899,6 +899,19 @@ def _populate_derived(data):
         elif sev in ("Medium", "Low", "Informational"):
             f["escalation"] = "log_only"
 
+    # 4a. Default owasp_llm / owasp_agentic to null when the LLM omitted the
+    # bullet entirely. The schema requires both fields *present* (the value may
+    # be null when the classification doesn't apply); some workers omit the
+    # bullet rather than write `null` explicitly, which would otherwise
+    # surface as `$.findings[N].owasp_llm: required field is missing` from
+    # the schema validator. Defaulting to null here makes the parser
+    # robust to that omission.
+    for f in findings:
+        f.setdefault("owasp_llm", None)
+        f.setdefault("owasp_agentic", None)
+        # `description` is the only legitimately-optional finding field;
+        # the schema treats missing-description as fine. Don't default it.
+
     # 5. findings[].policy_rule_text from rules[].rule_text lookup
     rules_by_id = {r["rule_id"]: r["rule_text"] for r in rules if "rule_id" in r}
     for f in findings:
