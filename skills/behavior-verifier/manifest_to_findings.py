@@ -556,10 +556,14 @@ def _parse_remit_coverage_section(lines, i):
         else:
             raise ManifestError(
                 f"line {i}: remit_coverage: unknown subsection {sub!r}")
-    if out["stat_counts"] is None:
-        raise ManifestError("## remit_coverage: missing `### stat_counts`")
     if out["rules"] is None:
         raise ManifestError("## remit_coverage: missing `### rules`")
+    # stat_counts is derived from rules[] at the end of parsing (see
+    # `_populate_derived`); the LLM is not expected to write it. If a manifest
+    # happens to include `### stat_counts`, the parser captured it above but
+    # the values are overwritten by the derivation pass.
+    if out["stat_counts"] is None:
+        out["stat_counts"] = {}  # placeholder; populated by _populate_derived
     return i, out
 
 
@@ -829,6 +833,126 @@ _SECTION_DISPATCH = {
     "footer":           _parse_footer_section,
 }
 
+# Sections the parser accepts but does not require. These contain values that
+# are mechanically derivable from the rest of the manifest — `_populate_derived`
+# computes them — and asking the LLM to write them is per-finding/per-rule busywork
+# that pads the Step 9.9 compose burst without adding information.
+_OPTIONAL_SECTIONS = {"footer"}
+
+
+def _populate_derived(data):
+    """Compute mechanically-derivable fields from what the manifest provides.
+
+    Overwrites any user-written values for the same fields — the manifest is
+    not the authority for derivable values; the rules[] / findings[] arrays
+    are. This keeps the SKILL author from carrying derivable bookkeeping
+    (counts, category names/weights, escalation, multi-rule joins) at the cost
+    of a small post-parse fix-up pass.
+
+    Fields populated:
+      * ``remit_coverage.stat_counts`` (verified/gap/partial/vague/enp/total)
+        from ``remit_coverage.rules[].status``
+      * ``footer.severity_counts`` (critical/high/medium/low/info) from
+        ``findings[].severity``
+      * ``raise_posture.categories[].name`` from ``key`` (canonical RAISE_NAMES)
+      * ``raise_posture.categories[].weight`` from ``key`` (0.25 for Zero
+        Trust, 0.15 for the other five)
+      * ``findings[].escalation`` from ``severity`` (Critical/High → alert,
+        else → log_only)
+      * ``findings[].policy_rule_text`` from ``findings[].policy_rule_ids``
+        by looking up the rule_id(s) in ``remit_coverage.rules[].rule_text``;
+        multi-rule joined with `" / "` (the renderer's display separator)
+    """
+    rules = data.get("remit_coverage", {}).get("rules", [])
+    findings = data.get("findings", [])
+
+    # 1. remit_coverage.stat_counts
+    stat_counts = {k: 0 for k in ("verified", "gap", "partial", "vague", "enp")}
+    for r in rules:
+        s = r.get("status")
+        if s in stat_counts:
+            stat_counts[s] += 1
+    stat_counts["total"] = len(rules)
+    data.setdefault("remit_coverage", {})["stat_counts"] = stat_counts
+
+    # 2. footer.severity_counts (creates `footer` if absent)
+    severity_counts = {k: 0 for k in ("critical", "high", "medium", "low", "info")}
+    for f in findings:
+        sev = f.get("severity")
+        if sev in schema.SEVERITY_COUNT_KEYS:
+            severity_counts[schema.SEVERITY_COUNT_KEYS[sev]] += 1
+    data["footer"] = {"severity_counts": severity_counts}
+
+    # 3. raise_posture.categories[].name / .weight
+    for cat in data.get("raise_posture", {}).get("categories", []):
+        key = cat.get("key")
+        if key in schema.RAISE_NAMES:
+            cat["name"] = schema.RAISE_NAMES[key]
+        if key in schema.RAISE_WEIGHTS:
+            cat["weight"] = schema.RAISE_WEIGHTS[key]
+
+    # 4. findings[].escalation
+    for f in findings:
+        sev = f.get("severity")
+        if sev in ("Critical", "High"):
+            f["escalation"] = "alert"
+        elif sev in ("Medium", "Low", "Informational"):
+            f["escalation"] = "log_only"
+
+    # 5. findings[].policy_rule_text from rules[].rule_text lookup
+    rules_by_id = {r["rule_id"]: r["rule_text"] for r in rules if "rule_id" in r}
+    for f in findings:
+        pri = f.get("policy_rule_ids")
+        if pri is None:
+            f["policy_rule_text"] = None
+        else:
+            ids = [s.strip() for s in pri.split(",") if s.strip()]
+            texts = []
+            missing_ids = []
+            for rid in ids:
+                if rid in rules_by_id:
+                    texts.append(rules_by_id[rid])
+                else:
+                    missing_ids.append(rid)
+            if missing_ids:
+                raise ManifestError(
+                    f"finding {f.get('id', '?')!r}: policy_rule_ids references "
+                    f"rule(s) {missing_ids} not present in remit_coverage.rules[]")
+            f["policy_rule_text"] = " / ".join(texts)
+
+    # Reorder each finding dict to canonical schema field order so that fields
+    # the LLM didn't write (escalation, policy_rule_text) appear in the right
+    # place in the emitted JSON, not at the end. Field order isn't semantic
+    # for JSON consumers but it matters for diff stability across re-renders.
+    canonical_finding_keys = (
+        "id", "severity", "summary", "description",
+        "tags", "policy_rule_ids", "policy_rule_text",
+        "evidence", "recommended_actions",
+        "raise_category", "owasp_llm", "owasp_agentic",
+        "confidence", "related_findings", "escalation",
+    )
+    for i, f in enumerate(findings):
+        reordered = {k: f[k] for k in canonical_finding_keys if k in f}
+        # Preserve any other fields (shouldn't be any, but defensive)
+        for k, v in f.items():
+            if k not in reordered:
+                reordered[k] = v
+        findings[i] = reordered
+    data["findings"] = findings
+
+    # Same canonical-order treatment for raise_posture.categories[] — `name`
+    # and `weight` derive between `key` and `score`/`rationale` in the schema.
+    canonical_category_keys = ("key", "name", "score", "confidence", "weight", "rationale")
+    cats = data.get("raise_posture", {}).get("categories", [])
+    for i, c in enumerate(cats):
+        reordered = {k: c[k] for k in canonical_category_keys if k in c}
+        for k, v in c.items():
+            if k not in reordered:
+                reordered[k] = v
+        cats[i] = reordered
+
+    return data
+
 
 def parse_manifest(text):
     """Parse a Praxen draft manifest into the canonical findings dict.
@@ -884,11 +1008,19 @@ def parse_manifest(text):
             data[name] = payload
 
     # Check completeness — every required section must be present.
-    required = set(_SECTION_DISPATCH.keys())
+    # `_OPTIONAL_SECTIONS` (e.g. `## footer`) is filled in by `_populate_derived`
+    # below, so the LLM is not asked to emit it.
+    required = set(_SECTION_DISPATCH.keys()) - _OPTIONAL_SECTIONS
     missing = required - seen_sections
     if missing:
         raise ManifestError(
             f"manifest is missing required sections: {sorted(missing)}")
+
+    # Compute mechanically-derivable values (counts, category names/weights,
+    # escalation, policy_rule_text by rule_id lookup). This is the second
+    # pillar of "move work out of the SKILL": fields the script can fill
+    # deterministically should not pad the Step 9.9 compose burst.
+    data = _populate_derived(data)
 
     # Re-emit the dict in canonical JSON key order. The manifest's natural
     # author-facing order puts `raise_posture` next to the RAISE work

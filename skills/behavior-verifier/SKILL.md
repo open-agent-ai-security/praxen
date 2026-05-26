@@ -565,15 +565,11 @@ Compute the weighted overall: Σ(score × weight) across the six categories, whe
 
 (The renderer derives and displays the label itself; lead with it in the prose so the rationale reads coherently.)
 
-### 9.6 Remit Coverage rule audit → `remit_coverage.rules[]` + `remit_coverage.stat_counts`
+### 9.6 Remit Coverage rule audit → `remit_coverage.rules[]`
 
-Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Phase 1 + Phase 2). For each rule, in document order: `rule_id` (`R-NN`), `section` (the remit section heading it came from), `rule_text` (the rule's operative sentence — a contiguous, verbatim quote from the remit, never elided or trimmed mid-sentence; see Step 6 Phase 1), `status` (`verified` | `gap` | `partial` | `vague` | `enp`), and `finding_id` (the `PRAX-...` id of the finding documenting this gap, or `null` for `verified` / `vague` / `enp` rules — every `gap` should normally point at one). Then count the statuses into `stat_counts` (the counts must match the rows, and `total` must equal the number of rows).
+Serialize the Policy-Implementation Divergence audit you completed in Step 6 (Phase 1 + Phase 2). For each rule, in document order: `rule_id` (`R-NN`), `section` (the remit section heading it came from), `rule_text` (the rule's operative sentence — a contiguous, verbatim quote from the remit, never elided or trimmed mid-sentence; see Step 6 Phase 1), `status` (`verified` | `gap` | `partial` | `vague` | `enp`), and `finding_id` (the `PRAX-...` id of the finding documenting this gap, or `null` for `verified` / `vague` / `enp` rules — every `gap` should normally point at one). The Step 10 script tallies `stat_counts` from the statuses you write — you do not author that section.
 
 **`finding_id` by status:** `gap` and `partial` rules carry the `PRAX-...` id of the finding that documents the specific code-side gap. `verified` rules carry `null` (the rule has no gap to point at, by construction). `vague` rules carry `null` (the rule is too imprecise to violate, by construction). `enp` rules carry `null` (enforcement-not-possible — there is no code finding to link, by definition; the rule is behavioral or cultural and lives outside the scan's visibility). A `gap` or `partial` rule with `finding_id: null` is a hole in the audit — either the finding wasn't written or the rule should be `verified` / `vague` / `enp` instead.
-
-**Tally explicitly — do not eyeball.** Manual counting across 5 statuses and 10–20+ rules is where this step most often goes wrong. Walk the `rules[]` array you just wrote and tally each status into its own running counter; then write `stat_counts` from the counters. The schema requires **all five status keys** — `verified`, `gap`, `partial`, `vague`, `enp` — to be present at all times, including those with a count of zero. (`vague: 0` is a valid and common case.) A missing zero-count key is a schema validation failure in Step 11.
-
-> **`Counter`-equality is not a self-check.** If you build a `collections.Counter` of the actual statuses and compare it to the dict you wrote into `stat_counts`, the check is unreliable: `Counter` *silently omits keys with a count of 0*. A scan with zero `vague` rules has `Counter({...})` *without* a `vague` key, while the JSON correctly carries `"vague": 0` — they compare unequal even though both are right. If you must validate before writing, build a plain dict over the full five-status key set **plus `total`** (e.g., `{**{k: sum(1 for r in rules if r["status"] == k) for k in ("verified","gap","partial","vague","enp")}, "total": len(rules)}`) and compare *that*. The renderer (Step 11) re-checks the counts authoritatively; this self-check just shortens the round trip.
 
 ### 9.7 Positives → `positives[]`
 
@@ -597,7 +593,7 @@ This is a hard gate, not a closing note. **Do not proceed to Step 10 until you h
 
 The manifest's job is to be **complete enough that Step 10's canonical JSON is produced from this file alone, with no reliance on working memory.**
 
-**This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, `policy_rule_text` (the verbatim remit quote), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. The Step 10 script performs JSON-shape translation only: it walks the manifest top-down, parses each field, and emits the corresponding JSON record. No re-composition, no wordsmithing, no analytical refinement — and no LLM in the loop.
+**This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, each rule's `rule_text` (the verbatim remit quote — once, in `remit_coverage.rules`), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. The Step 10 script performs JSON-shape translation only: it walks the manifest top-down, parses each field, and emits the corresponding JSON record. No re-composition, no wordsmithing, no analytical refinement — and no LLM in the loop.
 
 **Block patterns at a glance — the manifest uses two.** Repeated blocks named with their own `###` or `####` heading (each finding, each rule) place flat depth-0 field bullets *between* heading lines: `### PRAX-…` then `- id: …`, `- severity: …`, etc.; `#### R-NN` then `- section: …`, `- rule_text: …`, etc. Repeated blocks that live *inside* a section without their own heading (raise categories under `### categories`, positives entries, log-file rows) start with a depth-0 `- key:`-style bullet and continue with depth-2 field lines (no bullet) until the next `- ` at depth 0. The template below uses both patterns side by side; once you see them once they generalize.
 
@@ -632,25 +628,15 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 <9.5 prose, 2–4 sentences, single paragraph>
 
 ### categories
-For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet):
+For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet). `name` and `weight` are derived from `key` by the Step 10 script — do not write them:
 - key: <one of the six keys>
-  name: <display name>
   score: <0–5>
   confidence: <High | Medium | Low>
-  weight: <0.25 for implement_zero_trust; 0.15 for the other five>
   rationale: <9.4 prose, 1–2 sentences, single line>
 
-(Weights for `weighted_overall` above: implement_zero_trust = 0.25; each of the other five = 0.15. Compute Σ(score × weight) explicitly here in the manifest — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
+(The script applies the canonical name and the standard weight (`implement_zero_trust` = 0.25; the other five = 0.15) per key. Compute `weighted_overall` above as Σ(score × weight) — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
 
 ## remit_coverage
-### stat_counts
-- verified: <int>
-- gap: <int>
-- partial: <int>
-- vague: <int>      (write `0` explicitly — required even when zero)
-- enp: <int>
-- total: <int — must equal the number of rules below>
-
 ### rules
 For each rule, in document order, use a `#### R-NN` header followed by flat field bullets at depth 0:
 
@@ -672,7 +658,6 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
   - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
   - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
-- policy_rule_text: <verbatim remit quote, or null — null exactly when policy_rule_ids is null; for multi-rule, join quotes with " / " (space-slash-space) — no other separator>
 - evidence:                                         (each item starts with `- file:` at depth 2; `line:` and `snippet:` continue at depth 4, no bullet)
   - file: <workspace-relative path>
     line: <integer or null>
@@ -688,7 +673,8 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
 - owasp_agentic: <ASI01–ASI10 or null — primary only; secondaries go in tags[]>
 - confidence: <High | Medium | Low>
 - related_findings: <comma-separated PRAX-... ids, or empty after the colon for none — no brackets, no `null`, no `[]`>
-- escalation: <alert | log_only>
+
+(`policy_rule_text` and `escalation` are derived by the Step 10 script — do not write them. `policy_rule_text` is populated by looking up each `policy_rule_ids` entry in `remit_coverage.rules[].rule_text`; multi-rule findings get auto-joined with " / ". `escalation` is `alert` for Critical/High and `log_only` otherwise.)
 
 ## positives
 For each confirmed positive from Step 8, items start with `- title:` at depth 0 with continuation at depth 2:
@@ -711,39 +697,27 @@ For each log file (empty exactly when `present=false` — in that case write a s
   mtime: <date or "unknown">
   status: <active | new>
 
-## footer
-### severity_counts
-- critical: <int>
-- high: <int>
-- medium: <int>
-- low: <int>
-- info: <int>
-
-**Tally explicitly.** After writing every finding block above, walk the array and count each severity into its own running counter — do not rely on memory or scroll-and-eyeball. The five counters must sum to the total number of finding blocks, and each per-severity count must match the actual severities in `findings`. The Step 11 renderer re-checks this authoritatively; a mismatch is a validation failure named at `$.footer.severity_counts`.
+(The `## footer` and `### remit_coverage > ### stat_counts` sections are not authored — the Step 10 script computes them from the rules and findings you wrote above. Do not include them in the manifest.)
 ```
 
 **Format conventions the parser enforces.** Sections appear in any order (the parser re-orders the JSON to canonical key order on emission); fields within a section may appear in any order; values are single-line (prose blocks under `### intro_band` subsections, `## behavior_summary`, and `### weighted_rationale` may wrap, joined by single spaces on parse). Indentation is meaningful: flat fields at depth 0, nested array items at depth 2 (with `- ` bullet), continuation fields at depth 4 (no bullet). The parser refuses tabs, unknown fields, malformed bullets, and any structural surprise.
 
 **Manifest emission discipline — staying under the no-progress watchdog.** If you are executing this skill as a **background subagent**, the harness's no-progress watchdog kills the run after ~600 s without a tool call. Composing this entire manifest internally before the first `Write` fires can exceed that window — the prose for every finding, rule, category, and summary is in final form, and the synthesis phase is internal until the tool call lands. The following pattern keeps every tool call inside the budget by spreading manifest emission across many small calls:
 
-1. **Write the skeleton first.** `Write` the manifest file with every `## section` heading present. Fully populate these small sections in the initial Write:
+1. **Write the skeleton first.** `Write` the manifest file with every authored `## section` heading present, the small sections fully populated:
 
    - `## scan` — all fields including `manifest_format_version: 1`
    - `## intro_band` — both `### agent_remit_summary` and `### agent_structure_summary` prose blocks
    - `## behavior_summary` — the prose block
    - `## raise_posture` — `- weighted_overall:`, `### weighted_rationale` prose, and all six `- key:` category blocks under `### categories`
-   - `## remit_coverage > ### stat_counts` — write zeros across all five statuses + `total: 0` (you'll reconcile in step 4)
    - `## positives` — real entries if known, else a single line `(none)`
    - `## log_files` — `- present:`, `- no_logs_note:`, and `### rows` with `(empty)` when `present=false`
-   - `## footer > ### severity_counts` — zeros across all five severities (reconciled in step 4)
 
-   The two remaining sections — `### rules` (under `## remit_coverage`) and `## findings` — contain **only their heading** at this point, with no blocks underneath. You'll Edit-append into them in steps 2 and 3.
+   `## remit_coverage` contains only its `### rules` heading at this point; `## findings` contains only its heading. You'll Edit-append into both in steps 2 and 3. (Do not write a `### stat_counts` block under `## remit_coverage` and do not write a `## footer` section at all — the Step 10 script derives both.)
 
 2. **Edit-append each rule** under `### rules`, anchoring on the `### rules` heading line. Each rule is one `Edit` with `replace_all: false`. Before each Edit, emit a one-line text heartbeat — `"Drafting rule R-NN — <one-line theme>"` — as your assistant text response, *not* as a printed bash line. The heartbeat resets the watchdog during the model's compose pause between tool calls.
 
 3. **Edit-append each finding** under `## findings`, anchoring on the `## findings` heading line. Each finding is one `Edit`. Heartbeat before each — `"Drafting finding N/M — <one-line theme>"`.
-
-4. **Reconcile the totals.** After all rules and findings are appended, walk the manifest and re-tally: `### stat_counts` against the actual rule statuses; `### severity_counts` against the actual finding severities; `### stat_counts > total` against `len(rules)`. `Edit` those small sections to the correct counts. The Step 10 script verifies these against the parsed arrays and fails loudly if they are off — better to catch them here.
 
 Foreground (operator-driven) runs don't have the watchdog and can ignore this discipline. The pattern costs nothing extra on those runs, and following it is cheap insurance against a per-section compose burst exceeding a tool-call gap.
 
@@ -809,8 +783,8 @@ Rules for the finding manifest and the JSON it produces:
 - **`praxen_version` is a fixed literal.** It records the version of *Praxen* that produced the report — use the literal value shown in the template above; do **not** read it from a `.claude-plugin/plugin.json`. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxen's, and must not be used here.
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
 - **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (the deferred L&F revisit, `design/DEFERRED.md`, will surface the description). If you have nothing more to say than the summary, omit `description` entirely.
-- **`policy_rule_ids` / `policy_rule_text` may be `null` — and are null together.** A finding from the Policy-Implementation Divergence audit (Step 6) diverges from specific remit rule(s): set `policy_rule_ids` to the `R-NN` id(s) and `policy_rule_text` to the verbatim quoted rule text. But a finding raised by RAISE-category scoring (Step 5) or by a detection pattern with no corresponding remit clause — an absent control the remit never names, a supply-chain or monitoring gap the remit is silent on — does **not** trace to a rule. For such a finding set **both** fields to `null`. Do not invent an `R-NN` id and do not stuff an explanatory sentence into `policy_rule_ids` to dodge the field — `null` is the correct, expected value, and the renderer simply omits the policy-rule line for that card. The two fields are null together or populated together; never one without the other.
-- **Don't stretch the rule link.** When the connection between a finding and a remit clause is indirect — e.g. an *inbound*-access gap weakening a clause about *outbound* counterparties — resist the temptation to link the rule anyway because it's "in the neighbourhood." If the linkage is genuinely traceable but indirect (the finding is the *enabling condition* for a violation of the rule, not the violation itself), link the rule **and** name the chain in the finding's `description` so a reader sees why the link is legitimate. If the linkage is across unrelated categories or you can't explain the chain in one sentence, set both fields to `null` and put the connection (if any) in `description` instead. A stretched link confuses the operator and reduces trust in the audit; a clean `null` with an explanation does not.
+- **`policy_rule_ids` may be `null`.** A finding from the Policy-Implementation Divergence audit (Step 6) diverges from specific remit rule(s): set `policy_rule_ids` to the `R-NN` id(s) (the Step 10 script will populate `policy_rule_text` by looking up each id in `remit_coverage.rules[].rule_text` and joining multi-rule entries with `" / "`). But a finding raised by RAISE-category scoring (Step 5) or by a detection pattern with no corresponding remit clause — an absent control the remit never names, a supply-chain or monitoring gap the remit is silent on — does **not** trace to a rule. For such a finding set `policy_rule_ids: null`. Do not invent an `R-NN` id and do not stuff an explanatory sentence into `policy_rule_ids` to dodge the field — `null` is the correct, expected value, and the renderer simply omits the policy-rule line for that card.
+- **Don't stretch the rule link.** When the connection between a finding and a remit clause is indirect — e.g. an *inbound*-access gap weakening a clause about *outbound* counterparties — resist the temptation to link the rule anyway because it's "in the neighbourhood." If the linkage is genuinely traceable but indirect (the finding is the *enabling condition* for a violation of the rule, not the violation itself), link the rule **and** name the chain in the finding's `description` so a reader sees why the link is legitimate. If the linkage is across unrelated categories or you can't explain the chain in one sentence, set `policy_rule_ids` to `null` and put the connection (if any) in `description` instead. A stretched link confuses the operator and reduces trust in the audit; a clean `null` with an explanation does not.
 - **`evidence` is structured: an array of `{ "file", "line", "snippet" }` objects** — *not* free-form strings. `file` is a workspace-relative path (or a workspace-relative identifier when there's no single file); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context — a short, specific piece of prose. The renderer formats each item as `file:line — snippet` in the report. Every finding needs at least one evidence item. Bad evidence ("No input validation found") is still bad — say *what* and *where*, e.g. `{ "file": "src/agent.py", "line": 34, "snippet": "fetch_message() returns the full body before the trust check at :67" }`. **For evidence that spans a line range** (a function body, a Terraform block, a multi-line config), put the *start* line in the `line` field and carry the range in the `snippet` itself — e.g. `{ "file": "agent.py", "line": 197, "snippet": "request_approval node, lines 197-209 — yields RequestInput but the approval-UI handler dismisses it without operator review" }`. The schema requires a single integer (or null) for `line`; range syntax lives in the snippet. **Never reprint a secret value** in `snippet` (see the rule at the top of this skill).
 - **`recommended_actions` is an array of strings.** One action → single-item array; multiple actions → multiple items. The renderer renders a single-item array as inline text and a multi-item array as a bulleted list. Each item is one concrete action: file to edit, config to change, control to add. Inline `<code>` / `<strong>` / `<em>` is allowed.
 - **Finding-prose discipline — keep cards scannable.** Each finding card is read at a glance, not as a paragraph. Cap the prose tight:
@@ -845,24 +819,21 @@ Rules for the finding manifest and the JSON it produces:
   | ASI08 | `ASI08 — Cascading Failures` |
   | ASI09 | `ASI09 — Human-Agent Trust Exploitation` |
   | ASI10 | `ASI10 — Rogue Agents` |
-- **`escalation`** is `alert` for Critical and High findings, `log_only` for Medium, Low, and Informational.
-- **Counts must be consistent.** `footer.severity_counts` must match the actual severities in `findings[]`. `remit_coverage.stat_counts` must match the actual statuses in `rules[]`, and `total` must equal `len(rules)`. Every non-null `rule.finding_id` must exist in `findings[]`. `weighted_overall` must equal Σ(score × weight) within rounding. **The renderer re-checks all of this and refuses to run if it's off**, naming the offending path — so get it right here.
 - **`findings`** may be empty (a genuinely clean agent). `positives` may be empty. `log_files.rows` is empty exactly when `present` is false.
 - **No presentation values in the JSON.** `severity` is `"Critical"`, never `"sev-critical"`; `status` is `"gap"`, never `"pill-gap"`; do not put CSS classes, percentages, or `floor()`ed maturity labels anywhere. The renderer derives all of that.
 
-**Common validation errors — check these before you run the renderer.** The validator is strict about cross-field consistency, and these are the mistakes it catches most often. None are obvious bugs; they're consequences of the strict checks, so look for them deliberately:
+**Common validation errors — check these before you run the script.** The validator (run by the Step 10 script and again by Step 11) is strict about a few cross-field invariants the script does NOT derive for you:
 
-- **`footer.severity_counts` doesn't match `findings[]`.** Re-count the actual severities in the findings array; `critical` + `high` + `medium` + `low` + `info` must equal `len(findings)` and each bucket must match.
-- **`remit_coverage.stat_counts` doesn't match `rules[]`.** Re-count the actual `status` values; `verified` + `gap` + `partial` + `vague` + `enp` must equal `total`, and `total` must equal `len(rules)`. **All five status keys are required even at zero** — `vague: 0` is a valid and common case and must appear in the JSON. If you used `collections.Counter` to tally and then compared it to `stat_counts`, beware: `Counter` silently omits zero-count keys, so a self-check via Counter-equality misses both "I forgot to write `vague: 0`" *and* "I wrote it correctly but compared against a Counter that doesn't have it." Walk `rules[]` and tally over the explicit five-status key set instead. (See Step 9.6 for the recipe.)
-- **Wrong RAISE weight or category name.** `weight` is `0.25` for `implement_zero_trust` and `0.15` for the other five — exactly, no rounding. `name` must be the exact display string for the `key` (`limit_your_domain` → `"Limit Your Domain"`, etc.). And `weighted_overall` must equal Σ(score × weight) to two decimals.
-- **A `finding_id` / `related_findings` id that doesn't exist.** Every non-null `rule.finding_id` and every entry in any `related_findings` array must be the `id` of a finding actually present in `findings[]`. No self-references in `related_findings`.
-- **A finding violates a rule whose status says it isn't violated.** Walk every `findings[].policy_rule_ids` and look it up in `remit_coverage.rules[]`: the matching rule's `status` must be `gap` or `partial` — never `verified`, and rarely `vague` (a vague rule is too imprecise to violate by construction) or `enp` (enforcement-not-possible findings shouldn't usually trace to a remit rule). A finding citing a `verified` rule is a logical contradiction and almost always means the rule's status was assessed under one understanding of the code and the finding written under another — re-read the cited line and either downgrade the rule to `partial` (control exists but is bypassable in the case the finding describes) or drop the rule link from the finding (set `policy_rule_ids` / `policy_rule_text` to `null` and explain the connection in the finding's `description`).
-- **A `partial` rule linked to an unrelated finding.** The mirror of the `verified`-contradiction check above. Every `partial` rule's `finding_id` must point at the finding describing the *specific gap that makes this rule incomplete* — not just any finding in the vicinity. A `partial` rule linked to an unrelated finding (e.g. a logging-gap finding bolted onto a trust-rule's `partial` slot because both happened to land in the same scan) produces a misleading coverage picture: the audit table claims the rule is partially audited when it isn't audited at all. Walk every `partial` rule and confirm the linked finding's content actually describes the rule's gap; if it doesn't, either set the rule to the correct status (`gap` if no finding exists, `verified` if the gap was a misread) or correct the link to the finding that does describe the gap.
-- **`escalation` inconsistent with `severity`.** `alert` for Critical and High; `log_only` for Medium, Low, Informational. The validator cross-checks this.
+- **`weighted_overall` doesn't match Σ(score × weight).** The script applies the per-key weight, but you write `weighted_overall` yourself — and it must equal Σ(score × weight) to two decimals. Compute it explicitly from the per-category scores; do not eyeball.
+- **A `finding_id` / `related_findings` / `policy_rule_ids` id that doesn't exist.** Every non-null `rule.finding_id`, every entry in any `related_findings` array, and every id in any `policy_rule_ids` field must be the `id` of a finding (or rule, respectively) actually present in the manifest. No self-references in `related_findings`. The script catches dangling `policy_rule_ids` at parse time; the schema validator catches the rest.
+- **A finding violates a rule whose status says it isn't violated.** Walk every `findings[].policy_rule_ids` and look it up in `remit_coverage.rules[]`: the matching rule's `status` must be `gap` or `partial` — never `verified`, and rarely `vague` (a vague rule is too imprecise to violate by construction) or `enp` (enforcement-not-possible findings shouldn't usually trace to a remit rule). A finding citing a `verified` rule is a logical contradiction and almost always means the rule's status was assessed under one understanding of the code and the finding written under another — re-read the cited line and either downgrade the rule to `partial` (control exists but is bypassable in the case the finding describes) or drop the rule link from the finding (set `policy_rule_ids` to `null` and explain the connection in the finding's `description`).
+- **A `partial` rule linked to an unrelated finding.** Every `partial` rule's `finding_id` must point at the finding describing the *specific gap that makes this rule incomplete* — not just any finding in the vicinity. A `partial` rule linked to an unrelated finding (e.g. a logging-gap finding bolted onto a trust-rule's `partial` slot because both happened to land in the same scan) produces a misleading coverage picture: the audit table claims the rule is partially audited when it isn't audited at all. Walk every `partial` rule and confirm the linked finding's content actually describes the rule's gap; if it doesn't, either set the rule to the correct status (`gap` if no finding exists, `verified` if the gap was a misread) or correct the link to the finding that does describe the gap.
 - **`owasp_llm` / `owasp_agentic` not in canonical form.** These are `LLM01`–`LLM10` / `ASI01`–`ASI10` (or `null`) — not free text, not the full label (the label goes in `tags`).
 - **Multiple ASI categories on one finding.** `owasp_agentic` is a single code — pick the **primary** ASI classification (the dominant attack pattern the finding represents) for that field. Any secondary ASI tags go into `tags[]` only, each as a separate `{ "kind": "owasp_agentic", "label": "<CODE — Name>" }` entry, and *do not* set `owasp_agentic` to a comma-separated string or to a secondary code. The same rule applies to `owasp_llm` if a finding spans two LLM categories: primary in the scalar field, any secondaries in `tags[]` only. The validator and renderer both expect this shape.
 
-When the validator rejects the JSON the script names the offending path (e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`) — fix the corresponding bullet in the manifest, not the JSON, and rerun the script.
+(Counts mismatches — `footer.severity_counts` vs `findings[]`, `remit_coverage.stat_counts` vs `rules[]`, weight/name vs key, escalation vs severity, multi-rule `policy_rule_text` — are no longer possible authoring errors: the Step 10 script derives all of these from what you write in `rules[]` and `findings[]`, so they're correct by construction.)
+
+When the validator rejects the JSON the script names the offending path — fix the corresponding bullet in the manifest, not the JSON, and rerun the script.
 
 ---
 

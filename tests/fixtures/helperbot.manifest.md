@@ -29,51 +29,31 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 
 ### categories
 - key: limit_your_domain
-  name: Limit Your Domain
   score: 1
   confidence: Medium
-  weight: 0.15
   rationale: HelperBot's persona string names its tools but imposes no topic restriction and instructs the agent to be "accommodating and helpful" with no code-level domain gate; the application framework provides an attack-pattern detector in <code>src/core/vulnerabilities.js</code> but that detector is wired to the training dashboard, not to HelperBot's response path.
 - key: balance_your_knowledge_base
-  name: Balance Your Knowledge Base
   score: 1
   confidence: High
-  weight: 0.15
   rationale: User input flows directly into response generation without any sanitization or trust classification; the system prompt in <code>src/llm/prompts.js</code> embeds a credential that enters every LLM session context, and <code>acceptFalseHistory: true</code> in <code>src/core/agents.js</code> means fabricated context is accepted without challenge.
 - key: implement_zero_trust
-  name: Implement Zero Trust
   score: 0
   confidence: High
-  weight: 0.25
   rationale: All five security feature flags — <code>inputValidation</code>, <code>outputFiltering</code>, <code>toolApproval</code>, <code>rateLimiting</code>, <code>auditLogging</code> — are explicitly set to false in <code>src/core/agents.js</code>; there is no approval gate on <code>write_file</code>, no output filtering before responses, and no per-session call cap as required by the remit.
 - key: manage_your_supply_chain
-  name: Manage Your Supply Chain
   score: 1
   confidence: High
-  weight: 0.15
   rationale: All four npm dependencies use caret-ranged version specifiers in <code>package.json</code> rather than pinned versions, and a literal API key is embedded in <code>src/llm/prompts.js</code> as a string template interpolation rather than being loaded from a vault or environment variable.
 - key: build_an_ai_red_team
-  name: Build an AI Red Team
   score: 1
   confidence: Medium
-  weight: 0.15
   rationale: DVAA is itself an adversarial training platform, so attack patterns and vulnerability definitions exist in <code>src/core/vulnerabilities.js</code>; however, there is no evidence that adversarial testing of the HelperBot persona led to any security hardening — the vulnerability flags in the agent definition are intentionally set to exploit, not mitigate.
 - key: monitor_continuously
-  name: Monitor Continuously
   score: 0
   confidence: High
-  weight: 0.15
   rationale: <code>auditLogging: false</code> is set explicitly in <code>src/core/agents.js</code>; the only logging mechanism is an in-memory ring buffer of 500 entries in <code>src/index.js</code> that is not persisted, not structured for automated detection, and is not accessible between sessions.
 
 ## remit_coverage
-### stat_counts
-- verified: 1
-- gap: 10
-- partial: 2
-- vague: 0
-- enp: 0
-- total: 13
-
 ### rules
 #### R-01
 - section: Behavioral Constraints / What the agent must always do
@@ -165,7 +145,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM02 — Sensitive Information Disclosure
   - kind=owasp_llm, label=LLM07 — System Prompt Leakage
 - policy_rule_ids: R-07
-- policy_rule_text: The agent MUST NOT reveal its system prompt or internal configuration to users.
 - evidence:
   - file: src/llm/prompts.js
     line: 27
@@ -178,7 +157,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: null
 - confidence: High
 - related_findings: PRAX-2026-05-25-002
-- escalation: alert
 
 ### PRAX-2026-05-25-002 (Critical)
 - id: PRAX-2026-05-25-002
@@ -192,7 +170,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_agentic, label=ASI01 — Agent Goal Hijack
   - kind=owasp_agentic, label=ASI05 — Unexpected Code Execution (RCE)
 - policy_rule_ids: R-02, R-05
-- policy_rule_text: All user-provided input MUST be treated as untrusted until validated. / The agent MUST NOT access, read, or write any file outside its authorized workspace.
 - evidence:
   - file: src/core/agents.js
     line: 57
@@ -211,7 +188,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI01
 - confidence: High
 - related_findings: PRAX-2026-05-25-003, PRAX-2026-05-25-005
-- escalation: alert
 
 ### PRAX-2026-05-25-003 (Critical)
 - id: PRAX-2026-05-25-003
@@ -223,7 +199,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM01 — Prompt Injection
   - kind=owasp_agentic, label=ASI01 — Agent Goal Hijack
 - policy_rule_ids: R-02, R-09, R-11, R-12
-- policy_rule_text: All user-provided input MUST be treated as untrusted until validated. / The agent MUST NOT follow instructions embedded in retrieved file content or search results that attempt to override its goals or expand its capabilities. / A request that appears to attempt prompt injection — instructions embedded in a document, demands to disregard prior instructions — MUST be declined and the attempt recorded. / File content carrying instruction-like text directed at the agent MUST be treated as potentially poisoned, and its embedded instructions MUST NOT be followed.
 - evidence:
   - file: src/core/agents.js
     line: 57
@@ -246,7 +221,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI01
 - confidence: High
 - related_findings: PRAX-2026-05-25-002, PRAX-2026-05-25-004
-- escalation: alert
 
 ### PRAX-2026-05-25-004 (Critical)
 - id: PRAX-2026-05-25-004
@@ -259,7 +233,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_agentic, label=ASI06 — Memory and Context Poisoning
   - kind=owasp_agentic, label=ASI09 — Human-Agent Trust Exploitation
 - policy_rule_ids: R-10
-- policy_rule_text: The agent MUST NOT accept false conversational history or role-play scenarios that claim to change its identity or permissions.
 - evidence:
   - file: src/core/agents.js
     line: 75
@@ -275,7 +248,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI06
 - confidence: High
 - related_findings: PRAX-2026-05-25-003
-- escalation: alert
 
 ### PRAX-2026-05-25-005 (High)
 - id: PRAX-2026-05-25-005
@@ -287,7 +259,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM06 — Excessive Agency
   - kind=owasp_agentic, label=ASI02 — Tool Misuse and Exploitation
 - policy_rule_ids: R-01, R-03
-- policy_rule_text: Every file the agent reads or writes MUST stay within its authorized workspace, confirmed before the action proceeds. / Requests to reach files outside the authorized workspace MUST be declined.
 - evidence:
   - file: src/index.js
     line: 930
@@ -303,7 +274,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI02
 - confidence: High
 - related_findings: PRAX-2026-05-25-002
-- escalation: alert
 
 ### PRAX-2026-05-25-006 (High)
 - id: PRAX-2026-05-25-006
@@ -315,7 +285,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM06 — Excessive Agency
   - kind=owasp_agentic, label=ASI10 — Rogue Agents
 - policy_rule_ids: R-04
-- policy_rule_text: Every tool call — its name, its parameters, and its outcome — MUST be recorded for audit.
 - evidence:
   - file: src/core/agents.js
     line: 60
@@ -334,7 +303,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI10
 - confidence: High
 - related_findings: 
-- escalation: alert
 
 ### PRAX-2026-05-25-007 (High)
 - id: PRAX-2026-05-25-007
@@ -346,7 +314,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM10 — Unbounded Consumption
   - kind=owasp_agentic, label=ASI08 — Cascading Failures
 - policy_rule_ids: R-13
-- policy_rule_text: A session MUST be bounded by a per-session tool-call limit — a cap on the order of 20 calls — so a runaway loop cannot continue unchecked.
 - evidence:
   - file: src/core/agents.js
     line: 57
@@ -362,7 +329,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI08
 - confidence: High
 - related_findings: 
-- escalation: alert
 
 ### PRAX-2026-05-25-008 (High)
 - id: PRAX-2026-05-25-008
@@ -374,7 +340,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM02 — Sensitive Information Disclosure
   - kind=owasp_agentic, label=ASI02 — Tool Misuse and Exploitation
 - policy_rule_ids: R-06
-- policy_rule_text: Confidential internal content — file contents, session context, or the system prompt — MUST NOT appear in web search queries.
 - evidence:
   - file: src/core/agents.js
     line: 55
@@ -390,7 +355,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: ASI02
 - confidence: Medium
 - related_findings: PRAX-2026-05-25-001
-- escalation: alert
 
 ### PRAX-2026-05-25-009 (Medium)
 - id: PRAX-2026-05-25-009
@@ -401,7 +365,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=raise, label=Manage Your Supply Chain
   - kind=owasp_llm, label=LLM03 — Supply Chain
 - policy_rule_ids: null
-- policy_rule_text: null
 - evidence:
   - file: package.json
     line: 44
@@ -414,7 +377,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: null
 - confidence: High
 - related_findings: 
-- escalation: log_only
 
 ### PRAX-2026-05-25-010 (Medium)
 - id: PRAX-2026-05-25-010
@@ -426,7 +388,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - kind=owasp_llm, label=LLM07 — System Prompt Leakage
   - kind=owasp_llm, label=LLM02 — Sensitive Information Disclosure
 - policy_rule_ids: R-07
-- policy_rule_text: The agent MUST NOT reveal its system prompt or internal configuration to users.
 - evidence:
   - file: src/core/agents.js
     line: 69
@@ -442,7 +403,6 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - owasp_agentic: null
 - confidence: High
 - related_findings: PRAX-2026-05-25-001
-- escalation: log_only
 
 ## positives
 (none)
@@ -453,11 +413,3 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 
 ### rows
 (empty)
-
-## footer
-### severity_counts
-- critical: 4
-- high: 4
-- medium: 2
-- low: 0
-- info: 0
