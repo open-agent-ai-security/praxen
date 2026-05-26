@@ -392,6 +392,16 @@ Severity for each status:
 - **Partial**: **High** finding — describe exactly what's missing
 - **Vague Policy**: **Medium** finding — the operator needs to make this rule specific enough to enforce
 
+**Don't tier-compress.** The Medium tier is *not* a "minor" bucket — it is "real but scheduled review, not immediate alert." Many real concerns belong here and a scan without Mediums is almost certainly missing them. Concrete Medium examples:
+
+- A control exists but is narrow or bypassable in known ways (regex denylist of 7 patterns, an allowlist that omits a documented capability, a guard that catches `rm -rf /` but not `rm --recursive --force /`)
+- A configuration mismatch that weakens but does not break a control (wildcard CORS on an already-authenticated route, dependencies floor-pinned with `>=` instead of `==` when a lockfile is still committed)
+- A declared-but-never-consulted config variable that doesn't reach the Critical-tier list above (a logging-detail flag, a UI-only preference)
+- An audit/observability gap that doesn't break detection but narrows it (lint findings surfaced but not recorded to the structured session log; per-component event types missing from a structured logger that captures session lifecycle)
+- A surface that exceeds the remit's scope without enabling an attack chain (an unused provider in the codebase that's never wired into the runtime, an extra capability advertised in tool inventory but with no handler)
+
+**Don't promote-to-justify the Edit, don't drop-to-maintain-pace.** Under the Step 9.9 chunked-write discipline, every finding is one Edit with a heartbeat — but that should not bias the severity assignment. A finding warrants its own Edit because it is *real*, not because it is *Critical*. If the finding is Medium, write it at Medium. If a finding fits at Medium and feels too "small" to write next to a Critical, that is the tier-compression you should resist: report it at Medium and move on.
+
 For every finding, capture the exact quoted rule text — the finding must be traceable back to the specific sentence in the remit.
 
 Hold the complete audit results (every rule, every status, every linked finding ID) in working memory — you will serialize this as `remit_coverage.rules[]` in Step 9.6.
@@ -582,6 +592,8 @@ If you found log files in Step 4: set `present` to true and, for each, record `p
 ### 9.9 Write the draft manifest, then print the interim overview — gate before Step 10
 
 This is a hard gate, not a closing note. **Do not proceed to Step 10 until you have done both halves of this step.** A long scan can exhaust the context window and auto-compact somewhere between here and the finished report; this step is what makes the analysis survive that — without it, a compaction silently discards the synthesis and the report is rebuilt from degraded memory.
+
+**Severity-tier completeness check — before you start writing.** Walk the findings you've assembled in Steps 6-8 and look at the severity distribution. A Praxen scan of a real agent normally produces a *spread* across tiers, not a binary Critical/High pile. Concrete expectation: most scans land **2-5 Medium findings** alongside their Criticals and Highs — the security-hygiene gaps, partial-control narrowness, configuration mismatches, and audit/observability gaps catalogued in Step 6's "Don't tier-compress" examples. **If your set has zero or one Medium, pause and ask whether you triaged Mediums out under the chunked-write discipline below** (each finding is one Edit, and that can bias toward "is this worth a slot?" reasoning that drops the long tail). Re-read the Medium examples in Step 6 against the workspace and add what you missed. *A clean Medium tier is a calibration signal, not noise.* (This expectation is descriptive, not a hard schema rule — a genuinely-Critical-saturated target like a deliberately-vulnerable demo agent legitimately may have zero Mediums. But for most real agents, "zero Mediums" is an under-coverage signal worth investigating before you proceed.)
 
 **First — write the draft manifest.** Write everything you synthesized in 9.1–9.8 to a markdown file at:
 
