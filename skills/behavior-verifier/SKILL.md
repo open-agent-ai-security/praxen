@@ -628,13 +628,15 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 <9.5 prose, 2–4 sentences, single paragraph>
 
 ### categories
-For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet). `name` and `weight` are derived from `key` by the Step 10 script — do not write them:
+For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet). Write `name` and `weight` alongside the score even though the Step 10 script also derives them — writing the weight forces you to rehearse the relative-importance scale (Zero Trust counts double) right next to the score you're assigning, which is an anchor for consistent per-category calibration:
 - key: <one of the six keys>
+  name: <display name — Limit Your Domain | Balance Your Knowledge Base | Implement Zero Trust | Manage Your Supply Chain | Build an AI Red Team | Monitor Continuously>
   score: <0–5>
   confidence: <High | Medium | Low>
+  weight: <0.25 for implement_zero_trust; 0.15 for the other five>
   rationale: <9.4 prose, 1–2 sentences, single line>
 
-(The script applies the canonical name and the standard weight (`implement_zero_trust` = 0.25; the other five = 0.15) per key. Compute `weighted_overall` above as Σ(score × weight) — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
+(The script overwrites `name` and `weight` from `key` on emit, so a typo in either does not break the JSON — but the LLM rehearsing them out loud per category is the point. Compute `weighted_overall` above as Σ(score × weight) — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
 
 ## remit_coverage
 ### rules

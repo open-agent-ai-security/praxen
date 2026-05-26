@@ -29,28 +29,40 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 
 ### categories
 - key: limit_your_domain
+  name: Limit Your Domain
   score: 1
   confidence: Medium
+  weight: 0.15
   rationale: HelperBot's persona string names its tools but imposes no topic restriction and instructs the agent to be "accommodating and helpful" with no code-level domain gate; the application framework provides an attack-pattern detector in <code>src/core/vulnerabilities.js</code> but that detector is wired to the training dashboard, not to HelperBot's response path.
 - key: balance_your_knowledge_base
+  name: Balance Your Knowledge Base
   score: 1
   confidence: High
+  weight: 0.15
   rationale: User input flows directly into response generation without any sanitization or trust classification; the system prompt in <code>src/llm/prompts.js</code> embeds a credential that enters every LLM session context, and <code>acceptFalseHistory: true</code> in <code>src/core/agents.js</code> means fabricated context is accepted without challenge.
 - key: implement_zero_trust
+  name: Implement Zero Trust
   score: 0
   confidence: High
+  weight: 0.25
   rationale: All five security feature flags — <code>inputValidation</code>, <code>outputFiltering</code>, <code>toolApproval</code>, <code>rateLimiting</code>, <code>auditLogging</code> — are explicitly set to false in <code>src/core/agents.js</code>; there is no approval gate on <code>write_file</code>, no output filtering before responses, and no per-session call cap as required by the remit.
 - key: manage_your_supply_chain
+  name: Manage Your Supply Chain
   score: 1
   confidence: High
+  weight: 0.15
   rationale: All four npm dependencies use caret-ranged version specifiers in <code>package.json</code> rather than pinned versions, and a literal API key is embedded in <code>src/llm/prompts.js</code> as a string template interpolation rather than being loaded from a vault or environment variable.
 - key: build_an_ai_red_team
+  name: Build an AI Red Team
   score: 1
   confidence: Medium
+  weight: 0.15
   rationale: DVAA is itself an adversarial training platform, so attack patterns and vulnerability definitions exist in <code>src/core/vulnerabilities.js</code>; however, there is no evidence that adversarial testing of the HelperBot persona led to any security hardening — the vulnerability flags in the agent definition are intentionally set to exploit, not mitigate.
 - key: monitor_continuously
+  name: Monitor Continuously
   score: 0
   confidence: High
+  weight: 0.15
   rationale: <code>auditLogging: false</code> is set explicitly in <code>src/core/agents.js</code>; the only logging mechanism is an in-memory ring buffer of 500 entries in <code>src/index.js</code> that is not persisted, not structured for automated detection, and is not accessible between sessions.
 
 ## remit_coverage
