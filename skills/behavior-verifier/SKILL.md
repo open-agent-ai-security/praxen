@@ -169,7 +169,7 @@ Flag the remit as low-quality only if the **policy intent** is unclear — missi
 
 ## Step 3 — Load Your Calibration
 
-**Pacing note for background subagent execution.** From this step through Step 9.9, the harness's no-progress watchdog kills the run after ~600 s without a tool call. The Step 9.9 chunked-write discipline addresses the manifest emission, but Steps 3-8 — KB loading, artifact intake, source reading, RAISE scoring, divergence audit, compound reasoning — also have natural temptations to compose a lot of synthesis internally before the next tool call. **Keep tool-call cadence tight throughout.** After each KB read, each file/grep batch, each major analytical decision, emit a one-line text observation (≤25 words) summarizing what you just learned before the next tool call. This keeps the watchdog reset cadence well inside the 600 s budget regardless of how much internal reasoning the next step seems to want. The catch is that the temptation gets stronger on larger workspaces (more files cataloged in working memory before the next read; more compound chains to follow) — exactly the targets where stalls are most likely. Resist the pull toward extended internal-only reasoning; emit a sentence and a tool call instead.
+**Pacing throughout Steps 3–9.9 — background subagents.** The harness watchdog kills a run after ~600 s without a tool call. Between major reads/decisions in any step, emit a one-line observation (≤25 words) before the next tool call. Larger workspaces invite longer internal-only reasoning — resist it.
 
 Read the following knowledge base files from the `knowledge/` directory alongside this skill file. Do not skip them — they calibrate your scoring and pattern recognition.
 
