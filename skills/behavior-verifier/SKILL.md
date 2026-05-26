@@ -599,6 +599,8 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 
 **This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, `policy_rule_text` (the verbatim remit quote), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. The Step 10 script performs JSON-shape translation only: it walks the manifest top-down, parses each field, and emits the corresponding JSON record. No re-composition, no wordsmithing, no analytical refinement — and no LLM in the loop.
 
+**Block patterns at a glance — the manifest uses two.** Repeated blocks named with their own `###` or `####` heading (each finding, each rule) place flat depth-0 field bullets *between* heading lines: `### PRAX-…` then `- id: …`, `- severity: …`, etc.; `#### R-NN` then `- section: …`, `- rule_text: …`, etc. Repeated blocks that live *inside* a section without their own heading (raise categories under `### categories`, positives entries, log-file rows) start with a depth-0 `- key:`-style bullet and continue with depth-2 field lines (no bullet) until the next `- ` at depth 0. The template below uses both patterns side by side; once you see them once they generalize.
+
 ```markdown
 # Praxen draft manifest
 
@@ -670,8 +672,8 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
   - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
   - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
-- policy_rule_text: <verbatim remit quote, or null — null exactly when policy_rule_ids is null>
-- evidence:
+- policy_rule_text: <verbatim remit quote, or null — null exactly when policy_rule_ids is null; for multi-rule, join quotes with " / " (space-slash-space) — no other separator>
+- evidence:                                         (each item starts with `- file:` at depth 2; `line:` and `snippet:` continue at depth 4, no bullet)
   - file: <workspace-relative path>
     line: <integer or null>
     snippet: <exact observation or quoted context, single line>
@@ -685,10 +687,8 @@ For each finding, in canonical order (Critical → High → Medium → Low → I
 - owasp_llm: <LLM01–LLM10 or null — primary only; secondaries go in tags[]>
 - owasp_agentic: <ASI01–ASI10 or null — primary only; secondaries go in tags[]>
 - confidence: <High | Medium | Low>
-- related_findings: <comma-separated PRAX-... ids, or empty after the colon for none — no brackets>
+- related_findings: <comma-separated PRAX-... ids, or empty after the colon for none — no brackets, no `null`, no `[]`>
 - escalation: <alert | log_only>
-
-(**Multi-rule `policy_rule_text`:** concatenate the verbatim quotes with ` / ` (space-slash-space) — e.g. `<rule R-NN text> / <rule R-MM text>`. The Step 11 renderer relies on this exact separator to display the rules; no other delimiter is accepted.)
 
 ## positives
 For each confirmed positive from Step 8, items start with `- title:` at depth 0 with continuation at depth 2:
@@ -724,7 +724,30 @@ For each log file (empty exactly when `present=false` — in that case write a s
 
 **Format conventions the parser enforces.** Sections appear in any order (the parser re-orders the JSON to canonical key order on emission); fields within a section may appear in any order; values are single-line (prose blocks under `### intro_band` subsections, `## behavior_summary`, and `### weighted_rationale` may wrap, joined by single spaces on parse). Indentation is meaningful: flat fields at depth 0, nested array items at depth 2 (with `- ` bullet), continuation fields at depth 4 (no bullet). The parser refuses tabs, unknown fields, malformed bullets, and any structural surprise.
 
-**Then — print the interim overview to stdout**, so the operator sees the synthesis even if the session is truncated before the final summary:
+**Manifest emission discipline — staying under the no-progress watchdog.** If you are executing this skill as a **background subagent**, the harness's no-progress watchdog kills the run after ~600 s without a tool call. Composing this entire manifest internally before the first `Write` fires can exceed that window — the prose for every finding, rule, category, and summary is in final form, and the synthesis phase is internal until the tool call lands. The following pattern keeps every tool call inside the budget by spreading manifest emission across many small calls:
+
+1. **Write the skeleton first.** `Write` the manifest file with every `## section` heading present. Fully populate these small sections in the initial Write:
+
+   - `## scan` — all fields including `manifest_format_version: 1`
+   - `## intro_band` — both `### agent_remit_summary` and `### agent_structure_summary` prose blocks
+   - `## behavior_summary` — the prose block
+   - `## raise_posture` — `- weighted_overall:`, `### weighted_rationale` prose, and all six `- key:` category blocks under `### categories`
+   - `## remit_coverage > ### stat_counts` — write zeros across all five statuses + `total: 0` (you'll reconcile in step 4)
+   - `## positives` — real entries if known, else a single line `(none)`
+   - `## log_files` — `- present:`, `- no_logs_note:`, and `### rows` with `(empty)` when `present=false`
+   - `## footer > ### severity_counts` — zeros across all five severities (reconciled in step 4)
+
+   The two remaining sections — `### rules` (under `## remit_coverage`) and `## findings` — contain **only their heading** at this point, with no blocks underneath. You'll Edit-append into them in steps 2 and 3.
+
+2. **Edit-append each rule** under `### rules`, anchoring on the `### rules` heading line. Each rule is one `Edit` with `replace_all: false`. Before each Edit, emit a one-line text heartbeat — `"Drafting rule R-NN — <one-line theme>"` — as your assistant text response, *not* as a printed bash line. The heartbeat resets the watchdog during the model's compose pause between tool calls.
+
+3. **Edit-append each finding** under `## findings`, anchoring on the `## findings` heading line. Each finding is one `Edit`. Heartbeat before each — `"Drafting finding N/M — <one-line theme>"`.
+
+4. **Reconcile the totals.** After all rules and findings are appended, walk the manifest and re-tally: `### stat_counts` against the actual rule statuses; `### severity_counts` against the actual finding severities; `### stat_counts > total` against `len(rules)`. `Edit` those small sections to the correct counts. The Step 10 script verifies these against the parsed arrays and fails loudly if they are off — better to catch them here.
+
+Foreground (operator-driven) runs don't have the watchdog and can ignore this discipline. The pattern costs nothing extra on those runs, and following it is cheap insurance against a per-section compose burst exceeding a tool-call gap.
+
+**Then — print the interim overview to stdout**, so the operator sees the synthesis even if the session is truncated before the final summary. The renderer does not read this block; it is for the operator only, so column-aligned formatting is welcome but close-enough spacing is fine:
 
 ```
 Praxen — interim behavior analysis overview
@@ -763,7 +786,9 @@ ls -l ./reports/<agent-slug>-draft-<TIMESTAMP>.md
 
 If the file does not exist on disk, **stop, go back to Step 9.9, and write it before continuing.** Do not approximate the manifest and do not skip ahead — a Step 10 run with no manifest on disk has no recovery path if the session compacts mid-write, and that failure is silent.
 
-Once the manifest is on disk, run the converter — a deterministic Python script that walks the manifest top-down, validates against `schema.py`, and writes the canonical findings JSON. The script ships beside this skill file as `manifest_to_findings.py`, parallel to `render.py` in shape and intent (pure Python 3 stdlib, no synthesis, exits non-zero with a path-named diagnostic on any error):
+**Then complete the rest of Step 9.9's gate** — if you have not yet printed the **interim overview** to stdout (the formatted block that begins `Praxen — interim behavior analysis overview` — full format in Step 9.9), print it now. The overview is the second half of 9.9's gate; a compaction-resume that jumps straight to script-invocation silently skips it. The operator should see the synthesis before the canonical file lands.
+
+Once both gate checks are done, run the converter — a deterministic Python script that walks the manifest top-down, validates against `schema.py`, and writes the canonical findings JSON. The script ships beside this skill file as `manifest_to_findings.py`, parallel to `render.py` in shape and intent (pure Python 3 stdlib, no synthesis, exits non-zero with a path-named diagnostic on any error):
 
 ```bash
 python3 "<SKILL_DIR>/manifest_to_findings.py" \
@@ -774,8 +799,6 @@ python3 "<SKILL_DIR>/manifest_to_findings.py" \
 (`<SKILL_DIR>` is the absolute path of the directory that contains this `SKILL.md` — the same directory you read `report_template.html` and `knowledge/` from. Use the agent slug, `$SCAN_DATE`, and `$TIMESTAMP` from Step 1.)
 
 That is the whole of Step 10's tool work — one `Bash` invocation. The script reads the manifest, parses each section, validates the result against `schema.py`, and writes the file. **If the script exits non-zero, do not edit the JSON to "fix" it — fix the manifest and rerun.** The manifest is the source of truth; the JSON is its mechanical projection.
-
-**Before running the script, complete the rest of Step 9.9's gate.** If you have not yet printed the **interim overview** to stdout (the formatted block that begins `Praxen — interim behavior analysis overview` — full format in Step 9.9), print it now. The overview is the second half of 9.9's gate; a compaction-resume that jumps straight to script-invocation silently skips it. The operator should see the synthesis before the canonical file lands.
 
 **If the script fails.** The diagnostic names either a manifest line (parser error — e.g. `manifest_to_findings.py: line 47: 'finding': unknown field 'foo'`) or a JSON path (schema validation error — e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`). Both errors point at the same recovery: go to the manifest, fix the offending bullet/block, rerun the script. The "Common validation errors" checklist below is the field guide for the schema-validation class.
 
