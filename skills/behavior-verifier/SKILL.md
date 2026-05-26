@@ -593,22 +593,21 @@ This is a hard gate, not a closing note. **Do not proceed to Step 10 until you h
 ./reports/<agent-slug>-draft-<TIMESTAMP>.md
 ```
 
-(Agent slug and `$TIMESTAMP` from Step 1.) This is a working artifact, not a deliverable — it does not need to validate against any schema, but its structure is **not free-form**. Use the section headings and per-item field names below verbatim; they mirror the canonical findings JSON (Step 10), so post-compaction recovery becomes a mechanical translation from the manifest into the JSON shape rather than an interpretive rebuild from prose. A missing field here becomes a missing field in the JSON — write `(none)` or `null` explicitly rather than omitting.
+(Agent slug and `$TIMESTAMP` from Step 1.) This is a working artifact, not a deliverable, but its structure is **not free-form** — it is parser input. Step 10 runs a deterministic Python script (`manifest_to_findings.py`) that walks this file top-down and emits the canonical findings JSON mechanically; the parser fails loudly on any structural deviation. Use the section headings, field markers, and indentation conventions below verbatim. A missing field here becomes a parser error at Step 10 — write `null` explicitly when a nullable field is absent rather than omitting the bullet entirely (the one exception is finding `description`, which has its own omit convention; see the manifest template).
 
-The manifest's job is to be **complete enough that Step 10's canonical JSON could be written from this file alone, with no reliance on working memory.**
+The manifest's job is to be **complete enough that Step 10's canonical JSON is produced from this file alone, with no reliance on working memory.**
 
-**This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, `policy_rule_text` (the verbatim remit quote), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. Step 10 then performs JSON-shape translation only: walk the manifest top-down and emit each section's JSON record from its corresponding manifest bullet, with no re-composition, no wordsmithing, no analytical refinement.
-
-**Why this matters operationally.** Step 10 emits the findings JSON via Edit-append, one finding per Edit (see Step 10's emission discipline). If the prose for each finding is pre-composed in the manifest, that Edit completes in ~13 seconds — mechanical transcription, and the validation-history anchor-test confirms the rate. If the prose has to be composed *during* the Edit call — because the manifest carried an outline that needs expansion — the same operation can spike to >600 seconds and trip the subagent's no-progress watchdog. This is the canonical mid-scan stall site (the `v0.7.3-prerelease` and `r2` Full Suite Runs both hit it on multiple targets; the b733a45 emission discipline reduced but did not eliminate it). Pre-composing the prose at 9.9 eliminates the burst entirely — the watchdog has nothing to trip on because every Edit is a short, mechanical write.
+**This means literally complete.** Every prose value that will appear in the JSON — `summary`, `description`, each `evidence[].snippet`, each `recommended_actions[]` item, `policy_rule_text` (the verbatim remit quote), the per-category `rationale`, `weighted_rationale`, `behavior_summary`, the `agent_remit_summary` and `agent_structure_summary` intro-band blocks, each `positives[]` entry, the `log_files.no_logs_note` — must be written into the manifest in **its final form**, not as outlines, abbreviations, or `TBD` placeholders. The Step 10 script performs JSON-shape translation only: it walks the manifest top-down, parses each field, and emits the corresponding JSON record. No re-composition, no wordsmithing, no analytical refinement — and no LLM in the loop.
 
 ```markdown
 # Praxen draft manifest
 
 ## scan
+- manifest_format_version: 1                         (parser version; must equal 1 for the current converter)
 - agent: <agent name>
 - agent_slug: <slug>
-- schema_version: "2.0"                              (the quotes matter — this is a JSON string, not a number; carry the quotes into Step 10)
-- praxen_version: <fixed literal from Step 10 — Praxen's version, not the analyzed agent's>
+- schema_version: "2.0"                              (the quotes are optional — the parser strips them; the JSON value is the string "2.0")
+- praxen_version: <fixed literal — Praxen's version, not the analyzed agent's>
 - scan_date: <$SCAN_DATE — YYYY-MM-DD>
 - scan_timestamp: <$SCAN_TS — ISO 8601 UTC>   (cannot be regenerated after a compaction)
 - workspace: <absolute path>
@@ -616,28 +615,28 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON coul
 
 ## intro_band
 ### agent_remit_summary
-<9.1 prose, 2–4 sentences>
+<9.1 prose, 2–4 sentences, single paragraph>
 
 ### agent_structure_summary
-<9.2 prose, 2–4 sentences>
+<9.2 prose, 2–4 sentences, single paragraph>
 
 ## behavior_summary
-<9.3 dominant-pattern narrative, 2–4 sentences>
+<9.3 dominant-pattern narrative, 2–4 sentences, single paragraph>
 
 ## raise_posture
 - weighted_overall: <float, 2 decimals — Σ(score × weight)>
 
 ### weighted_rationale
-<9.5 prose, 2–4 sentences>
+<9.5 prose, 2–4 sentences, single paragraph>
 
 ### categories
-For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record:
+For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet):
 - key: <one of the six keys>
-- name: <display name>
-- score: <0–5>
-- confidence: <High | Medium | Low>
-- weight: <0.25 for implement_zero_trust; 0.15 for the other five>
-- rationale: <9.4 prose, 1–2 sentences>
+  name: <display name>
+  score: <0–5>
+  confidence: <High | Medium | Low>
+  weight: <0.25 for implement_zero_trust; 0.15 for the other five>
+  rationale: <9.4 prose, 1–2 sentences, single line>
 
 (Weights for `weighted_overall` above: implement_zero_trust = 0.25; each of the other five = 0.15. Compute Σ(score × weight) explicitly here in the manifest — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
 
@@ -651,54 +650,66 @@ For each of the six RAISE categories — in this fixed order: limit_your_domain,
 - total: <int — must equal the number of rules below>
 
 ### rules
-For each rule, in document order:
-- rule_id: R-NN
+For each rule, in document order, use a `#### R-NN` header followed by flat field bullets at depth 0:
+
+#### R-NN
 - section: <remit section heading>
-- rule_text: <contiguous verbatim quote from the remit>
+- rule_text: <contiguous verbatim quote from the remit, single line>
 - status: <verified | gap | partial | vague | enp>
 - finding_id: <PRAX-... or null>
 
 ## findings
-For each finding, in canonical order (Critical → High → Medium → Low → Informational, then by id within a tier):
+For each finding, in canonical order (Critical → High → Medium → Low → Informational, then by id within a tier), use a `### PRAX-... (Severity)` header followed by flat field bullets at depth 0. The `(Severity)` in the heading is informational; the parser reads the authoritative `severity` from the bullet and errors if the two disagree:
+
+### PRAX-YYYY-MM-DD-NNN (Severity)
 - id: PRAX-YYYY-MM-DD-NNN
 - severity: <Critical | High | Medium | Low | Informational>
 - summary: <one-sentence card header — ≤ 25 words, final-form prose>
-- description: <OPTIONAL longer-form paragraph — at most three sentences, final-form prose, or omit the bullet entirely>
-- tags:                                              (one sub-bullet per tag — never comma-joined. Each `kind=K, label=L` sub-bullet translates to `{"kind": "K", "label": "L"}` in `tags[]` in Step 10's JSON.)
+- description: <longer-form paragraph, at most three sentences, final-form prose — or the literal value `null` to omit from JSON>
+- tags:
   - kind=<raise|owasp_llm|owasp_agentic|mcp>, label=<full label>
   - kind=<...>, label=<...>
 - policy_rule_ids: <R-NN or "R-NN, R-MM", or null>
 - policy_rule_text: <verbatim remit quote, or null — null exactly when policy_rule_ids is null>
-  - **Multi-rule findings:** concatenate the verbatim quotes with ` / ` (space-slash-space) — e.g. `"<rule R-NN text> / <rule R-MM text>"`. The Step 11 renderer relies on this exact separator to display the rules; no other delimiter is accepted.
-- evidence: <one bullet per item, formatted `file:line — snippet` (or `file — snippet` for file-level)>
-- recommended_actions: <one bullet per action>
+- evidence:
+  - file: <workspace-relative path>
+    line: <integer or null>
+    snippet: <exact observation or quoted context, single line>
+  - file: <...>
+    line: <...>
+    snippet: <...>
+- recommended_actions:
+  - <specific action, one per bullet>
+  - <next action>
 - raise_category: <one of the six keys>
 - owasp_llm: <LLM01–LLM10 or null — primary only; secondaries go in tags[]>
 - owasp_agentic: <ASI01–ASI10 or null — primary only; secondaries go in tags[]>
 - confidence: <High | Medium | Low>
-- related_findings: <list of PRAX-... ids, or empty>
+- related_findings: <comma-separated PRAX-... ids, or empty after the colon for none — no brackets>
 - escalation: <alert | log_only>
 
-## positives
-For each confirmed positive from Step 8:
-- title: <short>
-- description: <1–2 sentences>
-- evidence_path: <file:line or config key>
+(**Multi-rule `policy_rule_text`:** concatenate the verbatim quotes with ` / ` (space-slash-space) — e.g. `<rule R-NN text> / <rule R-MM text>`. The Step 11 renderer relies on this exact separator to display the rules; no other delimiter is accepted.)
 
-If none, write `(none)` under this heading.
+## positives
+For each confirmed positive from Step 8, items start with `- title:` at depth 0 with continuation at depth 2:
+- title: <short>
+  description: <1–2 sentences>
+  evidence_path: <file:line or config key>
+
+If none, write a single line `(none)` under this heading.
 
 ## log_files
 - present: <true | false>
 - no_logs_note: <one sentence; required when present=false, may be empty otherwise>
 
 ### rows
-For each log file (empty exactly when present=false):
+For each log file (empty exactly when `present=false` — in that case write a single line `(empty)` under the `### rows` heading):
 - path: <path>
-- source: <component>
-- content_type: <type>
-- purpose: <what it captures>
-- mtime: <date or "unknown">
-- status: <active | new>
+  source: <component>
+  content_type: <type>
+  purpose: <what it captures>
+  mtime: <date or "unknown">
+  status: <active | new>
 
 ## footer
 ### severity_counts
@@ -708,10 +719,10 @@ For each log file (empty exactly when present=false):
 - low: <int>
 - info: <int>
 
-**Tally explicitly.** After writing every `findings:` block above, walk the array and count each severity into its own running counter — do not rely on memory or scroll-and-eyeball. The five counters must sum to the total number of finding blocks, and each per-severity count must match the actual contents of `findings[]`. The Step 11 renderer re-checks this authoritatively; a mismatch is a validation failure named at `$.footer.severity_counts`.
+**Tally explicitly.** After writing every finding block above, walk the array and count each severity into its own running counter — do not rely on memory or scroll-and-eyeball. The five counters must sum to the total number of finding blocks, and each per-severity count must match the actual severities in `findings`. The Step 11 renderer re-checks this authoritatively; a mismatch is a validation failure named at `$.footer.severity_counts`.
 ```
 
-These section headings and field names match the canonical JSON in Step 10 one-to-one. If the session compacts before the JSON is written, post-compaction Step 10 reads this file and translates each section into its JSON counterpart with no semantic decisions to re-litigate.
+**Format conventions the parser enforces.** Sections appear in any order (the parser re-orders the JSON to canonical key order on emission); fields within a section may appear in any order; values are single-line (prose blocks under `### intro_band` subsections, `## behavior_summary`, and `### weighted_rationale` may wrap, joined by single spaces on parse). Indentation is meaningful: flat fields at depth 0, nested array items at depth 2 (with `- ` bullet), continuation fields at depth 4 (no bullet). The parser refuses tabs, unknown fields, malformed bullets, and any structural surprise.
 
 **Then — print the interim overview to stdout**, so the operator sees the synthesis even if the session is truncated before the final summary:
 
@@ -744,7 +755,7 @@ and continue from Step 10. Writing the findings JSON and rendering now...
 
 ## Step 10 — Write the Canonical Findings JSON
 
-**Gate — confirm the draft manifest exists before you start.** Step 9.9's draft manifest is what makes this analysis survive a context-window compaction; it is also the source of truth Step 10 reads from when the synthesis can't be precisely recalled (see the recovery paragraph below). Run this first and only proceed when the file is present:
+**Gate — confirm the draft manifest exists before you start.** The Step 10 converter reads the manifest directly; it is the source of truth, with no reliance on conversational state. Run this first and only proceed when the file is present:
 
 ```bash
 ls -l ./reports/<agent-slug>-draft-<TIMESTAMP>.md
@@ -752,100 +763,25 @@ ls -l ./reports/<agent-slug>-draft-<TIMESTAMP>.md
 
 If the file does not exist on disk, **stop, go back to Step 9.9, and write it before continuing.** Do not approximate the manifest and do not skip ahead — a Step 10 run with no manifest on disk has no recovery path if the session compacts mid-write, and that failure is silent.
 
-Once the manifest is on disk, write a single JSON file — the canonical record of this analysis — to:
+Once the manifest is on disk, run the converter — a deterministic Python script that walks the manifest top-down, validates against `schema.py`, and writes the canonical findings JSON. The script ships beside this skill file as `manifest_to_findings.py`, parallel to `render.py` in shape and intent (pure Python 3 stdlib, no synthesis, exits non-zero with a path-named diagnostic on any error):
 
-```
-./reports/<agent-slug>-findings-<YYYY-MM-DD>.json
-```
-
-(Use the agent slug and `$SCAN_DATE` from Step 1; do not regenerate the date.)
-
-**Step 10 is mechanical translation, not composition.** Read the draft manifest you wrote in Step 9.9 (`./reports/<agent-slug>-draft-<TIMESTAMP>.md`) and walk it top-down. For each finding bullet in the manifest, emit the corresponding JSON object via Edit-append (anchored on the closing `]` of the `findings` array). Do not refine wording, do not add details, do not introduce new analytical judgment. **If the manifest is missing a field the JSON requires, go back to Step 9.9 and add it there** — do not compensate in Step 10. This holds for both foreground and subagent runs: the manifest is the authoritative record of the analysis, working memory is not, and composing-during-Edit at Step 10 is what trips the subagent watchdog (see Step 9.9's *Why this matters operationally* paragraph for the mechanism). If the operator is resuming a compacted run, they may point you straight at the manifest — same instruction: build Step 10 from the file, mechanically, top-down.
-
-**Before writing the JSON, complete the rest of Step 9.9's gate.** If you have not yet printed the **interim overview** to stdout (the formatted block that begins `Praxen — interim behavior analysis overview` — full format in Step 9.9), print it now from the manifest you just read. The overview is the second half of 9.9's gate and a compaction-resume that jumps straight to JSON-write silently skips it; the operator should see the synthesis before the canonical files land.
-
-This file is the **complete behavioral record**: everything the HTML report shows is derived from it by `render.py`, and it is also what downstream consumers (dashboards, ticketing, compliance pipelines) ingest. Use exactly this shape. Every field is required unless the comment says it may be null or empty:
-
-```json
-{
-  "schema_version": "2.0",
-  "praxen_version": "0.7.3",
-  "scan": {
-    "agent": "<agent name>",
-    "agent_slug": "<agent-slug>",
-    "scan_date": "<$SCAN_DATE, YYYY-MM-DD>",
-    "scan_timestamp": "<$SCAN_TS, ISO 8601 UTC, e.g. 2026-05-03T04:39:06Z>",
-    "workspace": "<absolute path to the agent workspace>",
-    "artifact_count": <integer — number of workspace artifacts you read in Step 4>
-  },
-  "intro_band": {
-    "agent_remit_summary": "<9.1 — 2-4 sentences; may contain <code> tags>",
-    "agent_structure_summary": "<9.2 — 2-4 sentences; may contain <code> tags>"
-  },
-  "behavior_summary": "<9.3 — 2-4 sentence dominant-pattern narrative; may contain <p> and <code> tags>",
-  "remit_coverage": {
-    "stat_counts": { "verified": <int>, "gap": <int>, "partial": <int>, "vague": <int>, "enp": <int>, "total": <int — must equal the number of rules below> },
-    "rules": [
-      { "rule_id": "R-01", "section": "<remit section heading>", "rule_text": "<the rule's operative sentence — contiguous and verbatim from the remit, never elided>", "status": "<verified | gap | partial | vague | enp>", "finding_id": "<PRAX-... or null>" }
-    ]
-  },
-  "findings": [
-    {
-      "id": "PRAX-YYYY-MM-DD-001",
-      "severity": "<Critical | High | Medium | Low | Informational>",
-      "summary": "<one sentence, specific — not generic; this is what shows on the finding card header>",
-      "description": "<OPTIONAL longer-form body, one short paragraph; may contain inline <code>/<strong>/<em>. Carried in the JSON for downstream consumers; surfaced in the HTML in a future release. Omit the field entirely if you have nothing to add beyond the summary.>",
-      "tags": [
-        { "kind": "raise", "label": "<RAISE category display name, e.g. Implement Zero Trust>" },
-        { "kind": "owasp_llm", "label": "LLM01 — Prompt Injection" },
-        { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
-      ],
-      "policy_rule_ids": "<the R-NN id(s) this finding violates, e.g. \"R-03\" or \"R-03, R-04\" — or null if the finding does not trace to a specific remit rule>",
-      "policy_rule_text": "<the remit text the finding violates — each rule quoted contiguous and verbatim (never elided), exactly as in rule_text; if it spans rules, concatenate the quotes with \" / \" — or null, together with policy_rule_ids>",
-      "evidence": [
-        { "file": "<workspace-relative path>", "line": <integer or null>, "snippet": "<exact observation or quoted context — never reprint secrets>" }
-      ],
-      "recommended_actions": [
-        "<specific action: file to edit, config to change, control to add; may contain inline <code>>",
-        "<additional action if there are multiple; one-action findings get a single-item array>"
-      ],
-      "raise_category": "<one of: limit_your_domain | balance_your_knowledge_base | implement_zero_trust | manage_your_supply_chain | build_an_ai_red_team | monitor_continuously>",
-      "owasp_llm": "<LLM01–LLM10, or null>",
-      "owasp_agentic": "<ASI01–ASI10, or null>",
-      "confidence": "<High | Medium | Low>",
-      "related_findings": ["<PRAX-... ids of related findings, or empty list>"],
-      "escalation": "<alert for Critical/High; log_only for Medium/Low/Informational>"
-    }
-  ],
-  "positives": [
-    { "title": "<short>", "description": "<1-2 sentences>", "evidence_path": "<file:line or config key>" }
-  ],
-  "log_files": {
-    "present": <true | false>,
-    "no_logs_note": "<one sentence on the absence (cite a finding ID if relevant) when present is false; may be empty string when present is true>",
-    "rows": [
-      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "<active | new>" }
-    ]
-  },
-  "raise_posture": {
-    "weighted_overall": <float, 2 decimals, = Σ(score × weight)>,
-    "weighted_rationale": "<9.5 — 2-4 sentences>",
-    "categories": [
-      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": <0-5>, "confidence": "<High|Medium|Low>", "weight": 0.15, "rationale": "<9.4 — 1-2 sentences>" },
-      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": <0-5>, "confidence": "<...>", "weight": 0.15, "rationale": "<...>" },
-      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": <0-5>, "confidence": "<...>", "weight": 0.25, "rationale": "<...>" },
-      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": <0-5>, "confidence": "<...>", "weight": 0.15, "rationale": "<...>" },
-      { "key": "build_an_ai_red_team",        "name": "Build an AI Red Team",        "score": <0-5>, "confidence": "<...>", "weight": 0.15, "rationale": "<...>" },
-      { "key": "monitor_continuously",        "name": "Monitor Continuously",        "score": <0-5>, "confidence": "<...>", "weight": 0.15, "rationale": "<...>" }
-    ]
-  },
-  "footer": {
-    "severity_counts": { "critical": <int>, "high": <int>, "medium": <int>, "low": <int>, "info": <int> }
-  }
-}
+```bash
+python3 "<SKILL_DIR>/manifest_to_findings.py" \
+  --manifest ./reports/<agent-slug>-draft-<TIMESTAMP>.md \
+  --out      ./reports/<agent-slug>-findings-<YYYY-MM-DD>.json
 ```
 
-Rules for the findings array and the JSON as a whole:
+(`<SKILL_DIR>` is the absolute path of the directory that contains this `SKILL.md` — the same directory you read `report_template.html` and `knowledge/` from. Use the agent slug, `$SCAN_DATE`, and `$TIMESTAMP` from Step 1.)
+
+That is the whole of Step 10's tool work — one `Bash` invocation. The script reads the manifest, parses each section, validates the result against `schema.py`, and writes the file. **If the script exits non-zero, do not edit the JSON to "fix" it — fix the manifest and rerun.** The manifest is the source of truth; the JSON is its mechanical projection.
+
+**Before running the script, complete the rest of Step 9.9's gate.** If you have not yet printed the **interim overview** to stdout (the formatted block that begins `Praxen — interim behavior analysis overview` — full format in Step 9.9), print it now. The overview is the second half of 9.9's gate; a compaction-resume that jumps straight to script-invocation silently skips it. The operator should see the synthesis before the canonical file lands.
+
+**If the script fails.** The diagnostic names either a manifest line (parser error — e.g. `manifest_to_findings.py: line 47: 'finding': unknown field 'foo'`) or a JSON path (schema validation error — e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`). Both errors point at the same recovery: go to the manifest, fix the offending bullet/block, rerun the script. The "Common validation errors" checklist below is the field guide for the schema-validation class.
+
+The canonical JSON the script writes is the **complete behavioral record**: everything the HTML report shows is derived from it by `render.py`, and it is also what downstream consumers (dashboards, ticketing, compliance pipelines) ingest. Its shape is defined by `findings.schema.json` (the published JSON-Schema contract) and enforced at runtime by `schema.py`. You do not write this file by hand; the rules below tell you what to put in the manifest so the script's output passes validation.
+
+Rules for the finding manifest and the JSON it produces:
 
 - **`praxen_version` is a fixed literal.** It records the version of *Praxen* that produced the report — use the literal value shown in the template above; do **not** read it from a `.claude-plugin/plugin.json`. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxen's, and must not be used here.
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
@@ -859,7 +795,7 @@ Rules for the findings array and the JSON as a whole:
   - **`description`** (when present) — three sentences max: what diverges, why it matters, where the chain ends. If the summary already says it, omit the field.
   - **`evidence`** — at most two cited spans per finding. If you genuinely need three, you have two findings, not one.
   - **`recommended_actions`** — at most two items, each ≤ two sentences. A long fix-list is a redesign discussion, not a recommendation.
-  Long prose isn't more rigorous — it's just harder for the operator to triage, and harder for the worker model to draft (longer silent compose bursts are the canonical mid-scan stall site).
+  Long prose isn't more rigorous — it's just harder for the operator to triage.
 - **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Unexpected Code Execution (RCE)`, not `ASI05`. The exact format is `<CODE> — <Name>`: the code (`LLM01`, `ASI05`), a space, an **em dash** (`—`, not a hyphen `-`, not an en dash `–`), a space, then the canonical name exactly as written in the KB. For an **MCP-checklist finding** — one produced by Step 6's MCP Server Evaluation against `knowledge/KB_MCP_SECURITY.md`'s minimum-bar checklist — add `{ "kind": "mcp", "label": "<the MCP checklist item the finding violates>" }`. **A finding whose primary classification is a different pattern but happens to involve MCP-shaped evidence does NOT carry the `mcp` tag** — e.g. an `LLM03 — Supply Chain` finding about an `npx -y @some/mcp-server` install lacking a version pin is a supply-chain finding; an `LLM06 — Excessive Agency` finding about a write-without-approval tool that happens to be exposed through MCP is an agency finding. Their evidence makes the MCP context clear, and their OWASP / RAISE tags carry the primary classification. Attach `kind=mcp` *only* when the finding is itself the violation of a specific MCP-checklist item from the KB.
 
   **Quick-reference labels (copy-paste verbatim).** The KB files (`knowledge/KB_LLM_TOP10.md`, `knowledge/KB_AGENTIC_TOP10.md`) remain authoritative; this table is a copy-paste aid so the labels don't drift across findings and you don't have to grep the KB for every tag. If this table ever diverges from the KB headings, the KB wins.
@@ -903,21 +839,7 @@ Rules for the findings array and the JSON as a whole:
 - **`owasp_llm` / `owasp_agentic` not in canonical form.** These are `LLM01`–`LLM10` / `ASI01`–`ASI10` (or `null`) — not free text, not the full label (the label goes in `tags`).
 - **Multiple ASI categories on one finding.** `owasp_agentic` is a single code — pick the **primary** ASI classification (the dominant attack pattern the finding represents) for that field. Any secondary ASI tags go into `tags[]` only, each as a separate `{ "kind": "owasp_agentic", "label": "<CODE — Name>" }` entry, and *do not* set `owasp_agentic` to a comma-separated string or to a secondary code. The same rule applies to `owasp_llm` if a finding spans two LLM categories: primary in the scalar field, any secondaries in `tags[]` only. The validator and renderer both expect this shape.
 
-When the renderer rejects the JSON it names the offending path (e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`) — fix that path and re-run.
-
-After writing the file, re-read it and confirm it parses as valid JSON and the counts line up. (Step 11 will catch any problem, but catching it here saves a round trip.)
-
-### Findings emission discipline — avoiding silent-composition stalls
-
-If you are executing this skill as a **background subagent**, the harness's no-progress watchdog will kill the run after ~600 s without a tool call — and the riskiest pause is the Write for this Step 10 JSON, because a complete multi-finding document is a long internal composition with nothing emitted to the stream until the Write fires. The following emission pattern keeps the stream alive and makes an interrupted run partially recoverable from disk:
-
-1. **Write the complete skeleton.** Required top-level arrays — **all four must appear, even if empty:** `findings: []`, `positives: []`, `log_files.rows: []`, `remit_coverage.rules: []`. (`raise_posture.categories` has all six entries from the start — it is never empty.) Required top-level objects with their required keys: `raise_posture.categories` populated; `footer.severity_counts` with all five keys at zero; `remit_coverage.stat_counts` with all five status keys at zero; `log_files` with `present: false` and `no_logs_note: ""`. Top-level fields (`schema_version`, `praxen_version`, `scan`, `intro_band`, `behavior_summary`) populated from the manifest. Do **not** render the skeleton — the schema requires `remit_coverage.rules` to have at least one entry, so a `rules: []` skeleton is intentionally non-renderable. The skeleton is a scaffold for the chunked Edits below; the first render is the final Step 11 render, after counts are reconciled.
-2. **Append findings one at a time** via `Edit` (`replace_all: false`), anchoring on the closing `]` of the findings array. Each finding object is one Edit. Never compose a multi-finding JSON in one Write — that is the canonical stall site.
-3. **One-line text heartbeat before each Edit** — `"Drafting finding N/M — <one-line theme>"`. Keeps the stream alive during the model's composition pauses *between* tool calls.
-4. **Same pattern for `remit_coverage.rules`** — empty array in the skeleton, `Edit`-append one rule at a time, heartbeat before each.
-5. **Reconcile counts at the very end, just before the final render.** `footer.severity_counts` must match the actual severities in `findings[]`; `remit_coverage.stat_counts` (all five status keys including zeros) must match the statuses in `rules[]`; `total` must equal `len(rules)`. The renderer enforces this and rejects a JSON whose counts don't line up. **Do not attempt intermediate renders mid-stream** — a `render` call against a half-built file with zero `severity_counts` will fail (correctly) and waste tokens. The first and only render is the Step 11 one after counts are reconciled.
-
-Foreground (operator-driven) runs don't have the watchdog and can ignore this discipline. It costs nothing on those runs, though, and following this pattern is a cheap insurance policy on the schema — so prefer it either way. The Finding-prose discipline above (tight `summary` / `description` / `evidence` / `recommended_actions` caps) is the upstream control: shorter findings compose faster, and a worker that's been drafting four-sentence summaries has more to silently compose per Edit and a correspondingly bigger stall risk.
+When the validator rejects the JSON the script names the offending path (e.g. `$.footer.severity_counts: critical=5 but findings[] contains 6 critical`) — fix the corresponding bullet in the manifest, not the JSON, and rerun the script.
 
 ---
 
