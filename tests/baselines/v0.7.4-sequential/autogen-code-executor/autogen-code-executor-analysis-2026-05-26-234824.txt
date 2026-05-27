@@ -1,0 +1,99 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Execution Subsystem
+Analysis: May 26, 2026, 23:48 UTC
+Praxen v0.7.4
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is *framework offers safe primitives, code/example uses
+none of them, and several primitives carry the shape of isolation but not the
+substance*. The remit declares six mandatory controls every executor MUST
+always do (work-directory confinement, wall-clock timeout, complete stdio
+capture, host-caller isolation, scoped persistence, and an audit log per
+execution); only the first three are reliably implemented across the executor
+set. The audit-log requirement — timestamp, executor kind, agent, work_dir,
+timeout, exit, digest — is entirely absent across every executor; the few
+`logging.info`/`logging.debug` calls present cover container lifecycle and pip
+installs, not executions. The host-isolation requirement is broken in two
+ways: the local executor passes the entire host environment to the child via
+`os.environ.copy()` in `local/__init__.py`, and the Docker executor accepts
+caller-supplied `extra_volumes` and `extra_hosts` and runs containers as the
+image default (typically root) with no network policy, leaving the container
+as a thin namespace boundary rather than a real isolation layer. Compounding
+this, `create_default_code_executor` will silently fall back from Docker to
+the local executor when Docker is unavailable — bypassing the remit's "local
+execution requires human approval" clause with only a `UserWarning` — and the
+local executor's own docstring claims "Command line code is sanitized using
+regular expression match against a list of dangerous commands" while no such
+code exists in the file.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.30 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    3/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 6   Medium: 4   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 8   Partial: 3   Vague: 0   Enforcement-not-possible: 1   (of 16 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-001  No executor records a per-execution audit log, in
+            direct contradiction of the remit's mandatory audit-log invariant.
+      Action 1: Add an audit emitter on the abstract `CodeExecutor` base class
+                (`python/packages/autogen-core/src/autogen_core/code_executor/_base.py`)
+                that every concrete executor must call exactly once per code
+                block with `{timestamp, executor_kind, language, source_agent,
+                work_dir, timeout, exit_code, code_sha256}` — emit before and
+                after execution so timeouts and exceptions are still recorded.
+      Action 2: Wire the emitter through `PythonCodeExecutionTool.run` so the
+                AutoGen tool layer can capture `source_agent` from the calling
+                agent context that the executor cannot see directly.
+
+  PRAX-2026-05-26-002  Local executor copies the full host environment into
+            every child process, leaking credentials and tokens to
+            LLM-generated code.
+      Action: Replace `os.environ.copy()` with an explicit allow-list of
+              environment variables to forward (default: `PATH` plus an
+              optional caller-supplied list); document the change in the class
+              docstring and add a regression test asserting that an env var
+              set on the parent process is not visible in the child's
+              `os.environ`.
+
+  PRAX-2026-05-26-003  Docker executor creates containers as the image default
+            user (root for `python:3-slim`) with no opt-in to a
+            less-privileged identity.
+      Action: Add a `run_as_user` config field defaulting to a non-root UID
+              (e.g. `"1000:1000"`) and pass it to
+              `client.containers.create(..., user=run_as_user)`; require an
+              explicit human-approval flag (e.g. `allow_root=True`) to
+              override the default.
+
+  PRAX-2026-05-26-004  `create_default_code_executor` silently falls back from
+            Docker to the local host executor when Docker is unavailable,
+            bypassing the remit's human-approval requirement for local
+            execution.
+      Action: Make the fallback opt-in: replace the silent fall-through with
+              `raise RuntimeError("Docker unavailable; pass
+              allow_local_fallback=True to use the host executor")` unless the
+              caller has explicitly enabled it; preserve the existing behavior
+              only behind an explicit kwarg so production callers see a hard
+              failure rather than a degraded executor.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

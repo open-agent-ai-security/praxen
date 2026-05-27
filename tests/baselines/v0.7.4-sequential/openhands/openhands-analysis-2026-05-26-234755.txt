@@ -1,0 +1,105 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenHands
+Analysis: May 26, 2026, 23:47 UTC
+Praxen v0.7.4
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the remit, partially enforced at
+the architectural boundary, and silently downgraded by configuration defaults.
+The remit is unusually specific — it names every approval-required action
+class (PR merge, off-task-repo writes, dependency commits, CI edits,
+MCP-server adds, force-push) — but the runtime exposes a single
+conversation-scoped confirmation_mode that defaults to NeverConfirm, with no
+per-action gate keyed to those specific classes; the MCP create_pr tool
+accepts repo_name straight from LLM output with no task-origin cross-check, so
+R-16 (writes outside task-origin repo) has no code-level enforcement. The
+companion pattern is the untrusted-content channel that the remit names
+explicitly and the code treats as authoritative: repo
+.openhands/microagents/*.md files are loaded into the LLM context every
+session, and the agent has full write access to them inside the sandbox —
+combined with shell/Jupyter auto-approval in the default config and the
+unauthenticated uvx mcp-server-fetch tool that brings arbitrary web content
+into context, that's a one-hop injection-to-exec chain that the sandbox
+boundary contains but does not prevent. The ProcessSandboxService alternative
+(used when RUNTIME=local, the path AGENTS.md tells developers to use) removes
+even the container boundary.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.15 / 5.0   (Partial)
+  Limit Your Domain              3/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: Medium, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           3/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 4   Medium: 4   Low: 0   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 9   Partial: 9   Vague: 0   Enforcement-not-possible: 7   (of 28 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-001  ProcessSandboxService runs the agent server as a
+            subprocess on the host with the parent's environment and OS user —
+            no FS or network isolation.
+      Action 1: In `ProcessSandboxService`, refuse to start when not running
+                under an explicit unprivileged OS user (e.g., refuse if
+                `os.geteuid() == 0` or if the calling user's uid matches the
+                parent), and document that the process runtime is *not* the
+                sandboxed-runtime described in the Worker Remit.
+      Action 2: Replace `env=env` (the full parent environment) at
+                `process_sandbox_service.py:120` with an explicit allowlist of
+                variables required by the agent server, mirroring the
+                env-passthrough policy already used by `DockerSandboxService`.
+
+  PRAX-2026-05-26-002  MCP
+            create_pr/create_mr/create_bitbucket_pr/create_azure_devops_pr
+            accept repo_name from LLM output with no task-origin cross-check.
+      Action 1: Add a task-origin check in each MCP PR-creation tool: read the
+                conversation's `selected_repository` (already available via
+                `AppConversationInfo` / `app_conversation_info_service`) and
+                reject the call when `repo_name` does not match, or require
+                the per-action user confirmation that R-16 describes.
+      Action 2: Centralize the cross-repo guard so future PR-creation tools
+                (and any added MCP tools that mutate remote state) inherit it
+                by construction rather than per-handler.
+
+  PRAX-2026-05-26-003  Repo .openhands/microagents/*.md and frontmatter-less
+            skills/*.md are loaded into LLM context every session as
+            authoritative guidance — direct contradiction of R-03/R-10.
+      Action 1: Tag each merged skill block with its origin class (public,
+                user, org, repo, sandbox) before it enters the LLM context,
+                and prepend a non-overridable system-level note that repo and
+                sandbox skills are untrusted content per R-03 — so the model
+                has structural separation between trusted operator
+                instructions and repo-supplied guidance.
+      Action 2: Add a per-session opt-in for project skills the first time a
+                new repo is connected (R-22-style gate), so the user confirms
+                that the repo's microagents are intended.
+
+  PRAX-2026-05-26-011  Compound chain — untrusted repo/web content →
+            auto-loaded microagent guidance → auto-approved cmd/jupyter exec →
+            optional LLM-API-key exfil via the in-sandbox session key.
+      Action 1: Break Step 1 by tagging repo/microagent/fetch content as
+                untrusted in the prompt structure (PRAX-2026-05-26-003), so
+                the model has the structural separation R-03 names.
+      Action 2: Break Step 3 by removing `SESSION_API_KEY` from the in-sandbox
+                env or scoping it so it cannot call
+                `/users/me?expose_secrets=true` (PRAX-2026-05-26-009) — the
+                session key should authorize sandbox-bound endpoints only, not
+                the user's full settings record.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================

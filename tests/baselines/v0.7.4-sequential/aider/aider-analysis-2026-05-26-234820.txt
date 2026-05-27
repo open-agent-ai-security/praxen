@@ -1,0 +1,94 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Aider
+Analysis: May 26, 2026, 23:48 UTC
+Praxen v0.7.4
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern across this scan is **policy declared in the Worker
+Remit, with the matching code-level enforcement missing in the very modules
+the remit names**. The remit's most specific behavioral controls —
+repository-root path containment, secret redaction from LLM context, treating
+file content as untrusted, blocking external network destinations beyond the
+LLM provider, requiring developer review of every commit, and refusing to
+follow instructions in file comments — are all uncontradicted by the code, but
+none of them is implemented. `safe_abs_path` resolves any path the LLM
+proposes (absolute, `..`, symlink) with no check against `self.root`;
+`get_files_content` concatenates raw file bodies into the prompt with no
+redaction; `auto_commits=True` commits LLM edits without showing the developer
+the diff first; `cmd_web` and the analytics module open outbound destinations
+the remit forbids; `--watch-files` operationalises the exact "follow
+instructions in comments" path the remit prohibits. The only specific
+behavioral guardrail that *is* implemented in code is the LLM-suggested
+shell-command confirmation in `base_coder.handle_shell_commands()` (with
+`explicit_yes_required=True`) — which is a real, operative control and the
+reason RAISE Implement Zero Trust is not 0. The supply-chain posture is the
+bright spot: `requirements.txt` is exhaustively `==`-pinned via a uv
+constraints file, and no live credentials live in the workspace.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.45 / 5.0   (Ad hoc)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 4   Medium: 2   Low: 0   Informational: 0
+  Total: 9
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 8   Partial: 5   Vague: 0   Enforcement-not-possible: 0   (of 16 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-001  File-path containment is not enforced — `safe_abs_path`
+            resolves any path the LLM proposes and `allowed_to_edit` never
+            checks that the result stays inside `self.root`.
+      Action 1: In `utils.safe_abs_path` or a new `repo_safe_path(root,
+                path)`, raise on `not
+                Path(resolved).is_relative_to(Path(root).resolve(strict=False))`
+                and call it from `Coder.abs_root_path` and from every `/add`,
+                `/read-only`, `cmd_load` ingest path before adding to
+                `abs_fnames`/`abs_read_only_fnames`.
+      Action 2: Refuse rather than confirm out-of-repo targets in
+                `allowed_to_edit` — the remit makes this a forbidden action,
+                not an approve-able one.
+
+  PRAX-2026-05-26-005  Auto-commit runs with no diff-confirmation gate — the
+            developer never sees or approves the LLM's changes before they
+            land in git history.
+      Action 1: In `Coder.auto_commit`, before calling `self.repo.commit`,
+                build the staged diff and call `self.io.confirm_ask("Commit
+                these changes?", subject=diff, explicit_yes_required=True)`;
+                bail out without committing on no.
+      Action 2: Change `--auto-commits` default to False (or document the
+                security trade-off in the help text and remit), so the
+                confirm-first behavior is the path of least surprise.
+
+  PRAX-2026-05-26-003  File content is fed verbatim to the LLM with no
+            injection-detection layer, and `--watch-files` operationalises the
+            exact "instructions in comments" pattern the remit prohibits.
+      Action 1: Add a pre-prompt sanitization pass that detects and
+                neutralizes instruction-shaped strings in file content, commit
+                messages, and `/web` output (a denylist of imperative-mood
+                patterns plus an LLM-based classifier when available), and
+                demote the watch-comment path so it only triggers on
+                developer-authored comments in the current working tree, not
+                on history or remote-fetched content.
+      Action 2: Default `--watch-files` to off (already the case) and refuse
+                to act on `AI!` markers in files that the developer did not
+                touch in the current session.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
