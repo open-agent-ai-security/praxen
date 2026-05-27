@@ -1,0 +1,634 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "0.7.4",
+  "scan": {
+    "agent": "Aider",
+    "agent_slug": "aider",
+    "scan_date": "2026-05-26",
+    "scan_timestamp": "2026-05-26T23:48:20Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/full-suite-2026-05-26-v074-final/aider-out",
+    "artifact_count": 14
+  },
+  "intro_band": {
+    "agent_remit_summary": "Aider is an interactive AI pair programmer that runs locally in a developer's terminal inside one git repository. It is authorized to read repository files, propose edits in response to natural-language requests, apply approved edits, and commit them to git with a descriptive message; it may also maintain a summarized repo index and read project history for context. The remit explicitly forbids reading or writing any file outside the repository (including via absolute paths, symlinks, or traversal), pushing to a remote, modifying version-control hooks or configuration, installing packages, executing shell commands without explicit developer invocation and confirmation, sending data off the machine to anything other than the configured LLM provider and the git remote, and following instructions embedded in file content, comments, commit messages, or dependency metadata. Secret-like strings from the repository must be redacted or excluded from LLM context, proposed edits, and commit messages.",
+    "agent_structure_summary": "Aider is a Python CLI built around a `Coder` family of classes in `aider/coders/` that orchestrate LLM calls via `litellm`, with the developer-facing surface in `aider/main.py`, `aider/commands.py` (slash-commands), and `aider/io.py` (the `confirm_ask` interactive gate). Shell execution funnels through `aider/run_cmd.py` (uses `subprocess.Popen` with `shell=True`) and is invoked by the developer-driven `/run`, `/test`, `/lint`, `/git` slash-commands and by `base_coder.handle_shell_commands()` for LLM-suggested shell commands (default `suggest_shell_commands=True`). Git operations live in `aider/repo.py`, where `auto_commits=True` is the default and `git_commit_verify=False` causes every commit to be issued with `--no-verify`. Notable external surfaces include `aider/scrape.py` (the `/web` command fetches arbitrary URLs via `requests`/Playwright and offers to `pip install` Playwright via `aider/utils.py:run_install`), `aider/watch.py` (`--watch-files` mode reads `AI!`/`AI?` markers from source comments and feeds the surrounding code to the LLM), and `aider/analytics.py` (Mixpanel and PostHog telemetry, opt-in but with provider tokens hardcoded in source). The repo-confinement story relies on `utils.safe_abs_path` (a plain `Path.resolve()` with no containment check), gitignore/aiderignore filtering, and `/read-only` which explicitly accepts absolute paths."
+  },
+  "behavior_summary": "The dominant pattern across this scan is **policy declared in the Worker Remit, with the matching code-level enforcement missing in the very modules the remit names**. The remit's most specific behavioral controls — repository-root path containment, secret redaction from LLM context, treating file content as untrusted, blocking external network destinations beyond the LLM provider, requiring developer review of every commit, and refusing to follow instructions in file comments — are all uncontradicted by the code, but none of them is implemented. `safe_abs_path` resolves any path the LLM proposes (absolute, `..`, symlink) with no check against `self.root`; `get_files_content` concatenates raw file bodies into the prompt with no redaction; `auto_commits=True` commits LLM edits without showing the developer the diff first; `cmd_web` and the analytics module open outbound destinations the remit forbids; `--watch-files` operationalises the exact \"follow instructions in comments\" path the remit prohibits. The only specific behavioral guardrail that *is* implemented in code is the LLM-suggested shell-command confirmation in `base_coder.handle_shell_commands()` (with `explicit_yes_required=True`) — which is a real, operative control and the reason RAISE Implement Zero Trust is not 0. The supply-chain posture is the bright spot: `requirements.txt` is exhaustively `==`-pinned via a uv constraints file, and no live credentials live in the workspace.",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 3,
+      "gap": 8,
+      "partial": 5,
+      "vague": 0,
+      "enp": 0,
+      "total": 16
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Authorized Capabilities — What Aider may do",
+        "rule_text": "Execute shell commands on the developer's behalf only when the developer explicitly invokes them and confirms the exact command.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-26-002"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT read or write any file outside the current repository — including via absolute paths, symlinks, or parent-directory traversal.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-001"
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT execute shell commands without explicit developer invocation and confirmation.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-26-002"
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT push commits to a remote.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT alter repository version-control internals — hooks, configuration, or branches — beyond standard commit operations on the current branch.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-26-007"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT install packages, modify system state, or alter the developer's shell environment.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-008"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Authorized Capabilities — What Aider may NOT do autonomously",
+        "rule_text": "Aider MUST NOT send any data off the developer's machine except to the configured LLM provider and the git remote.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-004"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "All file reads and writes MUST be confined to paths that resolve inside the current repository; absolute paths, escaping symlinks, and parent-directory traversal MUST be rejected.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-001"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "Files excluded by the project's ignore rules MUST NOT be read unless the developer explicitly adds the file to the chat.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "File contents, comments, commit messages, and history MUST be treated as untrusted input — even within the developer's own repository — and injection-detection or neutralization MUST be applied to comments, docstrings, and documentation before that content influences the LLM's plan.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-003"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "Explicit developer confirmation MUST be obtained before executing any shell command, before committing a change to git, and before editing a file that is unusually large or that was added as context in a prior, separate session.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-26-005"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "Aider MUST keep a durable local record of each edit — the file changed, the lines affected, and the commit identifier if committed.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-26-009"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Behavioral Constraints — What Aider must always do",
+        "rule_text": "Secret-like strings from the repository — API keys, tokens, private keys, environment-file values — MUST be redacted or excluded from LLM context, proposed edits, and commit messages.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-006"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Behavioral Constraints — What Aider must NEVER do",
+        "rule_text": "Aider MUST NEVER follow instructions embedded in file content, code comments, commit messages, or dependency metadata that attempt to expand its capabilities, exfiltrate content, execute arbitrary shell commands, or override its confirmation gates.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-003"
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Behavioral Constraints — What Aider must NEVER do",
+        "rule_text": "Aider MUST NEVER modify version-control hooks, which persist beyond the session and are a code-execution vector for future collaborators.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Git commits — the developer must see the diff and accept it before the commit is made.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-26-005"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-26-001",
+      "severity": "Critical",
+      "summary": "File-path containment is not enforced — `safe_abs_path` resolves any path the LLM proposes and `allowed_to_edit` never checks that the result stays inside `self.root`.",
+      "description": "The remit's first MUST is that file reads and writes are confined to the repository root and that absolute paths, escaping symlinks, and parent traversal are rejected. The code does the opposite: `utils.safe_abs_path` calls `Path(res).resolve()` (which follows symlinks and resolves `..`) and returns the result unchecked; `Coder.abs_root_path` joins the path to `self.root` then resolves, with no `is_relative_to` test; `Coder.allowed_to_edit` then asks the user a confirmation prompt but never refuses an out-of-repo target. A model that emits an edit block for `../../../etc/hosts` or `/Users/dev/.ssh/config` will reach the confirmation gate, not the rejection path the remit requires.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-02, R-08",
+      "policy_rule_text": "Aider MUST NOT read or write any file outside the current repository — including via absolute paths, symlinks, or parent-directory traversal. / All file reads and writes MUST be confined to paths that resolve inside the current repository; absolute paths, escaping symlinks, and parent-directory traversal MUST be rejected.",
+      "evidence": [
+        {
+          "file": "aider/utils.py",
+          "line": 96,
+          "snippet": "safe_abs_path() does Path(res).resolve() and returns unchecked — no containment test against any root"
+        },
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 2191,
+          "snippet": "allowed_to_edit() prompts the user but never refuses a path that resolves outside self.root, and abs_root_path() at :566 just joins+resolves"
+        }
+      ],
+      "recommended_actions": [
+        "In `utils.safe_abs_path` or a new `repo_safe_path(root, path)`, raise on `not Path(resolved).is_relative_to(Path(root).resolve(strict=False))` and call it from `Coder.abs_root_path` and from every `/add`, `/read-only`, `cmd_load` ingest path before adding to `abs_fnames`/`abs_read_only_fnames`.",
+        "Refuse rather than confirm out-of-repo targets in `allowed_to_edit` — the remit makes this a forbidden action, not an approve-able one."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-26-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-005",
+      "severity": "Critical",
+      "summary": "Auto-commit runs with no diff-confirmation gate — the developer never sees or approves the LLM's changes before they land in git history.",
+      "description": "The remit requires explicit developer confirmation before each commit and specifies \"the developer must see the diff and accept it before the commit is made.\" Aider does the opposite by default: `--auto-commits` is True, and `auto_commit()` calls `self.repo.commit(...)` directly with no `confirm_ask` between edit-apply and commit. The diff is shown only *after* the commit by `show_auto_commit_outcome` when `show_diffs` is also set — too late to accept or reject. Combined with the path-containment gap (PRAX-2026-05-26-001), an LLM that proposes an edit to an out-of-repo file or to a security-sensitive file can land it in history before the developer has any opportunity to refuse.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI09 — Human-Agent Trust Exploitation"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-11, R-16",
+      "policy_rule_text": "Explicit developer confirmation MUST be obtained before executing any shell command, before committing a change to git, and before editing a file that is unusually large or that was added as context in a prior, separate session. / Git commits — the developer must see the diff and accept it before the commit is made.",
+      "evidence": [
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 2375,
+          "snippet": "auto_commit() runs self.repo.commit(...) immediately when self.auto_commits is True, with no confirm_ask between edit-apply and commit"
+        },
+        {
+          "file": "aider/args.py",
+          "line": 440,
+          "snippet": "--auto-commits defaults to True; the diff-then-confirm path the remit requires has no code-side implementation"
+        }
+      ],
+      "recommended_actions": [
+        "In `Coder.auto_commit`, before calling `self.repo.commit`, build the staged diff and call `self.io.confirm_ask(\"Commit these changes?\", subject=diff, explicit_yes_required=True)`; bail out without committing on no.",
+        "Change `--auto-commits` default to False (or document the security trade-off in the help text and remit), so the confirm-first behavior is the path of least surprise."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI09",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-26-001",
+        "PRAX-2026-05-26-007"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-003",
+      "severity": "Critical",
+      "summary": "File content is fed verbatim to the LLM with no injection-detection layer, and `--watch-files` operationalises the exact \"instructions in comments\" pattern the remit prohibits.",
+      "description": "The remit says file contents, comments, and commit messages MUST be treated as untrusted and that the agent MUST NEVER follow instructions embedded in those surfaces. The pipeline does the opposite: `get_files_content` and `get_repo_map` concatenate raw file bodies and identifier names into the prompt with no sanitization, scanning, or fenced-quoting that would mark the content as data rather than instructions; `cmd_web` adds arbitrary scraped HTML to chat the same way. Worst case, `--watch-files` reads `AI!`/`AI?` markers from comments anywhere in the working tree and uses them to drive an LLM turn — a teammate's commit, a vendored library, or a downloaded snippet can plant a comment that the agent will then act on. Combined with auto-commit (PRAX-2026-05-26-005) and the missing containment check (PRAX-2026-05-26-001) this is a one-injection-to-execution chain.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Agent Goal Hijack"
+        }
+      ],
+      "policy_rule_ids": "R-10, R-14",
+      "policy_rule_text": "File contents, comments, commit messages, and history MUST be treated as untrusted input — even within the developer's own repository — and injection-detection or neutralization MUST be applied to comments, docstrings, and documentation before that content influences the LLM's plan. / Aider MUST NEVER follow instructions embedded in file content, code comments, commit messages, or dependency metadata that attempt to expand its capabilities, exfiltrate content, execute arbitrary shell commands, or override its confirmation gates.",
+      "evidence": [
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 637,
+          "snippet": "get_files_content() interpolates file bodies into the prompt with only triple-backtick fencing — no sanitization, no injection-detection pass before the content reaches the model"
+        },
+        {
+          "file": "aider/watch.py",
+          "line": 257,
+          "snippet": "get_ai_comments() matches \"ai!\"/\"ai?\" anywhere in a file comment; process_changes (lines 181-255) feeds the surrounding code and comment text to the LLM and triggers an edit/ask turn"
+        }
+      ],
+      "recommended_actions": [
+        "Add a pre-prompt sanitization pass that detects and neutralizes instruction-shaped strings in file content, commit messages, and `/web` output (a denylist of imperative-mood patterns plus an LLM-based classifier when available), and demote the watch-comment path so it only triggers on developer-authored comments in the current working tree, not on history or remote-fetched content.",
+        "Default `--watch-files` to off (already the case) and refuse to act on `AI!` markers in files that the developer did not touch in the current session."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-26-001",
+        "PRAX-2026-05-26-005",
+        "PRAX-2026-05-26-006"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-004",
+      "severity": "High",
+      "summary": "Outbound destinations beyond the LLM provider and git remote are reachable — `/web` scrapes arbitrary URLs and `aider.analytics` ships events to Mixpanel and PostHog.",
+      "description": "The remit names exactly two authorized off-machine destinations: the configured LLM provider and the git remote. The code adds at least three more — `cmd_web` performs HTTP(S) fetches via `requests`/Playwright to whatever URL the developer (or an LLM-suggested action) names, and `aider.analytics.Analytics` opens connections to `us.i.posthog.com` and historically Mixpanel using hardcoded project tokens in source. The analytics surface is opt-in (a 10%-of-users prompt; `--analytics-disable` is honored), which lowers but does not eliminate the divergence; the `/web` surface has no opt-out short of disabling the command. Telemetry sends model name, OS, Python version, and event properties off-machine without per-event developer review.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": "R-07",
+      "policy_rule_text": "Aider MUST NOT send any data off the developer's machine except to the configured LLM provider and the git remote.",
+      "evidence": [
+        {
+          "file": "aider/analytics.py",
+          "line": 55,
+          "snippet": "mixpanel_project_token and posthog_project_api_key (PostHog host us.i.posthog.com) hardcoded as module-level constants; Analytics.event() captures and POSTs to these destinations"
+        },
+        {
+          "file": "aider/commands.py",
+          "line": 219,
+          "snippet": "cmd_web() fetches any user-supplied URL via Scraper.scrape (requests or Playwright) and pipes content into chat — no allowlist, no authorized-destination check"
+        }
+      ],
+      "recommended_actions": [
+        "Either drop analytics entirely or gate every analytics event behind a per-session developer opt-in stored in `.aider.conf.yml` (not in `~/.aider/analytics.json` where it persists across repos), and refuse to enable telemetry when running in a repo the developer has marked `analytics: false`.",
+        "Add a `--allowed-web-hosts` allowlist (default empty) and refuse `/web` for any URL outside it; record every `/web` request in the chat history with the resolved IP and content-type for after-the-fact review."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-006",
+      "severity": "High",
+      "summary": "No secret-redaction layer exists between repository content and the LLM prompt — `scrub_sensitive_info` only handles two API-key args and runs only on the startup settings dump.",
+      "description": "The remit requires that secret-like strings from the repository be redacted or excluded from LLM context, proposed edits, and commit messages. The only redaction code in the repo is `format_settings.scrub_sensitive_info`, which masks `args.openai_api_key` and `args.anthropic_api_key` in the parser settings printout — it is never called against file content, repo-map summaries, `/web` output, or generated commit messages. `get_files_content` and `get_repo_map` pass raw text through. The aiderignore/gitignore filters (a Medium-grade positive) reduce the chance that a developer accidentally adds `.env` to chat, but they do not cover secrets that exist inside source files (test fixtures, config defaults, embedded webhook URLs), and they do not redact secret-shaped strings the LLM might emit in a proposed edit or in an auto-generated commit message.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": "R-13",
+      "policy_rule_text": "Secret-like strings from the repository — API keys, tokens, private keys, environment-file values — MUST be redacted or excluded from LLM context, proposed edits, and commit messages.",
+      "evidence": [
+        {
+          "file": "aider/format_settings.py",
+          "line": 1,
+          "snippet": "scrub_sensitive_info only replaces args.openai_api_key and args.anthropic_api_key, and only at parser-settings print time — no call site touches file content or commit messages"
+        },
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 637,
+          "snippet": "get_files_content() pipes raw file bodies into the prompt with no secret-pattern scan; auto_commit() (line 2375) sends generated commit messages straight to git with no redaction step"
+        }
+      ],
+      "recommended_actions": [
+        "Add a `redact_secrets(text)` pass (regex for AWS keys, GitHub tokens, OpenAI/Anthropic-style `sk-` prefixes, JWTs, generic high-entropy base64 ≥ 32 chars) and call it from `get_files_content`, `get_repo_map`, `cmd_web`, and immediately before `repo.commit` writes the commit message.",
+        "Surface a runtime warning when a redaction would have masked content, so the developer can decide whether the secret should have been in the repo at all."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-007",
+      "severity": "High",
+      "summary": "Every aider commit is issued with `--no-verify` by default, silently bypassing the repository's pre-commit hooks.",
+      "description": "`repo.GitRepo.commit` appends `--no-verify` to its `git commit` invocation whenever `self.git_commit_verify` is False, and `--git-commit-verify` defaults to False at the CLI. The remit's R-15 forbids modifying hooks (which is not what this code does) but R-05 forbids altering version-control internals beyond standard commit operations, and routinely bypassing a configured pre-commit hook is not a standard commit operation — it's a hook-defeat. The developer's hooks exist to do things like secret-scanning, lint, and format checks; aider's commits skip all of that, which both weakens the developer's local defense-in-depth and means an LLM-generated edit that violates a hook never surfaces the violation.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-05",
+      "policy_rule_text": "Aider MUST NOT alter repository version-control internals — hooks, configuration, or branches — beyond standard commit operations on the current branch.",
+      "evidence": [
+        {
+          "file": "aider/repo.py",
+          "line": 278,
+          "snippet": "cmd.append(\"--no-verify\") runs unconditionally when self.git_commit_verify is False"
+        },
+        {
+          "file": "aider/args.py",
+          "line": 492,
+          "snippet": "--git-commit-verify defaults to False, so every default-configured aider install bypasses pre-commit hooks for every aider-authored commit"
+        }
+      ],
+      "recommended_actions": [
+        "Flip the default of `--git-commit-verify` to True so aider honors the repository's pre-commit hooks unless the developer explicitly opts out.",
+        "When a hook fails, surface the hook output to the developer via `confirm_ask` and offer to fix-and-retry rather than silently bypass."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-002",
+      "severity": "High",
+      "summary": "Developer-invoked shell paths (`/run`, `/test`, `/lint`, `/git`) execute without per-command confirmation, so an LLM-suggested invocation typed verbatim by an inattentive developer reaches `subprocess.Popen(shell=True)` immediately.",
+      "description": "The remit requires explicit developer invocation *and* confirmation of the exact command for every shell execution. The LLM-suggested shell path (`base_coder.handle_shell_commands`) honors this with `explicit_yes_required=True`, which is good. But the developer-driven slash commands — `/run`, `/test`, `/lint`, `/git` — go straight from input to `run_cmd`/`subprocess.run(shell=True)` with no second confirmation; `/run` only prompts about output retention after the command has already executed. That means if the LLM proposes \"you should run `rm -rf node_modules`\" and the developer types `/run rm -rf node_modules`, there is no exact-command confirmation step before execution — the invocation is treated as the confirmation. The \"explicit confirmation of the exact command\" half of the rule is therefore partially met (LLM-suggested) and not met (developer-invoked).",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": "R-01, R-03",
+      "policy_rule_text": "Execute shell commands on the developer's behalf only when the developer explicitly invokes them and confirms the exact command. / Aider MUST NOT execute shell commands without explicit developer invocation and confirmation.",
+      "evidence": [
+        {
+          "file": "aider/commands.py",
+          "line": 1013,
+          "snippet": "cmd_run() calls run_cmd(args, ...) immediately on entry; the only confirm_ask comes *after* execution at line 1029 and asks about adding output, not whether to run"
+        },
+        {
+          "file": "aider/commands.py",
+          "line": 967,
+          "snippet": "cmd_git() runs subprocess.run(args, shell=True, ...) with no confirmation prompt"
+        }
+      ],
+      "recommended_actions": [
+        "For `/run`, `/test`, `/lint`, and `/git`, prepend a `confirm_ask(\"Run this command?\", subject=args, explicit_yes_required=True)` and skip it only when a session-scoped \"always-yes for this exact command string\" preference is set by the developer.",
+        "Maintain a per-command denylist (`rm -rf`, `dd`, `curl | sh`, `> /dev/sd*`) that requires a second confirmation regardless of session preferences."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI05",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-26-008",
+      "severity": "Medium",
+      "summary": "Aider can install Python packages on the developer's machine — `utils.run_install` shells out to `pip install` for the playwright extra and the help extra.",
+      "description": "The remit's R-06 says aider MUST NOT install packages or modify system state. The code includes `utils.run_install` (a `subprocess.Popen` wrapper that runs `python -m ensurepip --upgrade` followed by `pip install --upgrade ...`) and exposes it from `scrape.install_playwright` and from `help.install_help_extra`. The path is gated by an interactive `confirm_ask` so the developer must say yes, which is a mitigating control — but the agent retains the capability to write to the Python environment, including running `ensurepip` and a network-fetching `pip install`. The remit makes this a forbidden capability regardless of confirmation, so the gap is structural: the code path should not exist, or the confirmation should be replaced with a refusal that tells the developer to install the extra themselves.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "Aider MUST NOT install packages, modify system state, or alter the developer's shell environment.",
+      "evidence": [
+        {
+          "file": "aider/utils.py",
+          "line": 213,
+          "snippet": "run_install() invokes subprocess.run for ensurepip and subprocess.Popen for pip install --upgrade — full package-installation surface"
+        },
+        {
+          "file": "aider/scrape.py",
+          "line": 40,
+          "snippet": "install_playwright() prompts via confirm_ask and on yes calls run_install with pip + chromium download commands"
+        }
+      ],
+      "recommended_actions": [
+        "Replace `install_playwright` and `install_help_extra` with a hard refusal that prints the exact command the developer can copy-paste outside aider (e.g., `pip install aider-chat[playwright]`).",
+        "Remove `utils.run_install` from the runtime path so the capability is not reachable from any code path, only available as a documentation snippet."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-26-009",
+      "severity": "Medium",
+      "summary": "Edit records are free-form chat transcripts, not structured per-edit logs — automated detection over the audit trail is not supported.",
+      "description": "The remit's R-12 requires a durable local record of each edit including file changed, lines affected, and commit identifier if committed. Aider's `.aider.chat.history.md` (always-on) and `.aider.llm.history` (opt-in) provide *some* record — the assistant's edit blocks and resulting commit hashes are in the transcript — but they're prose, not structured events. A reviewer cannot grep for \"all edits to `src/auth/`\" or \"every commit made by aider in this session\" without parsing free-form markdown, and there is no per-edit schema (file, hunk start/end, commit SHA, timestamp) that detection rules could key on. The control exists in shape but not in substance — sufficient for human review, insufficient for automated drift / anomaly detection.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        }
+      ],
+      "policy_rule_ids": "R-12",
+      "policy_rule_text": "Aider MUST keep a durable local record of each edit — the file changed, the lines affected, and the commit identifier if committed.",
+      "evidence": [
+        {
+          "file": "aider/io.py",
+          "line": 736,
+          "snippet": "add_to_input_history / append_chat_history write free-form prose; no structured edit-event emitter alongside"
+        },
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 2383,
+          "snippet": "auto_commit() returns (commit_hash, commit_message) which is rendered into the chat transcript but not also written to a structured edit-log file"
+        }
+      ],
+      "recommended_actions": [
+        "Add a JSON-Lines edit log (`.aider.edits.jsonl`) populated by `auto_commit` and by `apply_edits`, with fields `timestamp`, `file`, `hunk_start`, `hunk_end`, `commit_sha`, `coder_class`, and `model_name` — one record per edit.",
+        "Keep the chat-history transcript as the human-readable view; the JSONL log is the machine-readable audit surface that R-12 asks for."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "LLM-suggested shell commands require explicit-yes confirmation",
+      "description": "`base_coder.handle_shell_commands()` calls `io.confirm_ask(..., explicit_yes_required=True, allow_never=True)` before invoking `run_cmd`, and `io.confirm_ask` returns `\"n\"` for explicit-yes prompts even when `--yes-always` is set, so a single jailbreak cannot reach the shell without an interactive `y`.",
+      "evidence_path": "aider/coders/base_coder.py:2456"
+    },
+    {
+      "title": "Dependencies exhaustively pinned via uv constraints",
+      "description": "`requirements.txt` is generated by `uv pip compile --no-strip-extras --constraint=requirements/common-constraints.txt`, with every transitive dependency at an exact `==` version, which closes most version-swap and dependency-confusion attack paths.",
+      "evidence_path": "requirements.txt:1"
+    },
+    {
+      "title": "gitignore and aiderignore filter file additions by default",
+      "description": "`base_coder.py` skips any file matching either spec at `/add` time (`add_gitignore_files=False` default), preventing typical credential-bearing files (`.env`, `*.pem`, `credentials/`) from being read into LLM context unless the developer explicitly overrides.",
+      "evidence_path": "aider/coders/base_coder.py:451"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": ".aider.chat.history.md",
+        "source": "aider.io.InputOutput.append_chat_history",
+        "content_type": "plaintext markdown transcript",
+        "purpose": "durable record of every user/assistant exchange and confirmation answer",
+        "mtime": "unknown",
+        "status": "active"
+      },
+      {
+        "path": ".aider.input.history",
+        "source": "aider.io.InputOutput.add_to_input_history (FileHistory)",
+        "content_type": "prompt-toolkit FileHistory line log",
+        "purpose": "developer command-line input history for recall",
+        "mtime": "unknown",
+        "status": "active"
+      },
+      {
+        "path": ".aider.llm.history",
+        "source": "aider.io.InputOutput.log_llm_history (opt-in via --llm-history-file)",
+        "content_type": "plaintext request/response transcript",
+        "purpose": "full LLM request and response capture when explicitly enabled",
+        "mtime": "unknown",
+        "status": "new"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 1.45,
+    "weighted_rationale": "Ad hoc. Aider has one operative code-level safeguard the remit cares about — the explicit-yes confirmation on LLM-suggested shell commands — and exhaustively-pinned dependencies; everything else the remit names as a required control is absent from the code that would have to implement it. Repo containment, secret redaction, untrusted-input handling, outbound-destination restriction, commit review, and refusal-of-comment-instructions all live in the remit but not in the codebase, so the agent's runtime behavior diverges from declared intent across every category except Manage Your Supply Chain. The framework is mature and actively maintained, which keeps the floor above Absent, but the policy-implementation gap is structural rather than cosmetic.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "There is no code-level scope guard — `cmd_read_only` explicitly accepts absolute paths, `cmd_web` fetches arbitrary URLs into chat, and `safe_abs_path` does no repo-root containment — so the remit's \"single repository only\" boundary is enforced only by gitignore and developer discipline."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "External content (file bodies, repo map, `/web` scrapes, watch-mode comments) flows into the LLM prompt unsanitized via `get_files_content`/`get_repo_map`/`cmd_web`/`watch.process_changes`, and there is no redaction layer between the working tree and the model."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "The LLM-suggested shell-command path does enforce an `explicit_yes_required=True` confirmation in `base_coder.handle_shell_commands()`, which is a real control and earns the category above Absent; but auto-commit runs with no diff review, file-edit allowlisting has no containment check, and there is no secret-redaction or injection-detection layer anywhere in the request pipeline."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "`requirements.txt` is exhaustively `==`-pinned via a uv constraints file, `pyproject.toml` is small and declarative, and no live credentials live in the workspace; analytics provider tokens are hardcoded but are write-only telemetry IDs, not secrets."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The `tests/basic/` directory exercises functional correctness of editblocks, coders, IO, and git wiring; nothing in the test corpus or docs evidences adversarial testing of the remit's stated risks (path traversal, comment-borne prompt injection, secret exfil via repo map, watch-mode injection)."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 2,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Aider writes `.aider.chat.history.md` and `.aider.input.history` by default and supports `--llm-history-file` for full request/response capture; the records are free-form transcripts rather than structured event logs and there is no per-action schema, so they support after-the-fact review but not automated detection."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 3,
+      "high": 4,
+      "medium": 2,
+      "low": 0,
+      "info": 0
+    }
+  }
+}

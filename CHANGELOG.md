@@ -9,6 +9,14 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [0.7.4] — *unreleased*
+
+**Deterministic Step 10 + Step 9.9 emission discipline + version-source-of-truth cleanup.** Three workstreams: (1) Step 10 of `SKILL.md` is now a deterministic Python conversion (`manifest_to_findings.py`) of the Step 9.9 manifest, replacing the LLM-composed JSON path that was the principal stall site at scale. (2) Step 9.9 picks up chunked-write discipline (skeleton + Edit-append + heartbeats) so manifest emission no longer triggers a silent-compose burst. (3) `praxen_version` and `schema_version` are populated by the converter from canonical sources (`.claude-plugin/plugin.json` and `schema.SCHEMA_VERSION`); the SKILL no longer writes them. Re-baselined as `tests/baselines/v0.7.4-sequential/`; the v0.7.0 baseline is retired.
+
+(Detailed entries to be filled at release time. See PR #32 for the deterministic-Step-10 RFE and design.)
+
+---
+
 ## [0.7.3] — 2026-05-25
 
 **Subagent watchdog stall fix + skill-assisted Worker Remit authoring + HTML report v2 polish.** Four workstreams in one release, all upstream of the canonical findings JSON — the schema, the scoring, and the analysis methodology are unchanged. The headline is the SKILL emission discipline that eliminates the silent-compose bursts that historically tripped the 600 s subagent no-progress watchdog on long scans; the same SKILL now also drives Worker Remit authoring from source/docs/description in addition to consuming an existing remit. The report layer picks up a masthead, jump-nav, and collapsible finding cards. The test plan is codified into three named tiers with a committed home for pre-release Full Suite Runs.

@@ -1,0 +1,107 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: May 26, 2026, 23:47 UTC
+Praxen v0.7.4
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in the prompt, zero code-level
+enforcement: every behavioral MUST in the Worker Remit — fraud detection
+cannot be skipped, runtime messages must not alter goals, decision logic must
+not be redefinable at runtime, no approval without human sign-off above
+threshold — is contradicted by a code path that lets a single unauthenticated
+admin POST replace the entire goal model, or that lets the LLM call
+approve_invoice with no runtime check on amount, fraud signal, or vendor
+status. This collapses into a one-hop compound chain: vendor-controlled
+invoice description reaches the LLM context unsanitised through
+get_invoice_details, and the LLM's tool call to approve_invoice writes
+payment_processed=True directly with no interposition — so an indirect
+prompt-injection in a single vendor-submitted invoice description is
+sufficient to issue payment without human review. The unauthenticated
+/admin/finbot/goals endpoint provides the same outcome through a more direct
+channel, and the absence of any structured action log means neither path
+leaves a forensic trail beyond the LLM's own narrative reasoning.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 8   Medium: 3   Low: 0   Informational: 0
+  Total: 16
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 18   Partial: 2   Vague: 0   Enforcement-not-possible: 0   (of 20 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-001  Fraud detection is runtime-toggleable through an
+            unauthenticated config endpoint, contradicting the remit's "MUST
+            NOT be skipped for any reason" clause.
+      Action 1: Remove fraud_detection_enabled from the writable surface
+                entirely and run fraud detection unconditionally inside
+                _approve_invoice before the payment_processed=True assignment,
+                returning escalation when any indicator fires.
+      Action 2: Gate /api/admin/finbot/config behind an authenticated operator
+                session and remove fraud_detection_enabled from the accepted
+                field list.
+
+  PRAX-2026-05-26-002  Vendor-supplied invoice description flows unsanitised
+            into the LLM context and the LLM's tool call writes payment
+            directly, creating a one-hop indirect-injection-to-payment chain.
+      Action 1: Treat the description as untrusted data: extract it into a
+                quoted block in the prompt with an explicit "data, not
+                instructions" header, and run the _detect_prompt_injection
+                check *before* the tool returns, refusing the tool call (or
+                auto-escalating) when the flag fires.
+      Action 2: Move the approval gate out of the LLM: have _approve_invoice
+                re-verify amount against auto_approve_threshold, vendor status
+                == 'approved' and trust_level != 'low', the fraud-pattern
+                result, and the confidence threshold before writing
+                payment_processed; refuse the write and escalate if any check
+                fails.
+
+  PRAX-2026-05-26-003  An unauthenticated POST to /admin/finbot/goals rewrites
+            FinBot's system prompt at runtime, directly violating the rule
+            that decision logic must not be redefinable at runtime.
+      Action 1: Remove the /admin/finbot/goals endpoint and the custom_goals
+                column; goal changes become a code change reviewed and
+                deployed by engineering, as the remit requires.
+      Action 2: If a runtime configuration knob is genuinely needed, replace
+                free-form text with a small enum of named operating modes
+                whose contents live in code and are referenced by key only.
+
+  PRAX-2026-05-26-004  The confidence_threshold setting is declared and
+            writable but no decision path ever reads it, so the rule that
+            low-confidence decisions must escalate is silently unenforced.
+      Action 1: In _approve_invoice, compare the incoming confidence argument
+                against config.confidence_threshold before writing
+                payment_processed=True; route to _request_human_review when
+                confidence is below threshold.
+      Action 2: Apply the same check in _fallback_processing's auto-approve
+                branches (lines 826-870), where confidence values are
+                hard-coded above the default threshold without comparison.
+
+  PRAX-2026-05-26-005  Flask SECRET_KEY is a hardcoded string literal in
+            src/main.py, committed to the repository and shipped in every
+            deployment.
+      Action: Replace the literal with os.environ['FLASK_SECRET_KEY'] (no
+              default), provision the value through Render's secret store, and
+              rotate the existing key on first deploy since it is now
+              compromised by repository disclosure.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
