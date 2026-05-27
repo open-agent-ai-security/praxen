@@ -202,7 +202,7 @@ def _coerce(raw, kind, lineno, fieldname):
     """
     if raw is None:
         return None
-    if kind.endswith("_or_none") and raw.strip() == "null":
+    if kind.endswith("_or_none") and _is_null_sentinel(raw):
         return None
     if kind == "str_or_none":
         return raw  # null already handled above
