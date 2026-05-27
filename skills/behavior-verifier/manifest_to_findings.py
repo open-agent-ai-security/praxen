@@ -64,6 +64,26 @@ class ManifestError(ValueError):
     """Raised when the draft manifest cannot be parsed cleanly."""
 
 
+def _load_praxen_version():
+    """Read the canonical Praxen version from `.claude-plugin/plugin.json`.
+
+    `findings.schema.json`'s `praxen_version` field is documented as a mirror
+    of the plugin manifest version, so this is the single source of truth.
+    Looked up relative to this script's location: in both the dev repo and an
+    installed plugin, `.claude-plugin/plugin.json` and `skills/` share a
+    common parent (the plugin root). Hard-fail if the file is missing or
+    malformed — silently emitting a stale or empty version would defeat the
+    point of having a canonical source.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    pp = os.path.normpath(os.path.join(here, "..", "..", ".claude-plugin", "plugin.json"))
+    with open(pp, encoding="utf-8") as fh:
+        v = json.load(fh).get("version")
+    if not isinstance(v, str) or not v:
+        raise RuntimeError(f"{pp}: missing or non-string `version` field")
+    return v
+
+
 # ── value coercion ───────────────────────────────────────────────────────────
 # Per-section field types. Fields not listed here default to string.
 # `null` is permitted everywhere a type is `str_or_none`, `int_or_none`, etc.
@@ -72,13 +92,18 @@ _NULL = object()  # sentinel: caller treats as None
 _SCAN_FIELD_TYPES = {
     "agent": "str",
     "agent_slug": "str",
-    "schema_version": "str",          # strip surrounding quotes if present
-    "praxen_version": "str",
     "scan_date": "str",
     "scan_timestamp": "str",
     "workspace": "str",
     "artifact_count": "int",
     "manifest_format_version": "int",
+    # Accepted-but-ignored for backward compatibility with manifests written
+    # before the version-source-of-truth cleanup (the converter now reads
+    # both from canonical sources — see `_load_praxen_version` and
+    # `schema.SCHEMA_VERSION`). The SKILL no longer asks workers to write
+    # them; if they appear they are parsed and discarded.
+    "schema_version": "str",
+    "praxen_version": "str",
 }
 
 _RAISE_POSTURE_FIELD_TYPES = {
@@ -413,10 +438,15 @@ def _read_tag_array(lines, i, item_indent, lineno_base):
 
 # ── section parsers ──────────────────────────────────────────────────────────
 def _parse_scan_section(lines, i):
-    """Parse `## scan`. Returns (new_i, {schema_version, praxen_version, scan})."""
+    """Parse `## scan`. Returns (new_i, {scan: {...}}).
+
+    `schema_version` and `praxen_version` are not read from the manifest —
+    they come from canonical sources (`schema.SCHEMA_VERSION` and
+    `.claude-plugin/plugin.json` respectively), populated in `parse_manifest`.
+    Only `manifest_format_version` is parsed and validated here.
+    """
     i = _skip_blank(lines, i)
     i, fields = _read_flat_fields(lines, i, 0, _SCAN_FIELD_TYPES, lineno_base=0)
-    # Required: manifest_format_version, schema_version, praxen_version
     mfv = fields.pop("manifest_format_version", None)
     if mfv is None:
         raise ManifestError("## scan: missing `manifest_format_version` bullet")
@@ -424,16 +454,12 @@ def _parse_scan_section(lines, i):
         raise ManifestError(
             f"## scan: manifest_format_version is {mfv}; this converter "
             f"understands version {MANIFEST_FORMAT_VERSION}")
-    sv = fields.pop("schema_version", None)
-    pv = fields.pop("praxen_version", None)
-    if sv is None or pv is None:
-        raise ManifestError(
-            "## scan: `schema_version` and `praxen_version` are required")
-    # The manifest may quote schema_version (`"2.0"`); strip surrounding quotes.
-    sv = sv.strip()
-    if sv.startswith('"') and sv.endswith('"') and len(sv) >= 2:
-        sv = sv[1:-1]
-    return i, {"schema_version": sv, "praxen_version": pv, "scan": fields}
+    # Drop the accepted-but-ignored deprecated fields. The canonical values
+    # are injected in `parse_manifest` from `schema.SCHEMA_VERSION` and
+    # `.claude-plugin/plugin.json`.
+    fields.pop("schema_version", None)
+    fields.pop("praxen_version", None)
+    return i, {"scan": fields}
 
 
 def _parse_intro_band_section(lines, i):
@@ -1028,6 +1054,13 @@ def parse_manifest(text):
     if missing:
         raise ManifestError(
             f"manifest is missing required sections: {sorted(missing)}")
+
+    # Inject canonical version fields. These do not come from the manifest:
+    # `schema_version` comes from `schema.SCHEMA_VERSION` (the validator
+    # owns its own version) and `praxen_version` comes from the plugin
+    # manifest. Single source of truth — the SKILL author writes neither.
+    data["schema_version"] = schema.SCHEMA_VERSION
+    data["praxen_version"] = _load_praxen_version()
 
     # Compute mechanically-derivable values (counts, category names/weights,
     # escalation, policy_rule_text by rule_id lookup). This is the second

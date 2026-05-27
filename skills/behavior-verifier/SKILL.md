@@ -614,8 +614,6 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 - manifest_format_version: 1                         (parser version; must equal 1 for the current converter)
 - agent: <agent name>
 - agent_slug: <slug>
-- schema_version: "2.0"                              (the quotes are optional — the parser strips them; the JSON value is the string "2.0")
-- praxen_version: <fixed literal — Praxen's version, not the analyzed agent's>
 - scan_date: <$SCAN_DATE — YYYY-MM-DD>
 - scan_timestamp: <$SCAN_TS — ISO 8601 UTC>   (cannot be regenerated after a compaction)
 - workspace: <absolute path>
@@ -792,7 +790,7 @@ The canonical JSON the script writes is the **complete behavioral record**: ever
 
 Rules for the finding manifest and the JSON it produces:
 
-- **`praxen_version` is a fixed literal.** It records the version of *Praxen* that produced the report — use the literal value shown in the template above; do **not** read it from a `.claude-plugin/plugin.json`. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxen's, and must not be used here.
+- **`praxen_version` and `schema_version` are populated by the Step 10 script** from Praxen's own canonical sources (`.claude-plugin/plugin.json` and `schema.py` respectively). You do **not** write them in the manifest. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxen's, and the converter never reads from the analyzed workspace.
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
 - **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (the deferred L&F revisit, `design/DEFERRED.md`, will surface the description). If you have nothing more to say than the summary, omit `description` entirely.
 - **`policy_rule_ids` may be `null`.** A finding from the Policy-Implementation Divergence audit (Step 6) diverges from specific remit rule(s): set `policy_rule_ids` to the `R-NN` id(s) (the Step 10 script will populate `policy_rule_text` by looking up each id in `remit_coverage.rules[].rule_text` and joining multi-rule entries with `" / "`). But a finding raised by RAISE-category scoring (Step 5) or by a detection pattern with no corresponding remit clause — an absent control the remit never names, a supply-chain or monitoring gap the remit is silent on — does **not** trace to a rule. For such a finding set `policy_rule_ids: null`. Do not invent an `R-NN` id and do not stuff an explanatory sentence into `policy_rule_ids` to dodge the field — `null` is the correct, expected value, and the renderer simply omits the policy-rule line for that card.

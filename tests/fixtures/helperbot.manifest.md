@@ -4,8 +4,6 @@
 - manifest_format_version: 1
 - agent: HelperBot
 - agent_slug: helperbot
-- schema_version: "2.0"
-- praxen_version: 0.7.2
 - scan_date: 2026-05-25
 - scan_timestamp: 2026-05-25T20:51:44Z
 - workspace: /Users/steve.wilson/Documents/github/deckard/local/examples-rescan/dvaa-src/

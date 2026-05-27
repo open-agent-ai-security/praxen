@@ -1,0 +1,109 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: May 26, 2026, 23:47 UTC
+Praxen v0.7.4
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is declared policy without code-level enforcement on the
+agent's untrusted-input path. The remit names instruction-injection screening,
+scope-bounded changes, secret redaction, and approval-gated CI/security-file
+edits as MUST-do controls — but in code, issue and comment bodies are
+concatenated into prompts unscreened, file-change validation only checks "does
+this path exist," is_blocked() in sweep_bot.py is defined but never called,
+and no CI/CD or security-file guard exists in any handler. Layered on top is
+an unauthenticated trigger surface: POST /jira (sweepai/api.py:296) is
+dispatched to handle_jira_ticket with no signature check, parses repo:
+org/name out of an attacker-supplied JSON body, creates a real issue, and runs
+the full Sweep pipeline against any installed repo — and verify_signature in
+sweepai/utils/hash.py fail-opens (returns True) when WEBHOOK_SECRET is unset,
+which is the default. Together with the unscreened input path, this is a
+one-hop chain from anonymous internet to LLM-driven code-write on customer
+repositories, and it is the finding to lead remediation with.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.00 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 3   Medium: 5   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 12   Partial: 2   Vague: 0   Enforcement-not-possible: 3   (of 21 rules)
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-001  Unauthenticated POST /jira endpoint lets any internet
+            caller trigger Sweep against any installed repository.
+      Action 1: Apply Depends(validate_signature) (or an equivalent
+                Atlassian-Jira HMAC verifier reading a new
+                JIRA_WEBHOOK_SECRET) to the /jira route in sweepai/api.py and
+                reject unauthenticated callers with 403.
+      Action 2: Replace the regex-extracted repo: directive with an
+                installation-scoped allowlist — refuse to dispatch unless
+                repo_full_name appears in a Jira-project-to-repo mapping that
+                the operator configured server-side, not one the request body
+                claims.
+
+  PRAX-2026-05-26-002  GitHub webhook signature check fail-opens when
+            WEBHOOK_SECRET is unset, which is the default configuration.
+      Action 1: Change verify_signature to raise RuntimeError (or return
+                False) when WEBHOOK_SECRET is unset, and add an assert
+                WEBHOOK_SECRET in sweepai/config/server.py at process start so
+                an unconfigured deployment fails closed rather than fails
+                open.
+      Action 2: Document the requirement in deployment docs and refuse to
+                register the FastAPI route at all if the secret is missing.
+
+  PRAX-2026-05-26-003  Issue body, comments, file contents, and diffs flow
+            into the LLM context with no instruction-injection screening,
+            contradicting the remit's MUST-screen rule.
+      Action 1: Add an instruction-injection screen ahead of construct_prompt
+                — at minimum a deterministic pattern check (system-prompt-like
+                phrases, role tokens, "ignore previous", embedded delimiters)
+                — and quote-wrap or escape the body before it reaches the
+                template; reject or flag-for-review on hits rather than
+                silently proceeding.
+      Action 2: Tag every untrusted span (issue body, comment, file content,
+                diff) with an explicit, distinct delimiter (e.g.
+                <untrusted_user_content>...</untrusted_user_content>) and bake
+                into the system prompt that anything inside such a tag is
+                data, not instruction.
+
+  PRAX-2026-05-26-004  Compound chain — unauthenticated webhook reach plus
+            unscreened prompt input drives agent goal-hijack and write actions
+            on customer repos in one hop.
+      Action: Treat PRAX-2026-05-26-001, PRAX-2026-05-26-002, and
+              PRAX-2026-05-26-003 as a single P0 remediation tranche — fixing
+              only one of the three still leaves the chain exploitable.
+
+  PRAX-2026-05-26-005  No code path enforces the remit's prohibition on
+            modifying CI/CD or security-sensitive files without explicit
+            approval.
+      Action 1: Add a path-category guard to
+                validate_and_sanitize_multi_file_changes that matches
+                sensitive prefixes (.github/workflows/, .github/CODEOWNERS,
+                SECURITY.md, dependabot.yml, renovate.json, signing-key paths)
+                and refuses the change unless the originating issue contains a
+                documented marker (e.g. sweep:allow-ci-edit) and the PR
+                description carries a high-visibility banner.
+      Action 2: Surface every sensitive-file change in the PR title prefix
+                ([Sweep CI Edit]) so review noise rises proportionally with
+                risk.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-ai-security/praxen  |  Apache-2.0
+==============================================================================
