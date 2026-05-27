@@ -11,7 +11,7 @@ This applies to every project space — issues, pull requests, code reviews, dis
 
 ## Reporting
 
-If you experience or witness conduct that you believe violates the Contributor Covenant, please report it privately to the project maintainers at **open-ai-security@exabeam.com**. Include enough context for the maintainers to understand what happened, when, where, and who was involved. Reports are read and handled by the project maintainers and treated as confidential.
+If you experience or witness conduct that you believe violates the Contributor Covenant, please report it privately to the project maintainers at **open-agent-ai-security@exabeam.com**. Include enough context for the maintainers to understand what happened, when, where, and who was involved. Reports are read and handled by the project maintainers and treated as confidential.
 
 You may also use GitHub's standard reporting tools (block, report content) for in-product behaviour; the maintainer email is the channel for cases that need a substantive maintainer response.
 

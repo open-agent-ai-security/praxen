@@ -24,9 +24,9 @@ That's the entire dependency surface.
 This is the recommended path for Claude Code users. From your terminal:
 
 ```bash
-claude plugin marketplace add open-ai-security/praxen
-claude plugin install praxen@open-ai-security
-claude plugin list      # confirm: praxen@open-ai-security, enabled, v0.7.2+
+claude plugin marketplace add open-agent-ai-security/praxen
+claude plugin install praxen@open-agent-ai-security
+claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.7.2+
 ```
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
@@ -55,7 +55,7 @@ Run:
 claude plugin list
 ```
 
-If `praxen@open-ai-security` appears at `v0.7.2` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
+If `praxen@open-agent-ai-security` appears at `v0.7.2` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
 For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
 
@@ -66,8 +66,8 @@ For an end-to-end first run that actually exercises the analysis pipeline — Wo
 **Plugin marketplace install:**
 
 ```bash
-claude plugin marketplace update open-ai-security
-claude plugin update praxen@open-ai-security
+claude plugin marketplace update open-agent-ai-security
+claude plugin update praxen@open-agent-ai-security
 ```
 
 Restart Claude Code to apply. (In-session equivalents are the same commands as `/plugin …`.)
@@ -81,11 +81,11 @@ Restart Claude Code to apply. (In-session equivalents are the same commands as `
 **Plugin marketplace install:**
 
 ```bash
-claude plugin uninstall praxen@open-ai-security
-claude plugin marketplace remove open-ai-security
+claude plugin uninstall praxen@open-agent-ai-security
+claude plugin marketplace remove open-agent-ai-security
 ```
 
-The marketplace is removed by its registered name (`open-ai-security`, from `.claude-plugin/marketplace.json`) — which here matches the repo owner used to add it.
+The marketplace is removed by its registered name (`open-agent-ai-security`, from `.claude-plugin/marketplace.json`) — which here matches the repo owner used to add it.
 
 **Unzipped release:** delete the directory. No system state is left behind.
 

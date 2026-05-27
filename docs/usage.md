@@ -173,7 +173,7 @@ A short list of first-run snags and how to clear them.
 The plugin is installed but the current session hasn't picked it up.
 
 - From within Claude Code: run `/reload-plugins`, or restart Claude Code.
-- From the terminal: `claude plugin list` should show `praxen@open-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen@open-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
+- From the terminal: `claude plugin list` should show `praxen@open-agent-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen@open-agent-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
 - Using an unzipped release directly (no marketplace): point the agent at `skills/behavior-verifier/SKILL.md` explicitly rather than naming the skill.
 
 ### `render.py` errored at the end of the run
@@ -185,7 +185,7 @@ This is usually a context-pressure symptom — the analysis was synthesised unde
 - **Re-run** in a larger context window or with a tighter input scope. See *Large workspaces and context sizing* above.
 - **Recover from the draft manifest** if Praxen wrote one (`./reports/<agent>-draft-<timestamp>.md` — Step 9.9 writes this before the JSON). Tell the agent: *"the canonical JSON failed validation — read the draft manifest and rebuild from it."*
 
-If the same JSON-shape error reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-ai-security/praxen/issues/new/choose) with the schema error and the agent slug.
+If the same JSON-shape error reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-agent-ai-security/praxen/issues/new/choose) with the schema error and the agent slug.
 
 ### "Worker Remit not found" / "no remit at that path"
 
