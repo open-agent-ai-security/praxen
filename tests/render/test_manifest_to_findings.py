@@ -167,6 +167,47 @@ check("(none) positives -> empty array",
       data["positives"] == [])
 
 
+# ── 5b. Sentinel-string normalization ───────────────────────────────────────
+# The LLM might write `"null"` / `"none"` / empty string instead of the
+# literal `null` for fields the schema permits to be null. The parser
+# normalizes those to JSON null in `_populate_derived` so schema validation
+# passes either way.
+print("\n5b. Sentinel-string normalization")
+manifest_text = read_text(MANIFEST)
+# Replace several nullable-field values with sentinel strings.
+mutated = (manifest_text
+    # `- finding_id: null` → `- finding_id: none` (R-08 has a null finding_id)
+    .replace("- finding_id: null", "- finding_id: none", 1)
+    # Mutate PRAX-001's `related_findings: PRAX-2026-05-25-002` to `NONE`
+    # (uppercase sentinel) — exercises the case where a worker wrote
+    # a sentinel string where the schema expects an id list.
+    .replace(
+        "- related_findings: PRAX-2026-05-25-002",
+        "- related_findings: NONE",
+        1,
+    )
+)
+with tempfile.TemporaryDirectory() as td:
+    mpath = os.path.join(td, "mutated.md")
+    Path(mpath).write_text(mutated, encoding="utf-8")
+    out_path = os.path.join(td, "mutated.json")
+    res = run_converter(mpath, out_path)
+    check("mutated manifest with sentinel strings exits 0",
+          res.returncode == 0, res.stderr or res.stdout)
+    if res.returncode == 0:
+        md = json.loads(read_text(out_path))
+        # R-08's `finding_id: none` should normalize to JSON null.
+        r08 = next(r for r in md["remit_coverage"]["rules"] if r["rule_id"] == "R-08")
+        check("`finding_id: none` -> JSON null",
+              r08["finding_id"] is None,
+              f"got {r08['finding_id']!r}")
+        # PRAX-001's `related_findings: NONE` should normalize to [].
+        f1 = next(f for f in md["findings"] if f["id"] == "PRAX-2026-05-25-001")
+        check("`related_findings: NONE` -> empty array",
+              f1.get("related_findings") == [],
+              f"got {f1.get('related_findings')!r}")
+
+
 # ── 6. Negative cases ───────────────────────────────────────────────────────
 print("\n6. Negative cases")
 

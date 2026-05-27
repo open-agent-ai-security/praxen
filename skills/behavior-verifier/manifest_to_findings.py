@@ -64,6 +64,18 @@ class ManifestError(ValueError):
     """Raised when the draft manifest cannot be parsed cleanly."""
 
 
+def _is_null_sentinel(v):
+    """True if `v` is an LLM-written sentinel for "no value" — an empty
+    string, or the strings "null"/"none" in any case. The parser already
+    converts the literal `null` (unquoted) to Python None at coercion time;
+    this helper handles the cases where the LLM wrote the string `"null"`,
+    `"none"`, or left the value empty when a real id/list was expected."""
+    if not isinstance(v, str):
+        return False
+    s = v.strip()
+    return s == "" or s.lower() in ("null", "none")
+
+
 def _load_praxen_version():
     """Read the canonical Praxen version from `.claude-plugin/plugin.json`.
 
@@ -745,9 +757,9 @@ def _parse_one_finding(lines, i):
             out["recommended_actions"] = items
             continue
         if key == "related_findings":
-            # Comma-separated PRAX-… ids, or empty for none.
+            # Comma-separated PRAX-… ids; empty / "null" / "none" → [].
             stripped = raw.strip()
-            if stripped == "":
+            if _is_null_sentinel(stripped):
                 out["related_findings"] = []
             else:
                 out["related_findings"] = [
@@ -892,12 +904,18 @@ def _populate_derived(data):
     rules = data.get("remit_coverage", {}).get("rules", [])
     findings = data.get("findings", [])
 
-    # 1. remit_coverage.stat_counts
+    # 1. remit_coverage.stat_counts + normalize rule sentinel finding_ids.
+    # The parser turns an unquoted literal `null` into Python None at coerce
+    # time; this catches the cases where the LLM wrote `"null"` / `"none"` /
+    # empty string instead, which would otherwise reach schema.validate as
+    # a string and fail.
     stat_counts = {k: 0 for k in ("verified", "gap", "partial", "vague", "enp")}
     for r in rules:
         s = r.get("status")
         if s in stat_counts:
             stat_counts[s] += 1
+        if _is_null_sentinel(r.get("finding_id")):
+            r["finding_id"] = None
     stat_counts["total"] = len(rules)
     data.setdefault("remit_coverage", {})["stat_counts"] = stat_counts
 
@@ -926,21 +944,28 @@ def _populate_derived(data):
             f["escalation"] = "log_only"
 
     # 4a. Default owasp_llm / owasp_agentic to null when the LLM omitted the
-    # bullet entirely. The schema requires both fields *present* (the value may
-    # be null when the classification doesn't apply); some workers omit the
-    # bullet rather than write `null` explicitly, which would otherwise
-    # surface as `$.findings[N].owasp_llm: required field is missing` from
-    # the schema validator. Defaulting to null here makes the parser
-    # robust to that omission.
+    # bullet entirely or wrote a sentinel string ("null" / "none" / empty).
+    # The schema requires both fields *present* (value may be null when the
+    # classification doesn't apply); workers sometimes omit the bullet rather
+    # than write `null` explicitly, which would surface as
+    # `$.findings[N].owasp_llm: required field is missing`. Defaulting + sentinel
+    # normalization here makes the parser robust to both shapes.
     for f in findings:
-        f.setdefault("owasp_llm", None)
-        f.setdefault("owasp_agentic", None)
+        for k in ("owasp_llm", "owasp_agentic"):
+            if _is_null_sentinel(f.get(k)):
+                f[k] = None
+            f.setdefault(k, None)
         # `description` is the only legitimately-optional finding field;
         # the schema treats missing-description as fine. Don't default it.
 
-    # 5. findings[].policy_rule_text from rules[].rule_text lookup
+    # 5. findings[].policy_rule_text from rules[].rule_text lookup.
+    # Normalize sentinel-string `policy_rule_ids` to None first so a worker
+    # who wrote `"null"` / `"none"` / empty doesn't trigger a "rule(s) not
+    # present" error below — that's a missing link, not a broken one.
     rules_by_id = {r["rule_id"]: r["rule_text"] for r in rules if "rule_id" in r}
     for f in findings:
+        if _is_null_sentinel(f.get("policy_rule_ids")):
+            f["policy_rule_ids"] = None
         pri = f.get("policy_rule_ids")
         if pri is None:
             f["policy_rule_text"] = None
