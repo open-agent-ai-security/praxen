@@ -8,10 +8,10 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.7.4**
+**agent behavior verifier · Version 0.7.5**
 
-[![CI](https://github.com/open-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-ai-security/praxen/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/open-ai-security/praxen?sort=semver)](https://github.com/open-ai-security/praxen/releases)
+[![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -23,9 +23,9 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 ---
 
-**📦 Install** with Claude Code — `/plugin marketplace add open-ai-security/praxen` then `/plugin install praxen@open-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
+**📦 Install** with Claude Code — `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
 
-**👀 See a real report** first — the [live FinBot analysis report](https://open-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
+**👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
 
 ---
 

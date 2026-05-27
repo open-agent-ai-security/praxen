@@ -27,20 +27,20 @@ Examples of in-scope issues: an injection in a finding's `evidence.snippet` that
 
 Use GitHub's private security advisory:
 
-1. Go to the [Security tab](https://github.com/open-ai-security/praxen/security) on this repository.
+1. Go to the [Security tab](https://github.com/open-agent-ai-security/praxen/security) on this repository.
 2. Click **Report a vulnerability**.
 3. Fill in the form. Include enough detail to reproduce — a minimal Praxen input, the observed output, and what you expected to differ. Attach the crafted findings JSON, remit, or repro script if applicable.
 
 GitHub will create a private advisory thread between you and the project maintainers. We will respond there.
 
-If GitHub Security Advisories are unavailable to you for any reason, email **open-ai-security@exabeam.com** with the subject line **`Praxen security report`** and the same level of detail.
+If GitHub Security Advisories are unavailable to you for any reason, email **open-agent-ai-security@exabeam.com** with the subject line **`Praxen security report`** and the same level of detail.
 
 ## What to expect
 
 - **Initial acknowledgement:** within 3 business days of your report.
 - **First substantive reply** (we understand the issue, we agree on scope and severity, here is the plan): within 10 business days.
 - **Fix timeline:** depends on severity and complexity. Critical issues are prioritised; expect a fix in an immediate patch release, rather than waiting for the next scheduled minor release.
-- **Coordinated disclosure:** we prefer to ship the fix in a tagged release, publish a [GitHub Security Advisory](https://github.com/open-ai-security/praxen/security/advisories) (with credit to you unless you ask otherwise), and request a CVE if the issue warrants one. We will coordinate the public-disclosure timing with you.
+- **Coordinated disclosure:** we prefer to ship the fix in a tagged release, publish a [GitHub Security Advisory](https://github.com/open-agent-ai-security/praxen/security/advisories) (with credit to you unless you ask otherwise), and request a CVE if the issue warrants one. We will coordinate the public-disclosure timing with you.
 
 If you do not hear back from us within the windows above, please nudge the thread or escalate via the email address above.
 

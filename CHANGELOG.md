@@ -9,6 +9,39 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [0.7.5] — 2026-05-27
+
+**GitHub org rename: `open-ai-security` → `open-agent-ai-security`.** Trademark-driven rename of the org, isolated in its own release so the migration is unambiguous. **No functional changes** — no schema change, no scoring change, no SKILL change, no renderer-logic change. The Praxen pipeline behaves identically to `0.7.4`; only the canonical URLs that Praxen emits and the plugin marketplace identifier change.
+
+**Migration for existing installs.** The plugin install identifier changes from `praxen@open-ai-security` → `praxen@open-agent-ai-security`. GitHub auto-redirects the old URLs, so existing installs keep working, but to land on the canonical identifier:
+
+```
+/plugin uninstall praxen@open-ai-security
+/plugin marketplace remove open-ai-security
+/plugin marketplace add open-agent-ai-security/praxen
+/plugin install praxen@open-agent-ai-security
+```
+
+### Changed
+- **Plugin marketplace identifier.** `.claude-plugin/marketplace.json`'s `name` is now `open-agent-ai-security`. Install command becomes `/plugin install praxen@open-agent-ai-security`. Marketplace `owner.url` and the praxen-entry remain the same in shape; only the org-name segment changes.
+- **Canonical URLs the renderer emits.** `render.py`'s `_DOCS_BASE` and footer attribution string, plus the four hard-coded RAISE/OWASP doc links and the footer link in `report_template.html`, now point at `open-agent-ai-security.github.io/praxen/docs/` and `github.com/open-agent-ai-security/praxen`. Every newly rendered report carries the new URLs in its body and footer.
+- **`findings.schema.json` `$id`.** Updated to the new canonical URL. Schema shape is unchanged; only the identifier moves. Old `$id` references still resolve via GitHub redirect.
+- **Repo metadata and docs.** Updated repo URLs in `README.md`, `docs/installation.md`, `docs/quickstart.md`, `docs/usage.md`, `docs/index.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `examples/README.md`, `tests/README.md`, and `.github/ISSUE_TEMPLATE/config.yml` (security advisory + discussions links).
+- **`tests/baselines/v0.7.4-sequential/` regenerated.** All eleven targets re-rendered against the new template + render constants; canonical JSON unchanged, so this is a URL-string diff only. `tests/fixtures/finbot.golden.{html,txt}` likewise regenerated. `examples/finbot/finbot-analysis.html` and `examples/helperbot/helperbot-analysis.html` regenerated.
+
+### Unchanged on purpose
+
+- **Historical baselines** (`tests/baselines/v0.7.0-sequential/**`, `tests/runs/v0.7.3-prerelease*/**`) keep their old-URL footers. Those are point-in-time snapshots and rewriting them would falsify what was actually shipped at that version. The byte-identity check in `tests/render/test_render.py` already filters on the current template-era URL marker, so frozen baselines validate schema and re-render only, not byte-identity.
+- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving.
+- **Schema, scoring, renderer logic, SKILL.** No behavior change. `test_render.py` is **176 / 0**, `test_manifest_to_findings.py` is **28 / 0**.
+
+### Notes
+
+- **RFE #37** ([open-agent-ai-security/praxen#37](https://github.com/open-agent-ai-security/praxen/issues/37)) tracked the scope of this release.
+- **Plugin-install smoke check.** Pre-tag `claude plugin validate .` passes; post-tag smoke check (`/plugin marketplace add open-agent-ai-security/praxen` + `install praxen@open-agent-ai-security`) is part of the release ritual.
+
+---
+
 ## [0.7.4] — 2026-05-27
 
 **Deterministic Step 10 + Step 9.9 emission discipline + version-source cleanup + v0.7.4 re-baseline.** Three workstreams in one release. (1) `SKILL.md` Step 10 converts from LLM-composed JSON to a deterministic stdlib Python converter (`manifest_to_findings.py`) that mechanically translates the Step 9.9 draft manifest into the canonical findings JSON. This eliminates the historical principal stall site at scale (LLM JSON-emission bursts under load) and the class of arithmetic-mismatch bugs surfaced by the v0.7.3 external-validation work (Lobot r1 `weighted_overall` mismatch; Lobot r2 `stat_counts` mismatch). (2) Step 9.9 picks up chunked-write emission discipline (skeleton + Edit-append + heartbeats) and Step 3 adds a one-line source-read pacing guard — together they close the remaining 600 s subagent-watchdog vectors at the SKILL layer. (3) `praxen_version` and `schema_version` are now populated by the converter from canonical sources (`.claude-plugin/plugin.json` and `schema.SCHEMA_VERSION` respectively); the SKILL no longer writes them, and `build.sh` sanity-checks that `PRAXEN_SPEC.md`, `plugin.json`, and `marketplace.json` agree. Re-baselined as `tests/baselines/v0.7.4-sequential/`; the v0.7.0 baseline is retired.
