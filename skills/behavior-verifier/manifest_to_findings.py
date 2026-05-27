@@ -89,8 +89,15 @@ def _load_praxen_version():
     """
     here = os.path.dirname(os.path.abspath(__file__))
     pp = os.path.normpath(os.path.join(here, "..", "..", ".claude-plugin", "plugin.json"))
-    with open(pp, encoding="utf-8") as fh:
-        v = json.load(fh).get("version")
+    try:
+        with open(pp, encoding="utf-8") as fh:
+            v = json.load(fh).get("version")
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"could not locate {pp} (expected two levels above "
+            f"skills/behavior-verifier/). Run this script from inside the "
+            f"plugin tree, not from a standalone copy of skills/."
+        ) from e
     if not isinstance(v, str) or not v:
         raise RuntimeError(f"{pp}: missing or non-string `version` field")
     return v

@@ -313,4 +313,9 @@ check("top-level keys are in canonical order", keys == expected_keys,
 
 
 print(f"\n{_passed} passed, {_failed} failed")
-sys.exit(0 if _failed == 0 else 1)
+# Guard the exit so `pytest <this-file>` doesn't fail collection with
+# `INTERNALERROR: SystemExit`. The test is a standalone script (see header);
+# pytest is not the supported runner, but the guard makes the wrong-runner
+# case fall through to pytest's "no tests collected" message instead.
+if __name__ == "__main__":
+    sys.exit(0 if _failed == 0 else 1)
