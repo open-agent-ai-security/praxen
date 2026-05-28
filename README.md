@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.7.5**
+**agent behavior verifier · Version 0.7.6**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
@@ -72,7 +72,7 @@ Every analysis runs these named verification patterns:
 - **Secondary prompt discovery** — session-loaded identity files (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, …) audited as system prompts
 - **Compound signal reasoning** — individual findings chained when they combine into a high-severity attack path
 
-Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, the **OWASP Secure MCP Server Development Guide 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks; see [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a finding card.
+Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, the **OWASP Secure MCP Server Development Guide 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10 Coverage** and **OWASP Agentic Top 10 Coverage** grid sections — a 5×2 card layout showing each finding chip-linked to its category, with empty cells rendered as "No findings" so the grid reads as a coverage map. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks; see [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a finding card.
 
 ---
 
