@@ -11,9 +11,10 @@ Frozen runs of the **eleven** test targets in [`../README.md`](../README.md), ke
 
 ```
 baselines/
-  README.md                 ← this file
-  owasp_coverage.py          ← cross-baseline OWASP-coverage HTML report generator
-  v0.7.4-sequential/         ← CURRENT — all eleven targets, Praxen v0.7.4 (schema 2.0)
+  README.md                       ← this file
+  owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
+  owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
+  v0.7.4-sequential/               ← CURRENT — all eleven targets, Praxen v0.7.4 (schema 2.0)
   v0.7.0-sequential/         retired — see CHANGELOG [0.7.4]
     BASELINE.md              ← summary table, provenance, how to compare
     <target>/
@@ -41,20 +42,22 @@ python3 skills/behavior-verifier/render.py \
 
 ## Cross-baseline OWASP coverage report
 
-`owasp_coverage.py` walks every `<target>/<target>-findings-*.json` in a chosen baseline set, sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars, and writes a self-contained HTML summary. Each per-target card links to **both** the agent's source repository **and** the per-target Praxen baseline analysis HTML — so the report doubles as a navigable index of what the suite tests and what the analyses found. Also includes a horizontal bar chart per OWASP Top 10 and a methodology note.
+A committed snapshot of the aggregate view lives at [`owasp-coverage-report.html`](owasp-coverage-report.html) and is served live by GitHub Pages — **[browse it here](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)**. Each per-target card links to **both** the agent's source repository **and** the per-target Praxen baseline analysis HTML, so the report doubles as a navigable index of what the suite tests and what the analyses found. Also includes a horizontal bar chart per OWASP Top 10 and a methodology note.
+
+The snapshot is produced by `owasp_coverage.py`, which walks every `<target>/<target>-findings-*.json` in the chosen baseline set and sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars. Regenerate it whenever the baselines change:
 
 ```bash
-# defaults: --baseline-dir tests/baselines/v0.7.4-sequential/, --out ./owasp-coverage-report.html
-python3 tests/baselines/owasp_coverage.py
-
-# pick a different baseline set, or write the output somewhere specific
+# regenerate the committed snapshot in place (canonical form)
 python3 tests/baselines/owasp_coverage.py \
   --baseline-dir tests/baselines/v0.7.4-sequential \
-  --out /tmp/owasp-coverage.html
+  --out tests/baselines/owasp-coverage-report.html
+
+# or render somewhere else for ad-hoc browsing
+python3 tests/baselines/owasp_coverage.py --out /tmp/owasp-coverage.html
 ```
 
-No external dependencies — pure Python 3 stdlib + inline CSS. The output is generated, not committed.
+No external dependencies — pure Python 3 stdlib + inline CSS.
 
 ## What is *not* kept here
 
-Ad-hoc / mid-development re-run reports. They regenerate on every run and drift between analyses — only the named, version-pinned baseline set is committed. The HTML produced by `owasp_coverage.py` is the same — regenerate it on demand, do not commit the rendered file.
+Ad-hoc / mid-development re-run reports for individual targets. They regenerate on every run and drift between analyses — only the named, version-pinned baseline set is committed. The `owasp-coverage-report.html` snapshot above is the *one* committed aggregate view (treated like the bundled example reports in [`examples/`](../../examples/) — a stable, browsable artifact that regenerates deterministically from the inputs).
