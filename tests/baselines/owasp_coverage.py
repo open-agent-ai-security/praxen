@@ -381,7 +381,7 @@ def main():
         sys.exit(1)
 
     report = build_report(args.baseline_dir, args.out)
-    args.out.write_text(report)
+    args.out.write_text(report, encoding="utf-8")
     print(f"owasp_coverage.py: wrote {args.out}")
 
 
