@@ -88,7 +88,7 @@ def gather(baseline_dir: Path):
         json_files = sorted(target_dir.glob(f"{slug}-findings-*.json"))
         if not json_files:
             continue
-        with open(json_files[-1]) as f:
+        with open(json_files[-1], encoding="utf-8") as f:
             data = json.load(f)
         findings = data.get("findings") or []
         t_llm = Counter()
@@ -138,7 +138,7 @@ def target_cards(per_target, out_dir: Path):
 
         report_link = ""
         if info.get("report"):
-            rel = os.path.relpath(info["report"], out_dir)
+            rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
             report_link = (
                 f'<a class="card-link card-link-report" href="{html.escape(rel)}" '
                 f'target="_blank" rel="noopener">Baseline report ↗</a>'
