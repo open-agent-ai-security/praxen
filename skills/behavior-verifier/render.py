@@ -77,6 +77,47 @@ _LOG_STATUS_LABEL = {"active": "Active", "new": "New"}
 _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
                 3: "score-3", 4: "score-4-5", 5: "score-4-5"}
 
+# OWASP Top 10 coverage grid — canonical code order and titles. Titles are
+# copied verbatim from the published OWASP entries (kept in sync with the
+# `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
+_OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
+                    "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
+_OWASP_LLM_TITLES = {
+    "LLM01": "Prompt Injection",
+    "LLM02": "Sensitive Information Disclosure",
+    "LLM03": "Supply Chain",
+    "LLM04": "Data and Model Poisoning",
+    "LLM05": "Improper Output Handling",
+    "LLM06": "Excessive Agency",
+    "LLM07": "System Prompt Leakage",
+    "LLM08": "Vector and Embedding Weaknesses",
+    "LLM09": "Misinformation",
+    "LLM10": "Unbounded Consumption",
+}
+_OWASP_AGENTIC_CODES = ("ASI01", "ASI02", "ASI03", "ASI04", "ASI05",
+                        "ASI06", "ASI07", "ASI08", "ASI09", "ASI10")
+_OWASP_AGENTIC_TITLES = {
+    "ASI01": "Agent Goal Hijack",
+    "ASI02": "Tool Misuse and Exploitation",
+    "ASI03": "Identity and Privilege Abuse",
+    "ASI04": "Agentic Supply Chain Vulnerabilities",
+    "ASI05": "Unexpected Code Execution (RCE)",
+    "ASI06": "Memory and Context Poisoning",
+    "ASI07": "Insecure Inter-Agent Communication",
+    "ASI08": "Cascading Failures",
+    "ASI09": "Human-Agent Trust Exploitation",
+    "ASI10": "Rogue Agents",
+}
+# Highest severity present in a card's top-3 -> CSS class on the card. Empty
+# cells use " empty" instead (handled below).
+_WORST_SEV_CLASS = {"Critical": "worst-critical", "High": "worst-high",
+                    "Medium": "worst-medium", "Low": "worst-low",
+                    "Informational": "worst-info"}
+# Per-card cap for the OWASP grid — chips beyond this are dropped from the
+# card (the full set still appears in the Findings Register). Three keeps
+# the cell compact and matches the published OWASP grid's visual density.
+_OWASP_CHIPS_PER_CARD = 3
+
 # Highest severity present in findings[] -> (badge class, badge label). Checked
 # top-to-bottom; "Medium" and "Low" both map to advisory; only-Informational or
 # no findings -> clean.
@@ -424,6 +465,63 @@ def _raise_card_ctx(cat, _idx):
     }
 
 
+# ── OWASP coverage grid ─────────────────────────────────────────────────────
+def _owasp_cards(findings, key, codes, titles):
+    """Group findings by their OWASP scalar (`owasp_llm` or `owasp_agentic`) and
+    shape one card record per canonical code in `codes`. Each card carries the
+    top-3 findings sorted by severity (Critical first), with finding-ID as the
+    deterministic tiebreaker. Cards with no findings get an "empty" marker;
+    populated cards get a "worst-<sev>" class derived from their highest-severity
+    chip. Findings whose `key` field is null simply don't land in any card.
+    """
+    groups = {c: [] for c in codes}
+    for f in findings:
+        code = f.get(key)
+        if code in groups:
+            groups[code].append(f)
+    cards = []
+    for code in codes:
+        bucket = sorted(groups[code],
+                        key=lambda f: (_SEV_RANK[f["severity"]], f["id"]))
+        chips = bucket[:_OWASP_CHIPS_PER_CARD]
+        if chips:
+            card_class = " " + _WORST_SEV_CLASS[chips[0]["severity"]]
+        else:
+            card_class = " empty"
+        cards.append({"code": code, "title": titles[code],
+                      "chips": chips, "card_class": card_class})
+    return cards
+
+
+def _owasp_chip_ctx(finding, _idx):
+    return {
+        "FINDING_ANCHOR": esc(finding["id"]),
+        "SEVERITY_CLASS": _SEV_CLASS[finding["severity"]],
+        "FINDING_SUMMARY": esc(finding["summary"]),
+    }
+
+
+def _owasp_card_ctx(card, _idx):
+    return {
+        "OWASP_CODE": esc(card["code"]),
+        "OWASP_TITLE": esc(card["title"]),
+        "OWASP_CARD_CLASS": card["card_class"],  # already includes leading space
+    }
+
+
+def _owasp_card_inner(chip_block_name):
+    """Return an `inner` callback for `expand_repeat` that expands one of the
+    two nested chip REPEATs (`owasp_llm_chip` or `owasp_agentic_chip`) inside a
+    card. An empty chip list collapses the REPEAT block to the muted
+    "No findings" note."""
+    no_findings = '<div class="owasp-count">No findings</div>'
+
+    def _inner(block, card):
+        return expand_repeat(block, chip_block_name, card["chips"],
+                             _owasp_chip_ctx, empty_replacement=no_findings)
+    return _inner
+
+
 _MH_SEV_TIERS = [("critical", "Critical", "mh-crit"), ("high", "High", "mh-high"),
                  ("medium", "Medium", "mh-med"), ("low", "Low", "mh-low"),
                  ("info", "Info", "mh-info")]
@@ -514,6 +612,18 @@ def render_html(template: str, data: dict) -> str:
     cats_sorted = sorted(data["raise_posture"]["categories"], key=lambda c: RAISE_KEYS.index(c["key"]))
     tpl = expand_repeat(tpl, "raise_card", cats_sorted, _raise_card_ctx)
 
+    # OWASP coverage grids — 10 LLM cards + 10 Agentic cards, each with up to
+    # three most-severe chips (or a "No findings" note). Driven by each
+    # finding's scalar `owasp_llm` / `owasp_agentic`, not the tags[] array.
+    llm_cards = _owasp_cards(data["findings"], "owasp_llm",
+                             _OWASP_LLM_CODES, _OWASP_LLM_TITLES)
+    tpl = expand_repeat(tpl, "owasp_llm_card", llm_cards, _owasp_card_ctx,
+                        inner=_owasp_card_inner("owasp_llm_chip"))
+    agentic_cards = _owasp_cards(data["findings"], "owasp_agentic",
+                                 _OWASP_AGENTIC_CODES, _OWASP_AGENTIC_TITLES)
+    tpl = expand_repeat(tpl, "owasp_agentic_card", agentic_cards, _owasp_card_ctx,
+                        inner=_owasp_card_inner("owasp_agentic_chip"))
+
     # 3. Top-level scalars.
     tpl = _substitute_scalars(tpl, _global_ctx(data))
 
@@ -582,6 +692,28 @@ def render_txt(data: dict) -> str:
                f"   Vague: {rc['vague']}   Enforcement-not-possible: {rc['enp']}"
                f"   (of {rc['total']} rules)")
     out.append("")
+
+    # OWASP coverage tables — full counts per category (not capped), em-dash
+    # for empty cells. The HTML grid caps per-card chips at three; this is
+    # the summary, so the number reflects all findings in each category.
+    for heading, key, codes, titles in (
+        ("OWASP LLM TOP 10 COVERAGE", "owasp_llm",
+         _OWASP_LLM_CODES, _OWASP_LLM_TITLES),
+        ("OWASP AGENTIC TOP 10 COVERAGE", "owasp_agentic",
+         _OWASP_AGENTIC_CODES, _OWASP_AGENTIC_TITLES),
+    ):
+        counts = {c: 0 for c in codes}
+        for f in findings:
+            code = f.get(key)
+            if code in counts:
+                counts[code] += 1
+        out.append(heading)
+        out.append(sub)
+        for code in codes:
+            n = counts[code]
+            tally = str(n) if n else "—"
+            out.append(f"  {code}  {titles[code]:<50} {tally}")
+        out.append("")
 
     crits = [f for f in findings if f["severity"] == "Critical"]
     if crits:

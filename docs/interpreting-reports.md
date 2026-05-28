@@ -98,7 +98,17 @@ Controls Praxen verified during the analysis. This is not a participation trophy
 
 Log files Praxen found in the input. Used to complement the static analysis with runtime context.
 
-### 9. RAISE Maturity Posture (the wrap-up)
+### 9. OWASP LLM Top 10 (2025) Coverage
+
+A full-bleed **5×2 grid of cards** — one per LLM01–LLM10. Each populated card shows up to **three most-severe findings** that classify against that category as clickable severity-dot chips (anchored to the matching entry in the Findings Register). Empty cells render a muted **"No findings"** placeholder so the grid reads as a *coverage map*, not just a hit list — at a glance you see both where the agent has problems and which categories the analysis did not surface.
+
+Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, capped at three. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
+
+### 10. OWASP Agentic Top 10 (2026) Coverage
+
+Mirror of §9, driven by the `owasp_agentic` scalar (ASI01–ASI10). Same 5×2 grid, same chips, same anchoring. Use these two grids together to see whether the agent's risk profile lives more in the *LLM-application* layer (prompt injection, supply chain, output handling) or the *agentic* layer (goal hijack, tool misuse, RCE).
+
+### 11. RAISE Maturity Posture (the wrap-up)
 
 The maturity scorecard appears at the **end** of the report on purpose: after you've seen the specific findings, the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
 
@@ -110,7 +120,7 @@ This section contains:
 
 **This is a maturity model, not a school grade.** A score of 3 / 5 means *Established*, not 60 percent. Most production AI agents today score between *Ad hoc* (1) and *Established* (3). A score of 2.5 places an agent in the *Partial → Established* maturity band — that is accurate reporting of current industry norms, not a failing grade. See [The RAISE Framework](RAISE.md) for the full rubric.
 
-### 10. Footer
+### 12. Footer
 
 Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxen version. (The headline counts and score also appear in the masthead; the footer is the provenance recap.)
 
@@ -174,7 +184,7 @@ The full schema, with field types and the validator's invariants, is documented 
 
 ## The .txt summary
 
-`<agent>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
+`<agent>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, **compact OWASP LLM and Agentic Top 10 coverage tables** (per-category finding counts), and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
 
 - Survive context-window compression in long-running analyses — it's a file on disk, written before the skill's final stdout, so it's there regardless of whether terminal output is lost
 - Be pasted into a Slack thread, email, or PR comment

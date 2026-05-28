@@ -87,6 +87,17 @@ Any "No" against the checklist is a finding; secrets in an MCP config file are a
 
 ---
 
+## How these tags surface in a report
+
+A finding's primary OWASP classification appears two ways in the HTML report:
+
+- On the **finding card** itself, as a labeled tag (`LLM01 — Prompt Injection`, `ASI05 — Unexpected Code Execution (RCE)`, …) that links to that entry in this page.
+- In the **OWASP LLM Top 10 Coverage** and **OWASP Agentic Top 10 Coverage** grid sections — full-bleed 5×2 cards, one per category, each populated card showing the top-three most-severe findings as clickable chips. Empty cells render "No findings" so the grid reads as a coverage map: at a glance you see both *what risks the agent has* and *which categories the analysis did not surface*.
+
+The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details.
+
+---
+
 ## How this fits with RAISE
 
 The OWASP frameworks above answer *"what kind of risk is this finding?"* The [RAISE Framework](RAISE.md) answers *"how mature is this agent's security posture overall?"* — a six-category 0–5 score. Every Praxen finding carries both: a RAISE category tag and (where applicable) an OWASP LLM, OWASP Agentic, or MCP tag. See [Interpreting Reports](interpreting-reports.md) for how the tags appear on a finding card.

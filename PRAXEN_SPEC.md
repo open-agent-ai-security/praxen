@@ -392,8 +392,10 @@ Each analysis produces a self-contained HTML report from a canonical template (`
 6. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags (each a link to that entry in the framework docs), quoted policy rule, evidence block, and recommended action
 7. **What's Working Well** — verified positive controls
 8. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
-9. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
-10. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxen version
+9. **OWASP LLM Top 10 (2025) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
+10. **OWASP Agentic Top 10 (2026) Coverage** — mirror of #9, driven by `owasp_agentic` (ASI01–ASI10).
+11. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
+12. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxen version
 
 The page renders correctly as `file://` — all CSS is inline, no external scripts, no external fonts beyond the declared Arial/Lausanne stack.
 
