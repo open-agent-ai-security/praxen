@@ -32,7 +32,7 @@ Customize this template for the specific agent before running an analysis.
 
 ## Mission
 
-*Describe the agent's primary purpose in 1–3 sentences. This is the north star for all behavioral evaluation.*
+*Describe the agent's primary purpose in 1–3 sentences. This is the north star for all behavioral evaluation. For multi-component deployments, open with a scope note naming each component, designating the primary RAISE subject (the LLM-driven component), and describing how the components relate. Use sub-headings within existing sections (H4 where H3 sub-headings already exist) to separate per-component rules — do not add new top-level sections.*
 
 ---
 
