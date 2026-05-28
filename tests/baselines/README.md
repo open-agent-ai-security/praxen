@@ -41,7 +41,7 @@ python3 skills/behavior-verifier/render.py \
 
 ## Cross-baseline OWASP coverage report
 
-`owasp_coverage.py` walks every `<target>/<target>-findings-*.json` in a chosen baseline set, sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars, and writes a self-contained HTML report with per-target cards (linked to the source repos), a horizontal bar chart per OWASP Top 10, and a methodology note. Use it to see at a glance which categories the suite exercises and which are absent.
+`owasp_coverage.py` walks every `<target>/<target>-findings-*.json` in a chosen baseline set, sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars, and writes a self-contained HTML summary. Each per-target card links to **both** the agent's source repository **and** the per-target Praxen baseline analysis HTML — so the report doubles as a navigable index of what the suite tests and what the analyses found. Also includes a horizontal bar chart per OWASP Top 10 and a methodology note.
 
 ```bash
 # defaults: --baseline-dir tests/baselines/v0.7.4-sequential/, --out ./owasp-coverage-report.html

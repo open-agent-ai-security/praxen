@@ -17,6 +17,7 @@ Defaults: reads `tests/baselines/v0.7.4-sequential/`, writes
 import argparse
 import html
 import json
+import os
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -99,7 +100,14 @@ def gather(baseline_dir: Path):
             if fnd.get("owasp_agentic"):
                 asi[fnd["owasp_agentic"]] += 1
                 t_asi[fnd["owasp_agentic"]] += 1
-        per_target[slug] = {"count": len(findings), "llm": t_llm, "asi": t_asi}
+        # Pick the most recent analysis HTML alongside the findings JSON.
+        analysis_html = sorted(target_dir.glob(f"{slug}-analysis-*.html"))
+        per_target[slug] = {
+            "count": len(findings),
+            "llm": t_llm,
+            "asi": t_asi,
+            "report": analysis_html[-1].resolve() if analysis_html else None,
+        }
         total += len(findings)
     return llm, asi, per_target, total
 
@@ -121,14 +129,25 @@ def bar_chart(rows, max_count, accent):
     return "\n".join(out)
 
 
-def target_cards(per_target):
+def target_cards(per_target, out_dir: Path):
     out = ['<div class="target-grid">']
     for slug, name, url, blurb in TARGETS:
-        info = per_target.get(slug, {"count": 0, "llm": Counter(), "asi": Counter()})
+        info = per_target.get(slug, {"count": 0, "llm": Counter(), "asi": Counter(), "report": None})
         llm_total = sum(info["llm"].values())
         asi_total = sum(info["asi"].values())
+
+        report_link = ""
+        if info.get("report"):
+            rel = os.path.relpath(info["report"], out_dir)
+            report_link = (
+                f'<a class="card-link card-link-report" href="{html.escape(rel)}" '
+                f'target="_blank" rel="noopener">Baseline report ↗</a>'
+            )
+        else:
+            report_link = '<span class="card-link card-link-disabled">No baseline report</span>'
+
         out.append(f'''
-        <a class="target-card" href="{html.escape(url)}" target="_blank" rel="noopener">
+        <div class="target-card">
           <div class="target-name">{html.escape(name)}</div>
           <div class="target-blurb">{html.escape(blurb)}</div>
           <div class="target-stats">
@@ -136,13 +155,18 @@ def target_cards(per_target):
             <span class="stat"><strong>{llm_total}</strong> LLM</span>
             <span class="stat"><strong>{asi_total}</strong> Agentic</span>
           </div>
-        </a>''')
+          <div class="target-links">
+            <a class="card-link card-link-source" href="{html.escape(url)}" target="_blank" rel="noopener">Source repo ↗</a>
+            {report_link}
+          </div>
+        </div>''')
     out.append('</div>')
     return "\n".join(out)
 
 
-def build_report(baseline_dir: Path) -> str:
+def build_report(baseline_dir: Path, out_path: Path) -> str:
     llm, asi, per_target, total = gather(baseline_dir)
+    out_dir = out_path.resolve().parent
 
     llm_rows = [(c, t, llm.get(c, 0)) for c, t in LLM_TITLES]
     asi_rows = [(c, t, asi.get(c, 0)) for c, t in ASI_TITLES]
@@ -211,17 +235,38 @@ def build_report(baseline_dir: Path) -> str:
   section h2 .scope {{ font-size: 13px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }}
   section .intro {{ color: var(--text-muted); margin: 12px 0 20px; font-size: 14px; }}
 
-  .target-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }}
+  .target-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }}
   .target-card {{
-    display: block; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column;
     border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;
-    background: var(--surface-alt); transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+    background: var(--surface-alt); transition: border-color 0.1s, box-shadow 0.1s;
   }}
-  .target-card:hover {{ border-color: var(--blue); box-shadow: 0 2px 8px rgba(0,107,255,0.12); transform: translateY(-1px); }}
-  .target-name {{ font-size: 15px; font-weight: 600; color: var(--blue-dark); margin-bottom: 4px; }}
+  .target-card:hover {{ border-color: var(--blue); box-shadow: 0 2px 8px rgba(0,107,255,0.12); }}
+  .target-name {{ font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }}
   .target-blurb {{ font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; min-height: 32px; }}
-  .target-stats {{ display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); }}
+  .target-stats {{ display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }}
   .target-stats strong {{ color: var(--navy); font-weight: 700; }}
+  .target-links {{
+    display: flex; gap: 8px; margin-top: auto;
+    padding-top: 10px; border-top: 1px solid var(--border-alt);
+  }}
+  .card-link {{
+    flex: 1; text-align: center; padding: 6px 10px; border-radius: 4px;
+    font-size: 12px; font-weight: 600; text-decoration: none; transition: all 0.1s;
+    white-space: nowrap;
+  }}
+  .card-link-source {{
+    color: var(--blue-dark); background: var(--bg); border: 1px solid var(--border-alt);
+  }}
+  .card-link-source:hover {{ background: var(--surface-alt); border-color: var(--blue); }}
+  .card-link-report {{
+    color: white; background: var(--blue); border: 1px solid var(--blue);
+  }}
+  .card-link-report:hover {{ background: var(--blue-dark); border-color: var(--blue-dark); }}
+  .card-link-disabled {{
+    color: var(--text-muted); background: var(--surface); border: 1px solid var(--border);
+    cursor: not-allowed;
+  }}
 
   .chart {{ margin-top: 8px; }}
   .bar-row {{ display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: center; padding: 6px 0; }}
@@ -274,8 +319,8 @@ def build_report(baseline_dir: Path) -> str:
 
   <section>
     <h2>Targets analyzed <span class="scope">{n_targets} frozen Praxen baseline scans</span></h2>
-    <p class="intro">Each card links to the source repository. Counts shown are the primary OWASP classifications drawn from each finding's <code>owasp_llm</code> / <code>owasp_agentic</code> scalar.</p>
-    {target_cards(per_target)}
+    <p class="intro">Each card links to <strong>both</strong> the agent's source repository and the per-target Praxen baseline analysis report. Counts shown are the primary OWASP classifications drawn from each finding's <code>owasp_llm</code> / <code>owasp_agentic</code> scalar.</p>
+    {target_cards(per_target, out_dir)}
   </section>
 
   <section>
@@ -335,7 +380,7 @@ def main():
         print(f"owasp_coverage.py: baseline directory not found: {args.baseline_dir}", file=sys.stderr)
         sys.exit(1)
 
-    report = build_report(args.baseline_dir)
+    report = build_report(args.baseline_dir, args.out)
     args.out.write_text(report)
     print(f"owasp_coverage.py: wrote {args.out}")
 
