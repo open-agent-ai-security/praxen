@@ -9,6 +9,33 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [0.7.6] — 2026-05-28
+
+**OWASP LLM and Agentic Top 10 coverage visualizations.** Every Praxen report now carries two full-bleed 5×2 coverage grid sections — one per framework — showing the top-three most-severe findings per category as anchored chips, with empty cells rendered as "No findings" so the grid reads as a coverage *map* rather than a hit list. A new cross-baseline aggregate report tool ships under `tests/baselines/` for reviewing the suite's coverage across all eleven targets. **No findings-engine change** — `SKILL.md`, `schema.py`, `manifest_to_findings.py`, the knowledge bases, and every committed findings JSON are byte-identical to `0.7.5`; the grids are a new view over data that has been in the canonical JSON since schema 2.0. No migration required.
+
+### Added
+- **OWASP LLM Top 10 Coverage and OWASP Agentic Top 10 Coverage grid sections** in the rendered HTML report. Each grid is a 5×2 layout, one card per `LLM01`–`LLM10` / `ASI01`–`ASI10`. Populated cards show up to three findings ordered Critical → High → Medium → Low → Informational then by finding ID, each as a clickable chip anchored to the matching Findings Register entry. Empty cells render a muted "No findings" placeholder. Driven by each finding's existing `owasp_llm` / `owasp_agentic` primary scalar.
+- **OWASP coverage tables in the TXT summary.** Compact per-category counts for both Top 10s now appear in `<agent>-analysis-<timestamp>.txt` between the remit-coverage tally and the Critical findings list — full counts, not capped at three.
+- **`tests/baselines/owasp_coverage.py`** — a stdlib-only utility that walks a chosen baseline set and renders a self-contained HTML summary aggregating OWASP classifications across targets, with horizontal bar charts and target cards linked to both the source repository and the per-target Praxen analysis report. Argparse CLI (`--baseline-dir`, `--out`), defaults to the current baseline set.
+- **`tests/baselines/owasp-coverage-report.html`** — committed snapshot of the cross-baseline summary, served live at `https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html`. Regenerated from the script when baselines change.
+
+### Changed
+- **`render.py` and `report_template.html`** — expanded with the grid-expansion logic and CSS for the new sections; `_OWASP_LLM_CODES`, `_OWASP_AGENTIC_CODES`, and `_OWASP_CHIPS_PER_CARD` constants document the placement and cap.
+- **Docs synced.** `PRAXEN_SPEC.md` §7 picks up the new grid sections (RAISE moves to §11, Footer to §12); `docs/interpreting-reports.md` adds §9 / §10; `docs/owasp.md` describes how the grid relates to per-finding tags; `README.md` mentions the grid in the OWASP framework bullet.
+- **`tests/baselines/v0.7.4-sequential/`, `tests/baselines/v0.7.0-sequential/`, `tests/fixtures/finbot.golden.{html,txt}`, `examples/{finbot,helperbot}/...analysis.html`** — re-rendered against the new template + render constants. Underlying JSON unchanged, so this is a template-output diff only.
+- **`tests/runs/v0.7.3-prerelease*` historical snapshots and `tests/baselines/v0.7.0-sequential/BASELINE.md`** — stale `open-ai-security.github.io/praxen/` URL prefix swept to `open-agent-ai-security.github.io/praxen/` so embedded RAISE / OWASP tag-chip links resolve again. No semantic change.
+
+### Unchanged on purpose
+- **Findings engine.** `skills/behavior-verifier/SKILL.md`, `schema.py`, `manifest_to_findings.py`, `findings.schema.json`, and the four knowledge bases under `knowledge/` are byte-identical to `0.7.5`. The scan procedure produces the same canonical JSON it did before; the grids are a new rendering.
+- **Schema and findings JSONs.** No schema bump — still `2.0`. Every committed findings JSON across baselines and examples is byte-identical to `0.7.5`. Existing JSONs render the new grid views without any re-scan.
+- **Plugin install identifier.** Still `praxen@open-agent-ai-security` — no marketplace change beyond the version bump.
+
+### Notes
+- The cross-baseline coverage report is treated as a stable, committed artifact (similar to the bundled `examples/` reports) rather than ad-hoc throwaway output. Regenerate via `python3 tests/baselines/owasp_coverage.py --baseline-dir tests/baselines/v0.7.4-sequential --out tests/baselines/owasp-coverage-report.html` whenever the underlying baselines change.
+- Two cross-platform robustness fixes on `owasp_coverage.py` (UTF-8 encoding on read and write, POSIX path normalization for HTML `href`s) ensure the tool runs identically on Windows; the file is otherwise pure Python 3.9+ stdlib.
+
+---
+
 ## [0.7.5] — 2026-05-27
 
 **GitHub org rename: `open-ai-security` → `open-agent-ai-security`.** Trademark-driven rename of the org, isolated in its own release so the migration is unambiguous. **No functional changes** — no schema change, no scoring change, no SKILL change, no renderer-logic change. The Praxen pipeline behaves identically to `0.7.4`; only the canonical URLs that Praxen emits and the plugin marketplace identifier change.

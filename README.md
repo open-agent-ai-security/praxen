@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.7.5**
+**agent behavior verifier · Version 0.7.6**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
