@@ -253,6 +253,8 @@ Sweep the workspace for files that appear to be logs. Identify them by:
 
 For each discovered log file, record: full path, apparent source, content type, apparent purpose, and last modified timestamp. You will serialize this list in Step 9.8.
 
+**Source-only scan — inferring log files from code.** If no log files are found on disk but logging infrastructure is present in source (a `setup_logging()` call, configured file paths in a constants module, `RotatingFileHandler` / `FileHandler` definitions), infer the runtime log file locations from the code. Record each inferred log file with `mtime: "unknown"` and `status: "inferred"`. These entries give the operator an accurate picture of where runtime logs will appear on a deployed instance and directly support Monitor Continuously scoring — omitting them because the scan is source-only leaves the report silent on a topic the code clearly addresses.
+
 **Before continuing to Step 4b: if any MCP server configuration was found in this step**, return to Step 3 and read `knowledge/KB_MCP_SECURITY.md` now. You need that calibration before Step 6's MCP Server Evaluation runs.
 
 ---
@@ -588,7 +590,7 @@ For each confirmed positive from Step 8: a `title` (short), a `description` (one
 
 ### 9.8 Discovered log files → `log_files`
 
-If you found log files in Step 4: set `present` to true and, for each, record `path`, `source` (the component that writes it), `content_type` (e.g., "structured JSON lines", "plaintext", "agent decision log"), `purpose` (what it captures), `mtime` (last-modified as you observed it — a date or `"unknown"`), and `status` (`active` if recently written, `new` if it looks freshly created this run). If you found none: set `present` to false, leave `rows` empty, and write a one-sentence `no_logs_note` — and if the absence of logging is itself a finding (it usually is for Monitor Continuously), say so and cite the finding ID.
+If you found log files in Step 4 (physically present or inferred from source): set `present` to true and, for each, record `path`, `source` (the component that writes it), `content_type` (e.g., "structured JSON lines", "plaintext", "agent decision log"), `purpose` (what it captures), `mtime` (last-modified as you observed it — a date or `"unknown"`), and `status` (`active` if recently written, `new` if it looks freshly created this run, `inferred` if the path was derived from source code rather than observed on disk). If you found neither physical log files nor logging infrastructure in source: set `present` to false, leave `rows` empty, and write a one-sentence `no_logs_note` — and if the absence of logging is itself a finding (it usually is for Monitor Continuously), say so and cite the finding ID.
 
 ### 9.9 Write the draft manifest, then print the interim overview — gate before Step 10
 
@@ -708,7 +710,7 @@ For each log file (empty exactly when `present=false` — in that case write a s
   content_type: <type>
   purpose: <what it captures>
   mtime: <date or "unknown">
-  status: <active | new>
+  status: <active | new | inferred>
 
 (The `## footer` and `### remit_coverage > ### stat_counts` sections are not authored — the Step 10 script computes them from the rules and findings you wrote above. Do not include them in the manifest.)
 ```
