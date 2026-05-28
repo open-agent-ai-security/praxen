@@ -5,7 +5,7 @@
 
 # Baseline — v0.7.0-sequential
 
-Frozen runs of all **eleven** test targets ([`../../README.md`](../../README.md)) on the **Praxen v0.7.0** skill, against the **rewritten intent-level Worker Remits** (`tests/remits/*.md`). The eleven runs were produced cold on 2026-05-19 under the Praxa-0.6.3-era skill code that emits these same findings; the Praxa → Praxen rename + the `praxa_version → praxen_version` schema-field rename re-render them as the v0.7.0 baselines (no scan content changes — same findings, same rule_text, same scores). See [issue #40](https://github.com/open-ai-security/praxen/issues/40) for the re-baseline rationale and the `[0.7.0]` changelog entry for the rename.
+Frozen runs of all **eleven** test targets ([`../../README.md`](../../README.md)) on the **Praxen v0.7.0** skill, against the **rewritten intent-level Worker Remits** (`tests/remits/*.md`). The eleven runs were produced cold on 2026-05-19 under the Praxa-0.6.3-era skill code that emits these same findings; the Praxa → Praxen rename + the `praxa_version → praxen_version` schema-field rename re-render them as the v0.7.0 baselines (no scan content changes — same findings, same rule_text, same scores). See [issue #40](https://github.com/open-agent-ai-security/praxen/issues/40) for the re-baseline rationale and the `[0.7.0]` changelog entry for the rename.
 
 ## What changed since the previous baselines
 

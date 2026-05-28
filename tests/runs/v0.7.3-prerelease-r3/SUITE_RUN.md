@@ -178,7 +178,7 @@ Legend: ✓ in-band / ⚠ in-tolerance with drift to note / ✗ regression. C/H/
 
 The 0.7.3 SKILL changes (`b733a45` Step 10 emission discipline + `88dd690` Step 9.9 full-prose manifest and Step 10 mechanical translation) resolve the subagent watchdog stalls that gated the v0.7.3-prerelease and r2 runs. The suite gate is **PASS**: 11/11 completed, all themes preserved, RAISE drift within blind-run-variance tolerance per `tests/baselines/v0.7.0-sequential/BASELINE.md`.
 
-**Recommendation:** Proceed with the 0.7.3 release. Before tagging, run the plugin-marketplace install smoke check (`claude plugin marketplace add open-ai-security/praxen` + `install praxen@open-ai-security` + `list`) per [`feedback_test_plugin_install_before_release`](memory) — that's the manual check `tests/render/test_render.py` doesn't cover and is the canonical pre-tag gate.
+**Recommendation:** Proceed with the 0.7.3 release. Before tagging, run the plugin-marketplace install smoke check (`claude plugin marketplace add open-agent-ai-security/praxen` + `install praxen@open-agent-ai-security` + `list`) per [`feedback_test_plugin_install_before_release`](memory) — that's the manual check `tests/render/test_render.py` doesn't cover and is the canonical pre-tag gate.
 
 ## Artifacts
 
