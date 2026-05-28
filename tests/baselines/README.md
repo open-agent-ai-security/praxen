@@ -12,6 +12,7 @@ Frozen runs of the **eleven** test targets in [`../README.md`](../README.md), ke
 ```
 baselines/
   README.md                 ← this file
+  owasp_coverage.py          ← cross-baseline OWASP-coverage HTML report generator
   v0.7.4-sequential/         ← CURRENT — all eleven targets, Praxen v0.7.4 (schema 2.0)
   v0.7.0-sequential/         retired — see CHANGELOG [0.7.4]
     BASELINE.md              ← summary table, provenance, how to compare
@@ -38,6 +39,22 @@ python3 skills/behavior-verifier/render.py \
   --out-html /tmp/<target>.html --out-txt /tmp/<target>.txt
 ```
 
+## Cross-baseline OWASP coverage report
+
+`owasp_coverage.py` walks every `<target>/<target>-findings-*.json` in a chosen baseline set, sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars, and writes a self-contained HTML report with per-target cards (linked to the source repos), a horizontal bar chart per OWASP Top 10, and a methodology note. Use it to see at a glance which categories the suite exercises and which are absent.
+
+```bash
+# defaults: --baseline-dir tests/baselines/v0.7.4-sequential/, --out ./owasp-coverage-report.html
+python3 tests/baselines/owasp_coverage.py
+
+# pick a different baseline set, or write the output somewhere specific
+python3 tests/baselines/owasp_coverage.py \
+  --baseline-dir tests/baselines/v0.7.4-sequential \
+  --out /tmp/owasp-coverage.html
+```
+
+No external dependencies — pure Python 3 stdlib + inline CSS. The output is generated, not committed.
+
 ## What is *not* kept here
 
-Ad-hoc / mid-development re-run reports. They regenerate on every run and drift between analyses — only the named, version-pinned baseline set is committed.
+Ad-hoc / mid-development re-run reports. They regenerate on every run and drift between analyses — only the named, version-pinned baseline set is committed. The HTML produced by `owasp_coverage.py` is the same — regenerate it on demand, do not commit the rendered file.
