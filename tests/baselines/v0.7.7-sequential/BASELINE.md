@@ -28,7 +28,7 @@ Frozen runs of all **eleven** test targets ([`../../README.md`](../../README.md)
 
 The 19.3% drop in total findings is within natural run-to-run variance (the SKILL's `Build an AI Red Team` calibration note documents ±2–3 swings per severity bucket per blind run). Per-target weighted RAISE is stable: 10 of 11 targets within ±0.15, the largest delta is deepagents-cli at −0.45 (boundary of natural variance, scope unchanged). Every Critical theme catalogued in `../../README.md`'s per-target notes is present in the v0.7.7 set — the "no Critical theme dropped" hard gate passes for all 11.
 
-The new `inferred` log-file rows fired correctly on six targets: `openhands` (3), `airline-customer-service` / `sweep` / `devika` / `deepagents-cli` (1 each), and `yaah` (2 — `status: new` since yaah ships an active session-store). The remaining five targets either had no logging infrastructure in source or shipped active log files that registered as `status: active`/`new`.
+The new `inferred` log-file rows fired correctly on six targets: `openhands` (3), `yaah` (2), and `airline-customer-service` / `sweep` / `devika` / `deepagents-cli` (1 each) — 9 inferred rows total across the suite. The remaining five targets had no logging infrastructure visible in the in-scope source files.
 
 ## The eleven baselines
 
