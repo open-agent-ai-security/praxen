@@ -178,7 +178,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
     llm_total = sum(llm.values())
     asi_total = sum(asi.values())
 
-    n_targets = len([s for s in per_target if per_target[s]["count"] > 0])
+    n_targets = len(per_target)
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y, %H:%M UTC")
     baseline_name = baseline_dir.name
 
