@@ -11,7 +11,7 @@ and writes an HTML report with bar charts and target links.
 Usage:
     python3 tests/baselines/owasp_coverage.py [--baseline-dir DIR] [--out FILE]
 
-Defaults: reads `tests/baselines/v0.7.7-sequential/`, writes
+Defaults: reads `tests/baselines/v0.7.7-claude48/`, writes
 `./owasp-coverage-report.html` in the current working directory.
 """
 import argparse
@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-DEFAULT_BASELINE = THIS_DIR / "v0.7.7-sequential"
+DEFAULT_BASELINE = THIS_DIR / "v0.7.7-claude48"
 DEFAULT_OUT = Path.cwd() / "owasp-coverage-report.html"
 
 TARGETS = [

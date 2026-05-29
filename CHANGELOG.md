@@ -9,6 +9,26 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [Unreleased]
+
+**Reference-model re-baseline on Opus 4.8 + a more robust freeze process.** No skill change — `SKILL.md`, `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.7.7`. This is a regression-baseline and test-plan change only.
+
+### Added
+- **`tests/baselines/v0.7.7-claude48/`** — the new canonical baseline: all eleven targets on the unchanged v0.7.7 skill under **Anthropic Claude Opus 4.8**, frozen via a **median-of-3** process (each target characterized over three independent runs; the committed exemplar is the median run). Replaces `v0.7.7-sequential/` (the same skill on Opus 4.7) as the comparison point for the release review. See `tests/baselines/v0.7.7-claude48/BASELINE.md` for the per-target table, 3-run stability stats, the model-lean analysis (+0.22 mean weighted, inverted-U by maturity), and the five band changes.
+- **`tests/README.md` — "Re-baselining (multi-run characterization)"** — documents the multi-run freeze process: characterize over three runs, freeze the median, set bands from the mean ± observed spread, distinguish *stable-but-offset* (move the band) from *noisy-but-centred* (widen the band), and diff by theme/rule-text not by run-local `R-NN` ids.
+- **`docs/understanding-variability.md`** — operator-facing page on run-to-run variability: why the LLM synthesis stage varies while rendering is deterministic, how much to expect, following up with the LLM to re-analyze, and running multiple times when stability matters more than runtime. Linked from the docs index, Interpreting Reports, and Challenging Findings.
+
+### Changed
+- **Per-target bands (`tests/README.md`)** — five bands updated to fit the 4.8 means: `aider` 1.1–1.8 → **1.8–2.4** (stable offset), `langchain-sql` 0.7–1.4 → **0.9–1.6**, `sweep` 0.7–1.3 → **0.9–1.4**, `openai-customer-service` 0.6–1.3 → **0.7–1.7** (widened for variance, not moved — highest-σ target), `openhands` 1.8–2.5 → **1.7–2.5**. The other six targets' means sit inside their existing bands, unchanged.
+- **`tests/baselines/owasp-coverage-report.html` + `owasp_coverage.py` default** — regenerated and re-pointed at the new baseline set.
+- **`tests/baselines/v0.7.7-sequential/` retired**, kept on disk for diff archaeology (4.7 reference). README pointers updated.
+
+### Unchanged on purpose
+- **The skill and findings engine.** No `SKILL.md`, `schema.py`, `render.py`, `manifest_to_findings.py`, or knowledge-base change — `schema_version` stays `"2.0"`. The only variables behind this re-freeze are the reference model (4.7 → 4.8) and the freeze method (single-run → median-of-3).
+
+### Notes
+- Per-category scoring variance (concentrated on operative-but-imperfect-control targets; `openai-customer-service` σ ≈ 0.28) is tracked for a future scoring-rigour change — see RFE [#48](https://github.com/open-agent-ai-security/praxen/issues/48). Theme-coverage (no Critical theme dropped) held on all 33 runs behind this baseline.
+
 ## [0.7.7] — 2026-05-29
 
 **SKILL polish + a fresh baseline set.** Two non-breaking SKILL improvements (multi-component remit guidance + source-inferred log files), an additive schema change, and a cold full-suite re-scan against all eleven targets to verify the SKILL deltas land non-breakingly. Findings engine remains the same shape: `manifest_to_findings.py` and the four knowledge bases are byte-identical to `0.7.6`; the new behavior is calibration-only.
