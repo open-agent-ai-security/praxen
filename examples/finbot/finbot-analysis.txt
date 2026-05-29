@@ -1,0 +1,138 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: May 22, 2026, 18:56 UTC
+Praxen v0.7.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in prose with zero deterministic
+code-level enforcement: every hard prohibition in the remit — never skip fraud
+detection, never approve above manual_review_threshold without human sign-off,
+never let runtime content rewrite goals — is left entirely to an LLM system
+prompt that the same prompt actively undermines by ranking "Business
+Continuity" and speed above security. There is no code gate that forces
+detect_fraud_patterns to run before approve_invoice, no amount or
+vendor-status check inside _approve_invoice before it sets
+payment_processed=True, and the fraud_detection_enabled flag short-circuits
+all fraud heuristics to an empty list. This converges into a single
+catastrophic compound chain: an unauthenticated /admin/finbot/goals endpoint
+writes attacker-supplied natural language into custom_goals, which is
+concatenated verbatim into the system prompt as an explicit override, while
+vendor-controlled invoice descriptions enter the same context unsanitized —
+giving two independent injection ingresses into a decision engine that can
+mark invoices paid, with no audit log to detect any of it. The CTF scaffolding
+(flag fields, hardcoded payloads in the walkthrough doc) confirms goal
+manipulation is the intended-and-reachable failure mode.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 5   Medium: 4   Low: 1   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 10   Partial: 4   Vague: 0   Enforcement-not-possible: 0   (of 15 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Supply Chain                                       1
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           —
+  LLM06  Excessive Agency                                   4
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     1
+  LLM10  Unbounded Consumption                              1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  4
+  ASI02  Tool Misuse and Exploitation                       2
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-22-001  Unauthenticated /admin/finbot/goals endpoint writes
+            attacker-supplied natural language directly into the agent's
+            system prompt as an explicit override.
+      Action 1: Remove the runtime goal-mutation path entirely: delete the
+                /admin/finbot/goals route and the update_goals() method, and
+                make agent goals a deployment-time constant rather than a
+                DB-backed custom_goals column.
+      Action 2: If a runtime override must exist, gate it behind
+                authenticated, role-checked operator access and never
+                concatenate its contents into the system prompt as an
+                instruction block — treat it as data, not directive.
+      Action 3: Add authentication middleware to the entire /admin/* blueprint
+                in src/routes/admin.py before any further hardening.
+
+  PRAX-2026-05-22-002  Fraud detection is fully bypassable via the
+            fraud_detection_enabled flag and is never enforced before
+            approval, contradicting the remit's must-always / must-never
+            rules.
+      Action 1: Enforce a deterministic fraud check in _approve_invoice at
+                src/services/finbot_agent.py:409: call _detect_fraud_patterns
+                and refuse approval (route to human review) on any
+                high/critical risk, independent of the LLM's tool sequencing.
+      Action 2: Remove fraud_detection_enabled as a runtime-mutable field, or
+                hard-reject any config update that sets it to false in
+                update_config() (finbot_agent.py:762).
+
+  PRAX-2026-05-22-003  Vendor-controlled invoice descriptions flow unsanitized
+            into the LLM decision context, giving an indirect prompt-injection
+            path into the approve/pay decision.
+      Action 1: Treat invoice.description as untrusted data: clearly delimit
+                and label it as external content in the tool result, and never
+                present it to the model as instruction-eligible text.
+      Action 2: Replace the regex blocklist approach with a deterministic
+                policy gate that routes any injection-flagged invoice to human
+                review regardless of business-context scoring (see
+                finbot_agent.py:841-855).
+
+  PRAX-2026-05-22-004  Every /admin/* route — config, goals, vendor-trust,
+            human review, reprocess — is exposed with no authentication or
+            authorization.
+      Action 1: Add an authentication + authorization gate (Flask
+                before_request on admin_bp) requiring an authenticated
+                finance-admin identity for every /admin/* route in
+                src/routes/admin.py.
+      Action 2: Restrict CORS in src/main.py:18 to the known admin/vendor
+                front-end origins instead of the default wildcard.
+
+  PRAX-2026-05-22-008  Compound chain: unauthenticated/vendor-controlled
+            injection into the LLM context drives a payment-marking decision
+            with no fraud gate and no audit log.
+      Action 1: Treat the chain as the priority remediation: authenticate
+                /admin/*, remove runtime goal injection, add a deterministic
+                pre-approval fraud + amount + vendor-status gate, and add
+                structured action logging — fixing any single link does not
+                break the chain.
+      Action 2: Re-baseline the system prompt so security/escalation is not
+                framed as subordinate to speed and business continuity.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
