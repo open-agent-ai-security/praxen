@@ -138,7 +138,10 @@ def target_cards(per_target, out_dir: Path):
 
         report_link = ""
         if info.get("report"):
-            rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
+            try:
+                rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
+            except ValueError:
+                rel = info["report"].as_uri()
             report_link = (
                 f'<a class="card-link card-link-report" href="{html.escape(rel)}" '
                 f'target="_blank" rel="noopener">Baseline report ↗</a>'
@@ -381,6 +384,7 @@ def main():
         sys.exit(1)
 
     report = build_report(args.baseline_dir, args.out)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report, encoding="utf-8")
     print(f"owasp_coverage.py: wrote {args.out}")
 
