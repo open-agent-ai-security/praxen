@@ -11,7 +11,7 @@ and writes an HTML report with bar charts and target links.
 Usage:
     python3 tests/baselines/owasp_coverage.py [--baseline-dir DIR] [--out FILE]
 
-Defaults: reads `tests/baselines/v0.7.4-sequential/`, writes
+Defaults: reads `tests/baselines/v0.7.7-sequential/`, writes
 `./owasp-coverage-report.html` in the current working directory.
 """
 import argparse
@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-DEFAULT_BASELINE = THIS_DIR / "v0.7.4-sequential"
+DEFAULT_BASELINE = THIS_DIR / "v0.7.7-sequential"
 DEFAULT_OUT = Path.cwd() / "owasp-coverage-report.html"
 
 TARGETS = [
@@ -138,7 +138,10 @@ def target_cards(per_target, out_dir: Path):
 
         report_link = ""
         if info.get("report"):
-            rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
+            try:
+                rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
+            except ValueError:
+                rel = info["report"].as_uri()
             report_link = (
                 f'<a class="card-link card-link-report" href="{html.escape(rel)}" '
                 f'target="_blank" rel="noopener">Baseline report ↗</a>'
@@ -175,7 +178,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
     llm_total = sum(llm.values())
     asi_total = sum(asi.values())
 
-    n_targets = len([s for s in per_target if per_target[s]["count"] > 0])
+    n_targets = len(per_target)
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y, %H:%M UTC")
     baseline_name = baseline_dir.name
 
@@ -381,6 +384,7 @@ def main():
         sys.exit(1)
 
     report = build_report(args.baseline_dir, args.out)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report, encoding="utf-8")
     print(f"owasp_coverage.py: wrote {args.out}")
 

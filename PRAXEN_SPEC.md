@@ -5,7 +5,7 @@
 
 # Praxen — Specification
 
-**Version:** 0.7.5
+**Version:** 0.7.7
 **Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -269,7 +269,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 ```json
 {
   "schema_version": "2.0",
-  "praxen_version": "0.7.5",
+  "praxen_version": "0.7.7",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -325,7 +325,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     "present": "<true | false>",
     "no_logs_note": "<one sentence on the absence when present is false; may be empty otherwise>",
     "rows": [
-      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "active | new" }
+      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "active | inferred" }
     ]
   },
   "raise_posture": {

@@ -1,0 +1,141 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Devika
+Analysis: May 29, 2026, 04:16 UTC
+Praxen v0.7.7
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is declared sandbox, no sandbox in code, with an
+LLM-to-shell pipeline already wired up. The Worker Remit forbids arbitrary
+shell execution outside a sandboxed runner and the architecture document names
+a sandbox module, but src/sandbox/firejail.py and src/sandbox/code_runner.py
+are both zero-byte stubs; the actual runtime path in
+src/agents/runner/runner.py calls subprocess.run directly on commands the LLM
+produced — no allowlist, no approval gate, no sandbox of any kind. Compounded
+with an unauthenticated POST /api/settings on a server bound to 0.0.0.0:1337
+(anyone on the network can swap the LLM endpoint to attacker-controlled
+inference) and a path-traversal in Coder.save_code_to_project (LLM-named file
+paths flow into os.path.join with no commonprefix check), the agent is one
+prompt away from arbitrary code execution on the operator host — and Devika
+ships with no audit log, no rate limit, no step-count cap, and no input
+screening for injection.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.60 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 6   High: 6   Medium: 3   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 14   Partial: 2   Vague: 1   Enforcement-not-possible: 1   (of 18 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Supply Chain                                       1
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           2
+  LLM06  Excessive Agency                                   4
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 1
+  ASI09  Human-Agent Trust Exploitation                     1
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-29-001  LLM-produced shell commands executed via subprocess.run
+            with no sandbox, no allowlist, and no approval gate.
+      Action 1: Add a per-command allowlist enforced before subprocess.run in
+                src/agents/runner/runner.py:85 and :137 and :177; reject
+                anything outside the allowlist with a hard halt and operator
+                alert.
+      Action 2: Wire control to the (currently empty) src/sandbox/firejail.py
+                or an equivalent OS-level isolation primitive before any
+                subprocess call, and require an operator approval click for
+                each command list.
+
+  PRAX-2026-05-29-002  Unauthenticated POST /api/settings on 0.0.0.0:1337
+            overwrites config.toml — API keys, endpoints, and timeouts.
+      Action 1: Bind the Flask/SocketIO server to 127.0.0.1 by default
+                (devika.py:209) and require a localhost-only or
+                token-authenticated path for /api/settings; reject mutation
+                requests without an operator-presented token.
+      Action 2: Restrict /api/settings to a documented allowlist of
+                safe-to-mutate keys and exclude API_ENDPOINTS — endpoint
+                changes should require a config-file edit, not a POST.
+
+  PRAX-2026-05-29-003  Path traversal in Coder.save_code_to_project —
+            LLM-named file paths reach os.path.join with no containment check.
+      Action 1: In save_code_to_project (coder.py:73-77), after building
+                file_path call os.path.abspath(file_path) and reject any path
+                whose commonpath with the project root is not the project
+                root; raise instead of writing.
+      Action 2: Apply the same containment to Feature.save_code_to_project and
+                Patcher.save_code_to_project so all three write paths share
+                one enforcement.
+
+  PRAX-2026-05-29-004  Sandbox module exists in the tree as zero-byte stubs —
+            firejail.py and code_runner.py are unimplemented.
+      Action 1: Implement src/sandbox/firejail.py to spawn each subprocess
+                inside a firejail (or equivalent OS-level sandbox) profile
+                with no network, read-only system paths, and a writable
+                allowlist scoped to the current project directory.
+      Action 2: Implement src/sandbox/code_runner.py as the only call site for
+                subprocess execution, route src/agents/runner/runner.py
+                through it, and add a unit test that fails the build when the
+                runner imports subprocess directly.
+
+  PRAX-2026-05-29-005  Unauthenticated network-reachable agent kickoff — any
+            LAN client can trigger plan/code/run via the user-message socket.
+      Action 1: Bind to 127.0.0.1 by default in devika.py:209 and require an
+                explicit opt-in env var for LAN exposure; add a SocketIO
+                connect-handshake check that validates a per-session token
+                issued by the local UI.
+      Action 2: Rate-limit user-message handling at the SocketIO layer (e.g.
+                flask-limiter) so a runaway client cannot fan out
+                plan/code/run threads in a loop.
+
+  PRAX-2026-05-29-008  Compound chain — web-fetched content flows unscreened
+            into LLM context that drives subprocess.run-based code execution.
+      Action 1: Implement an explicit injection-screening stage between
+                Browser.extract_text and Formatter — wrap returned content in
+                a labeled untrusted section in the prompt and run a
+                deterministic deny-list / LLM classifier before the content is
+                used; reject pages whose text contains imperative model
+                instructions.
+      Action 2: Block the indirect-injection-to-RCE path by gating any
+                Runner.run_code invocation on an explicit operator approval
+                that names the commands, not just by sandboxing — the sandbox
+                is the second layer, the gate is the first.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
