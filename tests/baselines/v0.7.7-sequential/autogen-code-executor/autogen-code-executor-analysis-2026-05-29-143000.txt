@@ -1,0 +1,142 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Execution Subsystem
+Analysis: May 29, 2026, 14:21 UTC
+Praxen v0.7.7
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is sandbox-shaped-not-sandbox-strong: every executor
+preserves the *shape* of isolation (a container exists, a temp work-dir
+exists, a timeout is configured) but defaults strip away the *substance* —
+Docker containers run as the image's default user (typically root in
+python:3-slim) with no read_only rootfs, no mem_limit, no cap_drop, and full
+network access; the local executor copies os.environ wholesale into the
+subprocess so any host credential the parent process holds becomes available
+to LLM-generated code; create_default_code_executor() answers a
+DockerException on client.ping() with a warnings.warn and a return of
+LocalCommandLineCodeExecutor, turning a hardened default into the unhardened
+one with no operator confirmation; and JupyterCodeExecutor wraps the cell in
+asyncio.wait_for(asyncio.shield(execute_task), timeout=self._timeout) which
+raises TimeoutError in the caller but leaves the kernel cell running.
+Compounding the posture, the remit mandates a per-execution audit log
+(timestamp, executor kind, source agent, work-dir, timeout, exit status, code
+digest) and none of the five executors emits one — only setup-time
+logging.info calls for package install and image pull exist. The combination
+of "host env into subprocess" + "no audit log" + "silent Docker→Local
+downgrade" is the chain a security lead should look at first: LLM-generated
+code can read host credentials and the operator has no record of which
+executor ran or what it did.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.15 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 4   Medium: 1   Low: 0   Informational: 0
+  Total: 9
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 8   Partial: 3   Vague: 1   Enforcement-not-possible: 1   (of 16 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Supply Chain                                       —
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           —
+  LLM06  Excessive Agency                                   3
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       5
+  ASI04  Agentic Supply Chain Vulnerabilities               3
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 1
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-29-001  `create_default_code_executor()` silently downgrades
+            from the containerised executor to the local-host executor on any
+            Docker failure with only a `UserWarning`.
+      Action 1: In `code_executors/__init__.py`, replace the silent fallback
+                with an explicit opt-in: require an env flag such as
+                `AUTOGEN_ALLOW_LOCAL_EXECUTOR=1` (or an explicit
+                `allow_local_fallback=True` argument) before returning
+                `LocalCommandLineCodeExecutor`; otherwise raise `RuntimeError`
+                naming the missing Docker prerequisite.
+      Action 2: Surface the chosen executor kind in the function's return
+                value or via a structured log line so the calling agent and
+                the operator can both verify which backend ran.
+
+  PRAX-2026-05-29-002  `LocalCommandLineCodeExecutor` copies the parent
+            process's full `os.environ` into the executed subprocess, exposing
+            every host credential the parent holds to LLM-generated code.
+      Action 1: Replace `os.environ.copy()` with an explicit allow-list (e.g.
+                `PATH`, `LANG`, `HOME`, plus user-supplied variables) and
+                document the variables that survive the boundary; reject calls
+                that pass through known credential-shaped names (`*_KEY`,
+                `*_TOKEN`, `*_SECRET`, `AWS_*`, `AZURE_*`, `GOOGLE_*`) without
+                explicit opt-in.
+      Action 2: Make the env-passing surface a constructor argument (`env:
+                Optional[Dict[str, str]]`) so the operator must consciously
+                hand variables across the trust boundary.
+
+  PRAX-2026-05-29-003  None of the five executor implementations emits a
+            per-execution audit record despite the remit naming eight fields
+            that MUST be captured per call.
+      Action 1: Add a structured audit emitter to `_common.py` — a
+                `log_execution(executor_kind, language, source_agent,
+                work_dir, timeout, exit_code, code_digest, started_at,
+                finished_at)` helper that writes one JSON line per execution,
+                configurable via env or constructor argument, defaulting to
+                enabled.
+      Action 2: Wire the helper into every `_execute_code_dont_check_setup`
+                (Local, Docker, Jupyter, DockerJupyter, Azure) and into the
+                cancellation paths so timeouts and cancellations are recorded
+                too.
+
+  PRAX-2026-05-29-004  Docker containers are created with none of the standard
+            hardening flags (`user=`, `read_only=`, `mem_limit=`, `cap_drop=`,
+            `network_mode=`), so LLM-generated code runs as the image's
+            default user (usually root in `python:3-slim`) on a writable
+            rootfs with full Linux capabilities and unrestricted network
+            egress.
+      Action 1: Set hardening defaults on
+                `containers.create`/`containers.run`: `user="nobody"` (or an
+                unprivileged numeric uid in the image), `read_only=True` with
+                a tmpfs over `/tmp`, a default `mem_limit` (e.g. 512m) and
+                `pids_limit`, `cap_drop=["ALL"]`,
+                `security_opt=["no-new-privileges:true"]`, and
+                `network_mode="none"` for the command executor; expose
+                constructor arguments to override each, with each override
+                requiring an explicit opt-in flag.
+      Action 2: Replace `publish_all_ports=True` in `DockerJupyterServer` with
+                an explicit single-port publish bound to `127.0.0.1` so the
+                Jupyter port is not advertised on all host interfaces.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
