@@ -58,7 +58,7 @@ SEVERITY_COUNT_KEYS = {              # finding.severity -> footer.severity_count
 REMIT_STATUSES = ["verified", "gap", "partial", "vague", "enp"]
 CONFIDENCES = ["High", "Medium", "Low"]
 TAG_KINDS = ["raise", "owasp_llm", "owasp_agentic", "mcp"]
-LOG_STATUSES = ["active", "new"]
+LOG_STATUSES = ["active", "new", "inferred"]
 ESCALATIONS = ["alert", "log_only"]
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

@@ -71,8 +71,8 @@ _STATUS_LABEL = {"verified": "Verified", "gap": "Gap", "partial": "Partial",
 _TAG_CLASS = {"raise": "tag-raise", "owasp_llm": "tag-owasp",
               "owasp_agentic": "tag-agentic", "mcp": "tag-owasp"}
 
-_LOG_STATUS_CLASS = {"active": "log-status-active", "new": "log-status-new"}
-_LOG_STATUS_LABEL = {"active": "Active", "new": "New"}
+_LOG_STATUS_CLASS = {"active": "log-status-active", "new": "log-status-new", "inferred": "log-status-inferred"}
+_LOG_STATUS_LABEL = {"active": "Active", "new": "New", "inferred": "Inferred"}
 
 _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
                 3: "score-3", 4: "score-4-5", 5: "score-4-5"}
