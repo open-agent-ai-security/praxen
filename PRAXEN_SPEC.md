@@ -325,7 +325,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     "present": "<true | false>",
     "no_logs_note": "<one sentence on the absence when present is false; may be empty otherwise>",
     "rows": [
-      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "active | new" }
+      { "path": "<path>", "source": "<component>", "content_type": "<...>", "purpose": "<...>", "mtime": "<date or 'unknown'>", "status": "active | inferred" }
     ]
   },
   "raise_posture": {
