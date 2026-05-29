@@ -22,7 +22,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - **`docs/writing-remits.md` sync** — surfaces the `[Inferred]` review checkpoint and a new "Writing restrictions for under-documented capabilities" entry under Common mistakes. (PR #42)
 
 ### Changed
-- **`findings.schema.json` and `schema.py`** — `log_files` row `status` enum is now `["active", "new", "inferred"]` (added `"inferred"`). Additive only; existing valid JSON remains valid. `schema_version` stays at `"2.0"`.
+- **`findings.schema.json` and `schema.py`** — `log_files` row `status` enum is now `["active", "inferred"]`. `inferred` is new (PR #43); `new` is removed as a vestige — it had appeared exactly once across all committed baselines (v0.7.4 aider's `.aider.llm.history`) and that one use was a misclassification of what should have been `inferred` (the path was derived from source code, not observed on disk; `inferred` didn't exist as a value yet). The scanner is read-only and has no scan-start-time comparison logic, so "freshly created this run" was never a semantically distinguishable case from `active`. The 6 rows in 4 historical JSONs that carried `"status": "new"` (1 in the v0.7.4 baseline, 5 across the `tests/runs/v0.7.3-prerelease*` snapshots) have been reclassified to `"inferred"`. `schema_version` stays at `"2.0"` — this is cleanup of a vestige rather than a semantic schema change.
 - **`render.py` and `report_template.html`** — added `log-status-inferred` CSS class (muted color) and label; added the **Logs** jump-nav button and an `id="logs"` anchor on the Discovered Log Files section.
 - **`tests/baselines/v0.7.7-sequential/`** — fresh full-suite re-scan against all eleven targets, replaces the previous `v0.7.4-sequential/` set as the canonical baseline. Cold runs against current upstream sources. Per-target delta narrative in `tests/baselines/v0.7.7-sequential/BASELINE.md`.
 - **`tests/baselines/owasp-coverage-report.html`** — regenerated against the new baseline set.
@@ -30,7 +30,8 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Unchanged on purpose
 - **Findings engine.** `manifest_to_findings.py` and the four knowledge bases (`KB_RAISE_SCANNING.md`, `KB_LLM_TOP10.md`, `KB_AGENTIC_TOP10.md`, `KB_MCP_SECURITY.md`) are byte-identical to `0.7.6`.
-- **Schema major.** Additive enum value; `schema_version` stays at `"2.0"`. Consumers of older `["active", "new"]` JSONs continue to parse without change.
+- **Schema major.** `schema_version` stays at `"2.0"`. The `log_files` row `status` enum cleanup removes a vestigial value that was never semantically distinct from `active` — practical impact on downstream consumers is nil.
+- **Render layer.** `render.py`'s `_LOG_STATUS_CLASS["new"]` / `_LOG_STATUS_LABEL["new"]` dict entries and `report_template.html`'s `.log-status-new` CSS rule are deliberately kept as dead code — removing them would break byte-identity with every historical committed HTML that embeds them in its `<style>` block.
 - **Plugin install identifier.** Still `praxen@open-agent-ai-security`; no marketplace `name` change.
 
 ### Calibration notes
