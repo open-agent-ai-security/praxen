@@ -23,6 +23,7 @@
 | Writing a Worker Remit for an agent | [Writing Worker Remits](writing-remits.md) |
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
+| Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
 | Trying to understand the RAISE maturity scoring | [The RAISE Framework](RAISE.md) |
