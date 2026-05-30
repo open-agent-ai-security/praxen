@@ -33,7 +33,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 Praxen is the open-source reference implementation of **Agent Behavior Verification (ABV)** — a proactive control model for AI agents and digital workers. The premise is the same one identity and access management applies to human employees: every actor has an authorized role, and the controls have to actually enforce it.
 
-And a misbehaving agent is hard to catch: whatever the cause, it surfaces the same way — as wrong behavior. So the only reliable signal is the *behavior* itself, measured as its deviation from declared intent.
+And a misbehaving agent is hard to catch: whatever the cause, it surfaces the same way — as wrong behavior. So the only reliable signal is the *behavior* itself.
 
 That's why screening for prompt injections, or scanning code for known-bad patterns, isn't enough. Those are necessary but partial: they catch some inputs and some implementation flaws, not the question that actually matters — *is this agent going to do, or is it doing, the thing it was deployed to do, and nothing else?*
 
@@ -52,6 +52,8 @@ Define the job. Test against the job. Everything else in Praxen serves those two
 - You point Praxen at **evidence** — source code, deployment state, behavioral logs, governance docs, or any mix. ([usage](docs/usage.md))
 - Praxen reports the **gap**. Every finding answers a single question: *does observed behavior match declared intent?* ([reading reports](docs/interpreting-reports.md))
 
+In practice that's one sentence to your coding agent — e.g. *"Run a Praxen behavior analysis on `./my-agent`"* — and Praxen does the rest: it finds (or asks for) the Worker Remit, reads the workspace, and writes the report.
+
 Findings land in a self-contained HTML report, a machine-readable JSON file, and a plain-text summary in `./reports/`. Nothing phones home.
 
 Praxen runs **before deployment** and on each release — pre-deployment verification of the agent's controls against its remit. Runtime monitoring of the deployed agent (Agent Behavior Analytics, **ABA**) is a complementary layer outside Praxen's scope.
@@ -60,19 +62,17 @@ Praxen runs **before deployment** and on each release — pre-deployment verific
 
 ## What Praxen verifies
 
-Every analysis runs these named verification patterns:
+Every analysis runs a set of named verification patterns, including:
 
 - **Policy-implementation divergence** — the code or behavior doesn't do what the policy document says
 - **Credential exposure** — secrets in unexpected locations across the workspace
 - **Configuration gaps** — auto-approved exec, disabled loop detection, missing rate limits
 - **Capability drift** — new tools or outbound destinations not in the authorized baseline
-- **Supply-chain risk** — unpinned dependencies, unreviewed plugins, unknown provenance
-- **Declared-but-never-consulted config / secret** — half-wired controls
-- **Empty stub files in security-relevant paths** — planned-but-not-implemented sandboxes, approval gates, redactors
-- **Secondary prompt discovery** — session-loaded identity files (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, …) audited as system prompts
 - **Compound signal reasoning** — individual findings chained when they combine into a high-severity attack path
 
-Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, the **OWASP Secure MCP Server Development Guide 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10 Coverage** and **OWASP Agentic Top 10 Coverage** grid sections — a 5×2 card layout showing each finding chip-linked to its category, with empty cells rendered as "No findings" so the grid reads as a coverage map. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks; see [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a finding card.
+…and more — supply-chain risk (unpinned deps, unreviewed plugins), declared-but-never-consulted controls, empty security-stub files (planned-but-unbuilt sandboxes, approval gates, redactors), and secondary prompt discovery (session-loaded identity files like `SOUL.md` / `AGENTS.md` / `MEMORY.md` audited as system prompts). See [docs/usage.md](docs/usage.md) and [PRAXEN_SPEC.md](PRAXEN_SPEC.md) for the full set.
+
+Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, the **OWASP Secure MCP Server Development Guide 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
 
 ---
 
