@@ -100,7 +100,7 @@ The standing rule (maintainers — `dev` is unprotected):
   soon as the release squash lands on `main` and the `vX.Y.Z` tag is cut, run —
   **before any new feature work** —
   ```
-  git checkout dev && git reset --hard origin/main && git push --force-with-lease origin dev
+  git fetch origin && git checkout dev && git reset --hard origin/main && git push --force-with-lease origin dev
   ```
   `dev` restarts cleanly from the released commit, so it can never sit behind
   `main`. This step has existed since 0.7.2; skipping it after 0.7.5 is how `dev`
