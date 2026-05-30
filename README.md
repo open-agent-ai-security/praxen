@@ -52,7 +52,7 @@ Define the job. Test against the job. Everything else in Praxen serves those two
 - You point Praxen at **evidence** — source code, deployment state, behavioral logs, governance docs, or any mix. ([usage](docs/usage.md))
 - Praxen reports the **gap**. Every finding answers a single question: *does observed behavior match declared intent?* ([reading reports](docs/interpreting-reports.md))
 
-In practice that's one sentence to your coding agent — e.g. *"Run a Praxen behavior analysis on `./my-agent`"* — and Praxen does the rest: it finds (or asks for) the Worker Remit, reads the workspace, and writes the report.
+In practice, that's one sentence to your coding agent — e.g. *"Run a Praxen behavior analysis on `./my-agent`"* — and Praxen does the rest: it finds (or asks for) the Worker Remit, reads the workspace, and writes the report.
 
 Findings land in a self-contained HTML report, a machine-readable JSON file, and a plain-text summary in `./reports/`. Nothing phones home.
 
@@ -70,7 +70,7 @@ Every analysis runs a set of named verification patterns, including:
 - **Capability drift** — new tools or outbound destinations not in the authorized baseline
 - **Compound signal reasoning** — individual findings chained when they combine into a high-severity attack path
 
-…and more — supply-chain risk (unpinned deps, unreviewed plugins), declared-but-never-consulted controls, empty security-stub files (planned-but-unbuilt sandboxes, approval gates, redactors), and secondary prompt discovery (session-loaded identity files like `SOUL.md` / `AGENTS.md` / `MEMORY.md` audited as system prompts). See [docs/usage.md](docs/usage.md) and [PRAXEN_SPEC.md](PRAXEN_SPEC.md) for the full set.
+…and more — supply-chain risk (unpinned dependencies, unreviewed plugins), declared-but-never-consulted controls, empty security-stub files (planned-but-unbuilt sandboxes, approval gates, redactors), and secondary prompt discovery (session-loaded identity files like `SOUL.md` / `AGENTS.md` / `MEMORY.md` audited as system prompts). See [docs/usage.md](docs/usage.md) and [PRAXEN_SPEC.md](PRAXEN_SPEC.md) for the full set.
 
 Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, the **OWASP Secure MCP Server Development Guide 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
 
