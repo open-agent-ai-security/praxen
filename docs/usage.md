@@ -82,7 +82,7 @@ Coverage and confidence increase with each additional input shape — see the [E
 
 ### For highest scan fidelity: run in a fresh context
 
-A scan run in the same session that explored the workspace earlier (while authoring the remit, reading code, or doing any other prep work) will systematically under-read during the Step 4 artifact sweep — the scanner pattern-matches against what it already knows rather than doing a full cold discovery. The `artifact_count` in the report only reflects what was read *during the scan steps*, not what the session already holds in memory. On large codebases this gap is real: in a validation run of the same Hermes Agent workspace, a cold-context scan read 3× as many artifacts and found evidence that shifted four RAISE categories upward by one point each.
+A scan run in the same session that explored the workspace earlier (while authoring the remit, reading code, or doing prep work) will systematically **under-read** during the Step 4 artifact sweep — the scanner pattern-matches against what it already knows rather than doing a full cold discovery. On a large codebase the gap is real: a cold-context scan reads materially more of the workspace, and that extra evidence can move RAISE scores upward — so a warm-context scan tends to *under*-report.
 
 **The recommended approach for a high-confidence scan:** spawn a subagent with no prior context and point it at the workspace. In Claude Code, the Agent tool sends a fresh instance with no conversation history:
 
@@ -211,13 +211,13 @@ The skill couldn't find the path you named. Most common causes:
 
 ### Mid-analysis context auto-compaction (silent quality loss)
 
-Long scans on agents with a lot of evidence can exceed the coding agent's context window. Auto-compaction is *silent* — the run keeps going, but findings gathered early get summarised away before the report is written. Symptoms:
+A long scan can exceed the context window and **auto-compact mid-run** — silently, so the run still finishes but findings gathered early get summarised away before the report is written. Symptoms:
 
 - The interim overview Praxen prints to stdout names findings the final HTML doesn't include.
 - The HTML report looks suspiciously thin compared to the workspace's complexity.
 - The agent suddenly switches to ad-hoc Python to "fix up" the JSON near the end of the run.
 
-What to do is in *Large workspaces and context sizing* above — the short version is: re-run in a larger window with a tighter scope, or recover from the draft manifest. A report produced through a mid-synthesis compaction should be treated as possibly incomplete until you've done one of those.
+→ Prevention and recovery (a larger window, tighter scope, and the draft-manifest safety net) are covered in [Large workspaces and context sizing](#large-workspaces-and-context-sizing) above.
 
 ### Scan stopped emitting output for several minutes (streaming hiccup)
 
