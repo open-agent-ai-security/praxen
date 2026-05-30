@@ -31,7 +31,7 @@ Hand-authoring is the ideal path — you understand the agent's intended behavio
 
 Ask Claude Code to *"draft a Worker Remit for this agent"* with the description or docs available, and the skill walks the `WORKER_REMIT_template.md` structure to produce a complete first draft. Treat the result as a starting point, not a finished remit: review every section, tighten anything vague (see [the specificity test](#the-specificity-test)), and make sure the **forbidden** actions reflect *your* intent — a drafted remit is only as good as what it had to work from.
 
-Pay particular attention to any clause tagged `[Inferred]` — these are places where the documentation was ambiguous and the skill made its best guess. They are focal review checkpoints, not finished policy. For multi-component deployments, confirm the scope note in the Mission section correctly identifies the primary RAISE subject and that per-component rules use sub-headings within existing sections rather than new top-level sections.
+Pay particular attention to any clause tagged `[Inferred]` — these are places where the documentation was ambiguous and the skill made its best guess. They are focal review checkpoints, not finished policy.
 
 ---
 
@@ -52,6 +52,8 @@ The template is a complete reference, but the load-bearing sections are:
 - **Escalation Rules** — what triggers halt, alert, log-only
 
 If a section doesn't apply to your agent, leave it minimal but explain why — Praxen will note vague or missing rules.
+
+**Multi-component deployments** (e.g. an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: name the primary RAISE subject in a scope note in the Mission, and give each component its own sub-headings *within* the existing sections rather than adding new top-level sections.
 
 ---
 

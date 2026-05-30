@@ -22,8 +22,6 @@ flowchart LR
   CJ --> SC
 ```
 
-The split matters in practice: the synthesis is an LLM job (judgement, calibration, prose), the rendering is mechanical (deterministic, no LLM call, byte-identical re-render from the same JSON). The JSON is the *canonical record*; the HTML and TXT are derived views.
-
 This page walks through what each section of the HTML report means, how severities and confidence levels work, how the RAISE maturity score should be read, and what's in the JSON.
 
 ---
@@ -121,7 +119,7 @@ This section contains:
 - **Six per-category cards** (Limit Your Domain, Balance Your Knowledge Base, Implement Zero Trust, Manage Your Supply Chain, Build an AI Red Team, Monitor Continuously) with score, confidence, weight, and rationale
 - **The Maturity Scoring Rubric** — the 0–5 scale with labels and meanings, baked into every report
 
-**This is a maturity model, not a school grade.** A score of 3 / 5 means *Established*, not 60 percent. Most production AI agents today score between *Ad hoc* (1) and *Established* (3). A score of 2.5 places an agent in the *Partial → Established* maturity band — that is accurate reporting of current industry norms, not a failing grade. See [The RAISE Framework](RAISE.md) for the full rubric.
+**This is a maturity model, not a school grade** — a 3 / 5 means *Established*, not 60 percent, and most production AI agents today land between *Ad hoc* (1) and *Established* (3). See [The RAISE Framework](RAISE.md) for the full rubric and how to read a given band.
 
 ### 12. Footer
 
@@ -172,7 +170,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 | `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |
 | `footer` | `severity_counts` (critical / high / medium / low / info) |
 
-The JSON holds **semantic values, not presentation** — `severity` is `"Critical"`, `status` is `"gap"`; CSS classes and the maturity label are computed by the renderer, not stored. So a consumer that wants the posture number reads `raise_posture.weighted_overall`; one that wants the headline reads `behavior_summary`; no HTML parsing needed. The bundled `schema.py` validator (which `render.py` runs before rendering) enforces the cross-field invariants — counts match the arrays, anchors resolve, the six RAISE keys are present, `weighted_overall` equals Σ(score × weight) — so a JSON that exists alongside an HTML report is internally consistent.
+The JSON holds **semantic values, not presentation** — `severity` is `"Critical"`, `status` is `"gap"`; CSS classes and the maturity label are computed by the renderer, not stored. So a consumer that wants the posture number reads `raise_posture.weighted_overall`; one that wants the headline reads `behavior_summary`; no HTML parsing needed. The bundled `schema.py` validator (which `render.py` runs before rendering) enforces the cross-field invariants, so a JSON that exists alongside an HTML report is internally consistent — see [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) §6 for the full schema.
 
 Use the JSON for:
 

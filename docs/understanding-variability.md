@@ -9,28 +9,7 @@ Run Praxen twice on the *same* agent, with the *same* Worker Remit and the *same
 
 ## Where the variability comes from
 
-A Praxen analysis has two stages, and only one of them is variable.
-
-```mermaid
-flowchart LR
-  subgraph S1["Stage 1 — LLM (variable)"]
-    direction TB
-    EV["evidence + remit"] --> SY["synthesis:<br/>read · judge · score · write"]
-    SY --> CJ["findings.json"]
-  end
-  subgraph S2["Stage 2 — deterministic (fixed)"]
-    direction TB
-    RN["render.py"] --> HT["analysis.html"]
-    RN --> TX["analysis.txt"]
-  end
-  CJ --> RN
-```
-
-**Stage 1 — synthesis — is done by a large language model** (your coding agent running the `behavior-verifier` skill). Reading the code, deciding what is and isn't a finding, judging severity, and assigning the six RAISE category scores are all *acts of judgement*. The same model given the same evidence will not make every borderline call identically every time — the same way two equally-qualified human reviewers, or the same reviewer on two different days, would write similar-but-not-identical reports. This is inherent to the task, not a defect.
-
-**Stage 2 — rendering — is deterministic.** `render.py` turns the findings JSON into the HTML and TXT views with no model involved; the same JSON always produces byte-identical output. None of the variability lives here. (See [Interpreting Reports](interpreting-reports.md) for the full two-stage picture.)
-
-So the variability you see is entirely the variability of the **synthesis**, captured in `findings.json`.
+A Praxen analysis has two stages, and only one of them varies. **Stage 1 — synthesis** is an LLM job (your coding agent running the skill): reading the code, deciding what is and isn't a finding, judging severity, and assigning the six RAISE category scores are all *acts of judgement*, and the same model won't make every borderline call identically every time — much as two equally-qualified reviewers would write similar-but-not-identical reports. **Stage 2 — rendering (`render.py`)** is deterministic: the same `findings.json` always produces byte-identical HTML/TXT. So all the variability lives in the Stage-1 synthesis, captured in `findings.json`. (See [Interpreting Reports](interpreting-reports.md) for the full two-stage picture and diagram.)
 
 ### Two flavours: variance and drift
 
@@ -58,14 +37,9 @@ The stable signal is the **finding set**; the noisy signal is the **exact number
 
 ## Following up with the LLM
 
-Because the synthesis is an LLM step, you can **interrogate and revise it in conversation** — the report is a starting point, not a verdict. In the same session that produced the analysis (or a new one pointed at the same inputs), you can ask the coding agent to:
+Because synthesis is an LLM step, you can interrogate and revise it in conversation — ask the agent to explain a score, re-examine a finding against its evidence, or re-evaluate a category, and it re-emits the findings JSON. That workflow (and why you revise the manifest/JSON rather than the HTML) is covered in [Challenging and Revising Findings](challenging-findings.md).
 
-- **Explain a call** — *"Why did you score Implement Zero Trust 1 and not 2?"* or *"What evidence backs finding PRAX-…-004?"*
-- **Re-examine a specific finding** — *"Re-check the `/read-only` finding against `commands.py`; is the severity right?"* The agent re-reads the artifact and either confirms or revises.
-- **Challenge a score** — if you believe a control was under- or over-credited, say so with the file/line; the agent can re-evaluate that category and re-emit the findings JSON.
-- **Re-run the whole analysis** — ask for a fresh pass to see whether a borderline result reproduces.
-
-This is the intended workflow for disagreements and close calls. See [Challenging and Revising Findings](challenging-findings.md) for how revisions flow back into the canonical JSON (and why you edit the manifest/JSON and re-render rather than hand-editing the HTML).
+The move specific to *variability*: **re-run the whole analysis** and see whether a borderline result reproduces. If it holds, it's real; if it swings, the target is judgement-sensitive (above) and worth characterising over several runs — see below.
 
 ## When stability matters more than runtime
 
