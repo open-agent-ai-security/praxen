@@ -199,4 +199,5 @@ The full schema, with field types and the validator's invariants, is documented 
 
 - [The RAISE Framework](RAISE.md) — the maturity rubric in depth
 - [Challenging and Revising Findings](challenging-findings.md) — what to do when you think a finding is wrong
+- [Understanding Run-to-Run Variability](understanding-variability.md) — why two runs of the same analysis give slightly different scores, and when to run more than once
 - [Writing Worker Remits](writing-remits.md) — when "Vague Policy" status means the remit needs work
