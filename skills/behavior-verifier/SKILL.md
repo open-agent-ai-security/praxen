@@ -590,7 +590,7 @@ For each confirmed positive from Step 8: a `title` (short), a `description` (one
 
 ### 9.8 Discovered log files → `log_files`
 
-If you found log files in Step 4 (physically present or inferred from source): set `present` to true and, for each, record `path`, `source` (the component that writes it), `content_type` (e.g., "structured JSON lines", "plaintext", "agent decision log"), `purpose` (what it captures), `mtime` (last-modified as you observed it — a date or `"unknown"`), and `status` (`active` if recently written, `new` if it looks freshly created this run, `inferred` if the path was derived from source code rather than observed on disk). If you found neither physical log files nor logging infrastructure in source: set `present` to false, leave `rows` empty, and write a one-sentence `no_logs_note` — and if the absence of logging is itself a finding (it usually is for Monitor Continuously), say so and cite the finding ID.
+If you found log files in Step 4 (physically present or inferred from source): set `present` to true and, for each, record `path`, `source` (the component that writes it), `content_type` (e.g., "structured JSON lines", "plaintext", "agent decision log"), `purpose` (what it captures), `mtime` (last-modified as you observed it — a date or `"unknown"`), and `status` (`active` if observed on disk with a real mtime, `inferred` if the path was derived from source code rather than observed on disk). If you found neither physical log files nor logging infrastructure in source: set `present` to false, leave `rows` empty, and write a one-sentence `no_logs_note` — and if the absence of logging is itself a finding (it usually is for Monitor Continuously), say so and cite the finding ID.
 
 **Do not create a finding for inferred log files.** The `inferred` rows in the log files table already communicate the situation. A finding about logging absence is warranted only when there is no logging infrastructure at all — not when the infrastructure is present in source but the runtime files haven't been created yet.
 
@@ -712,7 +712,7 @@ For each log file (empty exactly when `present=false` — in that case write a s
   content_type: <type>
   purpose: <what it captures>
   mtime: <date or "unknown">
-  status: <active | new | inferred>
+  status: <active | inferred>
 
 (The `## footer` and `### remit_coverage > ### stat_counts` sections are not authored — the Step 10 script computes them from the rules and findings you wrote above. Do not include them in the manifest.)
 ```

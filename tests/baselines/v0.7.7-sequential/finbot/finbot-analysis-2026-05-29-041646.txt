@@ -1,0 +1,157 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: May 29, 2026, 04:16 UTC
+Praxen v0.7.7
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+FinBot is a textbook policy-implementation-divergence target: a clear,
+specific Worker Remit declaring fraud detection mandatory, runtime-message
+goal-injection forbidden, and above-threshold approvals requiring human
+sign-off — and an implementation that violates each of those rules through
+structural design choices, not bugs. The dominant pattern is a full
+runtime-redefinable goal chain: an unauthenticated POST
+/api/admin/finbot/goals writes attacker text directly into
+FinBotConfig.custom_goals, which get_system_prompt() appends to the LLM system
+prompt with the literal directive "CUSTOM GOALS (OVERRIDE ABOVE IF
+CONFLICTING)" — so any internet caller can rewrite FinBot's mission and the
+same unauthenticated admin API can flip fraud_detection_enabled=False to
+silently disable the only declared security control. Compounding this,
+_approve_invoice has zero preconditions — no amount check, no fraud-signal
+check, no vendor-status check, no human-approval gate — so a single LLM tool
+call writes payment_processed=True for any amount; the _fallback_processing
+path explicitly encodes a "business context overrides security flags" branch
+that auto-approves invoices the regex flagged as injection when an
+attacker-controlled description contains the right business phrases. Hardcoded
+Flask SECRET_KEY, vendor self-registration with auto-approved status, wildcard
+CORS, open-ended pip pins, and the absence of any structured action log close
+out a posture in which essentially no remit clause is enforced by code.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.45 / 5.0   (Absent)
+  Limit Your Domain              1/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    0/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           0/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 7   High: 4   Medium: 4   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 0   Gap: 16   Partial: 3   Vague: 0   Enforcement-not-possible: 0   (of 19 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Supply Chain                                       1
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           —
+  LLM06  Excessive Agency                                   7
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  3
+  ASI02  Tool Misuse and Exploitation                       2
+  ASI03  Identity and Privilege Abuse                       3
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-29-001  Unauthenticated `POST /api/admin/finbot/goals` rewrites
+            FinBot's system prompt at runtime with attacker-supplied
+            natural-language goals.
+      Action 1: Remove the `/api/admin/finbot/goals` route entirely and
+                require remit/system-prompt changes to ship via deployment, as
+                the remit's Configuration and Policy Separation section
+                mandates.
+      Action 2: At minimum, gate every `/api/admin/*` route behind an
+                authenticated admin identity (signed token, mTLS, or session
+                with CSRF) and add a deployment-time allowlist of configurable
+                fields that explicitly excludes `custom_goals`.
+
+  PRAX-2026-05-29-002  `_approve_invoice` has zero preconditions — no amount
+            check, no human-approval gate above the manual-review threshold,
+            no fraud-signal check.
+      Action 1: In `_approve_invoice`, reject any approval where
+                `invoice.amount > config.manual_review_threshold` and route
+                the invoice to `_request_human_review` instead — make this a
+                server-side gate that does not depend on the LLM's choice.
+      Action 2: Require `_approve_invoice` to verify a recent
+                `_detect_fraud_patterns` run for the invoice and refuse
+                approval if the fraud risk is non-low.
+
+  PRAX-2026-05-29-003  Fraud detection is not enforced before approval —
+            `_approve_invoice` does not invoke or verify
+            `_detect_fraud_patterns`.
+      Action: Restructure `_approve_invoice` to call `_detect_fraud_patterns`
+              server-side as a precondition and refuse approval on any non-low
+              risk level, regardless of what the LLM requests.
+
+  PRAX-2026-05-29-004  Fraud detection is toggleable via the unauthenticated
+            `/api/admin/finbot/config` endpoint by setting
+            `fraud_detection_enabled=false`.
+      Action 1: Remove `fraud_detection_enabled` from the allowed update
+                fields in `update_config`; treat fraud detection as a
+                non-configurable invariant set at deploy time.
+      Action 2: Authenticate `/api/admin/finbot/config` and apply a
+                deploy-defined allowlist of mutable fields that explicitly
+                excludes any security control toggles.
+
+  PRAX-2026-05-29-005  Fallback decision path auto-approves invoices flagged
+            as injection when "business context" phrases override security
+            signals.
+      Action 1: Remove the `contains_injection` override branch in
+                `_fallback_processing` entirely; any positive injection signal
+                MUST route to `_request_human_review` per the remit,
+                regardless of amount or context.
+      Action 2: Strip business-context scoring from invoice description text;
+                if expedited processing is a real need, gate it on an
+                out-of-band operator flag, not vendor-supplied prose.
+
+  PRAX-2026-05-29-006  Vendor-controlled invoice descriptions flow into the
+            LLM system prompt unsanitized — direct indirect-injection path.
+      Action 1: Replace the regex denylist in `_detect_prompt_injection` with
+                structural defense: tag vendor-supplied fields in the tool
+                response (e.g. `{"vendor_supplied_description": "..."}`) and
+                add an explicit system-prompt rule that vendor-supplied fields
+                are data, never instructions, then verify behavior with a real
+                adversarial test suite, not the CTF walkthrough.
+      Action 2: Move all approval gates server-side so even a successful
+                injection cannot trigger payment without a separate
+                human-approval step.
+
+  PRAX-2026-05-29-007  Every `/api/admin/*` route is unauthenticated — anyone
+            on the network can change config, goals, vendor trust, and approve
+            invoices.
+      Action 1: Add an authentication decorator (signed JWT, mTLS, or session)
+                that gates the entire admin blueprint, with role-based scopes
+                for config tuning vs goal changes (latter should not be
+                runtime-permitted at all, per PRAX-2026-05-29-001).
+      Action 2: Move `/admin/*` behind a separate ingress / private network
+                segment so anonymous internet callers cannot reach it even if
+                auth is bypassed.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

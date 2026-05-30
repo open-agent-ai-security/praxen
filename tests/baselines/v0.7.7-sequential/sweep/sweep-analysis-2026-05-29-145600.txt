@@ -1,0 +1,120 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: May 29, 2026, 14:47 UTC
+Praxen v0.7.7
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared, code does not enforce: the remit
+states untrusted-content screening, no shell execution, and webhook integrity
+are mandatory, and the code in scope contradicts each of those statements
+directly. Issue bodies pass into the LLM context as raw Message.content in
+agents/distill_issue.py with no instruction-injection screening; LLM-supplied
+ripgrep queries are interpolated into subprocess.run(... shell=True) at
+agents/question_answerer.py:281, core/dynamic_context_bot.py:45, and
+core/context_pruning.py:187 — a one-hop indirect-injection-to-RCE chain; and
+WEBHOOK_SECRET is declared in config/server.py:204 but no HMAC verification
+call site is wired into the in-scope code path, so the webhook ingress fails
+open by default. A hardcoded PostHog project key in config/server.py:107
+compounds the credential-exposure picture, and the in-scope code provides no
+structured action log, no exec deny-list, and no instruction-screening
+primitive at all — the safeguards the remit names are simply absent from the
+codebase Praxen could inspect.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  0.90 / 5.0   (Absent)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           0/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           1/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 3   Medium: 2   Low: 0   Informational: 0
+  Total: 9
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 1   Gap: 5   Partial: 3   Vague: 0   Enforcement-not-possible: 1   (of 10 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Supply Chain                                       —
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           1
+  LLM06  Excessive Agency                                   1
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     1
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-29-001  LLM-supplied <code>query</code> strings flow into
+            <code>subprocess.run(... shell=True)</code> at three sites, giving
+            any successful prompt injection a one-hop path to shell execution.
+      Action: Convert all four subprocess.run(... shell=True) call sites in
+              scope (agents/question_answerer.py:270,
+              core/dynamic_context_bot.py:44, core/context_pruning.py:186,
+              config/client.py:338) to argv-form invocations that pass the
+              command and arguments as a list, removing the shell entirely;
+              add input validation that rejects any query containing
+              shell-meta characters (; | & ` $( $ \\) before the call.
+
+  PRAX-2026-05-29-003  <code>WEBHOOK_SECRET</code> is declared in
+            <code>config/server.py</code> but no HMAC verification call site
+            exists in the in-scope code, so webhook integrity is unenforced by
+            default.
+      Action: Add an explicit HMAC signature verification middleware to the
+              webhook ingress that reads WEBHOOK_SECRET, computes the expected
+              signature over the raw request body using SHA-256, and
+              constant-time compares against the X-Hub-Signature-256 header —
+              rejecting any request that fails the check before the event
+              reaches the dispatcher.
+
+  PRAX-2026-05-29-004  A hardcoded PostHog project key is shipped as the
+            default value for <code>POSTHOG_API_KEY</code> in
+            <code>config/server.py</code>.
+      Action: Remove the literal PostHog key from config/server.py:107 and
+              require the environment variable to be set (or fail closed) for
+              telemetry to be enabled; rotate the exposed key in the PostHog
+              project that owns it, since it is now indexable in every clone
+              of the repository.
+
+  PRAX-2026-05-29-002  Issue and comment bodies enter the LLM context with no
+            instruction-injection screening, in direct contradiction of the
+            remit's untrusted-input mandate.
+      Action: Add an instruction-injection screening pass before any
+              externally-sourced text (issue.body, comment.body, pr.body, file
+              contents, diffs) enters a Message object — at minimum,
+              quote-wrap the content in a delimited block the model is told to
+              treat as data, and reject or flag bodies that contain
+              instruction-shaped patterns such as ignore previous
+              instructions, system:, or markdown that simulates role
+              separators.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

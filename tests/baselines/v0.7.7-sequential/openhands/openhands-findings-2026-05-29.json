@@ -1,0 +1,891 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "0.7.7",
+  "scan": {
+    "agent": "OpenHands",
+    "agent_slug": "openhands",
+    "scan_date": "2026-05-29",
+    "scan_timestamp": "2026-05-29T04:16:21Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/full-suite-2026-05-29/sources/openhands-src",
+    "artifact_count": 28
+  },
+  "intro_band": {
+    "agent_remit_summary": "OpenHands is an autonomous software-engineering agent that accepts natural-language tasks and completes them end-to-end by writing code, executing it, browsing the web, and interacting with version control. Agent-generated code must run only inside a sandboxed runtime, file I/O must be confined to a per-session workspace, and untrusted inputs — including web pages, issue text, repo file contents, and micro-agent or memory content — must be treated as prompt-injection vectors. High-impact actions such as cross-repo writes, PR merges, force-push, dependency changes, CI/CD edits, new MCP servers, and new integration connections each require user confirmation, and every action must be recorded to a durable session record.",
+    "agent_structure_summary": "The in-scope workspace is the V1 application server — a FastAPI app under <code>openhands/app_server/</code> with the V0 server under <code>openhands/server/</code> reduced to deprecation shims that re-export from app_server. The agentic core (controller, runtime, LLM client, MCP client) has moved out of this repository into a separate <code>software-agent-sdk</code> package, so the app_server here is a control plane that mounts a FastMCP server at <code>/mcp</code>, exposes a v1 REST API at <code>/api/v1/*</code> (events, sandboxes, secrets, settings, webhooks, git, config, skills), provides three sandbox back-ends (Docker — the documented default, Process — same-host subprocess, Remote — managed cluster), and persists conversation events to filesystem, S3, or GCS. CORS, rate limiting, and cache-control middleware are wired in <code>app.py</code>; no authentication middleware is added by default, and per-router <code>get_dependencies()</code> only enforces an API key when the <code>SESSION_API_KEY</code> environment variable is set or when running in SAAS app mode. Docker compose mounts <code>/var/run/docker.sock</code> into the OpenHands container, and skills are loaded over HTTP from the agent-server inside the sandbox without any signature or hash check."
+  },
+  "behavior_summary": "The dominant pattern in this control plane is <strong>policy declared in the remit and at the runtime boundary, almost no code-level enforcement in the OSS default</strong>: every v1 router calls <code>get_dependencies()</code>, but that helper returns an empty list unless an operator sets <code>SESSION_API_KEY</code> or runs in SAAS mode, so a default <code>docker compose up</code> deployment exposes <code>/api/v1/sandboxes</code>, <code>/api/v1/secrets</code>, <code>/api/v1/settings</code>, <code>/api/v1/git</code>, <code>/api/v1/skills</code>, and the <code>/mcp</code> tool plane to any client that can reach port 3000 — and <code>LocalhostCORSMiddleware</code> logs a warning then allows the request anyway when no origins are configured. <p>Two compound chains amplify this: the Process sandbox back-end spawns the agent-server as a same-user subprocess inheriting <code>os.environ.copy()</code>, defeating the remit's \"MUST run inside the sandboxed runtime / MUST NOT run on the host\" clause whenever <code>RUNTIME=local</code> or <code>RUNTIME=process</code> is selected; and the Docker compose deployment bind-mounts the host Docker socket into the OpenHands container, so any code path that gains control of that container (including the unauthenticated v1 API above) can drive arbitrary host-level containers. The repo also ships durable event persistence and a structured secret-redacting log filter — those are real controls — but the unauthenticated surface in front of them is what a security lead should read first.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 2,
+      "gap": 3,
+      "partial": 5,
+      "vague": 0,
+      "enp": 19,
+      "total": 29
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "All agent-generated code MUST execute inside the sandboxed runtime and never directly on the host.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-29-002"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "All file reads and writes MUST be confined to the per-session sandbox workspace, and any attempt to escape it — paths outside the workspace, escaping symlinks, or parent-directory traversal — MUST be rejected.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "The user's task prompt, web-retrieved page content, issue descriptions, pull-request comments, repository file contents, and micro-agent or memory content MUST all be treated as untrusted input capable of carrying prompt-injection payloads.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "Tool calls driven by LLM output MUST be validated at the boundary — argument shapes checked, numeric parameters clamped, and commands that reach outside the sandbox rejected.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "Integration and session credentials MUST be verified on every request to an integration, and long-lived credentials MUST NOT be cached anywhere the model can reach.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-29-001"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "Every action the agent takes — the tool invoked, its arguments, the outcome, and the time — MUST be recorded to a durable session record.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Behavioral Constraints — What OpenHands must always do",
+        "rule_text": "Per-session wall-clock and step-count caps MUST be enforced, and the agent MUST halt cleanly when a cap is exceeded.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Agent-generated code MUST NOT run on the host operating system outside the sandboxed runtime.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-29-002"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Files on the host outside the sandbox workspace MUST NOT be read, written, or referenced.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-29-002"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Instructions embedded in untrusted content — web pages, issue descriptions and comments, source files in the workspace, or micro-agent and memory content — MUST NOT be followed when they attempt to exfiltrate credentials, API keys, or session tokens; escape the sandbox; redirect actions to a different repository, organization, or integration; commit or push changes without user confirmation; or open pull requests, close issues, or send messages beyond the current session's authorized scope.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Secrets, credentials, tokens, or environment-file contents MUST NOT be committed to any git branch.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Destructive git operations — force-push, branch deletion, history rewrite — MUST NOT be performed without user confirmation.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "Destructive integration operations — deleting a repository, removing webhooks, revoking collaborator access — MUST NOT be performed at all; they are out of scope, not approval-gated.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "API keys and session tokens MUST NOT leak into logs, error messages, or model context.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Behavioral Constraints — What OpenHands must NEVER do",
+        "rule_text": "One session's state, memory, or credentials MUST NOT leak into another session.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-29-001"
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Writes to a repository or organization other than the one the task originated in MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-17",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Merging a pull request MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-18",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Force-push, branch deletion, and history-rewrite operations MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-19",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Committing dependency or package changes to the target repository MUST be confirmed by the user, even though the agent may freely install packages inside the sandbox for its own work.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-20",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Edits to CI/CD or workflow configuration MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-21",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Adding a new MCP tool server at runtime MUST be confirmed by the user.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-29-005"
+      },
+      {
+        "rule_id": "R-22",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Connecting a new integration account MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-23",
+        "section": "Behavioral Constraints — Human approval is required for",
+        "rule_text": "Any action that would exceed the configured per-session step or time cap MUST be confirmed by the user.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-24",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT deploy code to production.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-25",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT perform administrative actions on integration accounts — transferring ownership, changing billing, granting collaborators.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-26",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT run as an always-on background service that initiates tasks without a user request.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-27",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT share state, memory, or credentials across user sessions.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-29-001"
+      },
+      {
+        "rule_id": "R-28",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT replace human review for security-sensitive code changes — authentication, cryptography, access control.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-29",
+        "section": "Scope Boundaries — What OpenHands does NOT do",
+        "rule_text": "OpenHands MUST NOT operate outside the sandboxed runtime.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-05-29-002"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-29-001",
+      "severity": "Critical",
+      "summary": "V1 control-plane API ships unauthenticated by default — every router uses an auth dependency that is empty unless SESSION_API_KEY is set or SAAS mode is on.",
+      "description": "<code>openhands/app_server/utils/dependencies.py</code> defines <code>get_dependencies()</code> as returning an empty list when neither <code>SESSION_API_KEY</code> nor SAAS app mode is active, and every v1 router (<code>/sandboxes</code>, <code>/secrets</code>, <code>/settings</code>, <code>/git</code>, <code>/skills</code>, <code>/app-conversations</code>, <code>/sandbox-specs</code>, <code>/pending-messages</code>, <code>/events</code>) attaches that empty list via <code>dependencies=get_dependencies()</code>. An OSS <code>docker compose up</code> exposes the entire control plane on port 3000 with no authentication or session check, allowing any caller that can reach the port to start sandboxes, read settings, list and retrieve stored secrets, and drive git integrations — directly violating the remit's credentials-verified-on-every-request and no-cross-session-leakage clauses.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-05, R-15, R-27",
+      "policy_rule_text": "Integration and session credentials MUST be verified on every request to an integration, and long-lived credentials MUST NOT be cached anywhere the model can reach. / One session's state, memory, or credentials MUST NOT leak into another session. / OpenHands MUST NOT share state, memory, or credentials across user sessions.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/dependencies.py",
+          "line": 23,
+          "snippet": "get_dependencies() returns [] when SESSION_API_KEY env var is unset and app_mode != SAAS — lines 23-32 — making the per-router dependencies a no-op in the OSS default"
+        },
+        {
+          "file": "openhands/app_server/app.py",
+          "line": 71,
+          "snippet": "app.include_router(v1_router.router) and app.include_router(health_router) — no app-level auth middleware (CORS, CacheControl, RateLimit only) at lines 81-86"
+        }
+      ],
+      "recommended_actions": [
+        "In <code>openhands/app_server/utils/dependencies.py</code>, require an explicit opt-out for unauthenticated mode (e.g. <code>OH_ALLOW_UNAUTH=true</code>) rather than the silent fall-through; refuse to start without one of (a) <code>SESSION_API_KEY</code>, (b) a configured user-auth class, or (c) the explicit opt-out, and log a Critical-level warning on the opt-out path so operators see it on every boot.",
+        "Add a default <code>OssDevelopmentUserAuth</code> bound to localhost-only requests so a fresh <code>docker compose up</code> can run on a developer laptop while still rejecting any non-localhost client."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-29-004",
+        "PRAX-2026-05-29-003"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-29-002",
+      "severity": "Critical",
+      "summary": "Process sandbox runs agent-server as a same-user host subprocess inheriting the parent environment, and the documented Docker deployment bind-mounts the host Docker socket — either path collapses the remit's \"agent code MUST run inside the sandboxed runtime\" guarantee.",
+      "description": "<code>openhands/app_server/sandbox/process_sandbox_service.py</code> lines 109-143 spawn the agent-server via <code>subprocess.Popen(cmd, env=env, cwd=working_dir, ...)</code> where <code>env = os.environ.copy()</code> seeded with the sandbox spec's <code>initial_env</code>. The child runs as the same OS user as the app-server, on the same kernel, with full filesystem access constrained only by Unix file permissions — no namespace, cgroup, seccomp, or chroot is applied. Whenever an operator selects the Process backend (it is one of three documented backends and the only one that works without Docker), the remit's \"agent-generated code MUST execute inside the sandboxed runtime and never directly on the host\" clause is violated by design. Compounding this, <code>docker-compose.yml</code> line 19 bind-mounts <code>/var/run/docker.sock</code> into the OpenHands container, so any code path that gains control of the OpenHands process (including the unauthenticated v1 API from finding -001) can issue arbitrary Docker commands against the host — read host filesystem volumes, launch privileged containers, exfiltrate other tenants' sandboxes — making the \"sandbox\" boundary nominal under the documented default deployment.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Resource Overload"
+        }
+      ],
+      "policy_rule_ids": "R-01, R-08, R-09, R-29",
+      "policy_rule_text": "All agent-generated code MUST execute inside the sandboxed runtime and never directly on the host. / Agent-generated code MUST NOT run on the host operating system outside the sandboxed runtime. / Files on the host outside the sandbox workspace MUST NOT be read, written, or referenced. / OpenHands MUST NOT operate outside the sandboxed runtime.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/sandbox/process_sandbox_service.py",
+          "line": 120,
+          "snippet": "env = os.environ.copy(); subprocess.Popen(cmd, env=env, cwd=working_dir, stdout=log_handle, stderr=log_handle) — agent-server runs as a same-user host subprocess inheriting parent environment"
+        },
+        {
+          "file": "docker-compose.yml",
+          "line": 19,
+          "snippet": "/var/run/docker.sock:/var/run/docker.sock — host Docker socket bind-mounted into OpenHands container; any control of the container is control of the host's Docker engine"
+        },
+        {
+          "file": "openhands/app_server/sandbox/process_sandbox_service.py",
+          "line": 109,
+          "snippet": "_start_agent_process docstring — \"Start the agent server process\" — no isolation primitive (chroot, namespace, seccomp, AppArmor) applied"
+        }
+      ],
+      "recommended_actions": [
+        "Remove <code>ProcessSandboxService</code> from the OSS-default injector chain, or guard its registration behind an explicit <code>OH_ALLOW_HOST_SANDBOX=true</code> opt-in with a logged Critical-level warning; the README/docs should mark it \"development-only, not isolated\".",
+        "Replace the docker-compose Docker-socket bind-mount with a per-sandbox runtime API (sysbox/podman rootless, or a privileged sandbox-launcher service on a dedicated socket) so compromise of the OpenHands container does not equal compromise of the host Docker engine."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-29-001",
+        "PRAX-2026-05-29-003"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-29-003",
+      "severity": "High",
+      "summary": "<code>LocalhostCORSMiddleware</code> falls open — when no CORS origins are configured (the OSS default), it logs a warning and then allows any origin with credentials, enabling cross-site read of the unauthenticated v1 API from a browser.",
+      "description": "<code>openhands/app_server/middleware.py</code> lines 34-49 define <code>is_allowed_origin</code>: if <code>self.allow_origins</code> is empty and no regex is configured, the middleware returns <code>True</code> for any origin — only emitting <code>logging.warning(\"No CORS origins configured, allowing origin: ...\")</code>. The default <code>permitted_cors_origins</code> from <code>get_default_permitted_cors_origins()</code> (<code>openhands/app_server/config.py</code> lines 103-113) is an empty list when neither <code>OH_PERMITTED_CORS_ORIGINS_*</code> nor legacy <code>PERMITTED_CORS_ORIGINS</code> is set. CORSMiddleware is also constructed with <code>allow_credentials=True</code> and <code>allow_methods=[\"*\"]</code> (lines 26-31). The combined effect: a victim-loaded malicious page can issue cross-origin credentialed POSTs to <code>/api/v1/secrets</code>, <code>/api/v1/git/...</code>, <code>/api/v1/sandboxes</code> on a developer's localhost OpenHands instance and read responses — making finding -001's unauthenticated control plane reachable from any tab the victim opens, not just from a co-resident process.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-05, R-15",
+      "policy_rule_text": "Integration and session credentials MUST be verified on every request to an integration, and long-lived credentials MUST NOT be cached anywhere the model can reach. / One session's state, memory, or credentials MUST NOT leak into another session.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 35,
+          "snippet": "if origin and not self.allow_origins and not self.allow_origin_regex — fall-through clause logs warning then returns True for any origin"
+        },
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 26,
+          "snippet": "super().__init__(app, allow_origins=allow_origins, allow_credentials=True, allow_methods=['*'], allow_headers=['*']) — credentialed cross-origin permitted"
+        },
+        {
+          "file": "openhands/app_server/config.py",
+          "line": 110,
+          "snippet": "get_default_permitted_cors_origins returns [] when PERMITTED_CORS_ORIGINS is unset — default deployment hits the open-CORS fall-through branch"
+        }
+      ],
+      "recommended_actions": [
+        "Change the default behaviour of <code>LocalhostCORSMiddleware.is_allowed_origin</code> to return <code>False</code> for non-localhost origins when <code>allow_origins</code> is empty (deny-by-default), and emit a Critical-level startup warning if an operator explicitly opts into the permissive mode via a new <code>OH_CORS_ALLOW_ANY_ORIGIN=true</code> flag.",
+        "Refuse to start with <code>allow_credentials=True</code> and an empty <code>allow_origins</code> simultaneously — that combination is a documented CORS anti-pattern (browsers reject it for non-localhost, but the middleware echoes the request origin, bypassing the protection)."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-29-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-29-004",
+      "severity": "High",
+      "summary": "Skills (public/user/project/org micro-agents) are loaded into the conversation context over HTTP from the agent-server with no signature, hash, or content-trust check — directly contradicting the remit's \"treat micro-agent and memory content as untrusted\" clause at the loading boundary.",
+      "description": "<code>openhands/app_server/app_conversation/skill_loader.py</code> lines 264-358 define <code>load_skills_from_agent_server</code> which POSTs to <code>{agent_server_url}/api/skills</code> and converts every returned <code>SkillInfo</code> (name, content, triggers, source, description) into a <code>Skill</code> that gets injected into the agent's prompt context via <code>_convert_skill_info_to_skill</code>. There is no signature verification, no hash pinning, no per-source allowlist, no content scanner, and no labelling of source-trust level: a \"public\" skill, a \"user\" skill, a \"project\" skill (loaded from a workspace repo that may itself be untrusted), and an \"org\" skill all flow through the same code path and reach the LLM as ordinary system context. Combined with the remit's recognition that micro-agent content is a prompt-injection vector, this means OpenHands' loader is treating untrusted strings as trusted instructions. The <code>load_public</code>, <code>load_user</code>, <code>load_project</code>, <code>load_org</code> flags all default to <code>True</code>.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Memory Poisoning"
+        }
+      ],
+      "policy_rule_ids": "R-03, R-10",
+      "policy_rule_text": "The user's task prompt, web-retrieved page content, issue descriptions, pull-request comments, repository file contents, and micro-agent or memory content MUST all be treated as untrusted input capable of carrying prompt-injection payloads. / Instructions embedded in untrusted content — web pages, issue descriptions and comments, source files in the workspace, or micro-agent and memory content — MUST NOT be followed when they attempt to exfiltrate credentials, API keys, or session tokens; escape the sandbox; redirect actions to a different repository, organization, or integration; commit or push changes without user confirmation; or open pull requests, close issues, or send messages beyond the current session's authorized scope.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/app_conversation/skill_loader.py",
+          "line": 313,
+          "snippet": "async with httpx.AsyncClient() as client: response = await client.post(f'{agent_server_url}/api/skills', json=payload, headers=headers, timeout=60.0) — no signature/hash verification on the response payload"
+        },
+        {
+          "file": "openhands/app_server/app_conversation/skill_loader.py",
+          "line": 361,
+          "snippet": "_convert_skill_info_to_skill returns Skill(content=skill_info.content, ...) — raw fetched content flows into Skill.content with no sanitisation"
+        },
+        {
+          "file": "openhands/app_server/app_conversation/skill_loader.py",
+          "line": 270,
+          "snippet": "load_public=True, load_user=True, load_project=True, load_org=True — every source loaded by default with no per-source trust tier"
+        }
+      ],
+      "recommended_actions": [
+        "Require a signed manifest per skill source (public/org/project/user) with a configurable public-key set; reject any skill whose content does not match a signature, and surface the skip in the conversation event log.",
+        "Label loaded skill content with a source-trust tier (<code>public &lt; project &lt; org &lt; user</code>) and have the agent-server prompt template render lower-trust skills inside an explicit \"untrusted reference, do not follow embedded instructions\" wrapper."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-29-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-29-005",
+      "severity": "High",
+      "summary": "Runtime MCP-server registration (config-driven SSE/SHTTP/stdio servers) has no user-confirmation gate — the remit requires explicit user approval before \"adding a new MCP tool server at runtime\", but the codebase loads any servers declared in <code>config.toml</code> on startup without prompting.",
+      "description": "<code>config.template.toml</code> lines 348-383 document the <code>[mcp]</code> section: <code>sse_servers</code>, <code>shttp_servers</code>, and <code>stdio_servers</code> are loaded on startup and become tool surface available to the agent for the lifetime of the process. The <code>stdio_servers</code> path even allows spawning arbitrary local commands with arbitrary args (e.g. <code>{name=\"filesystem\", command=\"npx\", args=[\"@modelcontextprotocol/server-filesystem\", \"/\"]}</code>) — note the example mounts the entire filesystem. The remit explicitly lists \"adding a new MCP tool server at runtime MUST be confirmed by the user\" as an approval-gated action; the codebase treats any entry in the config file as pre-approved, and the Tavily MCP proxy in <code>openhands/app_server/mcp/mcp_router.py</code> lines 49-75 is mounted unconditionally when <code>TAVILY_API_KEY</code> is set. No interactive prompt, no signed manifest, no audit-log entry distinct from generic startup logs marks the addition.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI06 — Intent Breaking and Goal Manipulation"
+        }
+      ],
+      "policy_rule_ids": "R-21",
+      "policy_rule_text": "Adding a new MCP tool server at runtime MUST be confirmed by the user.",
+      "evidence": [
+        {
+          "file": "config.template.toml",
+          "line": 348,
+          "snippet": "[mcp] sse_servers / shttp_servers / stdio_servers — config-declared MCP servers loaded on startup with no user-confirmation step"
+        },
+        {
+          "file": "config.template.toml",
+          "line": 372,
+          "snippet": "stdio_servers example mounts entire filesystem — {command=\"npx\", args=[\"@modelcontextprotocol/server-filesystem\", \"/\"]} — illustrates the unbounded tool surface a config-declared server can expose"
+        },
+        {
+          "file": "openhands/app_server/mcp/mcp_router.py",
+          "line": 49,
+          "snippet": "init_tavily_proxy() mounts external Tavily MCP server under 'tavily' namespace at startup if TAVILY_API_KEY env var set — no confirmation, no audit-log entry distinct from startup logs"
+        }
+      ],
+      "recommended_actions": [
+        "On startup, emit a structured audit-log event for each MCP server being mounted (name, transport, source) and require an operator-explicit <code>OH_MCP_APPROVED_SERVERS</code> allowlist that the loader checks against; refuse to mount any server not in the allowlist with a clear log message.",
+        "For interactive deployments, add a one-time confirmation flow per new MCP server tied to a per-user approval store, so an end-user is prompted before a config-declared server becomes accessible to a fresh conversation."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI06",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-004"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-29-006",
+      "severity": "Medium",
+      "summary": "The app-server records no durable admin-action audit log distinct from the per-conversation event stream — secret creation/deletion, sandbox spawn/delete, settings change, and git-provider-token storage are observable only via the optional rotating file log (which defaults to off in OSS).",
+      "description": "<code>openhands/app_server/event/event_service.py</code> persists per-conversation events durably (positive), and <code>openhands/app_server/utils/logger.py</code> offers a rotating file handler — but the file handler is opt-in (<code>LOG_TO_FILE</code> defaults to false unless DEBUG is set), and no structured per-request or per-admin-action audit log is registered by default. So a default OSS deployment that creates a secret via <code>POST /api/v1/secrets</code> (finding -001's unauthenticated path), then deletes it, then issues git tokens via <code>POST /api/v1/secrets/git-providers</code>, then spawns a sandbox, leaves no durable forensic record of any of that on disk — the request/response is gone the moment the process restarts. The remit clause \"every action MUST be recorded to a durable session record\" is satisfied for the agent's tool calls (via the conversation event service) but not for control-plane admin actions on the secret store, settings store, sandbox lifecycle, or token store — a monitoring gap relative to a Zero-Trust posture that would normally log every credential-store mutation regardless of LOG_TO_FILE.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM05 — Improper Output Handling"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI09 — Untraceability"
+        }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "Every action the agent takes — the tool invoked, its arguments, the outcome, and the time — MUST be recorded to a durable session record.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/logger.py",
+          "line": 1,
+          "snippet": "get_file_handler is gated on LOG_TO_FILE env var (default false in OSS); no separate admin-action audit log registered"
+        },
+        {
+          "file": "openhands/app_server/secrets/secrets_router.py",
+          "line": 249,
+          "snippet": "create_custom_secret / update_custom_secret / delete_custom_secret store changes via SecretsStore but emit no audit-log record distinct from generic request logging"
+        },
+        {
+          "file": "openhands/app_server/sandbox/sandbox_router.py",
+          "line": 1,
+          "snippet": "sandbox lifecycle endpoints record no separate audit log for start/pause/resume/delete — only the in-process logger emits an info-level line"
+        }
+      ],
+      "recommended_actions": [
+        "Add a dedicated audit-log handler that always writes (regardless of <code>LOG_TO_FILE</code>) a structured JSON line per state-mutating control-plane request: secret create/update/delete, git-provider-token store/unset, sandbox start/pause/resume/delete, settings change, MCP-server mount.",
+        "Make the audit log destination configurable (file path, syslog, S3) and refuse to start if it can't be written, so a forensic record always exists for admin actions."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM05",
+      "owasp_agentic": "ASI09",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-29-007",
+      "severity": "Medium",
+      "summary": "No prompt-injection, jailbreak, sandbox-escape, or auth-bypass test suite is present in the in-scope tree, and no red-team exercise documentation accompanies the code — the remit's untrusted-content clauses are policy, not tested behaviour.",
+      "description": "<code>tests/unit/app_server/</code> contains roughly 56 unit-test files covering injectors, service contracts, conversation routing, and settings persistence — important coverage, but every one targets functional correctness. There is no adversarial test file (no <code>test_prompt_injection*.py</code>, <code>test_jailbreak*.py</code>, <code>test_sandbox_escape*.py</code>, <code>test_auth_bypass*.py</code>, nothing under <code>tests/security/</code> or <code>tests/red_team/</code>), no fixtures that exercise the remit's R-03 (untrusted-content) or R-10 (malicious-instruction) clauses, and no architecture-change comment or commit message in the in-scope tree traceable to a documented red-team exercise. The Build-an-AI-Red-Team RAISE dimension is at the floor as a direct result. Findings -001/-002/-003/-004 are not regression-protected: a future refactor that re-introduces the auth-bypass surface or the host-execution path would not be caught by the existing test suite.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Build an AI Red Team"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI06 — Intent Breaking and Goal Manipulation"
+        }
+      ],
+      "policy_rule_ids": "R-03, R-04, R-10",
+      "policy_rule_text": "The user's task prompt, web-retrieved page content, issue descriptions, pull-request comments, repository file contents, and micro-agent or memory content MUST all be treated as untrusted input capable of carrying prompt-injection payloads. / Tool calls driven by LLM output MUST be validated at the boundary — argument shapes checked, numeric parameters clamped, and commands that reach outside the sandbox rejected. / Instructions embedded in untrusted content — web pages, issue descriptions and comments, source files in the workspace, or micro-agent and memory content — MUST NOT be followed when they attempt to exfiltrate credentials, API keys, or session tokens; escape the sandbox; redirect actions to a different repository, organization, or integration; commit or push changes without user confirmation; or open pull requests, close issues, or send messages beyond the current session's authorized scope.",
+      "evidence": [
+        {
+          "file": "tests/unit/app_server",
+          "line": 1,
+          "snippet": "~56 unit test files covering injectors, services, routers; no adversarial / red-team / prompt-injection / auth-bypass test files discoverable"
+        },
+        {
+          "file": "tests",
+          "line": 1,
+          "snippet": "no tests/security/ or tests/red_team/ subtree; no remit-clause-driven adversarial fixtures"
+        }
+      ],
+      "recommended_actions": [
+        "Add a <code>tests/security/</code> subtree with at least one regression test per Critical/High finding in this report: an integration test that asserts an unauthenticated <code>GET /api/v1/secrets/search</code> returns 401 (covers -001), a unit test that asserts <code>LocalhostCORSMiddleware</code> denies a non-localhost origin when <code>allow_origins=[]</code> (covers -003), a test that asserts the Process sandbox is not registered in the default injector chain (covers -002), and a test that asserts skill content is rejected without a verified signature (covers -004).",
+        "Adopt or fork a prompt-injection regression corpus (PromptBench, garak, or a custom set derived from the remit's R-10 clauses) and run it in CI against the agent-server's skill-loading and tool-validation paths."
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI06",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-05-29-001",
+        "PRAX-2026-05-29-002",
+        "PRAX-2026-05-29-003",
+        "PRAX-2026-05-29-004"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-29-008",
+      "severity": "Medium",
+      "summary": "Rate limiter is in-process and keyed only on client IP — defeated by any multi-replica deployment, a proxy that strips the original client IP, or a coordinated multi-IP attacker — leaving the unauthenticated v1 API without effective request-rate protection.",
+      "description": "<code>openhands/app_server/middleware.py</code> lines 75-110 implement <code>InMemoryRateLimiter</code> with <code>history: dict[str, list[datetime]]</code> keyed on <code>request.client.host</code>. Three issues compound: (1) state lives in the worker process — a deployment with multiple uvicorn workers or replicas behind a load balancer sees per-process counters, multiplying the effective rate; (2) the key is the raw <code>request.client.host</code>, so a reverse proxy that does not set <code>X-Forwarded-For</code> correctly causes every request to share the proxy's IP as the key, and an attacker with N IPs gets N×limit requests/sec; (3) the limit is <code>requests=10</code> per <code>seconds=1</code> per IP — generous enough that the unauthenticated finding -001 endpoints can be enumerated quickly. The middleware is good defence-in-depth on a single-process developer machine but does not meaningfully gate adversarial probing of the control plane.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM10 — Unbounded Consumption"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Resource Overload"
+        }
+      ],
+      "policy_rule_ids": "R-07",
+      "policy_rule_text": "Per-session wall-clock and step-count caps MUST be enforced, and the agent MUST halt cleanly when a cap is exceeded.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 75,
+          "snippet": "InMemoryRateLimiter.history is an in-process defaultdict(list); no Redis/external store; multi-worker deployments multiply the effective limit"
+        },
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 94,
+          "snippet": "key = request.client.host — raw client host, no X-Forwarded-For parsing, no per-user keying"
+        },
+        {
+          "file": "openhands/app_server/app.py",
+          "line": 85,
+          "snippet": "rate_limiter=InMemoryRateLimiter(requests=10, seconds=1) — 10 req/s per IP per process"
+        }
+      ],
+      "recommended_actions": [
+        "Replace the in-memory limiter with a shared-state limiter (Redis token bucket, e.g. <code>slowapi</code> with Redis backend) keyed on a combination of (authenticated identity if available, else trusted-proxy-resolved client IP) so multi-worker deployments enforce a single global limit.",
+        "Add a tighter per-endpoint limit for the secret/git/settings endpoints (e.g. 2 req/s, 100/hour) until the auth gap in finding -001 is closed."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-29-009",
+      "severity": "Medium",
+      "summary": "The Tavily MCP proxy is mounted unconditionally when <code>TAVILY_API_KEY</code> is set, fetching from a hard-coded external URL — third-party MCP-tool surface enters the agent context with no integrity-check, no allowlist, and no runtime confirmation.",
+      "description": "<code>openhands/app_server/mcp/mcp_router.py</code> lines 49-75 mount a proxy to <code>https://mcp.tavily.com/mcp/?tavilyApiKey={tavily_api_key}</code> under the <code>tavily</code> namespace whenever <code>TAVILY_API_KEY</code> is configured. The URL is hard-coded; there is no TLS cert pinning, no allowlist verification, no MCP-server identity check, no logging of which tools the upstream advertises. Whatever tools <code>mcp.tavily.com</code> chooses to expose (now or after a future upstream compromise) become callable by the agent through <code>tavily_*</code> tool names with the API key attached. Combined with finding -004 (skills with no content trust) and finding -005 (no MCP-runtime-add gate), this is the third channel through which untrusted instructions and tools reach the agent without an integrity check. The 60-second timeout and per-request payload routing through <code>fastmcp</code> mean upstream slowness or maliciously-large responses also become a local availability concern.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Cascading Hallucination Attacks"
+        }
+      ],
+      "policy_rule_ids": "R-21",
+      "policy_rule_text": "Adding a new MCP tool server at runtime MUST be confirmed by the user.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/mcp/mcp_router.py",
+          "line": 65,
+          "snippet": "transport=StreamableHttpTransport(url=f'https://mcp.tavily.com/mcp/?tavilyApiKey={tavily_api_key}') — hard-coded external MCP endpoint, no pinning"
+        },
+        {
+          "file": "openhands/app_server/mcp/mcp_router.py",
+          "line": 72,
+          "snippet": "mcp_server.mount(namespace='tavily', server=proxy_server) — proxy mounted unconditionally on startup if env var set, no allowlist of expected tool names"
+        }
+      ],
+      "recommended_actions": [
+        "Replace the hard-coded URL with a configurable endpoint (<code>OH_TAVILY_MCP_URL</code>) and require an operator to opt in via an explicit <code>OH_TRUSTED_MCP_PROXIES</code> allowlist (set of allowed FQDNs) checked at mount time.",
+        "Pin the expected tool surface (set of tool names + JSON-schema digests) on first mount and refuse to forward calls to any tool added by the upstream later without a re-approval."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI05",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-004",
+        "PRAX-2026-05-29-005"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-29-010",
+      "severity": "Low",
+      "summary": "OSS default user-auth (<code>DefaultUserAuth</code>) issues a single shared identity for every caller — combined with finding -001, this means cross-session secret and settings reads are not just unauthenticated, they are indistinguishable in the audit trail.",
+      "description": "<code>openhands/app_server/user_auth/default_user_auth.py</code> exists as the OSS fall-through user-auth — it does not bind a request to a specific user-id, and the webhook secret-lookup path explicitly instantiates it when <code>user_id</code> is absent (<code>openhands/app_server/event_callback/webhook_router.py</code> lines 497-501: <code>\"OpenHands (OSS mode) - use default user auth\"</code>). The R-15 / R-27 remit clauses (\"MUST NOT share state, memory, or credentials across user sessions\") presume per-user identity; the OSS deployment collapses this to a single anonymous identity, so a multi-user shared deployment of OSS OpenHands cannot honour those clauses even with <code>SESSION_API_KEY</code> set — every authenticated caller looks like the same user to the secrets store and the conversation tracker. This is by design for single-user dev deployments, but it materially limits the safe-deployment envelope, and the failure mode is silent: nothing refuses to start in a multi-user shared topology.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-15, R-27",
+      "policy_rule_text": "One session's state, memory, or credentials MUST NOT leak into another session. / OpenHands MUST NOT share state, memory, or credentials across user sessions.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/user_auth/default_user_auth.py",
+          "line": 1,
+          "snippet": "DefaultUserAuth provides the no-user-id fall-through identity for OSS mode"
+        },
+        {
+          "file": "openhands/app_server/event_callback/webhook_router.py",
+          "line": 497,
+          "snippet": "\"OpenHands (OSS mode) - use default user auth\" — DefaultUserAuth() explicitly instantiated when user_id is None"
+        }
+      ],
+      "recommended_actions": [
+        "On startup, refuse to bind to a non-loopback interface when <code>DefaultUserAuth</code> is the only configured user-auth, or require an explicit <code>OH_ALLOW_SHARED_DEFAULT_AUTH=true</code> flag with a Critical-level warning logged on every boot.",
+        "Document the single-user-only constraint of <code>DefaultUserAuth</code> in the README's deployment section, next to the docker-compose snippet."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-29-011",
+      "severity": "Informational",
+      "summary": "<code>SERVE_FRONTEND</code> defaults to true and mounts a SPA at the application root — the same port that serves the unauthenticated v1 API also serves a UI that can drive it, so a port-3000-exposed deployment hands an attacker a ready-made UI to a vulnerable backend.",
+      "description": "<code>openhands/app_server/app.py</code> lines 75-79 mount <code>SPAStaticFiles</code> at <code>/</code> when <code>SERVE_FRONTEND</code> is truthy (default: true). The docker-compose file exposes <code>3000:3000</code>. The SPA is the same UI that drives <code>/api/v1/secrets</code>, <code>/api/v1/git/providers</code>, <code>/api/v1/sandboxes</code>, etc. Because findings -001 and -003 leave the API unauthenticated and cross-origin-reachable, the SPA being served from the same origin means an attacker who can reach port 3000 has a UI to drive the unprotected backend. This is informational because each underlying issue is already counted (-001 / -003), but the deployment-coupling makes the practical-exposure path strictly easier than the analysis of each finding in isolation suggests.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-05",
+      "policy_rule_text": "Integration and session credentials MUST be verified on every request to an integration, and long-lived credentials MUST NOT be cached anywhere the model can reach.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/app.py",
+          "line": 75,
+          "snippet": "if os.getenv('SERVE_FRONTEND', 'true').lower() == 'true' — SPA mounted at / by default"
+        },
+        {
+          "file": "docker-compose.yml",
+          "line": 14,
+          "snippet": "ports — \"3000:3000\" — same port serves the SPA and the unauthenticated v1 API"
+        }
+      ],
+      "recommended_actions": [
+        "Decouple the SPA and the API: serve the SPA on a separate port (or behind a reverse proxy with its own auth) and require an explicit <code>SERVE_FRONTEND=true</code> opt-in for combined-origin deployments, surfacing the security implication in the startup log."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-05-29-001",
+        "PRAX-2026-05-29-003"
+      ],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Durable, structured conversation event log with pluggable back-end",
+      "description": "<code>openhands/app_server/event/event_service.py</code> defines an abstract <code>EventService</code> with filesystem, AWS S3, and Google Cloud back-ends and a webhook ingress at <code>/api/v1/webhooks/events/{conversation_id}</code> — every conversation event is persisted with a typed schema, which directly satisfies the remit's \"every action MUST be recorded to a durable session record\" clause at the agent-server boundary.",
+      "evidence_path": "openhands/app_server/event/event_service.py:46"
+    },
+    {
+      "title": "Secret-redacting log filter and JSON-structured logging path",
+      "description": "<code>openhands/app_server/utils/logger.py</code> applies <code>redact_api_key_literals</code> and <code>redact_text_secrets</code> to every log record before emission and offers a JSON formatter for structured ingestion, materially reducing the chance that <code>sk-</code>-prefixed keys or provider tokens reach log sinks.",
+      "evidence_path": "openhands/app_server/utils/logger.py:300"
+    },
+    {
+      "title": "Sandbox session-API-key validation rejects keys for non-running sandboxes",
+      "description": "<code>validate_session_key</code> in <code>openhands/app_server/sandbox/session_auth.py</code> rejects any <code>X-Session-API-Key</code> whose sandbox is not <code>RUNNING</code>, preventing leaked keys from being replayed against secret-lookup endpoints after the sandbox is paused, stopped, or deleted.",
+      "evidence_path": "openhands/app_server/sandbox/session_auth.py:76"
+    },
+    {
+      "title": "Explicit dependency pinning with CVE annotations",
+      "description": "<code>pyproject.toml</code> exact-pins <code>litellm</code> and <code>openai</code> and floor-pins <code>authlib</code>, <code>orjson</code>, and <code>aiohttp</code> against named CVEs (CVE-2026-27962, CVE-2025-67221), backed by a committed <code>poetry.lock</code> and <code>uv.lock</code>; supply-chain hygiene is intentional, not incidental.",
+      "evidence_path": "pyproject.toml"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": "~/.openhands/openhands.log",
+        "source": "openhands.app_server.utils.logger.get_file_handler",
+        "content_type": "plaintext or JSON lines (LOG_JSON)",
+        "purpose": "Rotating application log (daily, 7 backups); secret-redacted",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "<persistence_dir>/events/<conversation_id>/<event_id>.json",
+        "source": "openhands.app_server.event.filesystem_event_service.FilesystemEventService",
+        "content_type": "structured JSON per-event files",
+        "purpose": "Durable per-conversation event log; satisfies remit's \"every action recorded\"",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "<sandbox_working_dir>/.openhands-agent-server.log",
+        "source": "openhands.app_server.sandbox.process_sandbox_service.ProcessSandboxService._start_agent_process",
+        "content_type": "plaintext (stdout+stderr of agent-server subprocess)",
+        "purpose": "Captures process-sandbox agent-server runtime output",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 2.05,
+    "weighted_rationale": "Partial. OpenHands' V1 app server ships several mature primitives — a structured event log with filesystem/S3/GCS back-ends, per-sandbox session-API-key auth on the secret-lookup path, secret redaction in the logging layer, lockfile-based dependency tracking with named CVE pins, and a documented Docker sandbox as the default runtime — but the OSS default leaves the whole control-plane API unauthenticated, the CORS policy falls open with a logged warning, the Process sandbox backend collapses the isolation boundary, and there is no observable adversarial-testing footprint. Limit Your Domain and Manage Your Supply Chain score at Established because the codebase actually constrains scope and tracks dependencies; Zero Trust drags the weighted overall down because the framework's safe primitives exist but are not wired in by default; Build an AI Red Team is the floor because no adversarial test suite, no documented red-team exercise, and no architecture change traceable to one was discoverable in the in-scope tree.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The remit declares a single autonomous-SWE mission, the app server only mounts the documented v1 routers and a FastMCP namespace, and tool surface is constrained to PR/MR/issue operations plus the sandbox API — but the skill loader pulls public/user/project/org skills over HTTP with no content-trust check, which lifts the effective domain beyond what the remit's Known Good Baseline lists."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "External content reaches the agent through configured browser/web-fetch tools, the public Tavily MCP proxy, retrieved skills, and conversation events with no labelling or sanitisation at the app-server boundary — the remit's \"treat external content as untrusted\" clause is policy, not code, and the app-server passes the load through to the agent-server unchanged."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "<code>openhands/app_server/utils/dependencies.py</code> only attaches an auth dependency when <code>SESSION_API_KEY</code> is set or the app is running in SAAS mode, so every v1 router (<code>/sandboxes</code>, <code>/secrets</code>, <code>/settings</code>, <code>/git</code>, <code>/skills</code>, <code>/app-conversations</code>) is unauthenticated by default in OSS; <code>LocalhostCORSMiddleware</code> additionally allows any origin with only a logged warning when no origins are configured, and the Process sandbox runs the agent-server as a same-user host subprocess."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "<code>pyproject.toml</code> exact-pins litellm and openai, floor-pins authlib/orjson/aiohttp with inline CVE references, and a committed <code>poetry.lock</code>/<code>uv.lock</code> backs the build — but many transitive dependencies use wildcard or caret ranges, the Tavily MCP proxy and the runtime skill-loader fetch over HTTP without integrity checks, and the docker-compose file pins agent-server image tags via environment variables rather than digests."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "<code>tests/unit/app_server/</code> contains ~56 unit tests covering injectors, services, and conversation routing — no prompt-injection, jailbreak, sandbox-escape, or auth-bypass test files were found in the in-scope tree, no red-team exercise documentation accompanies the code, and the remit clauses about untrusted-content handling are not exercised by tests."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Conversation events are persisted to a durable store (filesystem, S3, or GCS) via the abstract <code>EventService</code>, the <code>openhands</code> logger has a secret-redacting filter (<code>redact_api_key_literals</code>, <code>redact_text_secrets</code>) and a JSON-formatter path, and timed-rotating file handlers are available — but file logging is opt-in (<code>LOG_TO_FILE</code> defaults to false unless DEBUG), no structured per-request audit log is registered by default, and the app server itself records no admin-action log distinct from the conversation event stream."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 2,
+      "high": 3,
+      "medium": 4,
+      "low": 1,
+      "info": 1
+    }
+  }
+}

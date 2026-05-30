@@ -96,7 +96,10 @@ Controls Praxen verified during the analysis. This is not a participation trophy
 
 ### 8. Discovered Log Files
 
-Log files Praxen found in the input. Used to complement the static analysis with runtime context.
+Log files Praxen found in the input, plus log files it could *infer* from the source. Each row's `status` distinguishes the two:
+
+- **`active`** — file was observed on disk with a real mtime. This is the strongest evidence: the agent has actually been writing to this log.
+- **`inferred`** — file path was derived from source code (a `setup_logging()` call, a `RotatingFileHandler`/`FileHandler` definition, a `winston`/`pino`/`zap` configuration, etc.) but the file was not present on disk at scan time. Typical for source-only scans where the agent hasn't run yet; the row tells the operator where logs *will* appear on a deployed instance and supports Monitor Continuously scoring without filing a false "no logging" finding.
 
 ### 9. OWASP LLM Top 10 (2025) Coverage
 
