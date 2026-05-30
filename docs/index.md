@@ -74,7 +74,7 @@ Every finding Praxen produces is classified against four industry-standard frame
 - **OWASP Secure MCP Server Development Guide 2026** — applied when MCP configuration is found
 - **RAISE Framework** — six-category 0–5 maturity score; see [RAISE](RAISE.md)
 
-For an overview of the OWASP Gen AI Security Project and a one-line gloss on each LLM, Agentic, and MCP risk, see [OWASP Gen AI Security](owasp.md).
+For an overview of the OWASP Gen AI Security Project and a one-line gloss on each LLM, Agentic, and MCP risk, see [OWASP Gen AI Security](owasp.md). Or browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** — aggregate LLM and Agentic Top-10 coverage across Praxen's example suite, with links into each per-target analysis.
 
 ---
 

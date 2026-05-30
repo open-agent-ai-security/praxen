@@ -111,6 +111,8 @@ Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering
 
 Mirror of §9, driven by the `owasp_agentic` scalar (ASI01–ASI10). Same 5×2 grid, same chips, same anchoring. Use these two grids together to see whether the agent's risk profile lives more in the *LLM-application* layer (prompt injection, supply chain, output handling) or the *agentic* layer (goal hijack, tool misuse, RCE).
 
+> These two grids appear per report. For the same coverage **aggregated across Praxen's entire example suite**, browse the live [OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html) on GitHub Pages.
+
 ### 11. RAISE Maturity Posture (the wrap-up)
 
 The maturity scorecard appears at the **end** of the report on purpose: after you've seen the specific findings, the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
