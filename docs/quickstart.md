@@ -5,7 +5,7 @@
 
 # Quickstart — your first Praxen report in 5 minutes
 
-This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable financial assistant from the OWASP Agentic AI CTF. No editing your own agent required.
+This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required.
 
 If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
 
