@@ -9,6 +9,8 @@ Praxen evaluates every AI agent against the **Responsible AI Software Engineerin
 
 It's a structured way to answer the question: *does this AI system have the controls it needs, are they actually implemented, and is it operated responsibly?*
 
+> **📊 See it live:** the **[RAISE Score Distribution Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/raise-coverage-report.html)** shows per-target scores for all six categories and the score distribution across Praxen's entire baseline suite — a population view of where real agents cluster on the maturity scale. Rendered on GitHub Pages.
+
 ---
 
 ## The Six Categories

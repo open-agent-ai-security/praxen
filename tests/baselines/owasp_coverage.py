@@ -24,8 +24,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-DEFAULT_BASELINE = THIS_DIR / "v0.7.7-claude48"
-DEFAULT_OUT = Path.cwd() / "owasp-coverage-report.html"
+
+def _default_baseline() -> Path:
+    """Return the most recently modified v*/ baseline dir alongside this script."""
+    candidates = sorted(THIS_DIR.glob("v*/"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0] if candidates else THIS_DIR / "v0.7.7-claude48"
+
+DEFAULT_BASELINE = _default_baseline()
+DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
 
 TARGETS = [
     ("finbot",                  "FinBot",                       "https://github.com/OWASP-ASI/finbot-ctf-demo",
