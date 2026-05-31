@@ -31,7 +31,7 @@ Hand-authoring is the ideal path — you understand the agent's intended behavio
 
 Ask Claude Code to *"draft a Worker Remit for this agent"* with the description or docs available, and the skill walks the `WORKER_REMIT_template.md` structure to produce a complete first draft. Treat the result as a starting point, not a finished remit: review every section, tighten anything vague (see [the specificity test](#the-specificity-test)), and make sure the **forbidden** actions reflect *your* intent — a drafted remit is only as good as what it had to work from.
 
-Pay particular attention to any clause tagged `[Inferred]` — these are places where the documentation was ambiguous and the skill made its best guess. They are focal review checkpoints, not finished policy.
+The skill authors from the agent's **documentation** — it states what the docs say the agent *should* do and leaves verifying the code to the scan, so the policy body carries no guesses or tags (every clause is a stated obligation). Where the docs don't settle a decision only you can make — authorized scope, thresholds, the counterparty allowlist — the skill collects those in an **"Open Questions for the operator"** section at the end of the file, below the closing footer. **Resolve those before you rely on the remit:** answer each as a real clause or delete it.
 
 ---
 
@@ -127,7 +127,7 @@ See [Challenging and Revising Findings](challenging-findings.md) for guidance on
 - **Listing tools and forgetting boundaries.** "The agent has Email, Slack, and Calendar tools" is a description. *"Email may only be sent to addresses in the authorized counterparty list; Slack messages may only be sent to channels listed in `approved_channels`; Calendar invites may only be issued to known contacts"* is a remit.
 - **Using "should" instead of "must".** Make rules unconditional. *"Should treat unknown senders carefully"* is unverifiable. *"Must escalate unknown senders to the operator before any reply"* is checkable.
 - **Forgetting forbidden domains of work.** Most remits do well at saying what the agent should do, less well at what it must never do. Both are necessary — a wide-open scope produces large compound findings.
-- **Writing restrictions for under-documented capabilities.** If documentation names a feature without scoping it — *"supports SSH tunnel mode"*, *"executes shell commands"* — don't write a MUST NOT clause based on an assumed scope. A prohibition that contradicts the implementation produces a Critical finding that is a remit error, not a code vulnerability. Let the skill tag its inference as `[Inferred]` and resolve the scope at review time.
+- **Writing restrictions for under-documented capabilities.** If documentation names a feature without scoping it — *"supports SSH tunnel mode"*, *"executes shell commands"* — don't write a fabricated MUST NOT based on an assumed scope (a prohibition that contradicts the implementation produces a Critical finding that is a remit error, not a code vulnerability). The skill instead states the *conservative security intent* the feature implies — e.g. *"an SSH tunnel MUST bind loopback and MUST NOT expose a service publicly"* — and lets the scan check it; whether the feature should be authorized *at all* goes in the Open Questions list, not as a guessed clause.
 
 ---
 
