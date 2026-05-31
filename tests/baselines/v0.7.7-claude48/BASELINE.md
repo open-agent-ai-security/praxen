@@ -5,7 +5,9 @@
 
 # Baseline — v0.7.7-claude48
 
-Frozen runs of all **eleven** test targets ([`../../README.md`](../../README.md)) on the **Praxen v0.7.7** skill, against the intent-level Worker Remits (`tests/remits/*.md`), executed on **Anthropic Claude Opus 4.8**. Becomes the comparison point for the release review, **superseding [`../v0.7.7-sequential/`](../v0.7.7-sequential/BASELINE.md)** (the same skill on Opus 4.7), which is retained on disk for diff archaeology.
+Frozen runs of all **twelve** test targets ([`../../README.md`](../../README.md)) on the **Praxen v0.7.7** skill, against the intent-level Worker Remits (`tests/remits/*.md`), executed on **Anthropic Claude Opus 4.8**. Becomes the comparison point for the release review, **superseding [`../v0.7.7-sequential/`](../v0.7.7-sequential/BASELINE.md)** (the same skill on Opus 4.7), which is retained on disk for diff archaeology.
+
+The first **eleven** targets are the coordinated 4.7 → 4.8 re-baseline (the 4.7 set is the predecessor each is diffed against). The **twelfth**, `hermes-agent-desktop` (Hermes Agent + Hermes Desktop), was added *after* that re-baseline as the suite's first **multi-component** target — one combined remit spanning an in-process LLM agent and its operator/desktop layer — and so has **no 4.7 predecessor**; it was characterized median-of-3 directly on 4.8.
 
 **The skill is unchanged.** `SKILL.md`, `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to the `v0.7.7-sequential` set. The only variables that moved between the two sets are **(a) the model** (Opus 4.7 → 4.8) and **(b) the freeze method** (see below). This set isolates the model's effect on the analysis.
 
@@ -13,7 +15,7 @@ Frozen runs of all **eleven** test targets ([`../../README.md`](../../README.md)
 
 A single full-suite run is a noisy way to freeze a baseline: parts of the analysis are LLM judgement (severity classification, the six RAISE category scores), so the *weighted score* of any one run carries run-to-run variance even though the *finding set* is stable. A single snapshot can catch several targets at simultaneous high (or low) draws and mis-state where a target really sits.
 
-So this set was **characterized over three independent runs per target** (33 runs total), holding the skill, sources, and remits constant:
+So this set was **characterized over three independent runs per target** (36 runs total — the original eleven re-baseline targets at 33, plus the twelfth, `hermes-agent-desktop`, at 3), holding the skill, sources, and remits constant:
 
 - **The committed exemplar for each target is its median run** — the JSON/HTML/TXT frozen here is one real, unedited run whose weighted score is the median of the three. (Where two runs tie at the median, the earliest is taken.)
 - **The per-target bands in [`../../README.md`](../../README.md) are set from the 3-run mean ± observed spread**, not from any single run.
@@ -33,7 +35,7 @@ Five per-target bands were widened or moved to fit the 4.8 means; the other six 
 | openai-customer-service | 0.6–1.3 | **0.7–1.7** | widened, not moved — mean 1.28 is in-band but σ 0.284 is the suite's highest; band widened so high draws don't false-fail |
 | openhands | 1.8–2.5 | **1.7–2.5** | floor lowered — mean 1.80, 2 of 3 runs at 1.75 |
 
-## The eleven baselines (committed median exemplar)
+## The twelve baselines (committed median exemplar)
 
 Sorted by weighted RAISE, ascending.
 
@@ -50,6 +52,7 @@ Sorted by weighted RAISE, ascending.
 | aider | 2 | 4 | 3 | 0 | 0 | 2.15 | Partial |
 | deepagents-cli | 0 | 3 | 4 | 0 | 0 | 2.15 | Partial |
 | yaah | 0 | 5 | 3 | 0 | 0 | 2.30 | Partial |
+| hermes-agent-desktop | 1 | 2 | 4 | 0 | 0 | 3.15 | Established |
 
 ## Stability across the three runs
 
@@ -68,8 +71,9 @@ Per-target weighted RAISE over the three independent runs (the committed exempla
 | deepagents-cli | 2.15 / 2.15 / 2.15 | 2.15 | **0.000** | 0.00 | +0.15 |
 | openhands | 1.90 / 1.75 / 1.75 | 1.80 | 0.087 | 0.15 | −0.25 |
 | yaah | 2.30 / 2.30 / 2.15 | 2.25 | 0.087 | 0.15 | +0.10 |
+| hermes-agent-desktop | 2.75 / 3.15 / 3.15 | 3.02 | **0.231** | 0.40 | new |
 
-**Most stable: deepagents-cli** (σ 0.000 — identical three times). **Least stable: openai-customer-service** (σ 0.284, ~3× the rest) — the lone high-variance target, matching the README note that flags it as a 0.6↔1.8 swing, and the prime exhibit for the per-category scoring-rigour work (RFE [#48](https://github.com/open-agent-ai-security/praxen/issues/48)). Ten of eleven targets vary by std ≤ 0.15. **Variance and band-offset are independent axes:** `aider` is *stable but offset* (σ 0.087, needs a band move); `openai-cs` is *noisy but centred* (mean in-band, needs a wider band).
+**Most stable: deepagents-cli** (σ 0.000 — identical three times). **Least stable: openai-customer-service** (σ 0.284, ~3× the rest) — the lone high-variance target among the eleven, matching the README note that flags it as a 0.6↔1.8 swing, and the prime exhibit for the per-category scoring-rigour work (RFE [#48](https://github.com/open-agent-ai-security/praxen/issues/48)). The twelfth, `hermes-agent-desktop`, is the **second-widest** (σ 0.231): a textbook *judgment-sensitive mid-maturity production target* whose spread is the Critical↔High call on its **disclosed default-isolation seam** (the local terminal backend runs LLM-emitted commands on the host) — elevated to Critical on the low-credit run (2.75, Partial) and held at High on the two higher draws (3.15, Established). The *finding set* is identical across all three runs. Ten of twelve targets vary by std ≤ 0.15. **Variance and band-offset are independent axes:** `aider` is *stable but offset* (σ 0.087, needs a band move); `openai-cs` and `hermes` are *noisy but centred* (mean in-band, want a wider band).
 
 ## Run notes
 
@@ -78,7 +82,7 @@ The 33 runs were executed via parallel background subagents (the canonical full-
 - **Cap concurrency at ≤ 3 for large-repo batches.** Four concurrent scans of large repos (langchain 2.3k / autogen 1.9k / openai 1.4k files) tripped the no-progress watchdog and intermittent stream-idle timeouts at the Step 9.9→11 region. Batches of ≤ 3 with the Step 9.9 incremental-write discipline emphasised ran clean.
 - **Late-pipeline stalls cost almost nothing.** A scan that stalls after the manifest is complete leaves a recoverable on-disk draft/JSON — run `manifest_to_findings.py` then `render.py` directly (deterministic, no model). Several of the 33 runs were recovered this way; a stall before the findings are written is the only case that needs a fresh run.
 
-The byte-identity / schema / remit-verbatim gate in `tests/render/test_render.py` passes for this set (66 checks across the eleven targets, 0 failures).
+The byte-identity / schema / remit-verbatim gate in `tests/render/test_render.py` passes for this set (72 checks across the twelve targets, 0 failures).
 
 ## How to compare
 

@@ -100,7 +100,7 @@ The [`examples/`](examples/) directory contains real analyses against deliberate
 
 - [`docs/`](docs/) — full documentation
 - [`examples/`](examples/) — sample analyses against real vulnerable agents
-- [`tests/`](tests/) — pre-release regression suite (eleven targets, source repo only — not in the distribution zip)
+- [`tests/`](tests/) — pre-release regression suite (twelve targets, source repo only — not in the distribution zip)
 - [`CHANGELOG.md`](CHANGELOG.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`PRAXEN_SPEC.md`](PRAXEN_SPEC.md) — full technical specification
 

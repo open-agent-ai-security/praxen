@@ -1,0 +1,611 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "0.7.7",
+  "scan": {
+    "agent": "Hermes Agent (with Hermes Desktop operator layer)",
+    "agent_slug": "hermes-agent-desktop",
+    "scan_date": "2026-05-31",
+    "scan_timestamp": "2026-05-31T16:20:26Z",
+    "workspace": "<workspace>/hermes-scan/sources (hermes-agent + hermes-desktop)",
+    "artifact_count": 42
+  },
+  "intro_band": {
+    "agent_remit_summary": "Hermes Agent is a single-tenant personal AI assistant that converses with one operator over a terminal UI and messaging gateways (Telegram, Discord, Slack, Email, SMS, and other adapters), and uses tools — `terminal`, `code_execution`, `file`, `web`, `browser`, `memory`, `skills`, `delegation`, `cronjob`, `messaging` — to act on the operator's behalf, improving itself through agent-curated memory and skills. Its governing intent is that dangerous capabilities stay behind a real OS-level isolation boundary and an operator approval path, that every network-exposed adapter refuse to dispatch work until a caller allowlist is set, and that credentials never leak outside the operator's trust envelope. Hermes Desktop is the non-agentic Electron operator layer: it installs, configures, and drives an Agent instance locally or over an SSH tunnel that must bind loopback, authenticate key-only in BatchMode, pin the remote host key, and target a dedicated non-root user.",
+    "agent_structure_summary": "A large Python agent (`run_agent.py` conversation loop, `toolsets.py` registry, `tools/` implementations) with pluggable terminal backends in `tools/environments/` (local, docker, ssh, modal, daytona, singularity), a multi-platform gateway in `gateway/platforms/`, and an HTTP API server adapter. The approval gate (`tools/approval.py`) freezes YOLO mode at import and enforces a hardline blocklist below YOLO; credential scrubbing for shell/MCP/code-execution children lives in `tools/environments/local.py` and `tools/env_passthrough.py` with a provider-credential blocklist; `hermes_logging.py` configures three redacting rotating logs. The Desktop (`hermes-desktop/src/main/`) builds SSH connections in `ssh-remote.ts` / `ssh-tunnel.ts` (BatchMode, loopback `-L` binds, `accept-new` host-key pinning) and is Electron-hardened (`security.ts`: contextIsolation on, sandbox on, nodeIntegration off). The most material divergence: the WeCom/Weixin/Yuanbao gateway adapters default `dm_policy: \"open\"` and self-declare `enforces_own_access_policy=True`, short-circuiting the gateway's default-deny so a default-config enable dispatches agent work with no operator allowlist."
+  },
+  "behavior_summary": "The dominant pattern is a mature, intent-aligned agent whose declared posture — \"the only boundary against an adversarial LLM is the OS; every in-process screen is a heuristic\" (`SECURITY.md` §2.2) — is matched by real, operative controls: a frozen-at-import YOLO flag that injection cannot flip, a hardline command blocklist below YOLO, provider-credential scrubbing for lower-trust child processes, default-deny gateway authorization, and a fail-closed API server. Against that strong baseline the sharpest divergence is local and specific: the WeCom, Weixin, and Yuanbao adapters ship `dm_policy: \"open\"` by default and set `enforces_own_access_policy=True`, which makes the gateway skip its default-deny and dispatch agent work to any caller when no allowlist is configured — the exact fail-open the remit names as a halt-tier condition. Secondary themes are operator-layer trust choices the code leaves ungated: the Desktop SSH path permits a `root` target username with no guard, and the Desktop telemetry defaults to opt-out (enabled on first run for official builds).",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 15,
+      "gap": 0,
+      "partial": 7,
+      "vague": 0,
+      "enp": 2,
+      "total": 24
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Approved Communication Channels / Hermes Agent",
+        "rule_text": "Every enabled network-exposed adapter MUST refuse to dispatch agent work, resolve approvals, or relay output until an operator-configured caller allowlist is set; no adapter may fail open when no allowlist is configured.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-001"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Approved Communication Channels / Hermes Agent",
+        "rule_text": "Authorization MUST be re-checked at every surface that crosses a trust boundary; a session identifier is a routing handle only and MUST NOT be accepted as proof of authorization.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Approved Communication Channels / Hermes Agent",
+        "rule_text": "Local-IPC and editor surfaces (ACP, TUI gateway) MUST rely on OS-level access control and MUST NOT be exposed beyond the local user without an explicit network authentication layer.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Approved Communication Channels / Hermes Agent",
+        "rule_text": "Binding a loopback-default HTTP surface to a non-loopback interface MUST be an explicit operator action, never a silent default.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Approved Communication Channels / Hermes Desktop",
+        "rule_text": "The SSH Tunnel MUST bind only to `127.0.0.1` on the desktop side and MUST NOT expose the remote Hermes port to the public internet.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Approved Communication Channels / Hermes Desktop",
+        "rule_text": "The desktop MUST authenticate to a remote Hermes host using key-based SSH in non-interactive (`BatchMode`) mode, and MUST NOT fall back to transmitting an operator password to satisfy a prompt.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Approved Communication Channels / Hermes Desktop",
+        "rule_text": "The desktop MUST verify the remote host key on first connection and pin it, and MUST fail closed if a pinned host key later changes rather than silently re-trusting it.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Approved Communication Channels / Hermes Desktop",
+        "rule_text": "The desktop MUST authorize its connection only against a dedicated, non-root Hermes user account on the remote host.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-004"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Data Boundaries / Forbidden Data Movement / Hermes Agent",
+        "rule_text": "Provider API keys and gateway tokens MUST be stripped from the environment passed to lower-trust in-process components (shell subprocesses, MCP subprocesses, the code-execution child) except where the operator or a loaded skill has explicitly declared a passthrough variable.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Data Boundaries / Forbidden Data Movement / Hermes Agent",
+        "rule_text": "Credentials and session-authorization material MUST NOT leak to any destination outside the trust envelope through environment passthrough, adapter logging, or transport errors that flush them upstream.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Data Boundaries / Forbidden Data Movement / Hermes Agent",
+        "rule_text": "Secret-like patterns MUST be redacted from operator-facing display surfaces.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Data Boundaries / Forbidden Data Movement / Hermes Desktop",
+        "rule_text": "Operator-entered credentials (provider API keys, SSH key paths, remote API keys) MUST be stored only in the operator's own config files and MUST NOT be transmitted anywhere other than the configured Agent host.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Action Boundaries / Requires Human Approval / Hermes Agent",
+        "rule_text": "Execution of destructive or state-mutating shell commands through the `terminal` tool.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-005"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Action Boundaries / Requires Human Approval / Hermes Agent",
+        "rule_text": "Installation of third-party skills and plugins, which MUST be subject to operator review (reading the skill's Python and scripts, not only its description) before the code is loaded and run.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-006"
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Action Boundaries / Requires Human Approval / Hermes Agent",
+        "rule_text": "Loading or launching an operator-configured MCP server, which MUST pass the documented supply-chain guard at launch.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-007"
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Action Boundaries / Never Allowed / Hermes Agent",
+        "rule_text": "Ingesting content from operator-uncontrolled surfaces (open web, inbound email, multi-user channels, untrusted MCP servers) while relying only on in-process heuristics, with no OS-level isolation boundary in force.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-17",
+        "section": "Action Boundaries / Never Allowed / Hermes Agent",
+        "rule_text": "Dispatching agent work, resolving an approval, or relaying output to a caller outside the configured authorization set.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-001"
+      },
+      {
+        "rule_id": "R-18",
+        "section": "Action Boundaries / Never Allowed / Hermes Agent",
+        "rule_text": "Running the agent process as root in a deployment that ingests untrusted input.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-19",
+        "section": "Action Boundaries / Never Allowed / Hermes Desktop",
+        "rule_text": "SSH'ing into, or authorizing its key on, the remote `root` account.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-05-31-004"
+      },
+      {
+        "rule_id": "R-20",
+        "section": "Action Boundaries / Never Allowed / Hermes Desktop",
+        "rule_text": "Disabling the Agent's host-key verification or weakening the SSH tunnel's loopback-only bind.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-21",
+        "section": "Behavioral Expectations / Acceptable Retry Behavior / Hermes Agent",
+        "rule_text": "The tool-calling loop MUST remain bounded by its iteration and budget limits and MUST stop on an operator interrupt.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-22",
+        "section": "Non-Goals / Hermes Desktop",
+        "rule_text": "Acting as an autonomous agent or independently initiating agentic actions — it brokers operator control and must not originate tool calls or shell execution of its own.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-23",
+        "section": "Tools and Capabilities / Known Good Baseline / Hermes Agent",
+        "rule_text": "The documented core toolsets plus whatever subset the operator has enabled per platform; no tool present in code that is absent from the authorized set above.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-24",
+        "section": "Behavioral Expectations / Acceptable Retry Behavior / Hermes Agent",
+        "rule_text": "Cron sessions MUST honor the documented hard interrupt; a job that fails repeatedly MUST be auto-blocked rather than retried indefinitely.",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-05-31-001",
+      "severity": "Critical",
+      "summary": "WeCom, Weixin, and Yuanbao gateway adapters default `dm_policy: \"open\"` and self-declare own-access-policy, so a default-config enable dispatches agent work to any caller with no operator allowlist.",
+      "description": "These adapters set `enforces_own_access_policy=True`, which makes `_is_user_authorized` short-circuit to allow before the gateway's env-allowlist default-deny runs; with the shipped default `dm_policy: \"open\"`, `_is_dm_allowed` returns True for every sender. An operator who enables WeCom/Weixin/Yuanbao without explicitly setting `dm_policy: allowlist` therefore exposes the agent to unauthorized callers — the exact fail-open the remit names as a halt-tier condition. The platform-layer authentication these adapters assume is not a substitute for the operator caller allowlist the remit requires.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-01, R-17",
+      "policy_rule_text": "Every enabled network-exposed adapter MUST refuse to dispatch agent work, resolve approvals, or relay output until an operator-configured caller allowlist is set; no adapter may fail open when no allowlist is configured. / Dispatching agent work, resolving an approval, or relaying output to a caller outside the configured authorization set.",
+      "evidence": [
+        {
+          "file": "gateway/platforms/wecom.py",
+          "line": 163,
+          "snippet": "dm_policy defaults to \"open\" (`os.getenv(\"WECOM_DM_POLICY\", \"open\")`); _is_dm_allowed at :860 returns True for any sender under the open policy"
+        },
+        {
+          "file": "gateway/run.py",
+          "line": 6755,
+          "snippet": "_is_user_authorized returns True when _adapter_enforces_own_access_policy(platform) is set, skipping the env-allowlist default-deny — and wecom.py:851 / weixin.py:1452 / yuanbao.py:4695 all return True"
+        }
+      ],
+      "recommended_actions": [
+        "Change the shipped default for `dm_policy` / `group_policy` in the WeCom, Weixin, and Yuanbao adapters from `\"open\"` to `\"allowlist\"` (or `\"disabled\"`), so an operator must opt into open access deliberately rather than inheriting it.",
+        "Emit a startup warning (as the gateway already does for env-allowlist platforms at `gateway/run.py:4075`) whenever an own-access-policy adapter is enabled with an effective open policy and no allow_from configured."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-31-004",
+      "severity": "High",
+      "summary": "The Desktop SSH path accepts an arbitrary `config.username`, including `root`, with no code guard rejecting or warning on a root target.",
+      "description": "`buildExecArgs` and the tunnel builder interpolate `config.username` directly into the ssh target (`${config.username}@${config.host}`), and the only root-specific logic is a gateway-start branch that tries `sudo` then falls back to a direct call \"when the SSH user is root\" — i.e. the code accommodates a root target rather than refusing it. The remit requires the Desktop authorize only against a dedicated non-root Hermes user and never SSH into root; the dedicated-user path is the documented one but nothing prevents an operator from configuring `username: root`.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-08, R-19",
+      "policy_rule_text": "The desktop MUST authorize its connection only against a dedicated, non-root Hermes user account on the remote host. / SSH'ing into, or authorizing its key on, the remote `root` account.",
+      "evidence": [
+        {
+          "file": "src/main/ssh-remote.ts",
+          "line": 40,
+          "snippet": "SSH target built as `${config.username}@${config.host}` with no username validation against a root denylist"
+        },
+        {
+          "file": "src/main/ssh-remote.ts",
+          "line": 1459,
+          "snippet": "buildGatewayStartCommand comment — \"a direct call for when the SSH user is root\"; code accommodates rather than rejects a root SSH user"
+        }
+      ],
+      "recommended_actions": [
+        "Reject or hard-warn in the Desktop connection-config validator when `username` resolves to `root`, steering the operator to the dedicated `hermes` service user the install path provisions."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-31-005",
+      "severity": "High",
+      "summary": "Destructive-shell approval rests on a regex denylist plus an optional auxiliary-LLM auto-approver, both of which are incomplete over Turing-complete shell input.",
+      "description": "`tools/approval.py` gates destructive commands by matching `DANGEROUS_PATTERNS`, and in `smart` mode delegates the approve/deny decision to an auxiliary LLM; the project's own SECURITY.md §2.4 states a denylist over shell strings is structurally incomplete and the gate catches cooperative-mode mistakes, not adversarial output. The remit requires destructive/state-mutating shell to be subject to the approval path; the path exists and runs but is bypassable by construction, so containment depends on the operator-selected terminal-backend or whole-process isolation rather than the gate itself. This is the intended design, surfaced here as the residual gap the remit's risk-sensitivity note calls out.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": "R-13",
+      "policy_rule_text": "Execution of destructive or state-mutating shell commands through the `terminal` tool.",
+      "evidence": [
+        {
+          "file": "tools/approval.py",
+          "line": 163,
+          "snippet": "DANGEROUS_PATTERNS regex denylist is the detection surface; SECURITY.md §2.4 — \"a denylist over shell strings is structurally incomplete ... catches cooperative-mode mistakes, not adversarial output\""
+        },
+        {
+          "file": "tools/approval.py",
+          "line": 879,
+          "snippet": "smart-approval path calls the auxiliary LLM (`agent.auxiliary_client.call_llm`) to decide approval — an attacker-influenced judge, not a deterministic gate"
+        }
+      ],
+      "recommended_actions": [
+        "Keep the gate but document in operator-facing config that it is accident-prevention; make the effective isolation posture (terminal backend vs. whole-process wrap) explicit at startup so an operator ingesting untrusted input is told the gate is not the boundary."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-05-31-006",
+      "severity": "Medium",
+      "summary": "Third-party skill/plugin install gating is a regex Skills Guard plus trust tiers; community skills with zero findings install without an enforced human-review step.",
+      "description": "`tools/skills_guard.py` scans externally-sourced skills with a regex denylist and a trust-aware policy (builtin never scanned, trusted allowed with caution, community blocked only on findings), but a community skill that produces no scanner findings is allowed to install and then executes arbitrary Python at import time. The remit requires operator review — reading the skill's Python and scripts, not just the description — before load; the guard is a review aid, not the review, and nothing in the code forces the human read the remit and SECURITY.md both say is the actual boundary.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Supply Chain"
+        }
+      ],
+      "policy_rule_ids": "R-14",
+      "policy_rule_text": "Installation of third-party skills and plugins, which MUST be subject to operator review (reading the skill's Python and scripts, not only its description) before the code is loaded and run.",
+      "evidence": [
+        {
+          "file": "tools/skills_guard.py",
+          "line": 11,
+          "snippet": "trust tiers — community skills \"blocked unless --force\" only when findings exist; a clean-scanning community skill installs and runs arbitrary Python at import with no enforced human read"
+        }
+      ],
+      "recommended_actions": [
+        "Add an explicit install-time confirmation that names the skill's Python entry points and requires operator acknowledgement before a community-trust skill is loaded, rather than gating solely on whether the regex scanner found something."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-31-007",
+      "severity": "Medium",
+      "summary": "The MCP tool-description poisoning scanner logs warnings but does not block; a poisoned MCP tool description reaches the model regardless.",
+      "description": "`_scan_mcp_description` matches injection patterns (prompt-override, identity-override, network commands, dangerous imports) in MCP tool descriptions but the patterns are WARNING-level by design — logged, not blocked, to avoid false positives breaking legitimate servers. Combined with the subprocess env-filter (a genuine positive at `_build_safe_env`), the MCP launch path vets credentials well but does not stop a tool-poisoning description from entering the model's context. The remit requires MCP launches pass the documented supply-chain guard; the guard runs but is advisory on the poisoning dimension. No deployed `.mcp.json` with server definitions was present in the workspace, so this is assessed against the launch mechanism, not a configured server.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        }
+      ],
+      "policy_rule_ids": "R-15",
+      "policy_rule_text": "Loading or launching an operator-configured MCP server, which MUST pass the documented supply-chain guard at launch.",
+      "evidence": [
+        {
+          "file": "tools/mcp_tool.py",
+          "line": 341,
+          "snippet": "_MCP_INJECTION_PATTERNS are \"WARNING-level — we log but don't block, since false positives would break legitimate MCP servers\""
+        },
+        {
+          "file": "tools/mcp_tool.py",
+          "line": 296,
+          "snippet": "_build_safe_env passes only PATH/HOME/USER/LANG/XDG_* plus user-declared vars to stdio MCP subprocesses — credential scrubbing is genuine, but description-poisoning is not gated"
+        }
+      ],
+      "recommended_actions": [
+        "Surface MCP description-scan warnings to the operator at server-add time (not only to logs) so a poisoned description is reviewed before the server's tools are exposed to the model."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-31-008",
+      "severity": "Medium",
+      "summary": "Desktop PostHog telemetry defaults to enabled (opt-out) on first run for official builds, and client-side IP suppression is not achievable.",
+      "description": "`analytics.ts` returns the build's analytics-enabled state on first run when no consent is stored (`if (stored === null) return hasKey`), so an official build with a PostHog key embedded begins capturing screen-view and feature-usage events before the operator opts out. The implementation is privacy-hardened (DNT respected, PII masking, no session recording, anonymous UUID), but its own comments note IP-address capture cannot be disabled client-side and must be turned off server-side. The remit does not forbid telemetry, but this is a data-minimization observation on the operator layer the operator should be able to consent to before data flows.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "src/renderer/src/utils/analytics.ts",
+          "line": 14,
+          "snippet": "isAnalyticsEnabled() — \"if (stored === null) return hasKey\" makes telemetry opt-out (on by default) for official key-bearing builds"
+        },
+        {
+          "file": "src/renderer/src/utils/analytics.ts",
+          "line": 59,
+          "snippet": "comment — full IP-address suppression \"is NOT possible from the client\"; relies on server-side PostHog project config the desktop cannot guarantee"
+        }
+      ],
+      "recommended_actions": [
+        "Make first-run analytics opt-in (default off until the operator consents) for official builds, or present an explicit consent prompt on first launch before any `capture()` fires."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-05-31-009",
+      "severity": "Medium",
+      "summary": "The agent has no in-process guard that warns or refuses when started as root while ingesting untrusted input; non-root operation is documentation-and-container default only.",
+      "description": "SECURITY.md §4 and the supplied container image run the agent as non-root, but no startup check in `run_agent.py`, `hermes_bootstrap.py`, or `cli.py` detects `euid==0` and warns the operator when untrusted input surfaces are enabled. The remit lists running as root with untrusted input as never-allowed; that constraint is real but enforced only by deployment convention, so an operator who runs the local backend as root inherits no in-process signal. Treated as a hardening gap rather than a divergence because the secure default exists and the constraint is a deployment-layer property the agent process cannot fully enforce.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "hermes-agent/run_agent.py",
+          "line": null,
+          "snippet": "no os.geteuid()/getuid()==0 startup check found across run_agent.py, hermes_bootstrap.py, cli.py, or gateway/run.py; root-vs-untrusted-input is left to SECURITY.md §4 guidance and the container's non-root default"
+        }
+      ],
+      "recommended_actions": [
+        "Add a startup advisory in the agent bootstrap that detects `os.geteuid() == 0` and, when any network-exposed adapter or untrusted input surface is enabled, prints a clear warning pointing at the non-root deployment guidance."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI03",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "YOLO mode frozen at import against injection escalation",
+      "description": "`tools/approval.py` reads `HERMES_YOLO_MODE` once at module import into `_YOLO_MODE_FROZEN`, explicitly so a skill running in-process cannot set the variable mid-session and bypass all approval checks — a deliberate prompt-injection-escalation defense.",
+      "evidence_path": "tools/approval.py:29"
+    },
+    {
+      "title": "Hardline command blocklist sits below YOLO and approval-off",
+      "description": "A small unconditional blocklist of unrecoverable commands (filesystem destruction at /, raw block-device overwrite, kernel shutdown) is refused even under `--yolo`, `approvals.mode=off`, or cron approve mode, providing a floor that operator break-glass cannot cross on host-capable backends.",
+      "evidence_path": "tools/approval.py:163"
+    },
+    {
+      "title": "Provider-credential scrubbing for lower-trust child processes",
+      "description": "`_HERMES_PROVIDER_ENV_BLOCKLIST` strips Hermes-managed provider keys from the env passed to shell, MCP, and code-execution children, and `env_passthrough.py` refuses to let a skill or config re-register a blocked provider credential — closing GHSA-rhgp-j443-p4rf.",
+      "evidence_path": "tools/env_passthrough.py:48"
+    },
+    {
+      "title": "API server fails closed without an API key",
+      "description": "The API server adapter's `connect()` refuses to start when `API_SERVER_KEY` is unset, including for loopback-only binds, and refuses a placeholder/weak key when network-accessible — so the no-key branch in `_check_auth` is a test-only dead path, not a live fail-open.",
+      "evidence_path": "gateway/platforms/api_server.py:4145"
+    },
+    {
+      "title": "Gateway authorization is default-deny",
+      "description": "`_is_user_authorized` denies by default when no allowlist and no explicit allow-all flag are configured, treats session IDs as routing handles only, and re-checks authorization rather than trusting prior session state.",
+      "evidence_path": "gateway/run.py:6747"
+    },
+    {
+      "title": "Desktop SSH uses key-only BatchMode auth with host-key pinning",
+      "description": "The Desktop builds SSH connections with `BatchMode=yes` (no interactive password fallback) and `StrictHostKeyChecking=accept-new` (trust-on-first-use pinning that fails closed if a pinned key later changes), and binds all tunnel forwards to `127.0.0.1`.",
+      "evidence_path": "src/main/ssh-remote.ts:30"
+    },
+    {
+      "title": "Desktop keeps the remote API key out of the renderer",
+      "description": "`getPublicConnectionConfig()` exposes only `hasApiKey` and the key length (for mask rendering) to the renderer process, never the secret itself, verified by `connection-config-security.test.ts`.",
+      "evidence_path": "tests/connection-config-security.test.ts:37"
+    },
+    {
+      "title": "Electron operator layer is security-hardened",
+      "description": "Both the main window and the askpass window set `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, and `webSecurity: true`, with `security.ts` enforcing the same on web-preferences creation.",
+      "evidence_path": "src/main/security.ts:58"
+    },
+    {
+      "title": "Exact-pinned dependencies with supply-chain CI",
+      "description": "Every direct dependency in `pyproject.toml` is pinned to `==X.Y.Z` with a committed `uv.lock`, CVE-annotated, and gated by OSV-scanner and a narrow supply-chain-audit workflow in CI.",
+      "evidence_path": "pyproject.toml:13"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": "~/.hermes/logs/agent.log",
+        "source": "Hermes Agent (hermes_logging.setup_logging)",
+        "content_type": "plaintext, redacted, rotating (RedactingFormatter)",
+        "purpose": "INFO+ catch-all of agent, tool, and session activity",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "~/.hermes/logs/errors.log",
+        "source": "Hermes Agent (hermes_logging.setup_logging)",
+        "content_type": "plaintext, redacted, rotating (RedactingFormatter)",
+        "purpose": "WARNING+ quick-triage error log",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "~/.hermes/logs/gateway.log",
+        "source": "Hermes Agent (hermes_logging.setup_logging, gateway mode)",
+        "content_type": "plaintext, redacted, rotating (RedactingFormatter)",
+        "purpose": "INFO+ gateway-component events (created when mode=gateway)",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 3.15,
+    "weighted_rationale": "Established. Hermes Agent presents a coherent, documented safety model whose load-bearing controls are genuinely wired into the runtime — approval gating with an injection-resistant YOLO freeze and a hardline floor, credential scrubbing across shell/MCP/code-execution children, default-deny caller authorization, exact-pinned dependencies with OSV and supply-chain CI, a substantial adversarial test suite, and structured redacting logs. It is held below Strong by a real fail-open in the WeCom/Weixin/Yuanbao adapters' default-open access policy, by the project's own honest stance that its in-process heuristics are not containment (so Zero Trust rests on an operator-selected OS isolation posture the code does not enforce), and by operator-layer gaps in the Desktop SSH and telemetry surfaces.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "The toolset registry in `toolsets.py` defines a bounded inventory matching the remit's Known Good Baseline with default-off toolsets, and the agent is single-operator by construction; tool exposure is gated by per-platform config rather than a general-purpose free-for-all."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "External content (web, email, MCP responses) enters context but passes message sanitization, automated-sender filtering (`gateway/platforms/email.py`), and output redaction, and memory/`SOUL.md` are operator-owned config; the residual risk is that these are in-process heuristics the project itself declines to treat as a boundary absent an OS isolation posture."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "Strong operative controls — YOLO frozen at import against injection escalation, a hardline blocklist below YOLO, the GHSA-rhgp-j443-p4rf provider-credential scrub, a fail-closed API server, and gateway default-deny — are offset by the WeCom/Weixin/Yuanbao default-`open` fail-open and the documented reality that in-process screens are not containment."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 4,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Every direct dependency is exact-pinned to `==` in `pyproject.toml` with a committed `uv.lock`, CVE-tracked comments, OSV-scanner and supply-chain-audit CI workflows, an MCP subprocess env-filter plus tool-description poisoning scanner, and a Skills Guard trust-tier install policy; provenance and integrity are managed deliberately."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "A substantial adversarial test suite (`test_browser_secret_exfil.py`, `test_browser_ssrf_local.py`, `test_cron_prompt_injection.py`, `test_command_guards.py`, `test_skills_guard.py`, `test_threat_patterns.py`) runs in CI, and code references to fixed advisories (GHSA-rhgp-j443-p4rf) show adversarial findings drove design changes rather than only documentation."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "`hermes_logging.py` configures three `RotatingFileHandler` logs (`agent.log`, `errors.log`, `gateway.log`) under `~/.hermes/logs/` with a `RedactingFormatter`, and sessions persist to a SQLite FTS5 store; the score is held at Established because action-level audit completeness was assessed source-only (no runtime log files on disk to confirm granularity)."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 1,
+      "high": 2,
+      "medium": 4,
+      "low": 0,
+      "info": 0
+    }
+  }
+}
