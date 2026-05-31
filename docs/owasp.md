@@ -7,6 +7,8 @@
 
 Every finding Praxen produces is tagged against industry-standard OWASP frameworks so the result lands in language your security team already speaks. This page explains where those frameworks come from and gives a one-line gloss on each risk so you can read a tag without leaving the report.
 
+> **📊 See it live:** the **[OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** aggregates LLM and Agentic Top-10 coverage across Praxen's entire example suite — a browsable map of which risks each target carries, with a link into every per-target analysis. Rendered on GitHub Pages.
+
 ---
 
 ## OWASP, briefly
@@ -94,7 +96,7 @@ A finding's primary OWASP classification appears two ways in the HTML report:
 - On the **finding card** itself, as a labeled tag (`LLM01 — Prompt Injection`, `ASI05 — Unexpected Code Execution (RCE)`, …) that links to that entry in this page.
 - In the **OWASP LLM Top 10 Coverage** and **OWASP Agentic Top 10 Coverage** grid sections — full-bleed 5×2 cards, one per category, each populated card showing the top-three most-severe findings as clickable chips. Empty cells render "No findings" so the grid reads as a coverage map: at a glance you see both *what risks the agent has* and *which categories the analysis did not surface*.
 
-The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details.
+The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details. For the same coverage view **aggregated across every target in Praxen's example suite**, browse the live [OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html).
 
 ---
 
