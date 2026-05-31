@@ -118,11 +118,17 @@ reviewed PR):
 
 If the histories have **already** diverged (a squash slipped through, or a commit
 landed on `main` outside this flow), don't squash-paper-over it — reconcile so the
-invariant holds again: rebuild `dev` as `origin/main` plus a cherry-pick of just
-the unreleased commits (`git reset --hard origin/main` then `git cherry-pick
---signoff <new commits>`), confirm the tree is byte-identical to the work you
-meant to keep, and force-push `dev`. This drops redundant already-released commits
-(and is how the 0.7.5→0.7.8 gap was finally closed).
+invariant holds again. Rebuild on a **temporary branch** off `origin/main` — never
+`reset --hard` `dev` in place, or you lose the commit hashes you still need to
+cherry-pick:
+```
+git checkout -b dev-rebuild origin/main
+git cherry-pick --signoff <the unreleased commits>   # the new work only
+git diff origin/dev dev-rebuild                       # MUST be empty (byte-identical)
+git push --force-with-lease origin dev-rebuild:dev
+```
+This drops redundant already-released commits (and is how the 0.7.5→0.7.8 gap was
+finally closed).
 
 A scheduled CI check (`.github/workflows/branch-drift.yml`) asserts `main` is an
 ancestor of `dev` and fails the day the histories diverge — catching a missed
