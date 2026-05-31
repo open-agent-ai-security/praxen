@@ -29,7 +29,7 @@ Are the data sources feeding the agent trustworthy and appropriate? Does externa
 
 ### Implement Zero Trust
 
-Does every action the agent takes go through appropriate validation and approval? Are inputs checked? Are outputs filtered? Are destructive capabilities gated? This category carries **25% weight** — double the others — because it covers the broadest attack surface and the most immediately exploitable gaps.
+Does every action the agent takes go through appropriate validation and approval? Are inputs checked? Are outputs filtered? Are destructive capabilities gated? This category carries the heaviest weight in the overall score (see [Weighted Overall Score](#weighted-overall-score) below).
 
 **Scanner looks for:** input validation, output filtering, tool-call approval gates, exec-capability restriction, least-privilege credentials, code-level enforcement of policy rules.
 
@@ -73,16 +73,6 @@ Most production AI agents today score between **Ad hoc (1)** and **Established (
 ## Weighted Overall Score
 
 Each category contributes to the overall score with a fixed weight. **Implement Zero Trust counts double** because it covers the broadest attack surface and the most immediately exploitable gaps; the other five each carry 15%.
-
-```mermaid
-pie title "RAISE category weights (Σ = 100%)"
-  "Implement Zero Trust (25%)" : 25
-  "Limit Your Domain (15%)" : 15
-  "Balance Your Knowledge Base (15%)" : 15
-  "Manage Your Supply Chain (15%)" : 15
-  "Build an AI Red Team (15%)" : 15
-  "Monitor Continuously (15%)" : 15
-```
 
 | Category | Weight | Why |
 |---|:-:|---|
