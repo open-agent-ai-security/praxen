@@ -26,8 +26,15 @@ from pathlib import Path
 THIS_DIR = Path(__file__).resolve().parent
 
 def _default_baseline() -> Path:
-    """Return the most recently modified v*/ baseline dir alongside this script."""
-    candidates = sorted(THIS_DIR.glob("v*/"), key=lambda p: p.stat().st_mtime, reverse=True)
+    """Return the canonical baseline named in CURRENT, falling back to the newest v* dir."""
+    current_file = THIS_DIR / "CURRENT"
+    if current_file.is_file():
+        name = current_file.read_text(encoding="utf-8").strip()
+        candidate = THIS_DIR / name
+        if candidate.is_dir():
+            return candidate
+    candidates = sorted([p for p in THIS_DIR.glob("v*") if p.is_dir()],
+                        key=lambda p: p.name, reverse=True)
     return candidates[0] if candidates else THIS_DIR / "v0.7.7-claude48"
 
 DEFAULT_BASELINE = _default_baseline()
