@@ -53,7 +53,7 @@ The template is a complete reference, but the load-bearing sections are:
 
 If a section doesn't apply to your agent, leave it minimal but explain why — Praxen will note vague or missing rules.
 
-**Multi-component deployments** (e.g. an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: name the primary RAISE subject in a scope note in the Mission, and give each component its own sub-headings *within* the existing sections rather than adding new top-level sections.
+**Multi-component deployments** (e.g., an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: name the primary RAISE subject in a scope note in the Mission, and give each component its own sub-headings *within* the existing sections rather than adding new top-level sections.
 
 ---
 

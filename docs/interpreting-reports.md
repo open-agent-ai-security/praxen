@@ -170,7 +170,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 | `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |
 | `footer` | `severity_counts` (critical / high / medium / low / info) |
 
-The JSON holds **semantic values, not presentation** — `severity` is `"Critical"`, `status` is `"gap"`; CSS classes and the maturity label are computed by the renderer, not stored. So a consumer that wants the posture number reads `raise_posture.weighted_overall`; one that wants the headline reads `behavior_summary`; no HTML parsing needed. The bundled `schema.py` validator (which `render.py` runs before rendering) enforces the cross-field invariants, so a JSON that exists alongside an HTML report is internally consistent — see [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) §6 for the full schema.
+The JSON holds **semantic values, not presentation** — `severity` is `"Critical"`, `status` is `"gap"`; CSS classes and the maturity label are computed by the renderer, not stored. So a consumer that wants the posture number reads `raise_posture.weighted_overall`; one that wants the headline reads `behavior_summary`; no HTML parsing needed. The bundled `schema.py` validator (which `render.py` runs before rendering) enforces the cross-field invariants, so a JSON that exists alongside an HTML report is internally consistent — see [`PRAXEN_SPEC.md` §6](../PRAXEN_SPEC.md#6-canonical-findings-json) for the full schema.
 
 Use the JSON for:
 
