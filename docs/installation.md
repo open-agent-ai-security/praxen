@@ -26,7 +26,7 @@ This is the recommended path for Claude Code users. From your terminal:
 ```bash
 claude plugin marketplace add open-agent-ai-security/praxen
 claude plugin install praxen@open-agent-ai-security
-claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.7.7+
+claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.7.8+
 ```
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
@@ -56,7 +56,7 @@ Run:
 claude plugin list
 ```
 
-If `praxen@open-agent-ai-security` appears at `v0.7.7` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
+If `praxen@open-agent-ai-security` appears at `v0.7.8` or later with `enabled`, the marketplace install is working. From within a Claude Code session, the same plugin shows up under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
 For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
 
