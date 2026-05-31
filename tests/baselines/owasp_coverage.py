@@ -50,6 +50,8 @@ TARGETS = [
      "LangChain agent harness (MCP coverage)"),
     ("yaah",                    "yaah",                         "https://github.com/dirien/yet-another-agent-harness",
      "Yet Another Agent Harness (MCP coverage)"),
+    ("hermes-agent-desktop",    "Hermes (Agent + Desktop)",     "https://github.com/NousResearch/hermes-agent",
+     "Multi-component LLM agent + desktop control layer"),
 ]
 
 LLM_TITLES = [

@@ -5,7 +5,7 @@
 
 # Test-suite baselines
 
-Frozen runs of the **eleven** test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v0.7.7-claude48/`** — all eleven targets on the Praxen v0.7.7 skill under **Anthropic Claude Opus 4.8**, against the intent-level Worker Remits, frozen via a **median-of-3** process (see its [`BASELINE.md`](v0.7.7-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The same skill on Opus 4.7 is retained as [`v0.7.7-sequential/`](v0.7.7-sequential/BASELINE.md) for diff archaeology.
+Frozen runs of the **twelve** test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v0.7.7-claude48/`** — all twelve targets on the Praxen v0.7.7 skill under **Anthropic Claude Opus 4.8**, against the intent-level Worker Remits, frozen via a **median-of-3** process (see its [`BASELINE.md`](v0.7.7-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The same skill on Opus 4.7 is retained as [`v0.7.7-sequential/`](v0.7.7-sequential/BASELINE.md) for diff archaeology.
 
 ## Layout
 
@@ -14,7 +14,7 @@ baselines/
   README.md                       ← this file
   owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
   owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
-  v0.7.7-claude48/                 ← CURRENT — all eleven targets, Praxen v0.7.7 on Opus 4.8 (median-of-3, schema 2.0)
+  v0.7.7-claude48/                 ← CURRENT — all twelve targets, Praxen v0.7.7 on Opus 4.8 (median-of-3, schema 2.0)
   v0.7.7-sequential/         retired — same skill on Opus 4.7; kept for diff archaeology
   v0.7.4-sequential/         retired — see CHANGELOG [0.7.7]
   v0.7.0-sequential/         retired — see CHANGELOG [0.7.4]
