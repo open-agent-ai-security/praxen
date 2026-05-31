@@ -7,11 +7,13 @@
 
 Every finding Praxen produces is tagged against industry-standard OWASP frameworks so the result lands in language your security team already speaks. This page explains where those frameworks come from and gives a one-line gloss on each risk so you can read a tag without leaving the report.
 
+> **📊 See it live:** the **[OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** aggregates LLM and Agentic Top-10 coverage across Praxen's entire example suite — a browsable map of which risks each target carries, with a link into every per-target analysis. Rendered on GitHub Pages.
+
 ---
 
 ## OWASP, briefly
 
-The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.org/)) is a non-profit foundation that produces free, community-built security resources — standards, tools, and the famous "Top 10" risk lists. Its material is vendor-neutral, openly licensed (mostly CC BY-SA), and widely treated as a baseline reference in application security. The original *OWASP Top 10* for web applications is the best-known example.
+The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.org/)) is the non-profit foundation behind the vendor-neutral, openly-licensed "Top 10" risk lists that are a baseline reference across application security.
 
 ## OWASP Gen AI Security Project
 
@@ -50,7 +52,7 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 
-Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of OpenClaw-style workers Praxen is built to verify.
+Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of autonomous, tool-using agents Praxen is built to verify.
 
 | ID | Risk | One-line gloss |
 |---|---|---|
@@ -94,7 +96,7 @@ A finding's primary OWASP classification appears two ways in the HTML report:
 - On the **finding card** itself, as a labeled tag (`LLM01 — Prompt Injection`, `ASI05 — Unexpected Code Execution (RCE)`, …) that links to that entry in this page.
 - In the **OWASP LLM Top 10 Coverage** and **OWASP Agentic Top 10 Coverage** grid sections — full-bleed 5×2 cards, one per category, each populated card showing the top-three most-severe findings as clickable chips. Empty cells render "No findings" so the grid reads as a coverage map: at a glance you see both *what risks the agent has* and *which categories the analysis did not surface*.
 
-The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details.
+The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details. For the same coverage view **aggregated across every target in Praxen's example suite**, browse the live [OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html).
 
 ---
 

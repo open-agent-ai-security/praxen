@@ -1,0 +1,44 @@
+# Copyright 2026 Exabeam, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fails if `dev` is on an OLDER release than `main` — i.e. a release (or hotfix)
+# landed on `main` and was never back-merged into `dev`. See CONTRIBUTING.md,
+# "Keeping `dev` in sync with `main`".
+#
+# This deliberately checks the release VERSION, not a raw `git diff`: `dev` is
+# expected to be *ahead* of `main` between releases (unreleased feature work),
+# and squash-merging means the two branches never share commit SHAs. The only
+# real failure is `dev` sitting on an older version than `main`.
+name: Branch drift
+
+on:
+  schedule:
+    - cron: "17 14 * * 1-5" # weekday mid-day UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dev-not-behind-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: dev must not be on an older release than main
+        run: |
+          git fetch -q origin main dev
+          ver() { git show "origin/$1:.claude-plugin/plugin.json" \
+            | sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1; }
+          dev_v="$(ver dev)"; main_v="$(ver main)"
+          echo "dev=$dev_v  main=$main_v"
+          if [ -z "$dev_v" ] || [ -z "$main_v" ]; then
+            echo "::error::could not read plugin.json version on dev and/or main"; exit 1
+          fi
+          newest="$(printf '%s\n%s\n' "$dev_v" "$main_v" | sort -V | tail -1)"
+          if [ "$dev_v" != "$main_v" ] && [ "$newest" = "$main_v" ]; then
+            echo "::error::dev ($dev_v) is behind main ($main_v) — a release landed on main without a back-merge. Open chore/sync-dev-with-main (git merge origin/main into dev, resolve in favour of main). See CONTRIBUTING.md, 'Keeping dev in sync with main'."
+            exit 1
+          fi
+          echo "OK: dev ($dev_v) is not behind main ($main_v)."

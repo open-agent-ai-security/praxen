@@ -85,6 +85,39 @@ part of a deliberate, re-verified release.
 When you open a PR, GitHub pre-selects the base branch as the repository default
 (`main`); switch it to `dev` unless you are specifically cutting a release.
 
+### Keeping `dev` in sync with `main`
+
+`main` and `dev` **diverge by construction**: a release is squash-merged from a
+`release/x.y` branch into `main`, which creates a new commit `dev` doesn't share.
+If release-only content — the version bump, the `CHANGELOG` entry, the frozen
+baseline, the spec edits — is authored on the release branch and never returns,
+`dev` silently falls *behind* `main`, and every release widens the gap. (This is
+how `dev` ended up two releases behind through 0.7.7.)
+
+The standing rule (maintainers — `dev` is unprotected):
+
+- **Realign `dev` to `main` immediately after every release (and any hotfix).** As
+  soon as the release squash lands on `main` and the `vX.Y.Z` tag is cut, run —
+  **before any new feature work** —
+  ```
+  git fetch origin && git checkout dev && git reset --hard origin/main && git push --force-with-lease origin dev
+  ```
+  `dev` restarts cleanly from the released commit, so it can never sit behind
+  `main`. This step has existed since 0.7.2; skipping it after 0.7.5 is how `dev`
+  ended up two releases behind through 0.7.7.
+- **If `dev` has *already* diverged with unreleased work** (so a hard reset would
+  discard it), don't reset — recover with a `chore/sync-dev-with-main` PR instead:
+  `git merge origin/main` into `dev`, resolving squash conflicts in favour of
+  `main` (the content-newer side). This is how the 0.7.7 gap was reconciled.
+- **Optionally, finalize releases *through* `dev`** (author the version bump,
+  `CHANGELOG`, and baseline freeze as PRs into `dev`, or merge the `release/x.y`
+  branch back into `dev`) so `main` never holds content that isn't already on
+  `dev` — which makes the realign a clean no-op.
+
+A scheduled CI check (`.github/workflows/branch-drift.yml`) fails if `dev` is ever
+on an older release than `main`, so a skipped realign is caught the next day
+instead of accumulating across releases.
+
 ## Before you open a PR
 
 - Run the test suite: `python3 tests/render/test_render.py` — it should report all checks passing.

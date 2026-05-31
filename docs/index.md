@@ -23,6 +23,7 @@
 | Writing a Worker Remit for an agent | [Writing Worker Remits](writing-remits.md) |
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
+| Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
 | Trying to understand the RAISE maturity scoring | [The RAISE Framework](RAISE.md) |
@@ -73,7 +74,7 @@ Every finding Praxen produces is classified against four industry-standard frame
 - **OWASP Secure MCP Server Development Guide 2026** — applied when MCP configuration is found
 - **RAISE Framework** — six-category 0–5 maturity score; see [RAISE](RAISE.md)
 
-For an overview of the OWASP Gen AI Security Project and a one-line gloss on each LLM, Agentic, and MCP risk, see [OWASP Gen AI Security](owasp.md).
+For an overview of the OWASP Gen AI Security Project and a one-line gloss on each LLM, Agentic, and MCP risk, see [OWASP Gen AI Security](owasp.md). Or browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** — aggregate LLM and Agentic Top-10 coverage across Praxen's example suite, with links into each per-target analysis.
 
 ---
 

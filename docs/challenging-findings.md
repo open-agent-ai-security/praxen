@@ -97,4 +97,5 @@ A regression in a re-run analysis (new findings appearing, scores moving) is not
 
 - [Writing Worker Remits](writing-remits.md) — for "Vague Policy" findings
 - [Interpreting Reports](interpreting-reports.md) — for understanding severities and confidence
+- [Understanding Run-to-Run Variability](understanding-variability.md) — why scores shift between runs, and how to get a stable number when it matters
 - [The RAISE Framework](RAISE.md) — for understanding maturity-score deltas across runs
