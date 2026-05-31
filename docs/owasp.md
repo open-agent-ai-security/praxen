@@ -13,7 +13,7 @@ Every finding Praxen produces is tagged against industry-standard OWASP framewor
 
 ## OWASP, briefly
 
-The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.org/)) is a non-profit foundation that produces free, community-built security resources — standards, tools, and the famous "Top 10" risk lists. Its material is vendor-neutral, openly licensed (mostly CC BY-SA), and widely treated as a baseline reference in application security. The original *OWASP Top 10* for web applications is the best-known example.
+The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.org/)) is the non-profit foundation behind the vendor-neutral, openly-licensed "Top 10" risk lists that are a baseline reference across application security.
 
 ## OWASP Gen AI Security Project
 
@@ -52,7 +52,7 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 
-Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of OpenClaw-style workers Praxen is built to verify.
+Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of autonomous, tool-using agents Praxen is built to verify.
 
 | ID | Risk | One-line gloss |
 |---|---|---|
