@@ -38,9 +38,10 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 If you can't or don't want to use the plugin marketplace flow, unzip the release archive somewhere your coding agent can see it. There's no install step.
 
 ```bash
-curl -L -o praxen-<version>.zip <release-URL>
-unzip praxen-<version>.zip
-cd praxen-<version>
+# Replace VERSION with the release tag and RELEASE_URL with the .zip asset URL
+curl -L -o praxen-VERSION.zip RELEASE_URL
+unzip praxen-VERSION.zip
+cd praxen-VERSION
 ```
 
 Then point your coding agent at `skills/behavior-verifier/SKILL.md` when running an analysis. See [Usage](usage.md).
