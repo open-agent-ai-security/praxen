@@ -23,6 +23,7 @@ import html
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import markdown
@@ -61,7 +62,9 @@ def rewrite_links(body: str) -> str:
     """
     def repl(m):
         href = m.group(1)
-        if href.startswith(("http://", "https://", "mailto:", "#")):
+        # Any scheme (http, https, mailto, ftp, …), protocol-relative, or pure
+        # in-page anchor: leave untouched.
+        if urlparse(href).scheme or href.startswith(("#", "//")):
             return m.group(0)
         if href.startswith("../"):
             return f'href="{REPO}/blob/main/{href[3:]}"'
@@ -70,8 +73,20 @@ def rewrite_links(body: str) -> str:
 
 
 def onpage_toc(toc_tokens) -> str:
-    """Build a flat 'sections' list from the page's H2 headings."""
-    items = [t for t in toc_tokens if t.get("level") == 2]
+    """Build a flat 'sections' list from the page's H2 headings.
+
+    toc_tokens is a hierarchical tree — H2s are nested under their H1 parent's
+    'children' — so walk it recursively rather than scanning only the top level.
+    """
+    items = []
+
+    def collect(tokens):
+        for t in tokens:
+            if t.get("level") == 2:
+                items.append(t)
+            collect(t.get("children") or [])
+
+    collect(toc_tokens)
     if not items:
         return ""
     lis = "".join(
@@ -155,7 +170,8 @@ def build():
         body = rewrite_links(body)
 
         m = re.search(r"<h1[^>]*>(.*?)</h1>", body, re.DOTALL)
-        title = re.sub(r"<[^>]+>", "", m.group(1)).strip() if m else label
+        # The H1 is already HTML-escaped; unescape before page_html re-escapes it.
+        title = html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else label
 
         nav = left_nav(src, onpage_toc(md.toc_tokens))
         out_path = OUT_DIR / (src[:-3] + ".html")
