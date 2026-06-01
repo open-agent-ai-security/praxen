@@ -8,6 +8,10 @@ Walks every `<target>/<target>-findings-*.json` under the chosen baseline
 directory, sums the per-finding `owasp_llm` / `owasp_agentic` primary scalars,
 and writes an HTML report with bar charts and target links.
 
+The report's look comes from the shared design system at `assets/praxen-theme.css`
+(inlined at render time so the output stays a single self-contained file); only
+the chart/card components are defined locally in OWASP_CSS below.
+
 Usage:
     python3 tests/baselines/owasp_coverage.py [--baseline-dir DIR] [--out FILE]
 
@@ -22,6 +26,8 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+
+from theme_utils import load_theme_css
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -48,6 +54,7 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
+
 
 TARGETS = [
     ("finbot",                  "FinBot",                       "https://github.com/OWASP-ASI/finbot-ctf-demo",
@@ -100,6 +107,59 @@ ASI_TITLES = [
     ("ASI09", "Human-Agent Trust Exploitation"),
     ("ASI10", "Rogue Agents"),
 ]
+
+# Report-specific components (cards + bar charts). Tokens, base elements,
+# buttons, the hero, sections and footer all come from the shared theme
+# (assets/praxen-theme.css), inlined ahead of this in the <style> block.
+OWASP_CSS = """
+  .target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .target-card {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+    background: var(--panel); transition: transform .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .target-card:hover { transform: translateY(-3px); border-color: var(--border-hi); background: var(--panel-2); }
+  .target-name { font-family: "Space Grotesk"; font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .target-blurb { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; min-height: 32px; }
+  .target-stats { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .target-stats strong { color: var(--text); font-weight: 700; }
+  .target-links { display: flex; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+  .card-link {
+    flex: 1; text-align: center; padding: 7px 10px; border-radius: 9px;
+    font-size: 12px; font-weight: 600; text-decoration: none; transition: all .15s ease; white-space: nowrap;
+  }
+  .card-link-source { color: var(--text); background: var(--panel); border: 1px solid var(--border); }
+  .card-link-source:hover { background: var(--panel-2); border-color: var(--border-hi); color: var(--text); }
+  .card-link-report { color: #1a0f06; background: linear-gradient(100deg, var(--orange-2), var(--orange-deep)); border: 1px solid transparent; }
+  .card-link-report:hover { color: #1a0f06; box-shadow: 0 6px 18px -6px rgba(255,122,46,0.6); }
+  .card-link-disabled { color: var(--muted-2); background: var(--panel); border: 1px solid var(--border); cursor: not-allowed; }
+
+  .chart { margin-top: 8px; }
+  .bar-row { display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: center; padding: 6px 0; }
+  .bar-label { font-size: 13px; color: var(--text); }
+  .bar-code {
+    display: inline-block; min-width: 46px; padding: 2px 7px; margin-right: 8px;
+    border-radius: 6px; background: var(--panel-2); color: var(--orange-2); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+  }
+  .bar-track {
+    position: relative; height: 24px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+  }
+  .bar-fill { height: 100%; border-radius: 6px 0 0 6px; transition: width 0.3s; }
+  .bar-count {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; font-weight: 700; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+  }
+  .bar-row.is-empty .bar-label { color: var(--muted-2); }
+  .bar-row.is-empty .bar-count { color: var(--muted-2); text-shadow: none; }
+
+  @media (max-width: 720px) {
+    .bar-row { grid-template-columns: 1fr; }
+    .bar-label { margin-bottom: 4px; }
+    .topline { gap: 14px; }
+  }
+"""
 
 
 def gather(baseline_dir: Path):
@@ -205,137 +265,23 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
     n_targets = len(per_target)
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y, %H:%M UTC")
     baseline_name = baseline_dir.name
+    theme_css = load_theme_css()
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Praxen — OWASP Coverage Across Baseline Targets</title>
-<style>
-  :root {{
-    --navy:        #0D1B2A;
-    --blue:        #006BFF;
-    --blue-lt:     #27B2FF;
-    --blue-dark:   #003FCC;
-    --purple:      #8D00FF;
-    --text:        #0D1B2A;
-    --text-muted:  #3A4A6B;
-    --bg:          #FFFFFF;
-    --surface:     #F5F7FA;
-    --surface-alt: #F0F4FF;
-    --border:      #E1E4E8;
-    --border-alt:  #C8D4F0;
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--surface);
-    color: var(--text);
-    line-height: 1.5;
-  }}
-  .wrap {{ max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }}
-  header.hero {{
-    background: var(--navy);
-    color: white;
-    padding: 36px 32px;
-    border-radius: 8px;
-    margin-bottom: 28px;
-  }}
-  header.hero h1 {{ margin: 0 0 6px; font-size: 28px; font-weight: 600; }}
-  header.hero .subtitle {{ color: #B8C5DB; margin: 0 0 18px; }}
-  .topline {{
-    display: flex; gap: 28px; flex-wrap: wrap; padding-top: 16px;
-    border-top: 1px solid #1F2D44;
-  }}
-  .topline .stat-block {{ color: white; }}
-  .topline .stat-block strong {{
-    display: block; font-size: 24px; font-weight: 700; color: var(--blue-lt);
-  }}
-  .topline .stat-block span {{ font-size: 13px; color: #B8C5DB; }}
-
-  section {{ background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 24px; }}
-  section h2 {{
-    margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--navy);
-    padding-bottom: 12px; border-bottom: 2px solid var(--border-alt);
-  }}
-  section h2 .scope {{ font-size: 13px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }}
-  section .intro {{ color: var(--text-muted); margin: 12px 0 20px; font-size: 14px; }}
-
-  .target-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }}
-  .target-card {{
-    display: flex; flex-direction: column;
-    border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;
-    background: var(--surface-alt); transition: border-color 0.1s, box-shadow 0.1s;
-  }}
-  .target-card:hover {{ border-color: var(--blue); box-shadow: 0 2px 8px rgba(0,107,255,0.12); }}
-  .target-name {{ font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }}
-  .target-blurb {{ font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; min-height: 32px; }}
-  .target-stats {{ display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }}
-  .target-stats strong {{ color: var(--navy); font-weight: 700; }}
-  .target-links {{
-    display: flex; gap: 8px; margin-top: auto;
-    padding-top: 10px; border-top: 1px solid var(--border-alt);
-  }}
-  .card-link {{
-    flex: 1; text-align: center; padding: 6px 10px; border-radius: 4px;
-    font-size: 12px; font-weight: 600; text-decoration: none; transition: all 0.1s;
-    white-space: nowrap;
-  }}
-  .card-link-source {{
-    color: var(--blue-dark); background: var(--bg); border: 1px solid var(--border-alt);
-  }}
-  .card-link-source:hover {{ background: var(--surface-alt); border-color: var(--blue); }}
-  .card-link-report {{
-    color: white; background: var(--blue); border: 1px solid var(--blue);
-  }}
-  .card-link-report:hover {{ background: var(--blue-dark); border-color: var(--blue-dark); }}
-  .card-link-disabled {{
-    color: var(--text-muted); background: var(--surface); border: 1px solid var(--border);
-    cursor: not-allowed;
-  }}
-
-  .chart {{ margin-top: 8px; }}
-  .bar-row {{ display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: center; padding: 6px 0; }}
-  .bar-label {{ font-size: 13px; color: var(--text); }}
-  .bar-code {{
-    display: inline-block; min-width: 44px; padding: 2px 6px; margin-right: 8px;
-    border-radius: 3px; background: var(--navy); color: white;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600;
-  }}
-  .bar-track {{
-    position: relative; height: 24px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-  }}
-  .bar-fill {{ height: 100%; border-radius: 3px 0 0 3px; transition: width 0.3s; }}
-  .bar-count {{
-    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-    font-size: 12px; font-weight: 600; color: var(--navy);
-    background: rgba(255,255,255,0.85); padding: 0 6px; border-radius: 3px;
-  }}
-  .bar-row.is-empty .bar-label {{ color: var(--text-muted); }}
-  .bar-row.is-empty .bar-count {{ color: var(--text-muted); }}
-
-  footer.foot {{
-    margin-top: 32px; padding: 18px 0 0; border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--text-muted); text-align: center;
-  }}
-  footer.foot a {{ color: var(--blue-dark); text-decoration: none; }}
-  footer.foot a:hover {{ text-decoration: underline; }}
-
-  @media (max-width: 720px) {{
-    .bar-row {{ grid-template-columns: 1fr; }}
-    .bar-label {{ margin-bottom: 4px; }}
-    .topline {{ gap: 14px; }}
-  }}
-</style>
+<style>{theme_css}
+{OWASP_CSS}</style>
 </head>
-<body>
+<body class="report-page">
 <div class="wrap">
 
   <header class="hero">
     <h1>OWASP Coverage Across Praxen Baseline Targets</h1>
-    <p class="subtitle">Aggregate finding counts by category, taken from the frozen <code style="background:#1F2D44;padding:2px 6px;border-radius:3px;color:#B8C5DB;font-size:12px;">tests/baselines/{html.escape(baseline_name)}/</code> set.</p>
+    <p class="subtitle">Aggregate finding counts by category, taken from the frozen <code>tests/baselines/{html.escape(baseline_name)}/</code> set.</p>
     <div class="topline">
       <div class="stat-block"><strong>{n_targets}</strong><span>targets analyzed</span></div>
       <div class="stat-block"><strong>{total}</strong><span>total findings</span></div>
@@ -352,14 +298,14 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
 
   <section>
     <h2>OWASP LLM Top 10 — finding count by category</h2>
-    <p class="intro">Coverage of <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener" style="color:var(--blue-dark);">OWASP Top 10 for LLM Applications 2025</a> across all baseline targets. Empty cells show categories the suite does not currently exercise.</p>
-    {bar_chart(llm_rows, max_llm, "var(--blue)")}
+    <p class="intro">Coverage of <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications 2025</a> across all baseline targets. Empty cells show categories the suite does not currently exercise.</p>
+    {bar_chart(llm_rows, max_llm, "var(--orange)")}
   </section>
 
   <section>
     <h2>OWASP Agentic Top 10 — finding count by category</h2>
-    <p class="intro">Coverage of <a href="https://genai.owasp.org/resource/agentic-ai-threats-and-mitigations/" target="_blank" rel="noopener" style="color:var(--blue-dark);">OWASP Top 10 for Agentic AI Applications 2026</a> across all baseline targets.</p>
-    {bar_chart(asi_rows, max_asi, "var(--purple)")}
+    <p class="intro">Coverage of <a href="https://genai.owasp.org/resource/agentic-ai-threats-and-mitigations/" target="_blank" rel="noopener">OWASP Top 10 for Agentic AI Applications 2026</a> across all baseline targets.</p>
+    {bar_chart(asi_rows, max_asi, "var(--accent-2)")}
   </section>
 
   <section>

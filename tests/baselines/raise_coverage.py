@@ -9,6 +9,10 @@ directory, extracts `raise_posture.weighted_overall` and the six per-category
 scores, and writes an HTML report with a per-target score heatmap, per-category
 score distributions, and a population weighted-overall histogram.
 
+The report's look comes from the shared design system at `assets/praxen-theme.css`
+(inlined at render time so the output stays a single self-contained file); only
+the table/heatmap/distribution components are defined locally in RAISE_CSS below.
+
 Usage:
     python3 raise_coverage.py [--baseline-dir DIR] [--out FILE]
 
@@ -25,6 +29,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, stdev
+
+from theme_utils import load_theme_css
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -51,6 +57,7 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "raise-coverage-report.html"
+
 
 TARGETS = [
     ("finbot",                  "FinBot",                       "https://github.com/OWASP-ASI/finbot-ctf-demo",
@@ -90,7 +97,8 @@ RAISE_CATEGORIES = [
 
 MATURITY = {0: "Absent", 1: "Ad hoc", 2: "Partial", 3: "Established", 4: "Strong", 5: "Exemplary"}
 
-# Score colour scale: red → amber → yellow → lime → green → teal
+# Score colour scale: red → amber → yellow → lime → green → teal. These jewel
+# tones read as a heatmap on the dark theme; kept as inline cell styles below.
 SCORE_COLORS = {
     0: ("#6B1010", "#FFCCCC"),   # bg, text
     1: ("#7D3800", "#FFDDBB"),
@@ -99,6 +107,73 @@ SCORE_COLORS = {
     4: ("#0A4400", "#B0EFC0"),
     5: ("#003344", "#A0E8F0"),
 }
+
+# Report-specific components (heatmap table + distribution bars). Tokens, base
+# elements, the hero, sections and footer all come from the shared theme
+# (assets/praxen-theme.css), inlined ahead of this in the <style> block.
+RAISE_CSS = """
+  /* Score table */
+  .table-scroll { overflow-x: auto; }
+  .score-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .score-table th {
+    background: var(--panel-2); color: var(--text); padding: 11px 12px;
+    text-align: center; font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+  .score-table th.target-hdr { text-align: left; min-width: 220px; }
+  .score-table th.overall-hdr { background: rgba(255,122,46,0.12); color: var(--orange-2); font-size: 12px; }
+  .score-table th.cat-header { font-size: 12px; min-width: 72px; }
+  .score-table tbody tr { border-bottom: 1px solid var(--border); }
+  .score-table tbody tr:hover { background: var(--panel); }
+  .score-cell {
+    text-align: center; padding: 10px 8px; font-weight: 700;
+    font-size: 14px; cursor: default; white-space: nowrap;
+  }
+  .score-cell.score-missing { color: var(--muted-2); background: transparent; }
+  .score-cell.score-overall { font-size: 13px; font-weight: 700; min-width: 72px; }
+  .score-sub { font-size: 10px; font-weight: 400; display: block; margin-top: 1px; opacity: 0.85; }
+  .target-cell { padding: 10px 14px; vertical-align: top; min-width: 220px; }
+  .tgt-name { font-family: "Space Grotesk"; font-weight: 600; font-size: 13px; color: var(--text); }
+  .tgt-blurb { font-size: 11.5px; color: var(--muted); margin: 2px 0 6px; }
+  .tgt-links { display: flex; gap: 8px; }
+  .tbl-link {
+    font-size: 11px; color: var(--orange-2); text-decoration: none;
+    padding: 3px 8px; border: 1px solid var(--border); border-radius: 7px;
+  }
+  .tbl-link:hover { background: var(--panel-2); border-color: var(--border-hi); }
+  .table-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+  /* Distribution charts */
+  .cat-block { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .cat-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .cat-block-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; flex-wrap: wrap; gap: 4px; }
+  .cat-block-name { font-family: "Space Grotesk"; font-weight: 600; font-size: 14px; color: var(--text); }
+  .cat-block-meta { font-size: 12px; color: var(--muted); }
+  .cat-dist { display: flex; flex-direction: column; gap: 5px; }
+  .dist-row { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center; }
+  .dist-label { display: flex; align-items: center; gap: 8px; }
+  .dist-score {
+    display: inline-block; min-width: 24px; text-align: center;
+    padding: 2px 6px; border-radius: 6px;
+    font-weight: 700; font-size: 12px;
+  }
+  .dist-maturity { font-size: 12px; color: var(--muted); }
+  .dist-track {
+    position: relative; height: 22px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+  }
+  .dist-fill { height: 100%; border-radius: 6px 0 0 6px; transition: width 0.3s; min-width: 2px; opacity: 0.9; }
+  .dist-count {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; font-weight: 600; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .overall-stats { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .overall-stats strong { color: var(--text); }
+
+  @media (max-width: 720px) {
+    .dist-row { grid-template-columns: 160px 1fr; }
+    .topline { gap: 14px; }
+  }
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -356,140 +431,24 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
     pop_avg = f"{mean(all_weighted):.2f}" if all_weighted else "—"
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y, %H:%M UTC")
     baseline_name = baseline_dir.name
-
-    CSS = """
-  :root {
-    --navy:       #0D1B2A;
-    --blue:       #006BFF;
-    --blue-lt:    #27B2FF;
-    --blue-dark:  #003FCC;
-    --text:       #0D1B2A;
-    --text-muted: #3A4A6B;
-    --bg:         #FFFFFF;
-    --surface:    #F5F7FA;
-    --surface-alt:#F0F4FF;
-    --border:     #E1E4E8;
-    --border-alt: #C8D4F0;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--surface);
-    color: var(--text);
-    line-height: 1.5;
-  }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
-
-  header.hero {
-    background: var(--navy); color: white;
-    padding: 36px 32px; border-radius: 8px; margin-bottom: 28px;
-  }
-  header.hero h1 { margin: 0 0 6px; font-size: 28px; font-weight: 600; }
-  header.hero .subtitle { color: #B8C5DB; margin: 0 0 18px; }
-  .topline { display: flex; gap: 28px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid #1F2D44; }
-  .topline .stat-block { color: white; }
-  .topline .stat-block strong { display: block; font-size: 24px; font-weight: 700; color: var(--blue-lt); }
-  .topline .stat-block span { font-size: 13px; color: #B8C5DB; }
-
-  section {
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 8px; padding: 24px; margin-bottom: 24px;
-  }
-  section h2 {
-    margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--navy);
-    padding-bottom: 12px; border-bottom: 2px solid var(--border-alt);
-  }
-  section h2 .scope { font-size: 13px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
-  section .intro { color: var(--text-muted); margin: 12px 0 20px; font-size: 14px; }
-
-  /* Score table */
-  .table-scroll { overflow-x: auto; }
-  .score-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .score-table th {
-    background: var(--navy); color: white; padding: 10px 12px;
-    text-align: center; font-weight: 600; white-space: nowrap;
-  }
-  .score-table th.target-hdr { text-align: left; min-width: 220px; }
-  .score-table th.overall-hdr { background: #1F2D44; font-size: 12px; }
-  .score-table th.cat-header { font-size: 12px; min-width: 72px; }
-  .score-table tbody tr { border-bottom: 1px solid var(--border); }
-  .score-table tbody tr:hover { background: var(--surface-alt); }
-  .score-cell {
-    text-align: center; padding: 10px 8px; font-weight: 700;
-    font-size: 14px; cursor: default; white-space: nowrap;
-  }
-  .score-cell.score-missing { color: var(--text-muted); background: var(--surface); }
-  .score-cell.score-overall { font-size: 13px; font-weight: 700; min-width: 72px; }
-  .score-sub { font-size: 10px; font-weight: 400; display: block; margin-top: 1px; opacity: 0.85; }
-  .target-cell { padding: 10px 14px; vertical-align: top; min-width: 220px; }
-  .tgt-name { font-weight: 600; font-size: 13px; color: var(--navy); }
-  .tgt-blurb { font-size: 11.5px; color: var(--text-muted); margin: 2px 0 6px; }
-  .tgt-links { display: flex; gap: 8px; }
-  .tbl-link {
-    font-size: 11px; color: var(--blue-dark); text-decoration: none;
-    padding: 2px 6px; border: 1px solid var(--border-alt); border-radius: 3px;
-  }
-  .tbl-link:hover { background: var(--surface-alt); }
-  .table-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
-
-  /* Distribution charts */
-  .cat-block { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-  .cat-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  .cat-block-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-  .cat-block-name { font-weight: 600; font-size: 14px; color: var(--navy); }
-  .cat-block-meta { font-size: 12px; color: var(--text-muted); }
-  .cat-dist { display: flex; flex-direction: column; gap: 5px; }
-  .dist-row { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center; }
-  .dist-label { display: flex; align-items: center; gap: 8px; }
-  .dist-score {
-    display: inline-block; width: 24px; text-align: center;
-    padding: 2px 4px; border-radius: 3px;
-    font-weight: 700; font-size: 12px;
-  }
-  .dist-maturity { font-size: 12px; color: var(--text-muted); }
-  .dist-track {
-    position: relative; height: 22px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-  }
-  .dist-fill { height: 100%; border-radius: 3px 0 0 3px; transition: width 0.3s; min-width: 2px; }
-  .dist-count {
-    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-    font-size: 11px; font-weight: 600; color: var(--navy);
-    background: rgba(255,255,255,0.85); padding: 0 4px; border-radius: 2px;
-  }
-  .overall-stats {
-    font-size: 13px; color: var(--text-muted); margin-bottom: 14px;
-  }
-  .overall-stats strong { color: var(--navy); }
-
-  footer.foot {
-    margin-top: 32px; padding: 18px 0 0; border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--text-muted); text-align: center;
-  }
-  footer.foot a { color: var(--blue-dark); text-decoration: none; }
-  footer.foot a:hover { text-decoration: underline; }
-
-  @media (max-width: 720px) {
-    .dist-row { grid-template-columns: 160px 1fr; }
-    .topline { gap: 14px; }
-  }
-"""
+    theme_css = load_theme_css()
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Praxen — RAISE Score Distribution Across Baseline Targets</title>
-<style>{CSS}</style>
+<style>{theme_css}
+{RAISE_CSS}</style>
 </head>
-<body>
+<body class="report-page">
 <div class="wrap">
 
   <header class="hero">
     <h1>RAISE Score Distribution Across Praxen Baseline Targets</h1>
     <p class="subtitle">Per-target scores and population distributions for all six RAISE categories,
-    drawn from the frozen <code style="background:#1F2D44;padding:2px 6px;border-radius:3px;color:#B8C5DB;font-size:12px;">tests/baselines/{html.escape(baseline_name)}/</code> baseline set.</p>
+    drawn from the frozen <code>tests/baselines/{html.escape(baseline_name)}/</code> baseline set.</p>
     <div class="topline">
       <div class="stat-block"><strong>{n_targets}</strong><span>targets analyzed</span></div>
       <div class="stat-block"><strong>{n_scored}</strong><span>with RAISE scores</span></div>
