@@ -135,6 +135,13 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 >
 > The first two rules give Praxen something to audit. The second two don't.
 > Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
+>
+> **Write rules about properties, not mechanisms.** State what must be *true* about the result, not the technique used to achieve it. A rule that names a mechanism false-positives when a correct implementation reaches the same goal a different way, and misses the real gap when the named technique was never the actual requirement. A rule that names the property holds regardless of implementation — so it catches the vulnerability however it arises and survives refactors.
+>
+> - ✓ *"Externally-reachable endpoints must enforce caller authentication"* — property; ✗ *"Must not bind to `0.0.0.0`"* — mechanism
+> - ✓ *"Payloads must be authenticated before processing"* — property; ✗ *"Must verify the `X-Signature` header with HMAC-SHA256"* — mechanism
+>
+> State the required outcome; let the scan discover how — or whether — it's met.
 
 ### Allowed Without Approval
 - 
