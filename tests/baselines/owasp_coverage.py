@@ -25,6 +25,15 @@ from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
 
+def _baseline_sort_key(p: Path):
+    """Version-aware sort key for `v*` baseline dirs: compares the numeric
+    version components, so v0.7.10 sorts above v0.7.9 (plain name sorting puts
+    it below). Non-numeric parts and unparseable names fall back to 0."""
+    version = p.name[1:].split("-", 1)[0]  # "0.7.10" from "v0.7.10-claude48"
+    nums = [int(part) if part.isdigit() else 0 for part in version.split(".")]
+    return (nums, p.name)
+
+
 def _default_baseline() -> Path:
     """Return the canonical baseline named in CURRENT, falling back to the newest v* dir."""
     current_file = THIS_DIR / "CURRENT"
@@ -34,7 +43,7 @@ def _default_baseline() -> Path:
         if candidate.is_dir():
             return candidate
     candidates = sorted([p for p in THIS_DIR.glob("v*") if p.is_dir()],
-                        key=lambda p: p.name, reverse=True)
+                        key=_baseline_sort_key, reverse=True)
     return candidates[0] if candidates else THIS_DIR / "v0.7.7-claude48"
 
 DEFAULT_BASELINE = _default_baseline()
