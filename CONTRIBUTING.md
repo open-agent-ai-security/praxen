@@ -87,36 +87,52 @@ When you open a PR, GitHub pre-selects the base branch as the repository default
 
 ### Keeping `dev` in sync with `main`
 
-`main` and `dev` **diverge by construction**: a release is squash-merged from a
-`release/x.y` branch into `main`, which creates a new commit `dev` doesn't share.
-If release-only content — the version bump, the `CHANGELOG` entry, the frozen
-baseline, the spec edits — is authored on the release branch and never returns,
-`dev` silently falls *behind* `main`, and every release widens the gap. (This is
-how `dev` ended up two releases behind through 0.7.7.)
+The invariant: **`main` is always an ancestor of `dev`** — `dev` is `main` plus
+the unreleased work, never a divergent history. Hold that and the two branches
+can never drift.
 
-The standing rule (maintainers — `dev` is unprotected):
+What broke it before: releases were **squash**-merged `dev -> main`. A squash
+discards the shared-parent link, so `main`'s release commit shared no history
+with `dev`; the merge-base froze (at 0.7.5) and every release widened the gap,
+even though the *content* stayed in sync via catch-up PRs. A later `dev -> main`
+then three-wayed from the frozen base and conflicted on everything. The trap was
+invisible to a version check because `dev` stayed *ahead* on version the whole
+time. (This is how `dev` ended up two releases behind through 0.7.7.)
 
-- **Realign `dev` to `main` immediately after every release (and any hotfix).** As
-  soon as the release squash lands on `main` and the `vX.Y.Z` tag is cut, run —
-  **before any new feature work** —
+The model that prevents it (maintainers — `dev` is unprotected, `main` requires a
+reviewed PR):
+
+- **Feature work → `dev`: squash-merge.** Short-lived branches, deleted on merge —
+  squash keeps `dev` tidy and is correct here.
+- **Release `dev → main`: MERGE COMMIT, never squash.** Promote the release PR with
+  a merge commit (`gh pr merge <n> --merge`, *not* `--squash`, *not*
+  `--delete-branch` — `dev` is long-lived). This keeps `dev`'s commits as ancestors
+  of `main`. Author the version bump, `CHANGELOG`, and baseline freeze on `dev`
+  first (so `main` never holds content `dev` lacks), then tag `vX.Y.Z` on `main`.
+- **Immediately after the promotion, fast-forward `dev` up to `main`:**
   ```
-  git fetch origin && git checkout dev && git reset --hard origin/main && git push --force-with-lease origin dev
+  git fetch origin && git checkout dev && git merge --ff-only origin/main && git push origin dev
   ```
-  `dev` restarts cleanly from the released commit, so it can never sit behind
-  `main`. This step has existed since 0.7.2; skipping it after 0.7.5 is how `dev`
-  ended up two releases behind through 0.7.7.
-- **If `dev` has *already* diverged with unreleased work** (so a hard reset would
-  discard it), don't reset — recover with a `chore/sync-dev-with-main` PR instead:
-  `git merge origin/main` into `dev`, resolving squash conflicts in favour of
-  `main` (the content-newer side). This is how the 0.7.7 gap was reconciled.
-- **Optionally, finalize releases *through* `dev`** (author the version bump,
-  `CHANGELOG`, and baseline freeze as PRs into `dev`, or merge the `release/x.y`
-  branch back into `dev`) so `main` never holds content that isn't already on
-  `dev` — which makes the realign a clean no-op.
+  Now `dev == main` and `main` is (trivially) an ancestor of `dev`. The FF is
+  always clean because the merge commit is a descendant of `dev`.
 
-A scheduled CI check (`.github/workflows/branch-drift.yml`) fails if `dev` is ever
-on an older release than `main`, so a skipped realign is caught the next day
-instead of accumulating across releases.
+If the histories have **already** diverged (a squash slipped through, or a commit
+landed on `main` outside this flow), don't squash-paper-over it — reconcile so the
+invariant holds again. Rebuild on a **temporary branch** off `origin/main` — never
+`reset --hard` `dev` in place, or you lose the commit hashes you still need to
+cherry-pick:
+```
+git checkout -b dev-rebuild origin/main
+git cherry-pick --signoff <the unreleased commits>   # the new work only
+git diff origin/dev dev-rebuild                       # MUST be empty (byte-identical)
+git push --force-with-lease origin dev-rebuild:dev
+```
+This drops redundant already-released commits (and is how the 0.7.5→0.7.8 gap was
+finally closed).
+
+A scheduled CI check (`.github/workflows/branch-drift.yml`) asserts `main` is an
+ancestor of `dev` and fails the day the histories diverge — catching a missed
+fast-forward (or an accidental squash promotion) before it accumulates.
 
 ## Before you open a PR
 

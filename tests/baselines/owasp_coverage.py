@@ -24,8 +24,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-DEFAULT_BASELINE = THIS_DIR / "v0.7.7-claude48"
-DEFAULT_OUT = Path.cwd() / "owasp-coverage-report.html"
+
+def _baseline_sort_key(p: Path):
+    """Version-aware sort key for `v*` baseline dirs: compares the numeric
+    version components, so v0.7.10 sorts above v0.7.9 (plain name sorting puts
+    it below). Non-numeric parts and unparseable names fall back to 0."""
+    version = p.name[1:].split("-", 1)[0]  # "0.7.10" from "v0.7.10-claude48"
+    nums = [int(part) if part.isdigit() else 0 for part in version.split(".")]
+    return (nums, p.name)
+
+
+def _default_baseline() -> Path:
+    """Return the canonical baseline named in CURRENT, falling back to the newest v* dir."""
+    current_file = THIS_DIR / "CURRENT"
+    if current_file.is_file():
+        name = current_file.read_text(encoding="utf-8").strip()
+        candidate = THIS_DIR / name
+        if candidate.is_dir():
+            return candidate
+    candidates = sorted([p for p in THIS_DIR.glob("v*") if p.is_dir()],
+                        key=_baseline_sort_key, reverse=True)
+    return candidates[0] if candidates else THIS_DIR / "v0.7.7-claude48"
+
+DEFAULT_BASELINE = _default_baseline()
+DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
 
 TARGETS = [
     ("finbot",                  "FinBot",                       "https://github.com/OWASP-ASI/finbot-ctf-demo",
