@@ -27,8 +27,9 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from theme_utils import load_theme_css
+
 THIS_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = THIS_DIR.parents[1] / "assets"   # tests/baselines -> repo root -> assets/
 
 def _baseline_sort_key(p: Path):
     """Version-aware sort key for `v*` baseline dirs: compares the numeric
@@ -53,19 +54,6 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
-
-
-def load_theme_css() -> str:
-    """Inline the shared design system (assets/praxen-theme.css) so the report
-    stays a self-contained single file. Edit that file to retheme every surface
-    (this report, the RAISE report, and the landing page) from one place."""
-    theme = ASSETS_DIR / "praxen-theme.css"
-    try:
-        return theme.read_text(encoding="utf-8")
-    except OSError:
-        print(f"owasp_coverage.py: warning: shared theme not found at {theme}; "
-              "report will use report-specific CSS only", file=sys.stderr)
-        return ""
 
 
 TARGETS = [
