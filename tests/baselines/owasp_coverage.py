@@ -54,6 +54,8 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
+# Live styled docs (the guide/ site), linked from the report for further reading.
+DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide"
 
 
 TARGETS = [
@@ -315,6 +317,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       This report sums those scalars across the frozen baseline JSONs in <code>tests/baselines/{html.escape(baseline_name)}/</code> — one per target — yielding the primary-classification counts shown.
       A finding can carry both an LLM and an Agentic primary tag, so the two totals overlap; a finding without any OWASP primary classification (a RAISE-only or supply-chain-only finding) appears in neither chart but still in the per-target total.
       The frozen baselines are version-pinned outputs of the cold pre-release scans; see <code>tests/baselines/README.md</code>.
+      For how Praxen classifies findings against the OWASP Top 10, see the <a href="{DOCS_BASE}/owasp.html">OWASP Gen&nbsp;AI Security guide</a>.
     </p>
   </section>
 

@@ -57,6 +57,8 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "raise-coverage-report.html"
+# Live styled docs (the guide/ site), linked from the report for further reading.
+DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide"
 
 
 TARGETS = [
@@ -495,7 +497,8 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       have weight&nbsp;0.15. Scores are from static source scans run at the version pinned in the
       baseline directory name; they reflect the agent's posture at the time of the scan, not the
       current state of the target repositories.
-      See <code>tests/baselines/README.md</code> for the full baseline methodology.
+      See <code>tests/baselines/README.md</code> for the full baseline methodology,
+      and the <a href="{DOCS_BASE}/RAISE.html">RAISE Framework guide</a> for the maturity model itself.
     </p>
   </section>
 
