@@ -15,7 +15,7 @@ The `WORKER_REMIT.md` for this agent was created using:
 * `Claude Sonnet 4.6` with medium effort, and
 * the following prompt:
   ```text
-  draft a worker remit for the agent source code at /Users/json/src/github/help-agent-accelerator
+  draft a worker remit for the agent source code at ../../github/help-agent-accelerator
   ```
 
 ## Report Generation
