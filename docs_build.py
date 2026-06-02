@@ -55,21 +55,31 @@ LEADING_COMMENT = re.compile(r"^\s*<!--.*?-->\s*", re.DOTALL)
 
 
 def rewrite_links(body: str) -> str:
-    """Rewrite href targets for the generated site:
-      - external (http/https/mailto) and pure #anchors: unchanged
-      - ../repo/file: GitHub blob view (these are dev artifacts, not on the site)
+    """Rewrite href targets in the generated HTML for the site:
+      - any URL with a scheme (http, https, mailto, ftp, …), a protocol-relative
+        //host, or a pure #anchor: left untouched
+      - ../repo/file: GitHub blob view (dev artifacts, not served on the site)
       - sibling docs foo.md[#frag]: foo.html[#frag]
+
+    This runs on the rendered HTML, so it also rewrites links inside any raw-HTML
+    passthrough blocks a doc may contain — correct for real navigation links. An
+    author wanting to *show* a literal `.md` href as an example should put it in a
+    fenced code block (Python-Markdown escapes the quotes there, so it never
+    matches). Both double- and single-quoted href attributes are handled.
     """
     def repl(m):
-        href = m.group(1)
-        # Any scheme (http, https, mailto, ftp, …), protocol-relative, or pure
-        # in-page anchor: leave untouched.
+        quote, href = m.group(1), m.group(2)
         if urlparse(href).scheme or href.startswith(("#", "//")):
             return m.group(0)
         if href.startswith("../"):
-            return f'href="{REPO}/blob/main/{href[3:]}"'
-        return 'href="' + re.sub(r"\.md(#|$)", r".html\1", href) + '"'
-    return re.sub(r'href="([^"]+)"', repl, body)
+            # docs/ is one level below the repo root, so a legitimate cross-repo
+            # link is a single `../`. Strip any leading `../` runs defensively so
+            # a stray `../../x` still yields a repo-root path, not `./x`.
+            new = f"{REPO}/blob/main/" + re.sub(r"^(?:\.\./)+", "", href)
+        else:
+            new = re.sub(r"\.md(#|$)", r".html\1", href)
+        return f"href={quote}{new}{quote}"
+    return re.sub(r"""href=(["'])(.*?)\1""", repl, body)
 
 
 def onpage_toc(toc_tokens) -> str:

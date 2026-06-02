@@ -27,7 +27,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from theme_utils import load_theme_css
+from theme_utils import load_theme_css, DOCS_BASE
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -54,8 +54,6 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "owasp-coverage-report.html"
-# Live styled docs (the guide/ site), linked from the report for further reading.
-DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide"
 
 
 TARGETS = [
