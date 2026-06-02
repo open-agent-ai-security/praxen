@@ -138,4 +138,6 @@ fast-forward (or an accidental squash promotion) before it accumulates.
 
 - Run the test suite: `python3 tests/render/test_render.py` — it should report all checks passing.
 - If you changed `skills/behavior-verifier/render.py` or `report_template.html`, regenerate the golden fixtures (see the header comment in `tests/render/test_render.py`) and include them in your PR.
+- If you changed any `docs/*.md`, regenerate the styled GitHub Pages docs and include the updated `guide/*.html`:
+  `pip install -r requirements-dev.txt && python3 docs_build.py`. The build-only `markdown` dependency is never shipped in the plugin; the distributable keeps the raw `docs/*.md`.
 - Keep changes scoped; one logical change per PR.

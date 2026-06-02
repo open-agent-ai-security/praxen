@@ -37,6 +37,29 @@ if [[ "$VERSION" != "$MARKET_VERSION" ]]; then
   exit 1
 fi
 
+# Freshness backstop: rebuild the GitHub Pages docs (guide/) from docs/*.md.
+# These pages are NOT packaged — Pages serves them from the repo — but rebuilding
+# here catches docs/ edits (or shared-theme changes) that weren't regenerated
+# before a tagged release. Requires the build-only `markdown` dependency
+# (requirements-dev.txt); skipped with a notice when absent so the stdlib-only CI
+# build stays green. The release workflow installs the dep, so a tagged release
+# always enforces this check.
+if python3 -c "import markdown" >/dev/null 2>&1; then
+  echo "Rebuilding docs site (guide/) from docs/*.md…"
+  python3 docs_build.py >/dev/null
+  if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if [[ -n "$(git status --porcelain -- guide/)" ]]; then
+      echo "error: guide/ is out of date with docs/*.md (or the shared theme)." >&2
+      echo "       run 'python3 docs_build.py' and commit the updated guide/*.html." >&2
+      git status --porcelain -- guide/ >&2
+      exit 1
+    fi
+  fi
+else
+  echo "note: 'markdown' not installed — skipping docs (guide/) rebuild + freshness check." >&2
+  echo "      run 'pip install -r requirements-dev.txt' to enable (the release workflow does this)." >&2
+fi
+
 DIST_DIR="dist"
 STAGE_DIR="$DIST_DIR/praxen-$VERSION"
 ZIP_PATH="$DIST_DIR/praxen-$VERSION.zip"

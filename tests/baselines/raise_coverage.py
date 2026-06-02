@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, stdev
 
-from theme_utils import load_theme_css
+from theme_utils import load_theme_css, DOCS_BASE
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -495,7 +495,8 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       have weight&nbsp;0.15. Scores are from static source scans run at the version pinned in the
       baseline directory name; they reflect the agent's posture at the time of the scan, not the
       current state of the target repositories.
-      See <code>tests/baselines/README.md</code> for the full baseline methodology.
+      See <code>tests/baselines/README.md</code> for the full baseline methodology,
+      and the <a href="{DOCS_BASE}/RAISE.html">RAISE Framework guide</a> for the maturity model itself.
     </p>
   </section>
 

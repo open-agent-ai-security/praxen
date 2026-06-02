@@ -27,7 +27,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from theme_utils import load_theme_css
+from theme_utils import load_theme_css, DOCS_BASE
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -315,6 +315,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       This report sums those scalars across the frozen baseline JSONs in <code>tests/baselines/{html.escape(baseline_name)}/</code> — one per target — yielding the primary-classification counts shown.
       A finding can carry both an LLM and an Agentic primary tag, so the two totals overlap; a finding without any OWASP primary classification (a RAISE-only or supply-chain-only finding) appears in neither chart but still in the per-target total.
       The frozen baselines are version-pinned outputs of the cold pre-release scans; see <code>tests/baselines/README.md</code>.
+      For how Praxen classifies findings against the OWASP Top 10, see the <a href="{DOCS_BASE}/owasp.html">OWASP Gen&nbsp;AI Security guide</a>.
     </p>
   </section>
 

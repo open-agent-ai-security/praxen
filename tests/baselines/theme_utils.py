@@ -8,6 +8,10 @@ from pathlib import Path
 # tests/baselines/theme_utils.py -> repo root -> assets/praxen-theme.css
 THEME_CSS = Path(__file__).resolve().parents[2] / "assets" / "praxen-theme.css"
 
+# Base URL of the live styled docs (the guide/ site); reports link here for
+# further reading. Shared so the two coverage generators can't drift.
+DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide"
+
 
 def load_theme_css() -> str:
     """Return the shared design system (assets/praxen-theme.css) so a coverage
