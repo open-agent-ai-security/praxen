@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,7 @@ TEMPLATE = os.path.join(SKILL_DIR, "report_template.html")
 FIXTURE_DIR = os.path.join(REPO_ROOT, "tests", "fixtures")
 MANIFEST = os.path.join(FIXTURE_DIR, "helperbot.manifest.md")
 GOLDEN_JSON = os.path.join(FIXTURE_DIR, "helperbot.from_manifest.json")
+PLUGIN_JSON = os.path.join(REPO_ROOT, ".claude-plugin", "plugin.json")
 
 sys.path.insert(0, SKILL_DIR)
 import schema  # noqa: E402
@@ -67,6 +69,28 @@ def read_bytes(path):
     return Path(path).read_bytes()
 
 
+def live_plugin_version():
+    """The canonical Praxen version the converter stamps into every output —
+    read from .claude-plugin/plugin.json, the same single source of truth the
+    converter's _load_praxen_version() uses."""
+    return json.loads(read_text(PLUGIN_JSON))["version"]
+
+
+_VERSION_RE = re.compile(rb'("praxen_version":\s*")[^"]*(")')
+
+
+def mask_version(data: bytes) -> bytes:
+    """Blank out the praxen_version value for the golden byte-comparison.
+
+    praxen_version is injected from .claude-plugin/plugin.json — it is NOT
+    derived from the manifest — so it tracks the live release and would make the
+    golden go stale on every version bump (which is exactly how this test came to
+    fail silently between 0.7.5 and 0.7.8). The converter's *stamping behavior*
+    is asserted separately below; here we hold it constant so the round-trip
+    checks everything the manifest actually drives."""
+    return _VERSION_RE.sub(rb"\1\2", data)
+
+
 def assert_parse_error(label, manifest_text, expected_substring):
     """Run the parser on `manifest_text`; check that it raises ManifestError
     whose message contains `expected_substring`."""
@@ -90,8 +114,18 @@ with tempfile.TemporaryDirectory() as td:
     check("converter exits 0", res.returncode == 0, res.stderr or res.stdout)
     actual_bytes = read_bytes(out)
     golden_bytes = read_bytes(GOLDEN_JSON)
-    check("output bytes match golden", actual_bytes == golden_bytes,
-          f"actual_len={len(actual_bytes)} golden_len={len(golden_bytes)}")
+    # Compare with praxen_version masked — it's stamped from plugin.json, not the
+    # manifest, so it must not couple the golden to the live release version.
+    masked_actual = mask_version(actual_bytes)
+    masked_golden = mask_version(golden_bytes)
+    check("output bytes match golden (version-masked)", masked_actual == masked_golden,
+          f"actual_len={len(masked_actual)} golden_len={len(masked_golden)}")
+    # …and assert the stamping behavior directly: the converter must write the
+    # current plugin.json version, regardless of what the golden was captured at.
+    stamped = json.loads(actual_bytes).get("praxen_version")
+    live = live_plugin_version()
+    check("converter stamps current plugin.json version", stamped == live,
+          f"stamped={stamped!r} plugin.json={live!r}")
 
 # ── 2. Determinism: rerun produces identical output ─────────────────────────
 print("\n2. Determinism")
