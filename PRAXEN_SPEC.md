@@ -59,7 +59,7 @@ Reports must never contain the literal value of a secret, credential, token, pas
 
 ### 2.4 Least privilege
 
-Praxen operates read-only on the agent's workspace. It does not take action on behalf of the agent. It does not modify the agent's code, skill files, configuration, or dependencies. It writes output only to its own `./reports/` directory in the current working directory.
+Praxen is designed to operate read-only on the agent's workspace: the skill reads the agent's artifacts and writes output only to its own `./reports/` directory in the current working directory. It does not take action on behalf of the agent, and does not modify the agent's code, skill files, configuration, or dependencies. This is a behavioral contract of the skill's instructions, not a technical sandbox — Praxen runs with the coding agent's ordinary tool access (including Bash and Write), so the read-only posture is enforced by convention rather than by an isolation boundary. (This is the same declared-versus-enforced distinction Praxen itself flags when it scans other agents.)
 
 ### 2.5 Separation
 
@@ -492,7 +492,7 @@ The Praxen operationalizes the **RAISE Security Review Skill** — a structured 
 The key design decisions in Praxen's synthesis:
 - A single Worker Remit serves as the policy baseline — Praxen's primary signal is divergence between declared policy and observed implementation.
 - A unified canonical findings JSON with dual RAISE + OWASP classification is the complete record; it carries every prose field the report shows, so JSON-only consumers see the same content as humans.
-- A canonical HTML template *plus* two deterministic Python scripts in sequence (`manifest_to_findings.py` translates the Step 9.9 draft manifest into the canonical findings JSON; `render.py` substitutes the JSON into the template): the LLM does judgment, code does the mechanical substitution — so every report looks identical, byte-for-byte, regardless of which model produced the findings, and a malformed analysis fails loudly at the schema validator rather than producing a broken report.
+- A canonical HTML template *plus* two deterministic Python scripts in sequence (`manifest_to_findings.py` translates the Step 9.9 draft manifest into the canonical findings JSON; `render.py` substitutes the JSON into the template): the LLM does judgment, code does the mechanical substitution — so the report's structure and styling are identical regardless of which model produced the findings (the renderer is deterministic: a given findings JSON always yields byte-identical HTML and TXT), and a malformed analysis fails loudly at the schema validator rather than producing a broken report. The findings themselves are LLM judgment and vary run to run; it is the rendering, not the analysis, that is byte-deterministic.
 - The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state. (Python 3 is the one runtime besides Claude Code — stdlib only.)
 
 ---
