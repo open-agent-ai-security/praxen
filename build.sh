@@ -81,6 +81,7 @@ mkdir -p "$STAGE_DIR"
 INCLUDE=(
   ".claude-plugin"
   ".codex-plugin"
+  ".agents"
   "README.md"
   "PRAXEN_SPEC.md"
   "LICENSE"

@@ -23,7 +23,11 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 ---
 
-**📦 Install** with Claude Code — `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
+**📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
+- **Claude Code:** `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`
+- **OpenAI Codex:** `codex plugin marketplace add open-agent-ai-security/praxen` then `codex plugin add praxen@open-agent-ai-security`
+
+Full guide (including the unzipped-release path, which works for either): [docs/installation.md](docs/installation.md).
 
 **👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
 
