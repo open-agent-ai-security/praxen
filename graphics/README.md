@@ -19,7 +19,7 @@ Brand and site assets for Praxen.
 | `favicon-180.png` | 180×180 | **Used** | Apple touch icon (`index.html:18`). |
 | `favicon-256.png` | 256×256 | **Used** | Bookmark / high-res icon (`index.html:17`). |
 
-The three favicons are **generated from `../favicon-master.png`** (the orange-tile shield, sized down with `sips`) — re-derive them from it if the favicon art changes. See *Editing notes* for the commands. (256 is a mild upscale: the master is 192×192.)
+The three favicons are **generated from `favicon-master.png`** (the orange-tile shield, sized down with `sips`) — re-derive them from it if the favicon art changes. See *Editing notes* for the commands. (256 is a mild upscale: the master is 192×192.)
 
 ## `graphics/` — source masters & other assets
 
