@@ -80,6 +80,7 @@ mkdir -p "$STAGE_DIR"
 # Add here if a new distributable artifact is introduced.
 INCLUDE=(
   ".claude-plugin"
+  ".codex-plugin"
   "README.md"
   "PRAXEN_SPEC.md"
   "LICENSE"
