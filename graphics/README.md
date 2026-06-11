@@ -16,12 +16,12 @@ Naming is by the **background the asset sits on**: `-dark-background` = light/wh
 | Base name (`.svg` + `.png`) | Form | For background | Used by |
 |---|---|---|---|
 | `praxen-favicon` | Shield app-tile (orange) | self-contained | **Favicon master** → `web/favicon-32/180/256.png` |
-| `praxen-lockup-dark-background` | Shield + "Praxen" + descriptor, horizontal | dark | **Landing nav (`index.html:284`) + footer (`:496`) + docs nav (`docs_build.py:135` → all `guide/*.html`)** — the SVG is referenced directly |
-| `praxen-lockup-light-background` | Same lockup | light | Available (no light-bg surface on the site yet) |
+| `praxen-wordmark-dark-background` | Shield + "Praxen", **no** descriptor, horizontal | dark | **Landing nav (`index.html:284`) + footer (`:496`) + docs nav (`docs_build.py:135` → all `guide/*.html`)** — the SVG is referenced directly (the descriptor renders too small at header size, so the header uses the wordmark, not the full lockup) |
+| `praxen-wordmark-light-background` | Same wordmark | light | Available (no light-bg surface on the site yet) |
+| `praxen-lockup-dark-background` | Shield + "Praxen" + descriptor, horizontal | dark | Available (full lockup, for larger placements) |
+| `praxen-lockup-light-background` | Same lockup | light | Available |
 | `praxen-lockup-stacked-dark-background` | Shield over wordmark+descriptor | dark | Available (square-ish contexts) |
 | `praxen-lockup-stacked-light-background` | Same, stacked | light | Available |
-| `praxen-wordmark-dark-background` | Shield + "Praxen", **no** descriptor, horizontal | dark | Available |
-| `praxen-wordmark-light-background` | Same wordmark | light | Available |
 | `community-logo-dark-background` | "Open Agentic and AI Security Community" (umbrella org — purple shield) | dark | Available — the **parent-org** brand, not Praxen's |
 | `community-logo-light-background` | Same | light | Available |
 
