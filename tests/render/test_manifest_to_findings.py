@@ -76,7 +76,7 @@ def live_plugin_version():
     return json.loads(read_text(PLUGIN_JSON))["version"]
 
 
-_VERSION_RE = re.compile(rb'("praxen_version":\s*")[^"]*(")')
+_VERSION_RE = re.compile(rb'("praxen_version"\s*:\s*")[^"]*(")')
 
 
 def mask_version(data: bytes) -> bytes:

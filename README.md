@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.7.8**
+**agent behavior verifier · Version 0.8.0**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
@@ -23,7 +23,11 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 ---
 
-**📦 Install** with Claude Code — `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`. Full guide: [docs/installation.md](docs/installation.md).
+**📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
+- **Claude Code:** `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`
+- **OpenAI Codex:** link `skills/behavior-verifier` into `.agents/skills/` and invoke `$praxen:behavior-verifier`
+
+Full guide (including the unzipped-release path, which works for either): [docs/installation.md](docs/installation.md).
 
 **👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
 
@@ -78,7 +82,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 ## Get started
 
-- [**Installation**](docs/installation.md) — plugin marketplace install or unzipped release
+- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex; marketplace or unzipped release
 - [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
@@ -86,7 +90,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 - [**Challenging and Revising Findings**](docs/challenging-findings.md) — what to do when you disagree
 - [**Full documentation index**](docs/index.md)
 
-**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install`; the renderer is stdlib-only.
+**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
 
 ---
 

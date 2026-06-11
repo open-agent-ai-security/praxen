@@ -22,10 +22,11 @@ if [[ -z "$VERSION" ]]; then
   exit 1
 fi
 
-# Sanity-check: PRAXEN_SPEC.md, .claude-plugin/plugin.json, and
-# .claude-plugin/marketplace.json must agree on the version. `manifest_to_findings.py`
-# reads praxen_version from plugin.json at runtime, so a drift between these
-# files silently produces reports stamped with the wrong version.
+# Sanity-check: PRAXEN_SPEC.md, .claude-plugin/plugin.json,
+# .claude-plugin/marketplace.json, and .codex-plugin/plugin.json must agree on the
+# version. `manifest_to_findings.py` reads praxen_version from the Claude plugin.json
+# at runtime, so a drift between these files silently produces reports stamped with
+# the wrong version; the Codex manifest ships the same skill and must not diverge.
 PLUGIN_VERSION="$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")"
 if [[ "$VERSION" != "$PLUGIN_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, plugin.json says $PLUGIN_VERSION" >&2
@@ -34,6 +35,11 @@ fi
 MARKET_VERSION="$(python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); print(m['plugins'][0]['version'])")"
 if [[ "$VERSION" != "$MARKET_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, marketplace.json praxen entry says $MARKET_VERSION" >&2
+  exit 1
+fi
+CODEX_VERSION="$(python3 -c "import json; print(json.load(open('.codex-plugin/plugin.json'))['version'])")"
+if [[ "$VERSION" != "$CODEX_VERSION" ]]; then
+  echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, .codex-plugin/plugin.json says $CODEX_VERSION" >&2
   exit 1
 fi
 
@@ -74,6 +80,8 @@ mkdir -p "$STAGE_DIR"
 # Add here if a new distributable artifact is introduced.
 INCLUDE=(
   ".claude-plugin"
+  ".codex-plugin"
+  ".agents"
   "README.md"
   "PRAXEN_SPEC.md"
   "LICENSE"
