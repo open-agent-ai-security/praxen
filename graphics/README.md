@@ -34,7 +34,7 @@ Naming is by the **background the asset sits on**: `-dark-background` = light/wh
 | `favicon-256.png` | 256×256 | **Used** | Bookmark / high-res icon (`index.html:17`) |
 | `praxy-working.png` | 1500×1001 | **Used** | Hero mascot (`index.html:321`) |
 
-The three favicons are **generated from `../brand/praxen-favicon.png`** (the 743² orange-tile master, sized down with `sips`).
+The three favicons are **generated from `brand/praxen-favicon.png`** (the 743² orange-tile master, sized down with `sips`).
 
 ## `graphics/` — other masters & assets
 
