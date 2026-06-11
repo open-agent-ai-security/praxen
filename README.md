@@ -82,7 +82,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 ## Get started
 
-- [**Installation**](docs/installation.md) — plugin marketplace install or unzipped release
+- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex; marketplace or unzipped release
 - [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
@@ -90,7 +90,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 - [**Challenging and Revising Findings**](docs/challenging-findings.md) — what to do when you disagree
 - [**Full documentation index**](docs/index.md)
 
-**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install`; the renderer is stdlib-only.
+**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
 
 ---
 
