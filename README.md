@@ -82,7 +82,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 ## Get started
 
-- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex; marketplace or unzipped release
+- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin / skill folder, or unzipped release)
 - [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
