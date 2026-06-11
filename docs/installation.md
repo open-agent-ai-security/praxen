@@ -66,8 +66,6 @@ In an interactive Codex session, approve workspace writes when prompted (or star
 
 > **Codex skill name.** Codex shows the skill to the model as `praxen:behavior-verifier` (plugin-qualified) — invoke it as `$praxen:behavior-verifier`, not `$behavior-verifier`.
 
-> **Codex plugin marketplace (experimental).** Praxen also ships `.codex-plugin/plugin.json` and a marketplace manifest (`.agents/plugins/marketplace.json`) for Codex's `codex plugin marketplace add …` / `codex plugin add …` flow. The repo-root plugin layout still needs finalizing before the public `codex plugin marketplace add open-agent-ai-security/praxen` install resolves the plugin, so use the skill-folder install above for now. Tracking: [#81](https://github.com/open-agent-ai-security/praxen/issues/81).
-
 ---
 
 ## Option C — Run from an unzipped release (either agent)
