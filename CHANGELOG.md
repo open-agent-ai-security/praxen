@@ -9,6 +9,26 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [0.8.0] — 2026-06-11
+
+**First-class OpenAI Codex support, a public website (landing page + styled docs), and a refreshed brand identity.** The **scan engine is unchanged** — `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.7.8`, `schema_version` stays `"2.0"`, and the committed baselines are untouched. The one `SKILL.md` change is the frontmatter `description` *length* (trimmed for a Codex skill-load limit); it preserves the full trigger surface and does not touch the 12-step analysis procedure. Codex support is packaging; the website and brand are project assets.
+
+### Added
+- **OpenAI Codex support** ([#83](https://github.com/open-agent-ai-security/praxen/pull/83), [#84](https://github.com/open-agent-ai-security/praxen/pull/84)) — Praxen now runs on **Codex** as well as Claude Code, from the same `skills/behavior-verifier` engine. Adds `.codex-plugin/plugin.json` and a Codex marketplace manifest (`.agents/plugins/marketplace.json`); the skill-folder install (`$praxen:behavior-verifier`, run under a workspace-write sandbox) is smoke-tested end-to-end on Codex. `build.sh` now ships `.codex-plugin/` and `.agents/` in the zip and the version guard spans **four** manifests. The public `codex plugin marketplace add` one-liner needs a verified plugin-subdir layout and is tracked as follow-up ([#81](https://github.com/open-agent-ai-security/praxen/issues/81)).
+- **Public website** — a GitHub Pages **landing page** ([#71](https://github.com/open-agent-ai-security/praxen/pull/71), [#73](https://github.com/open-agent-ai-security/praxen/pull/73)) and a **styled docs site** generated from `docs/*.md` with a shared design system ([#74](https://github.com/open-agent-ai-security/praxen/pull/74)). The distributable still ships the markdown docs; the rendered `guide/` is Pages-only, kept in lockstep by a `build.sh` freshness backstop.
+- **RAISE score-distribution coverage report** ([#63](https://github.com/open-agent-ai-security/praxen/pull/63)), plus version-aware coverage sorting and histogram-bucket clamping ([#68](https://github.com/open-agent-ai-security/praxen/pull/68)).
+- **`branch-drift` CI guard** ([#61](https://github.com/open-agent-ai-security/praxen/pull/61)) — asserts `main` is an ancestor of `dev`, not just a version comparison.
+- **Brand identity** ([#82](https://github.com/open-agent-ai-security/praxen/pull/82), [#84](https://github.com/open-agent-ai-security/praxen/pull/84)) — an SVG logo source set in `graphics/brand/` (favicon, wordmark, full lockup, stacked, in dark/light variants), favicons regenerated from a 743² master, a new Praxy mascot, and a refreshed social card + README banner. On-page logos render as SVG; favicons / social / banner stay PNG for browser and scraper compatibility.
+- **CI gate for the manifest→findings converter test** ([#76](https://github.com/open-agent-ai-security/praxen/pull/76)) and **version-mask regex hardening** ([#79](https://github.com/open-agent-ai-security/praxen/pull/79)) — closes a gap where a failing test across half the deterministic pipeline was hidden behind a green badge, and decouples the golden fixture from the live release version so it can't go silently stale on a bump.
+
+### Changed
+- **Determinism & read-only claims tightened** ([#76](https://github.com/open-agent-ai-security/praxen/pull/76)) in `PRAXEN_SPEC.md` and `docs/`: render-determinism is not whole-report identity (findings are LLM-generated and vary run to run — only the rendering is byte-deterministic), and §2.4 "read-only" is a **behavioral contract of the skill's instructions, not a technical sandbox**.
+- **`SKILL.md` frontmatter `description`** trimmed to ≤1024 chars — Codex enforces that cap at skill-load time (Claude Code has none). The full invocation trigger surface is preserved; the 12-step analysis procedure is unchanged.
+- **Install docs, landing page, and README** reworked for both platforms (Claude Code as the common path, Codex documented alongside), with developer jargon trimmed.
+
+### Unchanged on purpose
+- **The scan engine and findings schema.** No `schema.py`, `render.py`, `manifest_to_findings.py`, or knowledge-base change; `schema_version` stays `"2.0"`; the committed baselines and every scan's output are unaffected. Codex support is packaging, the website and brand are project assets, and the single `SKILL.md` edit is the frontmatter description length.
+
 ## [0.7.8] — 2026-05-31
 
 **Opus 4.8 reference re-baseline, a twelfth (multi-component) baseline target, a docs-first remit generator, and `dev`/`main` drift guards.** The **scan engine is unchanged** — `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.7.7`, and `schema_version` stays `"2.0"`. The one `SKILL.md` change is confined to the **Pre-flight remit-authoring** guidance (how the skill *drafts* a remit on request) and is scan-orthogonal: it does not change the 12-step analysis procedure, the committed baselines, or any scan's output.

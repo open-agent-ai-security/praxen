@@ -27,7 +27,7 @@ The recommended path for Claude Code users. From your terminal:
 ```bash
 claude plugin marketplace add open-agent-ai-security/praxen
 claude plugin install praxen@open-agent-ai-security
-claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.7.8+
+claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.8.0+
 ```
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
@@ -93,7 +93,7 @@ Then point your coding agent at `skills/behavior-verifier/SKILL.md` (Claude Code
 claude plugin list
 ```
 
-If `praxen@open-agent-ai-security` appears at `v0.7.8` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
+If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
 **Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` (e.g. it shows in Codex's skill list), then run a scoped scan and check that JSON / HTML / TXT land under `./reports/`.
 
