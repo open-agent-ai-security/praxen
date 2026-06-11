@@ -63,11 +63,11 @@ Praxen is designed to operate read-only on the agent's workspace: the skill read
 
 ### 2.5 Separation
 
-Praxen is not part of the agent it scans. It runs as a separate Claude Code invocation with its own session and its own output paths. An agent that has been compromised has no ability to interfere with Praxen.
+Praxen is not part of the agent it scans. It runs as a separate coding-agent invocation with its own session and its own output paths. An agent that has been compromised has no ability to interfere with Praxen.
 
 ### 2.6 No external dependencies required
 
-Praxen's hard dependencies are Claude Code (with its API connection to the LLM) and a Python 3 interpreter — **version 3.9 or newer**, standard library only, **no third-party packages to install** — used by the bundled report renderer. (3.9 is the macOS Command Line Tools system Python; 3.8 was dropped at v0.3.0, EOL since 2024-10-07.) Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
+Praxen's hard dependencies are a coding agent — Claude Code or OpenAI Codex (with its API connection to the LLM) — and a Python 3 interpreter — **version 3.9 or newer**, standard library only, **no third-party packages to install** — used by the bundled report renderer. (3.9 is the macOS Command Line Tools system Python; 3.8 was dropped at v0.3.0, EOL since 2024-10-07.) Everything else is local. All findings are written to local files. The HTML report is served from the filesystem and requires no web server. There is no database, message queue, logging infrastructure, or cloud service.
 
 ### 2.7 LLM-native logic
 
@@ -75,7 +75,7 @@ Praxen does not encode detection logic as code rules. The skill file and knowled
 
 The patterns worth catching do not reduce to enumerable rules. "This skill file quietly expands the agent's reach in a direction inconsistent with its remit" is a judgment call. Policy-implementation divergence — where a policy document says one thing and the running code does another — requires reading both and reasoning about whether they match. Traditional detection code cannot do this. An LLM can.
 
-The skill file gives Claude a calibrated framework for these judgments — what signals matter, what they imply, how confident to be — without enumerating every case in advance.
+The skill file gives the model a calibrated framework for these judgments — what signals matter, what they imply, how confident to be — without enumerating every case in advance.
 
 ---
 
@@ -85,7 +85,7 @@ The skill file gives Claude a calibrated framework for these judgments — what 
 ┌─────────────────────────────────────────┐
 │                 PRAXEN                  │
 │                                         │
-│  Invoked in Claude Code by the operator │
+│  Invoked in your coding agent           │
 │  (reads behavior-verifier/SKILL.md)     │
 │                                         │
 │  reads: agent code, skills, tools,      │
@@ -130,7 +130,7 @@ Praxen runs once per invocation: the skill reads and analyzes the workspace, wri
 
 ### Invocation model
 
-Praxen is a Claude Code skill. The operator runs it by opening a Claude Code session in a directory containing the Praxen package and asking Claude Code to read and execute `skills/behavior-verifier/SKILL.md`. Praxen is an on-demand tool — each invocation performs one full analysis and exits.
+Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs it by opening a session in their coding agent, in a directory containing the Praxen package, and asking the agent to read and execute `skills/behavior-verifier/SKILL.md`. Praxen is an on-demand tool — each invocation performs one full analysis and exits.
 
 ### Inputs
 
@@ -254,7 +254,7 @@ A template, `WORKER_REMIT_template.md`, ships at the Praxen package root — wri
 Policy rules must be specific enough to be verifiable. A rule that can't be checked can't be enforced.
 
 - **Too vague:** "Handle email appropriately" — no standard to compare code against.
-- **Specific enough:** "Message bodies must never be retrieved for senders not in the authorized counterparty list" — Claude can read the trust-check implementation and verify the order of operations.
+- **Specific enough:** "Message bodies must never be retrieved for senders not in the authorized counterparty list" — the model can read the trust-check implementation and verify the order of operations.
 
 The test: could Praxen read this rule, read the agent's code, and determine whether the code complies? If the rule is about what the agent *does* (not how it does it), it's the right kind of rule for a remit.
 
@@ -405,11 +405,11 @@ The page renders correctly as `file://` — all CSS is inline, no external scrip
 
 ### Prerequisites
 
-- Claude Code CLI installed and authenticated
-- An Anthropic API key (used by Claude Code)
+- A coding agent installed and authenticated — Claude Code or OpenAI Codex (any agent that can read a skill file and call tools works)
+- Access to that agent's LLM provider (e.g. an Anthropic API key for Claude Code; an OpenAI account for Codex)
 - Python 3.9+ on the PATH (used by `render.py`; standard library only — nothing to `pip install`)
-- The Praxen package in a directory Claude Code can see
-- A Worker Remit for the agent being analyzed (or willingness to write one through Claude Code)
+- The Praxen package in a directory the coding agent can see
+- A Worker Remit for the agent being analyzed (or willingness to write one through the coding agent)
 
 No scheduler, daemon, installer, or configuration file is required.
 
@@ -417,8 +417,8 @@ No scheduler, daemon, installer, or configuration file is required.
 
 1. Drop the Praxen directory anywhere on disk.
 2. Optionally place a `WORKER_REMIT.md` next to `skills/behavior-verifier/SKILL.md` (Praxen will find it automatically).
-3. Open a Claude Code session in the Praxen directory (or any parent).
-4. Tell Claude Code:
+3. Open a session in your coding agent, in the Praxen directory (or any parent).
+4. Tell the coding agent:
    > *"Please read and run skills/behavior-verifier/SKILL.md to analyze [agent workspace path]."*
 5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — four files in `./reports/` (the draft manifest is a working artifact that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
 6. Open the HTML report in a browser.
@@ -429,11 +429,11 @@ Each invocation is independent. To re-analyze after changes, invoke the skill ag
 
 ### Automated scheduling
 
-Praxen does not ship a scheduler. If recurring scans are desired, wrap the Claude Code invocation in whatever scheduler the operator already uses. Example patterns: a nightly cron job running `claude -p "$(cat skills/behavior-verifier/SKILL.md)"`, a GitHub Action on pull request, a launchd timer on macOS. Praxen is stateless across invocations, so scheduling is purely an operator concern.
+Praxen does not ship a scheduler. If recurring scans are desired, wrap the agent invocation in whatever scheduler the operator already uses. Example patterns: a nightly cron job (e.g. `claude -p "$(cat skills/behavior-verifier/SKILL.md)"` on Claude Code, or the Codex CLI equivalent), a GitHub Action on pull request, a launchd timer on macOS. Praxen is stateless across invocations, so scheduling is purely an operator concern.
 
 ### Context window pressure on large workspaces
 
-An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the Claude Code session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
+An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the coding agent's session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
 
 - At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived.
 - The same Step 9.9 prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout — before any file is written — so the operator sees the synthesis even if the session later truncates.
@@ -445,7 +445,7 @@ The draft manifest makes a compacted run recoverable; it does not prevent compac
 
 ## 9. Knowledge Base
 
-Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. These files give Claude the domain vocabulary, risk taxonomy, and pattern recognition needed to produce consistent, well-classified findings across scans.
+Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. These files give the model the domain vocabulary, risk taxonomy, and pattern recognition needed to produce consistent, well-classified findings across scans.
 
 | File | Contents |
 |------|----------|
@@ -454,7 +454,7 @@ Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. T
 | `KB_AGENTIC_TOP10.md` | OWASP Top 10 for Agentic Applications 2026 — agentic-specific attack patterns and the ASI taxonomy for classifying findings. |
 | `KB_MCP_SECURITY.md` | OWASP Secure MCP Server Development Guide 2026 — MCP-specific vulnerability landscape and minimum-bar checklist. Loaded only when MCP configuration is discovered in the workspace. |
 
-The knowledge base does not implement detection logic. It gives Claude a calibrated framework for recognizing risk patterns, scoring consistently, classifying findings against both RAISE and OWASP taxonomies, and generating grounded recommendations.
+The knowledge base does not implement detection logic. It gives the model a calibrated framework for recognizing risk patterns, scoring consistently, classifying findings against both RAISE and OWASP taxonomies, and generating grounded recommendations.
 
 ---
 
@@ -462,7 +462,7 @@ The knowledge base does not implement detection logic. It gives Claude a calibra
 
 ### Model selection
 
-Praxen is designed to run on Anthropic's Sonnet-class models. Smaller models do not reliably perform the remit-implementation cross-referencing Praxen requires. The skill file does not hardcode a model — Claude Code selects based on its session configuration.
+Praxen is designed to run on a frontier model — Anthropic's Sonnet-class (or higher) on Claude Code, a comparable tier on OpenAI Codex. Smaller models do not reliably perform the remit-implementation cross-referencing Praxen requires. The skill file does not hardcode a model — the coding agent selects based on its session configuration.
 
 ### Confidence calibration beats threshold tuning
 
@@ -493,7 +493,7 @@ The key design decisions in Praxen's synthesis:
 - A single Worker Remit serves as the policy baseline — Praxen's primary signal is divergence between declared policy and observed implementation.
 - A unified canonical findings JSON with dual RAISE + OWASP classification is the complete record; it carries every prose field the report shows, so JSON-only consumers see the same content as humans.
 - A canonical HTML template *plus* two deterministic Python scripts in sequence (`manifest_to_findings.py` translates the Step 9.9 draft manifest into the canonical findings JSON; `render.py` substitutes the JSON into the template): the LLM does judgment, code does the mechanical substitution — so the report's structure and styling are identical regardless of which model produced the findings (the renderer is deterministic: a given findings JSON always yields byte-identical HTML and TXT), and a malformed analysis fails loudly at the schema validator rather than producing a broken report. The findings themselves are LLM judgment and vary run to run; it is the rendering, not the analysis, that is byte-deterministic.
-- The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state. (Python 3 is the one runtime besides Claude Code — stdlib only.)
+- The package is self-contained: drop the directory, run the skill, read the report. No installer, no config file, no persistent state. (Python 3 is the one runtime besides the coding agent — stdlib only.)
 
 ---
 
