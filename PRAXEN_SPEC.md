@@ -462,7 +462,7 @@ The knowledge base does not implement detection logic. It gives the model a cali
 
 ### Model selection
 
-Praxen is designed to run on a frontier model — Anthropic's Sonnet-class (or higher) on Claude Code, a comparable tier on OpenAI Codex. Smaller models do not reliably perform the remit-implementation cross-referencing Praxen requires. The skill file does not hardcode a model — the coding agent selects based on its session configuration.
+Praxen is designed to run on a frontier model — Anthropic's Sonnet-class (or higher) on Claude Code, a comparable tier on OpenAI Codex (validated on GPT-5-class). Smaller models do not reliably perform the remit-implementation cross-referencing Praxen requires. The skill file does not hardcode a model — the coding agent selects based on its session configuration.
 
 ### Confidence calibration beats threshold tuning
 
