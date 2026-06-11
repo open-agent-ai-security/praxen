@@ -42,10 +42,9 @@ The three favicons are **generated from `../brand/praxen-favicon.png`** (the 743
 |---|---|---|
 | `praxy-working.png` | **Master** | Full-res source master for the hero; kept in sync with `web/praxy-working.png` |
 | `logo-only.png` | **Master** | Transparent shield-only mark; a brand master (the new favicon's tile lives in `brand/`). Not directly linked by the site |
-| `praxen-social.png` | **Used** | Open Graph + Twitter card image (`index.html:25`, `:29`) — **stays PNG** (social scrapers don't render SVG) |
-| `praxen-banner.png` | **Used** | Banner image in the repo `README.md` (`README.md:7`) — **stays PNG** |
+| `praxen-social.png` | **Used** | Open Graph + Twitter card image (`index.html:25`, `:29`) — fox + robot, 1.91:1. **Stays PNG** (social scrapers don't render SVG) |
+| `praxen-banner.png` | **Used** | Promo banner in the repo `README.md` (`README.md:7`) — logo + mascot + four-step overview. **Stays PNG** |
 | `exabeam-logo-white.svg` | **Used** | Sponsor band on the landing page (`index.html:528`) |
-| `praxen-social-2.png` | **Pending replacement** | Alternate social card; not currently linked |
 | `praxy-waves.png` | **Pending replacement** | Alternate mascot pose; not currently linked |
 
 ## Editing notes
