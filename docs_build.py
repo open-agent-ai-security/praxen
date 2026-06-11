@@ -132,7 +132,7 @@ def page_html(theme_css: str, title: str, nav: str, body: str, src: str) -> str:
 <body class="docs-page">
 <header class="docs-top">
   <div class="docs-top-inner">
-    <a class="docs-brand" href="../"><img src="../graphics/web/praxen-logo-dark-background.png" alt="Praxen"></a>
+    <a class="docs-brand" href="../"><img src="../graphics/brand/praxen-lockup-dark-background.svg" alt="Praxen"></a>
     <div class="docs-top-links">
       <a href="../">Home</a>
       <a href="{REPO}" target="_blank" rel="noopener">GitHub ↗</a>
