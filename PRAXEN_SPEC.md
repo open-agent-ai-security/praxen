@@ -384,7 +384,7 @@ Each analysis produces a self-contained HTML report from a canonical template (`
 
 **Sections, in order** (the masthead gives the verdict at a glance; below it the flow walks from "what the agent is" to the maturity verdict):
 
-1. **Masthead** — navy band with Exabeam-green accent, carrying the Praxen wordmark + tagline, the report identity (`<Agent> Analysis Report` and the completion date), and an at-a-glance metric cluster: finding counts by severity and the RAISE maturity score
+1. **Masthead** — navy band with an orange brand rule, carrying the Praxen brand lockup (inline SVG), the report identity (`<Agent> Analysis Report` and the completion date with artifact count examined), and an at-a-glance metric cluster: finding counts by severity and the RAISE maturity score (the score readout and progress bar are color-graded by maturity band — red below 2.0, amber below 3.5, green at or above)
 2. **Agent Remit (as declared)** — a short prose summary of the agent's declared intent, the baseline everything below is measured against
 3. **Behavior Summary (as observed)** — the dominant finding pattern, 2–4 sentences of synthesis
 4. **Scope of Analysis** — a short prose summary of what was actually examined (source code, deployment state, or behavioral transcript — named explicitly)
@@ -395,7 +395,7 @@ Each analysis produces a self-contained HTML report from a canonical template (`
 9. **OWASP LLM Top 10 (2025) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
 10. **OWASP Agentic Top 10 (2026) Coverage** — mirror of #9, driven by `owasp_agentic` (ASI01–ASI10).
 11. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
-12. **Footer** — brand, project sponsor, agent name, artifact count, finding counts, framework references, Praxen version
+12. **Footer** — navy band mirroring the masthead: brand lockup, repository link, project sponsor (Exabeam), and a legal line (Praxen version, license, copyright)
 
 The page renders correctly as `file://` — all CSS is inline, no external scripts, no external fonts beyond the declared Arial/Lausanne stack.
 
