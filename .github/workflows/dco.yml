@@ -38,15 +38,21 @@ jobs:
             const pr = context.payload.pull_request;
             const marker = '<!-- dco-check -->';
 
-            // Post or update the single bot-authored DCO comment (never spam,
-            // and never hijackable: match the bot author, not just the marker).
-            async function upsertComment(body) {
+            // Find the single bot-authored DCO comment, if one exists (match the
+            // bot author, not just the marker, so it can't be spoofed).
+            async function findDcoComment() {
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner, repo, issue_number: pr.number, per_page: 100,
               });
-              const existing = comments.find(
+              return comments.find(
                 x => x.user && x.user.login === 'github-actions[bot]' && x.body && x.body.includes(marker)
               );
+            }
+
+            // Post the DCO comment, or update it in place if we've already
+            // commented (never spam: one comment per PR, max).
+            async function upsertComment(body) {
+              const existing = await findDcoComment();
               if (existing) {
                 await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
               } else {
@@ -92,7 +98,18 @@ jobs:
             const contributing = `https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md#developer-certificate-of-origin-dco`;
 
             if (bad.length === 0) {
-              await upsertComment(`${marker}\n✅ **DCO check passed** — every commit is signed off. Thanks!`);
+              // Stay quiet on a clean PR — the green status check already says it
+              // passed, so a "passed!" comment is just noise. Only close the loop
+              // when we'd previously flagged a miss: flip that ❌ comment to ✅ so a
+              // contributor who just signed off sees it resolved. Never post a fresh
+              // comment on a PR that was clean from the first push.
+              const existing = await findDcoComment();
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: existing.id,
+                  body: `${marker}\n✅ **DCO check now passes** — every commit is signed off. Thanks for fixing it!`,
+                });
+              }
               core.info('All commits signed off.');
               return;
             }
