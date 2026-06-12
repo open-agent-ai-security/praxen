@@ -24,7 +24,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 ---
 
 **📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
-- **Claude Code:** `/plugin marketplace add open-agent-ai-security/praxen` then `/plugin install praxen@open-agent-ai-security`
+- **Claude Code:** one command — `claude plugin marketplace add open-agent-ai-security/praxen && claude plugin install praxen@open-agent-ai-security`
 - **OpenAI Codex:** link `skills/behavior-verifier` into `.agents/skills/` and invoke `$praxen:behavior-verifier`
 
 Full guide (including the unzipped-release path, which works for either): [docs/installation.md](docs/installation.md).
