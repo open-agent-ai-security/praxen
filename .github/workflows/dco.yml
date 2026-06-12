@@ -4,62 +4,105 @@
 # Enforces the Developer Certificate of Origin (see CONTRIBUTING.md): every
 # non-merge, non-bot commit in a pull request must carry a `Signed-off-by:`
 # trailer whose name/email matches the commit's author or committer. GitHub
-# bot accounts (Dependabot, gemini-code-assist, …) are exempt — they are
-# not human contributions and the DCO does not apply to them. No third-party
-# action — just git.
+# bot accounts (Dependabot, gemini-code-assist, …) are exempt.
+#
+# Runs on `pull_request_target` (not `pull_request`) on purpose:
+#   - it fires IMMEDIATELY, even for first-time fork contributors (whose
+#     `pull_request` workflows are otherwise held pending maintainer approval),
+#     so a missing sign-off fails fast instead of waiting to be noticed;
+#   - it has a write token, so on failure it posts a PR comment with the exact
+#     one-line fix — the contributor sees it instantly, no chasing required.
+#
+# Safety: this job NEVER checks out or runs the PR's code. It only reads commit
+# metadata through the API and posts a comment. That is the standard, safe use
+# of `pull_request_target` — no untrusted code runs with the write token.
 name: DCO
 
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   dco:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Check Signed-off-by on every commit, comment the fix on failure
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
-      - name: Check Signed-off-by on every commit in the PR
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          fail=0
-          for sha in $(git rev-list "$BASE_SHA..$HEAD_SHA"); do
-            subject="$(git show -s --format='%s' "$sha")"
-            # Merge commits don't need a sign-off.
-            if [ "$(git show -s --format='%P' "$sha" | wc -w)" -gt 1 ]; then
-              echo "skip (merge): ${sha:0:12}  $subject"
-              continue
-            fi
-            author="$(git show -s --format='%an <%ae>' "$sha")"
-            committer="$(git show -s --format='%cn <%ce>' "$sha")"
-            # GitHub bot accounts (Dependabot, gemini-code-assist, …) are
-            # exempt from DCO. Detected by the `[bot]` suffix in the author
-            # name — the only way to acquire that suffix is to be a GitHub
-            # App's installation actor, so this can't be spoofed by an
-            # ordinary contributor's display name.
-            if printf '%s' "$author" | grep -qE '\[bot\] <'; then
-              echo "skip (bot): ${sha:0:12}  $subject  ($author)"
-              continue
-            fi
-            body="$(git show -s --format='%B' "$sha")"
-            if ! printf '%s\n' "$body" | grep -qiE '^Signed-off-by: .+ <[^>]+@[^>]+>[[:space:]]*$'; then
-              echo "::error::${sha:0:12} is missing a Signed-off-by line: $subject"
-              fail=1
-              continue
-            fi
-            if printf '%s\n' "$body" | grep -qxF "Signed-off-by: $author" \
-               || printf '%s\n' "$body" | grep -qxF "Signed-off-by: $committer"; then
-              echo "ok: ${sha:0:12}  $subject"
-            else
-              echo "::error::${sha:0:12} has a Signed-off-by, but it doesn't match the author ($author) or committer ($committer): $subject"
-              fail=1
-            fi
-          done
-          if [ "$fail" -ne 0 ]; then
-            echo ""
-            echo "Fix: add a sign-off to each flagged commit, e.g. 'git commit --amend -s' for the last"
-            echo "one, or 'git rebase -i $BASE_SHA' adding a Signed-off-by line to each. See CONTRIBUTING.md."
-            exit 1
-          fi
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const marker = '<!-- dco-check -->';
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+
+            const bad = [];
+            for (const c of commits) {
+              if (c.parents.length > 1) continue;                       // merge commit — exempt
+              const ghIsBot = c.author && c.author.type === 'Bot';
+              const nameIsBot = /\[bot\]$/.test(c.commit.author.name);
+              if (ghIsBot || nameIsBot) continue;                       // bot account — exempt
+
+              const author    = `${c.commit.author.name} <${c.commit.author.email}>`;
+              const committer = `${c.commit.committer.name} <${c.commit.committer.email}>`;
+              const lines = c.commit.message.split('\n').map(l => l.trim());
+              const signed = lines.includes(`Signed-off-by: ${author}`)
+                          || lines.includes(`Signed-off-by: ${committer}`);
+              if (!signed) {
+                bad.push({ sha: c.sha.slice(0, 12), subject: c.commit.message.split('\n')[0], author });
+              }
+            }
+
+            // Find a previous DCO comment so we update in place (never spam).
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+            const existing = comments.find(x => x.body && x.body.includes(marker));
+
+            const contributing = `https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md#developer-certificate-of-origin-dco`;
+
+            let body;
+            if (bad.length === 0) {
+              body = `${marker}\n✅ **DCO check passed** — every commit is signed off. Thanks!`;
+            } else {
+              const n = commits.length;
+              const list = bad.map(b => `- \`${b.sha}\` — ${b.subject}`).join('\n');
+              body = [
+                marker,
+                `## ❌ DCO check failed — missing \`Signed-off-by\``,
+                ``,
+                `This project uses the [Developer Certificate of Origin](${contributing}) instead of a CLA: every commit needs a one-line \`Signed-off-by\` certifying you have the right to submit it. These commits aren't signed:`,
+                ``,
+                list,
+                ``,
+                `### Fix it in one step`,
+                `From your PR branch:`,
+                ``,
+                '```bash',
+                `git rebase --signoff HEAD~${n}`,
+                `git push --force-with-lease`,
+                '```',
+                ``,
+                `That stamps every commit with \`Signed-off-by: Your Name <your@email>\` and this check re-runs automatically. Going forward, just commit with \`git commit -s\`.`,
+                ``,
+                `_(Single commit? \`git commit --amend --signoff && git push --force-with-lease\` works too.)_`,
+              ].join('\n');
+            }
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else if (bad.length > 0) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+            }
+
+            if (bad.length > 0) {
+              core.setFailed(`${bad.length} commit(s) missing a matching Signed-off-by — see the PR comment for the one-line fix.`);
+            } else {
+              core.info('All commits signed off.');
+            }
