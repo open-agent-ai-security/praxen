@@ -9,6 +9,19 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [0.8.1] — 2026-06-12
+
+**Report theme refresh, a paste-safe install command, and a quieter DCO check.** The scan engine's *logic* is unchanged — `schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.8.0`, and `schema_version` stays `"2.0"`. The `render.py` + `report_template.html` change is presentational (report chrome only); every committed baseline re-renders byte-identically from its unchanged JSON.
+
+### Changed
+
+- **Refreshed the analysis-report theme** to match the Praxen brand. The masthead is now a navy band carrying the brand lockup (inline SVG) under an orange brand rule, with a matching navy footer (lockup · repository link · Exabeam sponsor · legal line). The RAISE maturity readout and progress bar are **color-graded by score** — red below 2.0, amber below 3.5, green at or above — instead of a fixed accent, so the color signals the score rather than the brand. The masthead date line now shows the artifact count examined. The light, print-friendly report body is unchanged.
+- **The landing-page install is now a single paste-safe command.** The "Copy install command" button copies one terminal chain — `claude plugin marketplace add … && claude plugin install … && claude plugin list` — instead of two newline-joined in-session `/plugin` slash commands, which fused into a broken submission when pasted into Claude Code (the first `/plugin` swallowed the second line as its arguments). `README.md`'s Claude Code install snippet moved to the same form, aligning the landing page, README, and `docs/installation.md`.
+
+### CI
+
+- The DCO check no longer comments on pull requests that are signed off from the first push. It posts only when a sign-off is missing, and flips that comment to ✅ once the contributor fixes it — so clean PRs stay comment-free while a miss still gets the one-line fix instantly.
+
 ## [0.8.0] — 2026-06-11
 
 **First-class OpenAI Codex support, a public website (landing page + styled docs), and a refreshed brand identity.** The **scan engine is unchanged** — `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.7.8`, `schema_version` stays `"2.0"`, and the committed baselines are untouched. The one `SKILL.md` change is the frontmatter `description` *length* (trimmed for a Codex skill-load limit); it preserves the full trigger surface and does not touch the 12-step analysis procedure. Codex support is packaging; the website and brand are project assets.
