@@ -38,9 +38,39 @@ jobs:
             const pr = context.payload.pull_request;
             const marker = '<!-- dco-check -->';
 
+            // Post or update the single bot-authored DCO comment (never spam,
+            // and never hijackable: match the bot author, not just the marker).
+            async function upsertComment(body) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: pr.number, per_page: 100,
+              });
+              const existing = comments.find(
+                x => x.user && x.user.login === 'github-actions[bot]' && x.body && x.body.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              }
+            }
+
             const commits = await github.paginate(github.rest.pulls.listCommits, {
               owner, repo, pull_number: pr.number, per_page: 100,
             });
+
+            // The commits API caps at 250 even with pagination. If the PR has
+            // more than we can see, fail CLOSED rather than silently pass a
+            // partially-checked PR.
+            if (pr.commits > commits.length) {
+              await upsertComment([
+                marker,
+                `## ⚠️ DCO check could not verify every commit`,
+                ``,
+                `This PR has **${pr.commits}** commits, but GitHub's API returns at most 250, so not all commits can be DCO-checked. Please squash or split the PR (or ask a maintainer) so every commit can be verified.`,
+              ].join('\n'));
+              core.setFailed(`PR has ${pr.commits} commits, exceeding the 250 the commits API returns — cannot fully verify DCO.`);
+              return;
+            }
 
             const bad = [];
             for (const c of commits) {
@@ -59,50 +89,34 @@ jobs:
               }
             }
 
-            // Find a previous DCO comment so we update in place (never spam).
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner, repo, issue_number: pr.number, per_page: 100,
-            });
-            const existing = comments.find(x => x.body && x.body.includes(marker));
-
             const contributing = `https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md#developer-certificate-of-origin-dco`;
 
-            let body;
             if (bad.length === 0) {
-              body = `${marker}\n✅ **DCO check passed** — every commit is signed off. Thanks!`;
-            } else {
-              const n = commits.length;
-              const list = bad.map(b => `- \`${b.sha}\` — ${b.subject}`).join('\n');
-              body = [
-                marker,
-                `## ❌ DCO check failed — missing \`Signed-off-by\``,
-                ``,
-                `This project uses the [Developer Certificate of Origin](${contributing}) instead of a CLA: every commit needs a one-line \`Signed-off-by\` certifying you have the right to submit it. These commits aren't signed:`,
-                ``,
-                list,
-                ``,
-                `### Fix it in one step`,
-                `From your PR branch:`,
-                ``,
-                '```bash',
-                `git rebase --signoff HEAD~${n}`,
-                `git push --force-with-lease`,
-                '```',
-                ``,
-                `That stamps every commit with \`Signed-off-by: Your Name <your@email>\` and this check re-runs automatically. Going forward, just commit with \`git commit -s\`.`,
-                ``,
-                `_(Single commit? \`git commit --amend --signoff && git push --force-with-lease\` works too.)_`,
-              ].join('\n');
-            }
-
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-            } else if (bad.length > 0) {
-              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
-            }
-
-            if (bad.length > 0) {
-              core.setFailed(`${bad.length} commit(s) missing a matching Signed-off-by — see the PR comment for the one-line fix.`);
-            } else {
+              await upsertComment(`${marker}\n✅ **DCO check passed** — every commit is signed off. Thanks!`);
               core.info('All commits signed off.');
+              return;
             }
+
+            const list = bad.map(b => `- \`${b.sha}\` — ${b.subject}`).join('\n');
+            await upsertComment([
+              marker,
+              `## ❌ DCO check failed — missing \`Signed-off-by\``,
+              ``,
+              `This project uses the [Developer Certificate of Origin](${contributing}) instead of a CLA: every commit needs a one-line \`Signed-off-by\` certifying you have the right to submit it. These commits aren't signed:`,
+              ``,
+              list,
+              ``,
+              `### Fix it in one step`,
+              `From your PR branch:`,
+              ``,
+              '```bash',
+              `git rebase --signoff HEAD~${commits.length}`,
+              `git push --force-with-lease`,
+              '```',
+              ``,
+              `That stamps every commit with \`Signed-off-by: Your Name <your@email>\` and this check re-runs automatically. Going forward, just commit with \`git commit -s\`.`,
+              ``,
+              `_(Single commit? \`git commit --amend --signoff && git push --force-with-lease\` works too.)_`,
+            ].join('\n'));
+
+            core.setFailed(`${bad.length} commit(s) missing a matching Signed-off-by — see the PR comment for the one-line fix.`);
