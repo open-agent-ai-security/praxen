@@ -547,6 +547,17 @@ def _overall_status(findings):
     return "clean", "CLEAN"
 
 
+def _maturity_band_class(wo: float) -> str:
+    """Map a weighted RAISE maturity (0–5) to a masthead color band: red below
+    2.0, amber below 3.5, green at or above. Drives the score readout + bar fill
+    so the color signals the score, not the brand (orange stays brand-only)."""
+    if wo < 2.0:
+        return "mh-mat-low"
+    if wo < 3.5:
+        return "mh-mat-mid"
+    return "mh-mat-high"
+
+
 def _global_ctx(data):
     scan = data["scan"]
     rc = data["remit_coverage"]["stat_counts"]
@@ -584,6 +595,7 @@ def _global_ctx(data):
         "N_INFO": str(sc["info"]),
         "WEIGHTED_SCORE": f"{wo:.2f}",
         "RAISE_PCT": str(round(wo / 5 * 100)),
+        "MATURITY_BAND_CLASS": _maturity_band_class(wo),
         "MATURITY_LABEL": maturity_label(wo),
         "WEIGHTED_RATIONALE": esc(posture["weighted_rationale"]),
         "NO_LOGS_NOTE": esc(lf["no_logs_note"]) if not lf["present"] else "",
