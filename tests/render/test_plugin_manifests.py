@@ -87,7 +87,7 @@ def main():
     iface = xp.get("interface") or {}
     check("codex plugin.json has interface.displayName + shortDescription",
           bool(iface.get("displayName") and iface.get("shortDescription")))
-    for e in (plugins or []):
+    for e in (plugins if isinstance(plugins, list) else []):
         check(f"marketplace plugin {e.get('name')!r} has name + source + version",
               bool(e.get("name") and e.get("source") and e.get("version")))
 

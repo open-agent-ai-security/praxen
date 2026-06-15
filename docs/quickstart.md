@@ -56,7 +56,7 @@ That's the whole prompt. Praxen will:
 3. Score the six RAISE categories
 4. Audit every remit rule
 5. Surface compound attack chains
-6. Write three files to `./reports/finbot-quickstart/`
+6. Write three files to `./reports/finbot-quickstart/` (plus a working draft checkpoint it may clean up)
 
 The skill prints an interim overview to stdout while it works. When it finishes you'll have:
 
