@@ -13,7 +13,7 @@ If you haven't installed yet, do [Installation](installation.md) first — one m
 
 ## 1. Get a copy of the Praxen repository
 
-If you don't have a local copy of the Praxen repository yet, clone it (or unzip a release):
+If you don't have a local copy of the Praxen repository yet, clone it:
 
 ```bash
 git clone https://github.com/open-agent-ai-security/praxen.git
