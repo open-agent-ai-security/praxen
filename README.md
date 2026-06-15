@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.8.1**
+**agent behavior verifier**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
@@ -83,7 +83,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 ## Get started
 
 - [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin / skill folder, or unzipped release)
-- [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
+- [**Quickstart**](docs/quickstart.md) — your first end-to-end report in about five minutes: scan the FinBot agent (source cloned from upstream) against the bundled remit
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
 - [**Interpreting Reports**](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
@@ -99,6 +99,8 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 ## Examples
 
 The [`examples/`](examples/) directory contains real analyses against deliberately vulnerable agents from the OWASP Agentic AI CTF and the Damn Vulnerable AI Agent project. Each example ships with the Worker Remit we wrote, the HTML report, and the JSON findings — see [`examples/README.md`](examples/README.md) for the walkthrough.
+
+> **`examples/` holds completed reports, not scan targets.** These directories are showcase output — what Praxen *produces*, not what it *scans*. A scan always needs two separate inputs: a **Worker Remit** and a **separate agent source tree**. To reproduce an example, use its remit (or the matching one under [`tests/remits/`](tests/remits/)) and clone the upstream source linked in [`examples/README.md`](examples/README.md). See [Quickstart](docs/quickstart.md) for the full walkthrough.
 
 ---
 

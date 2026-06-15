@@ -7,6 +7,8 @@
 
 Real analyses from **Praxen** against two deliberately vulnerable AI agents, so you can see Praxen in action.
 
+> **These are completed reports, not scan targets.** This directory is showcase *output* — what Praxen produces — plus the remit each analysis used. It is **not** a source tree to point a scan at. A Praxen scan always takes two separate inputs: a **Worker Remit** and a **separate agent source tree**. To reproduce one of these, use the remit here (or the matching one under [`../tests/remits/`](../tests/remits/)) and clone the upstream **Source** linked below — see [Quickstart](../docs/quickstart.md) for the step-by-step.
+
 For each example we followed the standard Praxen analysis workflow:
 
 1. Wrote a `WORKER_REMIT.md` describing the agent's *intended* scope — what a legitimate version of this agent should and shouldn't do, who it can talk to, what requires approval.
