@@ -38,24 +38,16 @@ mkdir -p "$HOME/.agents/skills"
 ln -sfn "$PWD/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
 ```
 
-Codex surfaces the skill as **`praxen:behavior-verifier`**. Invoke it by name and point it at a target. Praxen needs workspace writes (it creates `./reports/` and runs two bundled Python scripts), so run `codex exec` with a workspace-write sandbox:
+Codex surfaces the skill as **`praxen:behavior-verifier`** — invoke it by that plugin-qualified name (`$praxen:behavior-verifier`, not `$behavior-verifier`) and point it at a target. Praxen needs workspace writes (it creates `./reports/` and runs two bundled Python scripts), so run `codex exec` with a workspace-write sandbox:
 
 ```bash
 codex exec --sandbox workspace-write -C /path/to/scan-dir \
   'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./target. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
 ```
 
-That's the whole happy path. For an end-to-end first run, see [Quickstart](quickstart.md). A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.
+That's the whole happy path; for an end-to-end first run, see [Quickstart](quickstart.md). (To scope the skill to a single project instead of user-wide, link it into that repo's own `.agents/skills/`. A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.)
 
-### Codex — discovery, sandbox & trusted-directory details
-
-You can skip this on a first read; the user-wide link above is all most setups need.
-
-- **Repo-local link (project-only alternative).** To scope the skill to one project instead of user-wide, link it inside that repo: `mkdir -p .agents/skills && ln -sfn "$PWD/skills/behavior-verifier" .agents/skills/behavior-verifier`. Codex walks **up** from the session's directory to find `.agents/skills/`, so a repo-root link is visible from the repo root and any subdirectory (including a nested `local/<target>_scan/`). A scan directory **outside the repo tree** won't see it — which is exactly the case the user-wide link avoids.
-- **Workspace-write sandbox.** In an interactive session, approve workspace writes when prompted (or start with a workspace-write posture). Praxen's reads, the two Python scripts, and the `./reports/` writes all run under that one sandbox — no other approval needed.
-- **Trusted-directory check.** `codex exec -C <dir>` refuses to run in a directory that isn't inside a trusted git repo (`Not inside a trusted directory and --skip-git-repo-check was not specified`). Run from a scan directory inside a git checkout, or add `--skip-git-repo-check` (the unzipped-release smoke test below does exactly this).
-- **Skill name.** Codex shows the skill as the plugin-qualified `praxen:behavior-verifier` — invoke it as `$praxen:behavior-verifier`, not `$behavior-verifier`.
-- **Benign loader warnings.** During discovery Codex may print warnings unrelated to Praxen — about *other* installed plugins, plugin-asset icon-path (`..`) notices, or a telemetry metric-tag warning that the colon-qualified id "contains invalid characters." None block discovery or execution; the skill still loads and runs. The telemetry constraint is a Codex-side limit on the plugin-qualified id, not a Praxen error.
+> **Two Codex gotchas.** `codex exec -C <dir>` refuses to run outside a trusted git repo (`Not inside a trusted directory…`) — run from a git checkout, or add `--skip-git-repo-check`. And on load Codex may print warnings about *other* installed plugins or a telemetry metric-tag on the `praxen:behavior-verifier` id; those are Codex-side and don't affect the scan.
 
 ## Option C — Run from an unzipped release (either agent)
 
