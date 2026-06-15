@@ -104,9 +104,12 @@ Author diagrams as a ` ```mermaid ` fenced block in Markdown — the build does 
 
 - The fence is converted to a `<pre class="mermaid">` element, and the **Mermaid runtime is
   injected only on pages that actually contain a diagram** (other pages stay clean).
-- The runtime loads from a **pinned CDN module** (`mermaid@11` via jsDelivr) and is initialized
-  with a dark theme tuned to the navy palette. Styling lives in `.prose pre.mermaid` /
-  `themeVariables` — adjust there, not in the HTML.
+- The runtime (Mermaid, MIT-licensed) loads from jsDelivr **pinned to an exact version with a
+  Subresource Integrity (SRI) hash** (`MERMAID_VERSION` / `MERMAID_SRI` in `docs_build.py`), so the
+  browser refuses any CDN bytes that don't match. It's initialized with a dark theme tuned to the
+  navy palette; styling lives in `.prose pre.mermaid` / `themeVariables` — adjust there, not in the
+  HTML. To bump Mermaid, change the version and regenerate the SRI hash (the one-liner is in the
+  `docs_build.py` comment).
 
 **Key assumption — diagrams need an HTTP(S) origin to render.** Because the runtime is a remote
 ES module, browsers block the import from a `file://` page (null origin), so a diagram opened

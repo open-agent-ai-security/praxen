@@ -3,9 +3,9 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Quickstart — your first Praxen report in 5 minutes
+# Quickstart — your first Praxen report in five minutes
 
-This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required.
+This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required. (FinBot is small, so five minutes is realistic; a real-world target typically takes longer — see [Usage](usage.md).)
 
 If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
 
@@ -24,7 +24,7 @@ The pieces you'll point Praxen at are already inside `examples/finbot/`:
 examples/finbot/
   WORKER_REMIT.md          ← the policy doc you'll verify against
   finbot-analysis.html     ← the committed report (what your run should approximately produce)
-  finbot-findings.json     ← the same content as canonical JSON
+  finbot-findings.json     ← the same content as the findings JSON
 ```
 
 A real first scan would use *your* agent's source plus a remit you wrote. We're using the pre-staged ones so the first run has no moving parts.
@@ -102,4 +102,4 @@ See the [Troubleshooting](usage.md#troubleshooting) section in `usage.md`. The m
 
 - **"behavior-verifier skill not found"** — restart Claude Code or run `/reload-plugins`
 - **`render.py` errored at the end** — the LLM produced a malformed findings JSON; re-run with more context window or a more focused workspace path
-- **Context window auto-compacted during the run** — Praxen wrote a draft manifest in `./reports/<agent>-draft-<timestamp>.md`; tell the agent to read it and finish from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).
+- **Context window auto-compacted during the run** — Praxen wrote a draft manifest in `./reports/<agent-slug>-draft-<timestamp>.md`; tell the agent to read it and finish from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).

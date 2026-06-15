@@ -13,6 +13,11 @@ Covers:
   * render.py output is byte-deterministic
   * rendered HTML/TXT match the committed golden files (tests/fixtures/finbot.golden.*)
   * HTML normalises stray HTML entities in prose (no double-escaping)
+  * untrusted evidence laced with XSS payloads is HTML-escaped — no live
+    <script>/<img>/event-handler/javascript: markup reaches the report, while the
+    bare-tag allowlist (<strong> etc.) still renders (security regression net)
+  * a credential-shaped evidence snippet triggers a best-effort stderr WARNING
+    (location + pattern, never the value) without changing the rendered output
   * --out-txt-only mode works
   * every committed regression baseline under tests/baselines/ validates against
     schema.py, and the post-relicense ones re-render byte-identically from their
@@ -312,6 +317,87 @@ def main():
     disagreements = [name for (jenum, penum, name) in pairs if list(jenum) != list(penum)]
     check("findings.schema.json enums agree with the Python validator constants",
           not disagreements, f"diverged: {disagreements}")
+
+    # 4f. SECURITY — XSS / HTML-injection hardening. Praxen renders UNTRUSTED
+    #     evidence (a scanned agent's own code, prompts, and session-loaded files
+    #     like SOUL.md / AGENTS.md) into a shareable, self-contained HTML report.
+    #     Every untrusted field must be HTML-escaped via esc(), or pass through
+    #     the bare-tag-only allowlist in render_rich() — no attacker-controlled
+    #     markup may render live. The static template carries zero
+    #     <script>/<img>/on*-handler/javascript: markup (the committed golden has
+    #     none), so any live occurrence after injecting payloads is an escape
+    #     regression. This locks in the behaviour the 1.0 security audit proved
+    #     empirically: a crafted target repo cannot land executable markup in the
+    #     report someone opens in a browser.
+    P_SCRIPT = "<script>alert('xss1')</script>"
+    P_IMG    = "<img src=x onerror=alert('xss2')>"
+    P_CODE   = "<code onmouseover=\"alert('xss4')\">x</code>"   # event handler smuggled onto an allowlisted tag
+    P_AHREF  = "<a href=\"javascript:alert('xss5')\">x</a>"      # javascript: URI inside a rich (allowlisted) field
+    xss = json.loads(json.dumps(data))
+    # esc() paths — plain fields the renderer emits as text/attribute content
+    xss["scan"]["agent"] += P_SCRIPT
+    xss["findings"][0]["summary"] += " " + P_SCRIPT
+    xss["findings"][0]["evidence"][0]["snippet"] = (
+        P_IMG + " // " + xss["findings"][0]["evidence"][0]["snippet"])
+    xss["raise_posture"]["categories"][0]["rationale"] += " " + P_IMG
+    # render_rich() path — behavior_summary allows only the bare tags <p>/<strong>/<em>/<code>
+    xss["behavior_summary"] = (P_SCRIPT + P_CODE + P_AHREF
+                               + " Legit <strong>prose</strong> survives.")
+    xss_path = os.path.join(tmp, "xss.json")
+    xss_html = os.path.join(tmp, "xss.html")
+    dump_json(xss_path, xss)
+    r = run_render(["--findings", xss_path, "--template", TEMPLATE,
+                    "--out-html", xss_html, "--out-txt", os.path.join(tmp, "xss.txt")])
+    check("render exits 0 on a findings file laced with XSS payloads",
+          r.returncode == 0, r.stderr.strip())
+    xh = text_or_empty(xss_html)
+    xl = xh.lower()
+    # (a) no attacker-controlled markup renders LIVE
+    check("no live <script> tag survives injection (esc + render_rich)", "<script" not in xl)
+    check("no live <img> tag survives injection", "<img" not in xl)
+    check("no smuggled handler rides an allowlisted tag (<code onmouseover=...> is escaped)",
+          "<code onmouseover" not in xl)
+    check("no live event-handler attribute on any tag in the report",
+          re.search(r"<[a-z][^>]*\son[a-z]+\s*=", xh, re.I) is None)
+    check("no live <a> carries a javascript: URI",
+          re.search(r"<a\b[^>]*javascript:", xh, re.I) is None)
+    # (b) the payloads were ESCAPED (present-but-inert), not silently dropped —
+    #     proving the escape path ran, rather than the content just vanishing.
+    check("the <script> payload is present but escaped (&lt;script&gt;)", "&lt;script&gt;" in xh)
+    check("the <img onerror> payload is present but escaped (&lt;img)", "&lt;img" in xh)
+    check("the <code> handler-smuggle payload is escaped (&lt;code onmouseover)",
+          "&lt;code onmouseover" in xh)
+    check("the javascript: <a> payload is escaped (&lt;a href=&quot;javascript)",
+          "&lt;a href=&quot;javascript" in xh)
+    # (c) the bare-tag allowlist still works — a legitimate <strong> in the same
+    #     rich field renders live, so the hardening didn't just strip every tag.
+    check("legitimate allowlisted <strong> in a rich field still renders live",
+          "<strong>prose</strong>" in xh)
+
+    # 4g. SECURITY — secret backstop. The renderer WARNS (to stderr, without
+    #     printing the value) when an evidence snippet still looks like it carries
+    #     a credential — surfacing a model slip past the Never-Reprint-Secrets
+    #     redaction rule. The warning must not change the rendered output.
+    sec = json.loads(json.dumps(data))
+    # AKIAIOSFODNN7EXAMPLE is AWS's published, non-functional example key id.
+    sec["findings"][0]["evidence"][0]["snippet"] = "aws_key = 'AKIAIOSFODNN7EXAMPLE'  # example only"
+    sec_path = os.path.join(tmp, "sec.json")
+    dump_json(sec_path, sec)
+    r = run_render(["--findings", sec_path, "--out-txt", os.path.join(tmp, "sec.txt")])
+    check("render still exits 0 on a secret-shaped snippet (warn, not fail)",
+          r.returncode == 0, r.stderr.strip())
+    check("render warns on stderr about a secret-shaped evidence snippet",
+          "WARNING" in r.stderr and "secret" in r.stderr.lower() and "AWS access key id" in r.stderr,
+          f"stderr: {r.stderr!r}")
+    check("the secret warning names the location/pattern, not the value",
+          "AKIAIOSFODNN7EXAMPLE" not in r.stderr)
+    clean = json.loads(json.dumps(data))
+    clean["findings"][0]["evidence"][0]["snippet"] = "aws_key = '[REDACTED — AWS key at config.py:3]'"
+    clean_path = os.path.join(tmp, "clean.json")
+    dump_json(clean_path, clean)
+    rc = run_render(["--findings", clean_path, "--out-txt", os.path.join(tmp, "clean.txt")])
+    check("no secret warning on a clean (redacted) snippet", "WARNING" not in rc.stderr,
+          f"stderr: {rc.stderr!r}")
 
     # 5. negative cases — each must exit non-zero with a useful message
     def negative(name, mutate):

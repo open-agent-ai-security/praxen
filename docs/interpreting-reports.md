@@ -5,7 +5,7 @@
 
 # Interpreting Reports
 
-Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume.
+Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume. (The skill also writes a working `<agent-slug>-draft-<timestamp>.md` checkpoint mid-run — a recovery artifact, not a deliverable, and safe to delete.)
 
 ```mermaid
 flowchart LR
@@ -149,7 +149,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 
 ## The JSON output
 
-`<agent>-findings-<date>.json` is the **canonical, complete record** of the analysis — everything the HTML report shows is derived from it. It is a single top-level object (not a list), with these sections:
+`<agent-slug>-findings-<date>.json` is the **canonical, complete record** of the analysis — everything the HTML report shows is derived from it. It is a single top-level object (not a list), with these sections:
 
 | Key | What's in it |
 |---|---|
@@ -177,7 +177,7 @@ The full schema, with field types and the validator's invariants, is documented 
 
 ## The .txt summary
 
-`<agent>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, **compact OWASP LLM and Agentic Top 10 coverage tables** (per-category finding counts), and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
+`<agent-slug>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, **compact OWASP LLM and Agentic Top 10 coverage tables** (per-category finding counts), and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
 
 - Survive context-window compression in long-running analyses — it's a file on disk, written before the skill's final stdout, so it's there regardless of whether terminal output is lost
 - Be pasted into a Slack thread, email, or PR comment

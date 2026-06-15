@@ -9,6 +9,30 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [Unreleased]
+
+Staging work toward **1.0**. Nothing here is tagged yet — fresh installs still get `0.8.1` until the next release.
+
+### Added
+- **1.0 stability contract** — [`STABILITY.md`](STABILITY.md) defines what 1.0 holds stable (findings JSON schema, RAISE category set + weights, the skill invocation/output contract, the Worker Remit section structure) versus what is free to evolve, plus a one-paragraph semver/compatibility policy.
+- **Agent Behavior Verification concept page + docs authoring/style guide** ([#99](https://github.com/open-agent-ai-security/praxen/pull/99)).
+- **Security regression tests** — the self-contained HTML report is verified (with crafted payloads) to escape untrusted evidence so no `<script>`/event-handler/`javascript:` markup executes; and a best-effort **secret-leak backstop** in `render.py` warns (on stderr, never printing the value) when an evidence snippet looks like a credential.
+- **Plugin-manifest CI test** (`tests/render/test_plugin_manifests.py`) — catches the bare-`"."` marketplace `source` (the v0.6.1 install-breaker) and version drift across the three manifests + `PRAXEN_SPEC.md`, on every PR.
+- **"Releasing and rolling back" runbook** in `CONTRIBUTING.md`.
+
+### Changed
+- **Docs consistency pass** ([#99](https://github.com/open-agent-ai-security/praxen/pull/99)) — sentence-case headings, single section dividers, em-dash list style, normalized blockquote callouts. **Mermaid diagrams now render**, pinned to an exact version with a Subresource Integrity (SRI) hash.
+- README now states the supported **frontier-model tier** and that RAISE scores are **not comparable across model tiers**.
+- `findings.schema.json` `schema_version` accepts any `2.x` (was pinned to `const "2.0"`), matching the minor-tolerant validator.
+- `PRAXEN_SPEC.md` lists **four** input shapes (adds Governance & methodology docs); the MCP framework now uses its official OWASP title (*A Practical Guide for Secure MCP Server Development 2026*).
+- `SECURITY.md` supported-versions table de-staled.
+
+### Fixed
+- `tests/baselines/owasp_coverage.py` — harden the `as_uri()` fallback against a path-like `str`, not only a `Path` ([#50](https://github.com/open-agent-ai-security/praxen/issues/50)).
+
+### CI
+- Bump `actions/github-script` 7 → 9 ([#98](https://github.com/open-agent-ai-security/praxen/pull/98)).
+
 ## [0.8.1] — 2026-06-12
 
 **Report theme refresh, a paste-safe install command, and a quieter DCO check.** The scan engine's *logic* is unchanged — `schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `0.8.0`, and `schema_version` stays `"2.0"`. The `render.py` + `report_template.html` change is presentational (report chrome only); every committed baseline re-renders byte-identically from its unchanged JSON.
@@ -17,6 +41,8 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 - **Refreshed the analysis-report theme** to match the Praxen brand. The masthead is now a navy band carrying the brand lockup (inline SVG) under an orange brand rule, with a matching navy footer (lockup · repository link · Exabeam sponsor · legal line). The RAISE maturity readout and progress bar are **color-graded by score** — red below 2.0, amber below 3.5, green at or above — instead of a fixed accent, so the color signals the score rather than the brand. The masthead date line now shows the artifact count examined. The light, print-friendly report body is unchanged.
 - **The landing-page install is now a single paste-safe command.** The "Copy install command" button copies one terminal chain — `claude plugin marketplace add … && claude plugin install … && claude plugin list` — instead of two newline-joined in-session `/plugin` slash commands, which fused into a broken submission when pasted into Claude Code (the first `/plugin` swallowed the second line as its arguments). `README.md`'s Claude Code install snippet moved to the same form, aligning the landing page, README, and `docs/installation.md`.
+
+- **Reverted the public Codex `plugin marketplace add` path** ([#88](https://github.com/open-agent-ai-security/praxen/pull/88)). The `.agents/plugins/marketplace.json` manifest added in `0.8.0` didn't install reliably, so it (and `.agents/` from the zip) was removed; Codex install is the documented **skill-folder** path (`.agents/skills/`, `$praxen:behavior-verifier`, under a workspace-write sandbox). A reliable public one-liner is tracked in [#102](https://github.com/open-agent-ai-security/praxen/issues/102). *(This reversal shipped in 0.8.1 but was omitted from the entry at release; recorded here for accuracy.)*
 
 ### CI
 

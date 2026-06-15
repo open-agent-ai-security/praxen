@@ -776,6 +776,45 @@ def _read_template(path: str) -> str:
         sys.exit(f"render.py: cannot read template {path}: {e}")
 
 
+# Best-effort secret backstop. The SKILL's "Never Reprint Secrets" rule asks the
+# model to redact credentials to location-and-pattern only; this is a code-side
+# net that WARNS (to stderr — it never alters the rendered output, so the render
+# stays byte-deterministic) when an evidence snippet still looks like it carries a
+# live secret. It names the location and the pattern class, never the value.
+_SECRET_PATTERNS = [
+    ("private key block", re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----")),
+    ("AWS access key id", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("OpenAI-style key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
+    ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b")),
+    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
+    ("assigned credential literal", re.compile(
+        r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)\b"
+        r"\s*[:=]\s*['\"][^'\"\s]{6,}['\"]")),
+]
+
+
+def _warn_secrets(data) -> None:
+    """Scan finding evidence snippets for credential-shaped strings and warn on
+    stderr — without printing the value. Heuristic and best-effort: the primary
+    control is the SKILL's redaction rule; this only surfaces a slip past it."""
+    for f in data.get("findings", []):
+        for ev in (f.get("evidence") or []):
+            snippet = ev.get("snippet")
+            if not isinstance(snippet, str):
+                continue
+            loc = ev.get("file") or "?"
+            if ev.get("line") not in (None, ""):
+                loc = f"{loc}:{ev['line']}"
+            for name, pat in _SECRET_PATTERNS:
+                if pat.search(snippet):
+                    print(f"render.py: WARNING — evidence at {loc} looks like it contains "
+                          f"a secret ({name}); per the Never-Reprint-Secrets rule the report "
+                          f"should carry [REDACTED — pattern at {loc}], not the value. "
+                          f"Rendering as-is.", file=sys.stderr)
+                    break  # one warning per snippet is enough
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="render.py",
@@ -800,6 +839,8 @@ def main(argv=None) -> int:
         schema.validate(data)
     except SchemaError as e:
         sys.exit(f"render.py: schema validation failed — {e}")
+
+    _warn_secrets(data)  # best-effort stderr warning; never alters the output
 
     # Schema validation passed — `schema.validate` raises on any failure, so
     # reaching this point means zero schema errors. The summary line below
