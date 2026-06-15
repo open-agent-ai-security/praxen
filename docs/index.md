@@ -5,18 +5,17 @@
 
 # Praxen Documentation
 
-**Praxen** is the open-source reference implementation of **Agent Behavior Verification (ABV)** — a proactive control model for AI agents and digital workers. It compares an AI agent's declared policy (a Worker Remit) against whatever evidence is available about that agent — source code, live deployment state, behavioral artifacts, governance docs, or any mix — and reports where observed behavior diverges from declared intent.
+**Praxen** is the open-source reference implementation of **[Agent Behavior Verification (ABV)](abv.md)** — a proactive control model for AI agents and digital workers. It compares an AI agent's declared policy (a Worker Remit) against whatever evidence is available about that agent — source code, live deployment state, behavioral artifacts, governance docs, or any mix — and reports where observed behavior diverges from declared intent.
 
 > *Make sure your agent does its job — and only its job.*
 
 *Praxen is a project sponsored by [Exabeam](https://www.exabeam.com/).*
 
----
-
 ## Where to start
 
 | If you are… | Read this first |
 |---|---|
+| New to the concept and want the "why" | [What is Agent Behavior Verification?](abv.md) |
 | Setting up Praxen for the first time | [Installation](installation.md) |
 | Trying it out for the first time | [Quickstart](quickstart.md) — first report against the bundled `finbot` example in five minutes |
 | Ready to run your first real analysis | [Usage](usage.md) |
@@ -28,9 +27,7 @@
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
 | Trying to understand the RAISE maturity scoring | [The RAISE Framework](RAISE.md) |
 
----
-
-## How Praxen Works (in 90 seconds)
+## How Praxen works (in 90 seconds)
 
 Praxen reduces agent verification to a single comparison:
 
@@ -50,9 +47,7 @@ flowchart LR
 
 The output is a self-contained HTML analysis report, a machine-readable JSON findings file, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
 
----
-
-## Four Input Shapes
+## Four input shapes
 
 Praxen is **not just a source-code analyzer.** Any of these — alone or in combination — are valid input:
 
@@ -63,20 +58,16 @@ Praxen is **not just a source-code analyzer.** Any of these — alone or in comb
 
 The methodology adapts. Categories the input doesn't cover are scored at lower confidence and explicitly noted in the report. See [Usage](usage.md) for how to point Praxen at each type.
 
----
-
 ## Frameworks
 
 Every finding Praxen produces is classified against four industry-standard frameworks simultaneously:
 
 - **OWASP Top 10 for LLM Applications 2025** — `LLM01`–`LLM10` tags
 - **OWASP Top 10 for Agentic AI Applications 2026** — `ASI01`–`ASI10` tags
-- **OWASP Secure MCP Server Development Guide 2026** — applied when MCP configuration is found
+- OWASP's **A Practical Guide for Secure MCP Server Development 2026** — applied when MCP configuration is found
 - **RAISE Framework** — six-category 0–5 maturity score; see [RAISE](RAISE.md)
 
 For an overview of the OWASP Gen AI Security Project and a one-line gloss on each LLM, Agentic, and MCP risk, see [OWASP Gen AI Security](owasp.md). Or browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** — aggregate LLM and Agentic Top-10 coverage across Praxen's example suite, with links into each per-target analysis.
-
----
 
 ## Quick reference
 

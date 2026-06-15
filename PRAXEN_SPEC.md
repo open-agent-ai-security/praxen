@@ -17,11 +17,12 @@
 
 **Is what the agent actually does, has done, or is configured to do aligned with its authorized policy?** (intended vs observed behavior)
 
-Praxen is **not limited to source code.** Three input shapes are first-class:
+Praxen is **not limited to source code.** Four input shapes are first-class:
 
 - **Source repository** — code, configs, skill files, prompts, dependencies. Reveals what the agent is *configured* to do.
 - **Running deployment** — live memory files, action logs, configuration files, postmortems pulled from a deployed instance. Reveals what the agent *has done* and the current operational state.
 - **Behavioral artifacts** — chat transcripts, email histories, conversation logs, decision records. Reveals what the agent *actually does* in practice — including subtle policy drift that no static analysis can see.
+- **Governance & methodology docs** — red-team reports, threat models, runbooks, incident retrospectives, dependency-management policy. Reveals the engineering *process* around the agent — feeding the maturity-oriented RAISE categories (Build an AI Red Team, Monitor Continuously, Manage Your Supply Chain) that code alone can't show.
 
 Most agent security failures trace to one of three causes: a misconfigured tool or unreviewed skill file (source); a policy that says one thing while live behavior does another (deployment); or a control that exists in policy but never fires when it should (behavior). Praxen reads whatever evidence is available, compares it to the Worker Remit, and writes findings to a local report. The methodology adapts: categories the input doesn't cover are scored at lower confidence and explicitly noted. Nothing phones home.
 
@@ -452,7 +453,7 @@ Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. T
 | `KB_RAISE_SCANNING.md` | RAISE framework scanning methodology — scoring model, artifact intake patterns, signal-to-risk heuristics, inference rules, compound patterns, positive posture signals. Primary calibration file. |
 | `KB_LLM_TOP10.md` | OWASP Top 10 for LLM Applications 2025 — distilled to code patterns, behavioral indicators, and cross-category compound risks. |
 | `KB_AGENTIC_TOP10.md` | OWASP Top 10 for Agentic Applications 2026 — agentic-specific attack patterns and the ASI taxonomy for classifying findings. |
-| `KB_MCP_SECURITY.md` | OWASP Secure MCP Server Development Guide 2026 — MCP-specific vulnerability landscape and minimum-bar checklist. Loaded only when MCP configuration is discovered in the workspace. |
+| `KB_MCP_SECURITY.md` | OWASP's *A Practical Guide for Secure MCP Server Development 2026* — MCP-specific vulnerability landscape and minimum-bar checklist. Loaded only when MCP configuration is discovered in the workspace. |
 
 The knowledge base does not implement detection logic. It gives the model a calibrated framework for recognizing risk patterns, scoring consistently, classifying findings against both RAISE and OWASP taxonomies, and generating grounded recommendations.
 

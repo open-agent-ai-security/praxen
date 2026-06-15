@@ -9,8 +9,6 @@ This walks you from "Praxen is installed" to "I have a real report" against one 
 
 If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
 
----
-
 ## 1. Get a copy of the example workspace
 
 If you don't have a local copy of the Praxen repository yet, clone it (or unzip a release):
@@ -97,8 +95,6 @@ The pattern is identical with a real target:
 3. Read the report; [iterate](challenging-findings.md) on the remit and the agent as needed
 
 See [Usage](usage.md) for the full set of input shapes and the running-an-analysis details.
-
----
 
 ## If something went wrong
 

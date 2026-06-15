@@ -47,11 +47,50 @@ PAGES = [
     ("interpreting-reports.md",   "Interpreting Reports"),
     ("challenging-findings.md",   "Challenging Findings"),
     ("understanding-variability.md", "Run-to-Run Variability"),
+    ("abv.md",                    "Agent Behavior Verification"),
     ("owasp.md",                  "OWASP Gen AI Security"),
     ("RAISE.md",                  "The RAISE Framework"),
 ]
 
 LEADING_COMMENT = re.compile(r"^\s*<!--.*?-->\s*", re.DOTALL)
+
+# Python-Markdown's fenced_code renders ```mermaid as <pre><code class="language-mermaid">
+# with the source HTML-escaped. Mermaid.js renders elements matching `.mermaid`
+# from their raw text, so convert the block and un-escape the diagram source.
+MERMAID_BLOCK = re.compile(
+    r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.DOTALL
+)
+
+# Loaded only on pages that actually contain a diagram. The guide/ site is the
+# public, online clone (not the shipped self-contained report), so a pinned CDN
+# module is acceptable here; themed to match the dark navy docs.
+MERMAID_SCRIPT = """<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  fontFamily: '"Inter", system-ui, sans-serif',
+  themeVariables: { primaryColor: '#13233b', primaryBorderColor: '#2a3b57',
+    primaryTextColor: '#e8eef7', lineColor: '#8aa0bd', fontSize: '14px' },
+});
+mermaid.run({ querySelector: '.prose pre.mermaid' });
+</script>"""
+
+
+def render_mermaid_blocks(body: str):
+    """Convert escaped mermaid code blocks into Mermaid-renderable elements.
+
+    Returns (new_body, has_mermaid) so the caller can inject the runtime only
+    where a diagram is present.
+    """
+    found = False
+
+    def repl(m):
+        nonlocal found
+        found = True
+        return f'<pre class="mermaid">{html.unescape(m.group(1))}</pre>'
+
+    return MERMAID_BLOCK.sub(repl, body), found
 
 
 def rewrite_links(body: str) -> str:
@@ -119,7 +158,7 @@ def left_nav(active_file: str, active_toc: str) -> str:
     return "".join(out)
 
 
-def page_html(theme_css: str, title: str, nav: str, body: str, src: str) -> str:
+def page_html(theme_css: str, title: str, nav: str, body: str, src: str, body_end: str = "") -> str:
     edit_url = f"{REPO}/blob/main/docs/{src}"
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -146,6 +185,7 @@ def page_html(theme_css: str, title: str, nav: str, body: str, src: str) -> str:
     <p class="docs-edit"><a href="{edit_url}" target="_blank" rel="noopener">Edit this page on GitHub ↗</a></p>
   </main>
 </div>
+{body_end}
 </body>
 </html>
 """
@@ -162,7 +202,9 @@ def build():
     missing = known - on_disk
     if missing:
         sys.exit(f"docs_build.py: PAGES lists files not in docs/: {sorted(missing)}")
-    extra = on_disk - known
+    # README.md is the contributor-facing authoring guide for docs/, not a site
+    # page — intentionally not built into guide/ and not a "forgotten" page.
+    extra = on_disk - known - {"README.md"}
     if extra:
         print(f"docs_build.py: note: docs/*.md not in the nav (skipped): {sorted(extra)}",
               file=sys.stderr)
@@ -178,6 +220,7 @@ def build():
         md.reset()
         body = md.convert(text)
         body = rewrite_links(body)
+        body, has_mermaid = render_mermaid_blocks(body)
 
         m = re.search(r"<h1[^>]*>(.*?)</h1>", body, re.DOTALL)
         # The H1 is already HTML-escaped; unescape before page_html re-escapes it.
@@ -185,7 +228,8 @@ def build():
 
         nav = left_nav(src, onpage_toc(md.toc_tokens))
         out_path = OUT_DIR / (src[:-3] + ".html")
-        out_path.write_text(page_html(theme_css, title, nav, body, src), encoding="utf-8")
+        body_end = MERMAID_SCRIPT if has_mermaid else ""
+        out_path.write_text(page_html(theme_css, title, nav, body, src, body_end), encoding="utf-8")
         print(f"docs_build.py: wrote {out_path.relative_to(ROOT)}")
 
 
