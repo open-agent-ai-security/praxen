@@ -783,7 +783,12 @@ def _read_template(path: str) -> str:
 # never the value). This keeps the shareable HTML/TXT free of the literal secret
 # even if the model's own redaction missed it.
 _SECRET_PATTERNS = [
-    ("private key block", re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----")),
+    # Match the WHOLE PEM block (header through matching footer, DOTALL) so the
+    # base64 body is redacted too — not just the BEGIN line. The footer is optional
+    # so a truncated block (BEGIN + body, no END) still redacts to end of snippet.
+    ("private key block", re.compile(
+        r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
+        r"(?:.*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----|.*)", re.DOTALL)),
     ("AWS access key id", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("OpenAI-style key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
     ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b")),

@@ -400,6 +400,23 @@ def main():
           "a credential value leaked into the rendered report")
     check("the report carries a [REDACTED] marker in place of the secret",
           "[REDACTED" in sh and "AWS access key id" in sh)
+    # A full PEM private-key block must be redacted ENTIRELY (the base64 body, not
+    # just the BEGIN header) — the body is the secret.
+    pk = json.loads(json.dumps(data))
+    body1, body2 = "MIIBVENOTAREALKEYbody0000xxxxYYYYzzzz1234567890abcdef", "SECONDbodyLINEnotreal99887766554433221100"
+    pk["findings"][0]["evidence"][0]["snippet"] = (
+        "-----BEGIN RSA PRIVATE KEY-----\n" + body1 + "\n" + body2 + "\n-----END RSA PRIVATE KEY-----")
+    pk_path = os.path.join(tmp, "pk.json")
+    pk_html = os.path.join(tmp, "pk.html")
+    dump_json(pk_path, pk)
+    rpk = run_render(["--findings", pk_path, "--template", TEMPLATE,
+                      "--out-html", pk_html, "--out-txt", os.path.join(tmp, "pk.txt")])
+    pkh = text_or_empty(pk_html)
+    check("a full PEM private key is redacted entirely (body, not just the BEGIN header)",
+          rpk.returncode == 0 and body1 not in pkh and body2 not in pkh
+          and "BEGIN RSA PRIVATE KEY" not in pkh and "[REDACTED" in pkh,
+          "private-key body leaked into the rendered HTML")
+
     clean = json.loads(json.dumps(data))
     clean["findings"][0]["evidence"][0]["snippet"] = "aws_key = '[REDACTED — AWS key at config.py:3]'"
     clean_path = os.path.join(tmp, "clean.json")
