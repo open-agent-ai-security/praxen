@@ -23,7 +23,7 @@ Within a given `schema_version` MAJOR, the published JSON is a stable contract f
 - The **required sections**: `scan`, `intro_band`, `behavior_summary`, `remit_coverage`, `findings`, `positives`, `log_files`, `raise_posture`, `footer`.
 - The **fixed enumerations**: `SEVERITIES`, `REMIT_STATUSES`, `CONFIDENCES`, `TAG_KINDS`, `ESCALATIONS`, and the finding-ID grammar `PRAX-YYYY-MM-DD-NNN`.
 
-**Additive minors only.** A new *optional* field or a new enum *value* may ship in a schema MINOR (e.g. `2.1`); consumers must ignore unknown fields and unknown enum values. Removing a field, removing/renaming an enum value, or changing a field's type or required-ness is a schema-MAJOR (`3.0`) change. The validator's rule stands: a consumer accepts any matching MAJOR and a newer MINOR, and rejects a different MAJOR.
+**Strict today; additive by policy.** The published schema and the bundled validator (`schema.py`) are **strict** to the current `schema_version` (`2.0`): objects are closed (`additionalProperties: false`) and enums are fixed, so they validate Praxen's own output exactly and reject anything they don't recognize. The **compatibility policy** for future minors is additive — a new *optional* field or enum *value* may ship in a schema MINOR (e.g. `2.1`), and when one does, the published schema and validator are updated in lockstep to accept it. Removing a field, removing/renaming an enum value, or changing a type or required-ness is a schema-MAJOR (`3.0`) change. **Downstream consumers** should pin to the schema MAJOR and tolerate fields/values they don't recognize *in their own parsing*; Praxen's strict validator exists to check Praxen's output, not to read a future minor.
 
 ### 2. The RAISE six-category set and weights
 

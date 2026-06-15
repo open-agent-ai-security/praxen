@@ -16,14 +16,14 @@ Staging work toward **1.0**. Nothing here is tagged yet — fresh installs still
 ### Added
 - **1.0 stability contract** — [`STABILITY.md`](STABILITY.md) defines what 1.0 holds stable (findings JSON schema, RAISE category set + weights, the skill invocation/output contract, the Worker Remit section structure) versus what is free to evolve, plus a one-paragraph semver/compatibility policy.
 - **Agent Behavior Verification concept page + docs authoring/style guide** ([#99](https://github.com/open-agent-ai-security/praxen/pull/99)).
-- **Security regression tests** — the self-contained HTML report is verified (with crafted payloads) to escape untrusted evidence so no `<script>`/event-handler/`javascript:` markup executes; and a best-effort **secret-leak backstop** in `render.py` warns (on stderr, never printing the value) when an evidence snippet looks like a credential.
+- **Security regression tests** — the self-contained HTML report is verified (with crafted payloads) to escape untrusted evidence so no `<script>`/event-handler/`javascript:` markup executes; and a best-effort **secret-leak backstop** in `render.py` **redacts** a credential-shaped evidence snippet (replacing the value with `[REDACTED — <pattern>]`) before it reaches the rendered report, and warns on stderr — so the shareable HTML/TXT never carries the literal value even if the model's own redaction missed it.
 - **Plugin-manifest CI test** (`tests/render/test_plugin_manifests.py`) — catches the bare-`"."` marketplace `source` (the v0.6.1 install-breaker) and version drift across the three manifests + `PRAXEN_SPEC.md`, on every PR.
 - **"Releasing and rolling back" runbook** in `CONTRIBUTING.md`.
 
 ### Changed
 - **Docs consistency pass** ([#99](https://github.com/open-agent-ai-security/praxen/pull/99)) — sentence-case headings, single section dividers, em-dash list style, normalized blockquote callouts. **Mermaid diagrams now render**, pinned to an exact version with a Subresource Integrity (SRI) hash.
 - README now states the supported **frontier-model tier** and that RAISE scores are **not comparable across model tiers**.
-- `findings.schema.json` `schema_version` accepts any `2.x` (was pinned to `const "2.0"`), matching the minor-tolerant validator.
+- **Documented the findings-schema compatibility contract** ([`STABILITY.md`](STABILITY.md)): the published schema and validator are strict to the current `schema_version` (`2.0`); the forward-compatibility policy for future minors is additive, shipped in lockstep. `schema_version` is validated as exact `2.0` across `findings.schema.json` and `schema.py` (no behavior change from `0.8.1` — it documents and tightens the existing contract rather than loosening it).
 - `PRAXEN_SPEC.md` lists **four** input shapes (adds Governance & methodology docs); the MCP framework now uses its official OWASP title (*A Practical Guide for Secure MCP Server Development 2026*).
 - `SECURITY.md` supported-versions table de-staled.
 

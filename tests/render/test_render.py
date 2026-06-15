@@ -374,23 +374,32 @@ def main():
     check("legitimate allowlisted <strong> in a rich field still renders live",
           "<strong>prose</strong>" in xh)
 
-    # 4g. SECURITY — secret backstop. The renderer WARNS (to stderr, without
-    #     printing the value) when an evidence snippet still looks like it carries
-    #     a credential — surfacing a model slip past the Never-Reprint-Secrets
-    #     redaction rule. The warning must not change the rendered output.
+    # 4g. SECURITY — secret backstop. The renderer REDACTS a credential-shaped
+    #     evidence snippet before it reaches the report, and warns (to stderr,
+    #     without the value) — enforcing the Never-Reprint-Secrets rule for the
+    #     shareable HTML/TXT even if the model's own redaction missed it.
     sec = json.loads(json.dumps(data))
     # AKIAIOSFODNN7EXAMPLE is AWS's published, non-functional example key id.
     sec["findings"][0]["evidence"][0]["snippet"] = "aws_key = 'AKIAIOSFODNN7EXAMPLE'  # example only"
     sec_path = os.path.join(tmp, "sec.json")
+    sec_html = os.path.join(tmp, "sec.html")
+    sec_txt = os.path.join(tmp, "sec.txt")
     dump_json(sec_path, sec)
-    r = run_render(["--findings", sec_path, "--out-txt", os.path.join(tmp, "sec.txt")])
-    check("render still exits 0 on a secret-shaped snippet (warn, not fail)",
+    r = run_render(["--findings", sec_path, "--template", TEMPLATE,
+                    "--out-html", sec_html, "--out-txt", sec_txt])
+    check("render still exits 0 on a secret-shaped snippet (redact, not fail)",
           r.returncode == 0, r.stderr.strip())
-    check("render warns on stderr about a secret-shaped evidence snippet",
-          "WARNING" in r.stderr and "secret" in r.stderr.lower() and "AWS access key id" in r.stderr,
+    check("render warns on stderr about a redacted secret",
+          "WARNING" in r.stderr and "redacted" in r.stderr.lower() and "AWS access key id" in r.stderr,
           f"stderr: {r.stderr!r}")
     check("the secret warning names the location/pattern, not the value",
           "AKIAIOSFODNN7EXAMPLE" not in r.stderr)
+    sh = text_or_empty(sec_html); st = text_or_empty(sec_txt)
+    check("the secret VALUE never reaches the rendered HTML or TXT report",
+          "AKIAIOSFODNN7EXAMPLE" not in sh and "AKIAIOSFODNN7EXAMPLE" not in st,
+          "a credential value leaked into the rendered report")
+    check("the report carries a [REDACTED] marker in place of the secret",
+          "[REDACTED" in sh and "AWS access key id" in sh)
     clean = json.loads(json.dumps(data))
     clean["findings"][0]["evidence"][0]["snippet"] = "aws_key = '[REDACTED — AWS key at config.py:3]'"
     clean_path = os.path.join(tmp, "clean.json")

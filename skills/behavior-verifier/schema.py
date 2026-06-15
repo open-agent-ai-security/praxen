@@ -26,8 +26,11 @@ import math
 import re
 
 # ── version ──────────────────────────────────────────────────────────────────
-# The schema major version this validator (and the bundled renderer) understands.
-# A JSON with a different MAJOR is rejected; a newer MINOR is accepted.
+# The exact schema version this validator (and the bundled renderer) understands.
+# Validation is strict (closed objects, fixed enums), so the version check is exact
+# too: a document must declare this version. A future MINOR ships an additive schema
+# and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
+# to read a version we cannot actually validate.
 SCHEMA_VERSION = "2.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
@@ -182,11 +185,9 @@ def _str_list(value, path, *, allow_empty_items=False):
 # ── section validators ───────────────────────────────────────────────────────
 def _validate_version(data):
     sv = _nonempty_str(data, "schema_version", "$")
-    want_major = SCHEMA_VERSION.split(".", 1)[0]
-    got_major = sv.split(".", 1)[0]
-    if got_major != want_major:
+    if sv != SCHEMA_VERSION:
         _err("$.schema_version",
-             f"renderer understands schema {want_major}.x; got {sv!r}")
+             f"renderer understands schema {SCHEMA_VERSION} exactly; got {sv!r}")
     _nonempty_str(data, "praxen_version", "$")
 
 
