@@ -45,7 +45,7 @@ codex exec --sandbox workspace-write -C /path/to/scan-dir \
   'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./target. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
 ```
 
-That's the whole happy path. For an end-to-end first run, see the [Codex smoke test](#verifying-the-install) below. A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.
+That's the whole happy path. For an end-to-end first run, see [Quickstart](quickstart.md). A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.
 
 ### Codex — discovery, sandbox & trusted-directory details
 
@@ -80,34 +80,9 @@ claude plugin list
 
 If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
-**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` (e.g. it shows in Codex's skill list), then run one real FinBot scan — enough to validate Codex skill loading. Both variants clone the **upstream** source into `./finbot` (never `examples/`) and use the FinBot remit that ships in the release zip; they differ only in the scan directory and the trusted-directory flag.
+**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` in Codex's skill list. That's the parity check — it confirms discovery, the same way `claude plugin list` does for Claude Code.
 
-**From a git checkout** — `local/` is gitignored and trusted, so no flag is needed:
-
-```bash
-PRAXEN_ROOT=/path/to/praxen
-cd "$PRAXEN_ROOT"
-mkdir -p local/finbot_scan/reports && cd local/finbot_scan
-git clone https://github.com/OWASP-ASI/finbot-ctf-demo finbot
-cp "$PRAXEN_ROOT/examples/finbot/WORKER_REMIT.md" ./WORKER_REMIT.md
-codex exec --sandbox workspace-write -C "$(pwd)" \
-  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./finbot. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
-```
-
-**From an unzipped release** — not a git repo, so add `--skip-git-repo-check`:
-
-```bash
-PRAXEN_ROOT=/path/to/praxen-unzipped
-mkdir -p "$PRAXEN_ROOT/finbot_scan/reports" && cd "$PRAXEN_ROOT/finbot_scan"
-git clone https://github.com/OWASP-ASI/finbot-ctf-demo finbot
-cp "$PRAXEN_ROOT/examples/finbot/WORKER_REMIT.md" ./WORKER_REMIT.md
-codex exec --skip-git-repo-check --sandbox workspace-write -C "$(pwd)" \
-  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./finbot. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
-```
-
-Either way, expect four files under `reports/`: a `finbot-draft-*.md` checkpoint plus `finbot-findings-*.json`, `finbot-analysis-*.html`, and `finbot-analysis-*.txt`. (For a Codex *platform* check, one FinBot or HelperBot scan is enough; the full 12-target suite is the release gate for Praxen changes — see [tests/README.md](../tests/README.md).)
-
-For a guided end-to-end first run that exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes.
+For the first **end-to-end run** on either platform — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes, with the exact Claude Code and Codex commands.
 
 ## Updating
 

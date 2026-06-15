@@ -51,7 +51,12 @@ Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
 to ./reports/finbot-quickstart/.
 ```
 
-> **On Codex:** the flow is identical — after linking the skill once ([Installation](installation.md#option-b--openai-codex-agent-skill) Option B), invoke `$praxen:behavior-verifier` with the same request (target `../finbot-src`, remit `examples/finbot/WORKER_REMIT.md`). The [Codex smoke test](installation.md#verifying-the-install) shows the exact `codex exec` form.
+**On Codex** the flow is identical. After the one-time user-wide skill link ([Installation](installation.md#option-b--openai-codex-agent-skill) Option B), run the same request via `codex exec` from the `praxen` repo directory:
+
+```bash
+codex exec --sandbox workspace-write -C "$(pwd)" \
+  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ../finbot-src. Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs to ./reports/finbot-quickstart/.'
+```
 
 That's the whole prompt. Praxen will:
 
