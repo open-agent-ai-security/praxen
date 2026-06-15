@@ -71,6 +71,8 @@ For each target:
 6. Instruct Claude Code to read `skills/behavior-verifier/SKILL.md` and analyze the workspace path.
 7. Review `<target>-analysis-<timestamp>.html` in `reports/`.
 
+> **On Codex:** the same single-target flow works — link the skill per [`docs/installation.md`](../docs/installation.md#option-b--openai-codex-agent-skill) Option B and invoke `$praxen:behavior-verifier` against the workspace (same remit + source inputs). The [Codex smoke test](../docs/installation.md#verifying-the-install) is a worked single-target example.
+
 ## Full Suite Run protocol
 
 The Full Suite Run validates a release candidate against all twelve targets. **Typical wallclock: 8–15 min per scan**, ~2 hours of model time across the 12 scans. End-to-end: ~90 min via parallel subagent (4–8 concurrent), ~3–4 hours via sequential foreground.

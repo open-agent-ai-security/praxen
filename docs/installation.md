@@ -44,7 +44,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -sf "$(pwd)/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
 ```
 
-> **Working-directory scope — the common gotcha.** A repo-local `.agents/skills/` link is only visible to Codex sessions launched *inside that directory*. Praxen scans usually run from a **separate** scan directory (holding `WORKER_REMIT.md`, the target source, and `reports/`), where a repo-local link won't be found. For that shape, either link the skill into the **scan directory's** own `.agents/skills/`, or link it **user-wide** (B2).
+> **Working-directory scope — the common gotcha.** Codex walks **up** from the session's directory looking for `.agents/skills/`, so a repo-local link is visible from the repo root *and any subdirectory* — a scan directory nested inside the repo (e.g. `local/<target>_scan/`, as in the smoke test below) does find a repo-root link. What won't find it is a scan directory **outside the repo tree**, with no ancestor holding the link. For that out-of-tree shape, either link the skill into the **scan directory's** own `.agents/skills/`, or link it **user-wide** (B2).
 
 Codex surfaces the skill as **`praxen:behavior-verifier`**. Invoke it by name and point it at a target:
 
@@ -95,21 +95,23 @@ If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, 
 
 ```bash
 PRAXEN_ROOT=/path/to/praxen          # your checkout or unzipped release
-mkdir -p local/finbot_scan/reports   # repo-local + gitignored → no --skip-git-repo-check needed
+cd "$PRAXEN_ROOT"                     # so local/ lands under the repo (gitignored + trusted in a checkout)
+mkdir -p local/finbot_scan/reports
 cd local/finbot_scan
 
 # the agent to scan = the REAL upstream source, never examples/
 # (clone into ./finbot so the report slug — derived from the workspace dir name — is "finbot-…")
 git clone https://github.com/OWASP-ASI/finbot-ctf-demo finbot
 
-# the policy baseline = a committed remit, placed as WORKER_REMIT.md
-cp "$PRAXEN_ROOT/tests/remits/finbot.md" ./WORKER_REMIT.md
+# the policy baseline = the FinBot remit. examples/ ships in the release zip; tests/ does not,
+# so this line works from both a checkout and an unzipped release.
+cp "$PRAXEN_ROOT/examples/finbot/WORKER_REMIT.md" ./WORKER_REMIT.md
 
 codex exec --sandbox workspace-write -C "$(pwd)" \
   'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./finbot. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
 ```
 
-Expect four files under `reports/`: a `finbot-draft-*.md` checkpoint plus `finbot-findings-*.json`, `finbot-analysis-*.html`, and `finbot-analysis-*.txt`. (For a Codex *platform* check, one FinBot or HelperBot scan is enough; the full 12-target suite is the release gate for Praxen changes — see [tests/README.md](../tests/README.md).)
+Expect four files under `reports/`: a `finbot-draft-*.md` checkpoint plus `finbot-findings-*.json`, `finbot-analysis-*.html`, and `finbot-analysis-*.txt`. (From an **unzipped release** rather than a git checkout, `local/` isn't inside a git repo — add `--skip-git-repo-check` to the `codex exec`, per the note in Option B. For a Codex *platform* check, one FinBot or HelperBot scan is enough; the full 12-target suite is the release gate for Praxen changes — see [tests/README.md](../tests/README.md).)
 
 For a guided end-to-end first run that exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes.
 

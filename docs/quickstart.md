@@ -9,7 +9,7 @@ This walks you from "Praxen is installed" to "I have a real report" against **Fi
 
 Every Praxen scan needs **two separate inputs**: a **Worker Remit** (the policy) and a **separate agent source tree** (the evidence). Here you'll use the bundled FinBot remit and clone FinBot's source from upstream. The `examples/finbot/` report files are the *reference output* — what your run should approximately produce — **not** the thing you scan.
 
-If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
+If you haven't installed yet, do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex.
 
 ## 1. Get a copy of the Praxen repository
 
@@ -50,6 +50,8 @@ Please run the behavior-verifier skill against ../finbot-src.
 Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
 to ./reports/finbot-quickstart/.
 ```
+
+> **On Codex:** the flow is identical — after linking the skill once ([Installation](installation.md#option-b--openai-codex-agent-skill) Option B), invoke `$praxen:behavior-verifier` with the same request (target `../finbot-src`, remit `examples/finbot/WORKER_REMIT.md`). The [Codex smoke test](installation.md#verifying-the-install) shows the exact `codex exec` form.
 
 That's the whole prompt. Praxen will:
 
