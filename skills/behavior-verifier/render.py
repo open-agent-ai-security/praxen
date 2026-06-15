@@ -776,6 +776,54 @@ def _read_template(path: str) -> str:
         sys.exit(f"render.py: cannot read template {path}: {e}")
 
 
+# Best-effort secret backstop. The SKILL's "Never Reprint Secrets" rule asks the
+# model to redact credentials to location-and-pattern only; this is a code-side
+# net that REDACTS a credential-shaped evidence snippet before it reaches the
+# rendered report, and warns (to stderr — naming the location and pattern class,
+# never the value). This keeps the shareable HTML/TXT free of the literal secret
+# even if the model's own redaction missed it.
+_SECRET_PATTERNS = [
+    # Match the WHOLE PEM block (header through matching footer, DOTALL) so the
+    # base64 body is redacted too — not just the BEGIN line. The footer is optional
+    # so a truncated block (BEGIN + body, no END) still redacts to end of snippet.
+    ("private key block", re.compile(
+        r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
+        r"(?:.*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----|.*)", re.DOTALL)),
+    ("AWS access key id", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("OpenAI-style key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
+    ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b")),
+    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
+    ("assigned credential literal", re.compile(
+        r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)\b"
+        r"\s*[:=]\s*['\"][^'\"\s]{6,}['\"]")),
+]
+
+
+def _scrub_secrets(data) -> None:
+    """Redact credential-shaped strings in evidence snippets *before* rendering, and
+    warn on stderr (without the value). This enforces the Never-Reprint-Secrets rule
+    for the rendered reports — the value never reaches the HTML/TXT — as a code-side
+    backstop to the SKILL's redaction instruction. It mutates only the in-memory
+    copy used for rendering; the on-disk findings JSON is untouched. Deterministic,
+    so the render stays byte-stable for secret-free input (the common case)."""
+    for f in data.get("findings", []):
+        for ev in (f.get("evidence") or []):
+            snippet = ev.get("snippet")
+            if not isinstance(snippet, str):
+                continue
+            loc = ev.get("file") or "?"
+            if ev.get("line") not in (None, ""):
+                loc = f"{loc}:{ev['line']}"
+            for name, pat in _SECRET_PATTERNS:
+                if pat.search(snippet):
+                    snippet = pat.sub(f"[REDACTED — {name}]", snippet)
+                    print(f"render.py: WARNING — redacted a probable secret ({name}) in "
+                          f"evidence at {loc}; the report carries [REDACTED], not the value "
+                          f"(Never-Reprint-Secrets backstop).", file=sys.stderr)
+            ev["snippet"] = snippet
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="render.py",
@@ -800,6 +848,8 @@ def main(argv=None) -> int:
         schema.validate(data)
     except SchemaError as e:
         sys.exit(f"render.py: schema validation failed — {e}")
+
+    _scrub_secrets(data)  # redact credential-shaped evidence + warn (Never-Reprint-Secrets backstop)
 
     # Schema validation passed — `schema.validate` raises on any failure, so
     # reaching this point means zero schema errors. The summary line below

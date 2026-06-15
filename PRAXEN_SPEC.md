@@ -104,7 +104,7 @@ The skill file gives the model a calibrated framework for these judgments — wh
 │              │                          │
 │              ▼                          │
 │      Parser-grade draft manifest        │
-│  ./reports/<agent>-draft-<ts>.md        │
+│  <agent-slug>-draft-<timestamp>.md      │
 │   (working artifact — Step 9.9)         │
 │              │                          │
 │              ▼                          │
@@ -113,13 +113,13 @@ The skill file gives the model a calibrated framework for these judgments — wh
 │              │                          │
 │              ▼                          │
 │      Canonical findings JSON            │
-│  ./reports/<agent>-findings-<date>.json │
+│  <agent-slug>-findings-<date>.json      │
 │   (the complete record)                 │
 │              │                          │
 │              ▼                          │
 │  render.py  (deterministic, stdlib)     │
-│   <agent>-analysis-<timestamp>.html     │
-│   <agent>-analysis-<timestamp>.txt      │
+│   <agent-slug>-analysis-<timestamp>.html│
+│   <agent-slug>-analysis-<timestamp>.txt │
 └─────────────────────────────────────────┘
 ```
 

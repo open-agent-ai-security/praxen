@@ -18,6 +18,8 @@ A Praxen analysis has two stages, and only one of them varies. **Stage 1 — syn
 
 Both are normal. Both are larger for *judgment-sensitive* targets (see below) and smaller for clear-cut ones.
 
+> **Don't compare absolute scores across model tiers.** Praxen's RAISE bands are calibrated against a specific model tier, so drift means the same target can land a few tenths higher or lower on a different model. Compare scores only *within* a fixed model; when you move to a new model tier, treat it as a **re-baseline**, not a regression or an improvement. (This is why Praxen's own frozen test baselines are pinned to a named model.)
+
 ## How much to expect
 
 The stable signal is the **finding set**; the noisy signal is the **exact numbers**.

@@ -111,3 +111,9 @@ A scan result is a snapshot. Use it to:
 - **Compare defaults vs. hardened configurations.** Many agents ship with permissive defaults. Re-scanning after applying recommended operator configuration often reveals that controls exist but weren't enforced.
 
 A score is one signal. The Findings Register, Remit Coverage table, and Behavior Summary in the full report contain the specifics you need to act on.
+
+## Next steps
+
+- [Interpreting Reports](interpreting-reports.md) — where these scores and the RAISE Maturity Posture section appear on a report
+- [Understanding Run-to-Run Variability](understanding-variability.md) — why two runs can score a category slightly differently
+- [OWASP Gen AI Security](owasp.md) — the other frameworks Praxen tags findings against

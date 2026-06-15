@@ -92,6 +92,8 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 **Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
 
+**Model tier matters.** Praxen runs on a **frontier model** — Anthropic Sonnet-class or higher on Claude Code, a comparable tier (validated on GPT-5-class) on OpenAI Codex. Smaller models don't reliably do the remit-to-implementation cross-referencing Praxen depends on. And because the RAISE maturity bands are calibrated per model tier, **compare scores only within a fixed model** — a score produced on one model tier is not directly comparable to one from another. See [Understanding Run-to-Run Variability](docs/understanding-variability.md).
+
 ---
 
 ## Examples
@@ -107,6 +109,7 @@ The [`examples/`](examples/) directory contains real analyses against deliberate
 - [`tests/`](tests/) — pre-release regression suite (twelve targets, source repo only — not in the distribution zip)
 - [`CHANGELOG.md`](CHANGELOG.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`PRAXEN_SPEC.md`](PRAXEN_SPEC.md) — full technical specification
+- [`STABILITY.md`](STABILITY.md) — the 1.0 stability contract + semver/compatibility policy
 
 ---
 

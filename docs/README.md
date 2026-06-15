@@ -104,17 +104,21 @@ Author diagrams as a ` ```mermaid ` fenced block in Markdown — the build does 
 
 - The fence is converted to a `<pre class="mermaid">` element, and the **Mermaid runtime is
   injected only on pages that actually contain a diagram** (other pages stay clean).
-- The runtime loads from a **pinned CDN module** (`mermaid@11` via jsDelivr) and is initialized
-  with a dark theme tuned to the navy palette. Styling lives in `.prose pre.mermaid` /
-  `themeVariables` — adjust there, not in the HTML.
+- The runtime (Mermaid, MIT-licensed) loads from jsDelivr **pinned to an exact version with a
+  Subresource Integrity (SRI) hash** (`MERMAID_VERSION` / `MERMAID_SRI` in `docs_build.py`), so the
+  browser refuses any CDN bytes that don't match. It's initialized with a dark theme tuned to the
+  navy palette; styling lives in `.prose pre.mermaid` / `themeVariables` — adjust there, not in the
+  HTML. To bump Mermaid, change the version and regenerate the SRI hash (the one-liner is in the
+  `docs_build.py` comment).
 
-**Key assumption — diagrams need an HTTP(S) origin to render.** Because the runtime is a remote
-ES module, browsers block the import from a `file://` page (null origin), so a diagram opened
-directly from disk falls back to showing its *source text*. Over `http(s)://` — GitHub Pages, or
-the local `python3 -m http.server` above — it renders correctly. This is a deliberate tradeoff:
-`guide/` is the online website clone, so a CDN module is acceptable there. If a fully
-offline-self-contained diagram is ever required, the alternative is hand-built CSS box-and-arrow
-markup (no JS).
+**Key assumption — preview diagrams over an HTTP(S) origin.** The runtime is a classic CDN script
+loaded with Subresource Integrity and `crossorigin`, which needs a real origin: GitHub Pages or the
+local `python3 -m http.server` above render correctly, while a diagram opened directly from a
+`file://` page may fall back to showing its *source text* (browsers handle an integrity-checked
+cross-origin fetch from a null `file://` origin inconsistently). This is a deliberate tradeoff:
+`guide/` is the online website clone, so a pinned, integrity-checked CDN script is acceptable there.
+If a fully offline-self-contained diagram is ever required, the alternative is to vendor the Mermaid
+bundle locally or hand-build CSS box-and-arrow markup (no JS).
 
 ## Release / CI tie-in
 

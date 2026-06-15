@@ -77,7 +77,7 @@ Instead of asking only *is this dependency vulnerable?*, *is this package outdat
 - Are trust boundaries enforced?
 - Is runtime behavior consistent with declared intent?
 
-These are governance questions, and they can't be answered through vulnerability scanning alone. Praxen scores them against the six categories of [the RAISE framework](RAISE.md) and tags each finding to the relevant [OWASP Gen AI Security](owasp.md) guidance.
+These are governance questions, and they can't be answered through vulnerability scanning alone. Praxen scores them against the six categories of [the RAISE Framework](RAISE.md) and tags each finding to the relevant [OWASP Gen AI Security](owasp.md) guidance.
 
 ## How Praxen implements ABV
 
@@ -87,7 +87,7 @@ It is intentionally separated from the agent being evaluated — it operates as 
 
 > **Does the implementation support the agent's authorized role?**
 
-The result is a self-contained HTML report, a machine-readable JSON findings file, and a plain-text summary. See [Interpreting Reports](interpreting-reports.md) for how to read them, and [Usage](usage.md) for running an analysis end-to-end.
+The result is a self-contained HTML report, a machine-readable findings JSON, and a plain-text summary. See [Interpreting Reports](interpreting-reports.md) for how to read them, and [Usage](usage.md) for running an analysis end-to-end.
 
 ## ABV and Agent Behavior Analytics (ABA)
 
