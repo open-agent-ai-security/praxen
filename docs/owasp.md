@@ -9,8 +9,6 @@ Every finding Praxen produces is tagged against industry-standard OWASP framewor
 
 > **📊 See it live:** the **[OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** aggregates LLM and Agentic Top-10 coverage across Praxen's entire example suite — a browsable map of which risks each target carries, with a link into every per-target analysis. Rendered on GitHub Pages.
 
----
-
 ## OWASP, briefly
 
 The **Open Worldwide Application Security Project** ([owasp.org](https://owasp.org/)) is the non-profit foundation behind the vendor-neutral, openly-licensed "Top 10" risk lists that are a baseline reference across application security.
@@ -26,8 +24,6 @@ As LLM-based systems moved into production, OWASP spun up a dedicated effort: th
 | [A Practical Guide for Secure MCP Server Development 2026](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/) | Securing Model Context Protocol servers and the tools they expose | `mcp` (checklist items) |
 
 Praxen carries distilled extracts of all three in its knowledge base (`skills/behavior-verifier/knowledge/`), but the canonical, full-length versions live at the links above — go there for the complete write-ups, examples, and references.
-
----
 
 ## OWASP Top 10 for LLM Applications 2025
 
@@ -48,8 +44,6 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 → Full document: **[OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/)**
 
----
-
 ## OWASP Top 10 for Agentic AI Applications 2026
 
 Risks that emerge once an LLM is wired to tools, memory, other agents, and the ability to act. This is the list that matters most for the kind of autonomous, tool-using agents Praxen is built to verify.
@@ -69,8 +63,6 @@ Risks that emerge once an LLM is wired to tools, memory, other agents, and the a
 
 → Full document: **[OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/)**
 
----
-
 ## A Practical Guide for Secure MCP Server Development 2026
 
 The Model Context Protocol (MCP) is how many agents discover and call external tools. MCP servers are unusual: they run with delegated user permissions, support dynamic tool loading, and can chain tool calls — so a single weakness amplifies. When Praxen finds an MCP configuration in the evidence (`.mcp.json`, `mcp.json`, or similar), it applies the guide's **minimum-bar checklist** across these areas:
@@ -87,8 +79,6 @@ Any "No" against the checklist is a finding; secrets in an MCP config file are a
 
 → Full document: **[A Practical Guide for Secure MCP Server Development 2026](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/)**
 
----
-
 ## How these tags surface in a report
 
 A finding's primary OWASP classification appears two ways in the HTML report:
@@ -98,13 +88,9 @@ A finding's primary OWASP classification appears two ways in the HTML report:
 
 The grids are driven by each finding's `owasp_llm` / `owasp_agentic` primary scalar; secondaries listed in a finding's `tags[]` array still appear on the finding card. See [Interpreting Reports](interpreting-reports.md) §9–§10 for the grid layout details. For the same coverage view **aggregated across every target in Praxen's example suite**, browse the live [OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html).
 
----
-
 ## How this fits with RAISE
 
 The OWASP frameworks above answer *"what kind of risk is this finding?"* The [RAISE Framework](RAISE.md) answers *"how mature is this agent's security posture overall?"* — a six-category 0–5 score. Every Praxen finding carries both: a RAISE category tag and (where applicable) an OWASP LLM, OWASP Agentic, or MCP tag. See [Interpreting Reports](interpreting-reports.md) for how the tags appear on a finding card.
-
----
 
 ## See also
 

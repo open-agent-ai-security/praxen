@@ -9,9 +9,7 @@ Running a Praxen analysis takes two inputs: a **Worker Remit** (the agent's decl
 
 **Praxen is designed as a read-only external observer.** It reads the artifacts you point it at and writes a local report; it does not modify the agent, sit in its control path, or call any service Praxen itself controls. This read-only posture is a discipline of the skill's instructions rather than a technical sandbox — the analysis runs with the coding agent's ordinary Bash/Write access — but it keeps Praxen suitable as an independent verifier, not self-attestation by the agent under analysis.
 
-This page covers the end-to-end run. For installing Praxen, see [Installation](installation.md). For authoring the Worker Remit, see [Writing Worker Remits](writing-remits.md).
-
----
+This page covers the end-to-end run. For installing Praxen, see [Installation](installation.md). For authoring the Worker Remit, see [Writing Worker Remits](writing-remits.md). For the verification model Praxen implements, see [Agent Behavior Verification](abv.md).
 
 ## The two inputs
 
@@ -33,8 +31,6 @@ Praxen accepts four input shapes — used individually or in combination:
 | **Governance & methodology docs** | RAISE scores *maturity*, not just behavior — so development and operational practice documents count as evidence too. A red-team plan or its results, threat models, security review records, SDLC/runbook docs, incident retrospectives, dependency-management policy, monitoring/alerting design. These feed the maturity-oriented RAISE categories (**Build an AI Red Team**, **Monitor Continuously**, **Manage Your Supply Chain**) that source code alone can't speak to. |
 
 You can provide more than one shape in the same analysis — for example, source code plus a recent action log plus the team's red-team report. Coverage and confidence increase with each additional input shape.
-
----
 
 ## Running an analysis
 
@@ -104,15 +100,11 @@ Praxen reads the evidence, evaluates it against the RAISE framework and the Work
 
 The `.txt` summary is also printed to stdout during the analysis, so you can read it as the run completes.
 
----
-
 ## Where outputs land
 
 By default, Praxen writes to `./reports/` relative to the directory you started the coding agent in. If the directory doesn't exist, Praxen creates it.
 
 If you want outputs elsewhere, change directory before running, or instruct your coding agent to write to a specific path. The skill follows your instruction.
-
----
 
 ## Re-running after changes
 
@@ -123,8 +115,6 @@ Please re-run the behavior-verifier skill against the same workspace and remit.
 ```
 
 A new pair of timestamped files is written. Prior reports are not overwritten — you can compare runs by diffing the `findings-<date>.json` files or by opening multiple HTML reports side by side.
-
----
 
 ## Results tuning
 
@@ -143,8 +133,6 @@ Praxen will re-evaluate with the added context. This is the intended workflow: t
 
 For the fuller treatment — including when a finding means "fix the remit" or "fix the agent" rather than "add evidence", and how to record an accepted risk — see [Challenging and Revising Findings](challenging-findings.md).
 
----
-
 ## Automating analyses
 
 Praxen does not include a scheduler. If you want recurring analyses, wrap the coding agent invocation in whatever scheduler your environment already uses:
@@ -154,8 +142,6 @@ Praxen does not include a scheduler. If you want recurring analyses, wrap the co
 - **GitHub Action** — run on a schedule and post the `.txt` summary as a comment.
 
 Because Praxen is stateless and produces deterministic outputs (modulo timestamp), CI integration is straightforward. The JSON output is the right format for automated downstream consumers.
-
----
 
 ## Large workspaces and context sizing
 
@@ -175,8 +161,6 @@ A Praxen analysis is read-heavy: it loads the skill procedure, the knowledge bas
 A report produced *through* a mid-synthesis compaction should be treated as possibly incomplete until you've done one of those — not authoritative.
 
 This is guidance, not a guarantee — a genuinely large workspace can still compact even when scoped well. Scoping tighter and giving the run a fresh, large context window is the most reliable thing you can do today; the draft manifest is the safety net for when it compacts regardless.
-
----
 
 ## Troubleshooting
 
@@ -232,8 +216,6 @@ What to do: cancel the run and re-invoke against the same target. The chunked-em
 ### Scores look lower than reality
 
 The most common operator surprise — *"my agent is more careful than this report suggests."* In nearly every case, the cause is that the evidence you handed Praxen didn't *show* a control that's actually in place (a review process, a deployment-time limit, an external guardrail, a monitoring pipeline, a red-team cadence). See *Results tuning* above for the additive-evidence workflow.
-
----
 
 ## Next steps
 

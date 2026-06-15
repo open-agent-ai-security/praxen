@@ -24,8 +24,6 @@ flowchart LR
 
 This page walks through what each section of the HTML report means, how severities and confidence levels work, how the RAISE maturity score should be read, and what's in the JSON.
 
----
-
 ## Report structure
 
 Every Praxen HTML report has the same sections, in the same order. The masthead gives the verdict at a glance; below it you read top-to-bottom from "what the agent is" → "what was found" → the maturity wrap-up.
@@ -109,7 +107,7 @@ Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering
 
 Mirror of §9, driven by the `owasp_agentic` scalar (ASI01–ASI10). Same 5×2 grid, same chips, same anchoring. Use these two grids together to see whether the agent's risk profile lives more in the *LLM-application* layer (prompt injection, supply chain, output handling) or the *agentic* layer (goal hijack, tool misuse, RCE).
 
-> These two grids appear per report. For the same coverage **aggregated across Praxen's entire example suite**, browse the live [OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html) on GitHub Pages.
+> **📊 See it live:** these two grids appear per report; for the same coverage **aggregated across Praxen's entire example suite**, browse the live **[OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** on GitHub Pages.
 
 ### 11. RAISE Maturity Posture (the wrap-up)
 
@@ -127,8 +125,6 @@ This section contains:
 
 Brand mark, project sponsor attribution, agent name, finding counts, framework references, Praxen version. (The headline counts and score also appear in the masthead; the footer is the provenance recap.)
 
----
-
 ## Severity meanings
 
 | Severity | Definition |
@@ -141,8 +137,6 @@ Brand mark, project sponsor attribution, agent name, finding counts, framework r
 
 Severity is surfaced two ways: the masthead's finding counts are colored by tier, and each finding card carries its own severity badge.
 
----
-
 ## Confidence levels
 
 Each finding (and each RAISE category score) has a confidence level:
@@ -152,8 +146,6 @@ Each finding (and each RAISE category score) has a confidence level:
 - **Low** — no direct evidence; scored from absence or heuristics
 
 Low confidence is valid and expected when the input shape doesn't cover a category — for example, a behavior-only analysis cannot confidently assess Manage Your Supply Chain. Look at confidence alongside score: a 1/5 with Low confidence means "we couldn't see this category clearly," while a 1/5 with High confidence means "we saw it clearly and it's weak."
-
----
 
 ## The JSON output
 
@@ -183,8 +175,6 @@ Use the JSON for:
 
 The full schema, with field types and the validator's invariants, is documented in [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) §6 (and codified in `skills/behavior-verifier/schema.py`). The published JSON-Schema document at `skills/behavior-verifier/findings.schema.json` is the machine-readable contract for downstream tooling. For the history of schema changes across releases, see [`CHANGELOG.md`](../CHANGELOG.md).
 
----
-
 ## The .txt summary
 
 `<agent>-analysis-<timestamp>.txt` is a plain-text rendering of the headline content: agent name, analysis timestamp, behavior summary, RAISE category scores and weighted overall, finding counts, remit-coverage tally, **compact OWASP LLM and Agentic Top 10 coverage tables** (per-category finding counts), and every Critical finding with its recommended action. `render.py` writes it (Step 11) alongside the HTML. It's designed to:
@@ -192,8 +182,6 @@ The full schema, with field types and the validator's invariants, is documented 
 - Survive context-window compression in long-running analyses — it's a file on disk, written before the skill's final stdout, so it's there regardless of whether terminal output is lost
 - Be pasted into a Slack thread, email, or PR comment
 - Show up in a terminal-only environment where the HTML can't be rendered
-
----
 
 ## Next steps
 

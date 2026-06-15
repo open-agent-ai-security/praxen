@@ -11,9 +11,7 @@ It's a structured way to answer the question: *does this AI system have the cont
 
 > **📊 See it live:** the **[RAISE Score Distribution Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/raise-coverage-report.html)** shows per-target scores for all six categories and the score distribution across Praxen's entire baseline suite — a population view of where real agents cluster on the maturity scale. Rendered on GitHub Pages.
 
----
-
-## The Six Categories
+## The six categories
 
 Each Praxen scan scores an agent 0–5 in every category and reports a per-category rationale plus a weighted overall score.
 
@@ -31,7 +29,7 @@ Are the data sources feeding the agent trustworthy and appropriate? Does externa
 
 ### Implement Zero Trust
 
-Does every action the agent takes go through appropriate validation and approval? Are inputs checked? Are outputs filtered? Are destructive capabilities gated? This category carries the heaviest weight in the overall score (see [Weighted Overall Score](#weighted-overall-score) below).
+Does every action the agent takes go through appropriate validation and approval? Are inputs checked? Are outputs filtered? Are destructive capabilities gated? This category carries the heaviest weight in the overall score (see [weighted overall score](#weighted-overall-score) below).
 
 **Scanner looks for:** input validation, output filtering, tool-call approval gates, exec-capability restriction, least-privilege credentials, code-level enforcement of policy rules.
 
@@ -53,9 +51,7 @@ Does the agent log its actions with enough detail to reconstruct incidents? Are 
 
 **Scanner looks for:** structured action logs, per-tool-call audit records, evidence of alerting or dashboard consumption, log schema that supports incident reconstruction.
 
----
-
-## The Maturity Scoring Scale
+## The maturity scoring scale
 
 **This is a maturity model, not a school grade.** A score of 3 out of 5 doesn't mean "60 percent." It means "Established" — a respectable operating posture.
 
@@ -70,9 +66,7 @@ Does the agent log its actions with enough detail to reconstruct incidents? Are 
 
 Most production AI agents today score between **Ad hoc (1)** and **Established (3)**. The best-engineered agents hit Established in 2–3 categories and Partial in the rest. A weighted overall of 2.5 — a common scan result — places an agent in the *Partial → Established* maturity band. That is accurate reporting of current industry norms, not a failing grade.
 
----
-
-## Weighted Overall Score
+## Weighted overall score
 
 Each category contributes to the overall score with a fixed weight. **Implement Zero Trust counts double** because it covers the broadest attack surface and the most immediately exploitable gaps; the other five each carry 15%.
 
@@ -87,9 +81,7 @@ Each category contributes to the overall score with a fixed weight. **Implement 
 
 The weighted overall is computed as `Σ (category_score × category_weight)` across the six categories, producing a 0.0–5.0 scalar.
 
----
-
-## Confidence Levels
+## Confidence levels
 
 Alongside each category score, Praxen reports a **confidence level**:
 
@@ -99,9 +91,7 @@ Alongside each category score, Praxen reports a **confidence level**:
 
 Low confidence is valid and expected for categories where Praxen has limited visibility. It doesn't mean the score is wrong — it means more evidence would be useful.
 
----
-
-## Scoring Principles
+## Scoring principles
 
 The scanner follows a small set of explicit anti-patterns:
 
@@ -112,9 +102,7 @@ The scanner follows a small set of explicit anti-patterns:
 
 These principles are implemented in the scoring guidance Praxen loads from `knowledge/KB_RAISE_SCANNING.md`.
 
----
-
-## Interpreting Your Score
+## Interpreting your score
 
 A scan result is a snapshot. Use it to:
 
