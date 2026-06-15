@@ -5,11 +5,13 @@
 
 # Quickstart — your first Praxen report in five minutes
 
-This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required. (FinBot is small, so five minutes is realistic; a real-world target typically takes longer — see [Usage](usage.md).)
+This walks you from "Praxen is installed" to "I have a real report" against **FinBot**, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required. (FinBot is small, so five minutes is realistic; a real-world target typically takes longer — see [Usage](usage.md).)
+
+Every Praxen scan needs **two separate inputs**: a **Worker Remit** (the policy) and a **separate agent source tree** (the evidence). Here you'll use the bundled FinBot remit and clone FinBot's source from upstream. The `examples/finbot/` report files are the *reference output* — what your run should approximately produce — **not** the thing you scan.
 
 If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
 
-## 1. Get a copy of the example workspace
+## 1. Get a copy of the Praxen repository
 
 If you don't have a local copy of the Praxen repository yet, clone it (or unzip a release):
 
@@ -18,16 +20,16 @@ git clone https://github.com/open-agent-ai-security/praxen.git
 cd praxen
 ```
 
-The pieces you'll point Praxen at are already inside `examples/finbot/`:
+The only thing you'll take from `examples/finbot/` is the **remit** — the rest of that folder is the reference report:
 
 ```
 examples/finbot/
-  WORKER_REMIT.md          ← the policy doc you'll verify against
-  finbot-analysis.html     ← the committed report (what your run should approximately produce)
-  finbot-findings.json     ← the same content as the findings JSON
+  WORKER_REMIT.md          ← the policy doc you'll verify against  (the one input you use)
+  finbot-analysis.html     ← reference report — what your run should approximately produce (NOT a scan target)
+  finbot-findings.json     ← the same reference findings, as JSON                          (NOT a scan target)
 ```
 
-A real first scan would use *your* agent's source plus a remit you wrote. We're using the pre-staged ones so the first run has no moving parts.
+You'll get the *other* input — the agent source to scan — by cloning FinBot from upstream in the next step. A real first scan would use *your* agent's source plus a remit you wrote; we're using the pre-staged remit so the first run has no moving parts.
 
 ## 2. Get the FinBot source
 

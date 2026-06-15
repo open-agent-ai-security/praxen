@@ -5,7 +5,7 @@
 
 # Installation
 
-Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce identical analyses — only the install/packaging differs. Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
+Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce the same JSON / HTML / TXT report format — only the install/packaging differs. On the same inputs, findings should cover the same major themes, but exact counts, grouping, and RAISE maturity scores can vary by model and context (see [Understanding Run-to-Run Variability](understanding-variability.md)). Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
 
 ## Prerequisites
 
@@ -30,17 +30,21 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 
 ## Option B — OpenAI Codex (agent skill)
 
-Codex reads skills from `.agents/skills/` (in the repo/working directory) and from `~/.agents/skills/` (user-wide). From a repo checkout or an unzipped release (Option C), link the bundled skill so Codex discovers it:
+Codex discovers skills from a `.agents/skills/` directory — both repo-local (in the working directory of the session) and user-wide (`~/.agents/skills/`). The current first-class Codex path is to **link the bundled skill** from a repo checkout or an unzipped release (Option C); a public Codex *marketplace* install (`codex plugin marketplace add …`, mirroring Option A) is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.
+
+Pick the link scope that matches how you'll run Praxen:
 
 ```bash
-# repo-local (this project only):
+# B1 — repo-local: this project's directory only
 mkdir -p .agents/skills
 ln -sf "$(pwd)/skills/behavior-verifier" .agents/skills/behavior-verifier
 
-# …or user-wide (every Codex session):
+# B2 — user-wide: every Codex session, any directory
 mkdir -p "$HOME/.agents/skills"
 ln -sf "$(pwd)/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
 ```
+
+> **Working-directory scope — the common gotcha.** A repo-local `.agents/skills/` link is only visible to Codex sessions launched *inside that directory*. Praxen scans usually run from a **separate** scan directory (holding `WORKER_REMIT.md`, the target source, and `reports/`), where a repo-local link won't be found. For that shape, either link the skill into the **scan directory's** own `.agents/skills/`, link it **user-wide** (B2), or invoke `SKILL.md` by **absolute path**.
 
 Codex surfaces the skill as **`praxen:behavior-verifier`**. Invoke it by name and point it at a target:
 
@@ -58,7 +62,11 @@ codex exec --sandbox workspace-write -C /path/to/working-dir \
 
 In an interactive Codex session, approve workspace writes when prompted (or start the session with a workspace-write posture). No special approval is needed beyond that — Praxen's reads, the two Python scripts, and the `./reports/` writes all run under a workspace-write sandbox.
 
+> **Scan directory outside a git repo?** `codex exec -C <dir>` refuses to run in a directory that isn't inside a trusted git repo (`Not inside a trusted directory and --skip-git-repo-check was not specified`). Either add `--skip-git-repo-check` to the command, or — preferred — use a trusted **repo-local** scan directory such as `local/<target>_scan/` (the `local/` convention this repo already gitignores) instead of `/tmp`.
+
 > **Codex skill name.** Codex shows the skill to the model as `praxen:behavior-verifier` (plugin-qualified) — invoke it as `$praxen:behavior-verifier`, not `$behavior-verifier`.
+
+> **Benign Codex loader warnings.** During skill discovery Codex may print warnings unrelated to Praxen — about *other* installed plugins, repeated plugin-asset icon-path (`..`) notices, or a telemetry metric-tag warning that the colon-qualified id `praxen:behavior-verifier` "contains invalid characters." None of these block discovery or execution; the skill still loads and runs. The telemetry metric-tag constraint is a Codex-side limitation on the plugin-qualified id, not a Praxen error.
 
 ## Option C — Run from an unzipped release (either agent)
 
@@ -83,9 +91,26 @@ claude plugin list
 
 If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
-**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` (e.g. it shows in Codex's skill list), then run a scoped scan and check that JSON / HTML / TXT land under `./reports/`.
+**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` (e.g. it shows in Codex's skill list), then run a scoped scan and check that JSON / HTML / TXT land under `./reports/`. A copy-paste FinBot smoke test (one real single-target scan — enough to validate Codex skill loading):
 
-For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
+```bash
+PRAXEN_ROOT=/path/to/praxen          # your checkout or unzipped release
+mkdir -p local/finbot_scan/reports   # repo-local + gitignored → no --skip-git-repo-check needed
+cd local/finbot_scan
+
+# the agent to scan = the REAL upstream source, never examples/
+git clone https://github.com/OWASP-ASI/finbot-ctf-demo
+
+# the policy baseline = a committed remit, placed as WORKER_REMIT.md
+cp "$PRAXEN_ROOT/tests/remits/finbot.md" ./WORKER_REMIT.md
+
+codex exec --sandbox workspace-write -C "$(pwd)" \
+  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./finbot-ctf-demo. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
+```
+
+Expect four files under `reports/`: a `finbot-draft-*.md` checkpoint plus `finbot-findings-*.json`, `finbot-analysis-*.html`, and `finbot-analysis-*.txt`. (For a Codex *platform* check, one FinBot or HelperBot scan is enough; the full 12-target suite is the release gate for Praxen changes — see [tests/README.md](../tests/README.md).)
+
+For a guided end-to-end first run that exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes.
 
 ## Updating
 
@@ -117,6 +142,6 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — first end-to-end report against the bundled `finbot` example
+- [Quickstart](quickstart.md) — first end-to-end report: scan the FinBot agent (source cloned from upstream) against the bundled remit
 - [Writing Worker Remits](writing-remits.md) — authoring the policy document Praxen verifies against
 - [Usage](usage.md) — the full running-an-analysis reference
