@@ -59,6 +59,8 @@ A baseline freeze should not rest on a single run — parts of the analysis are 
 
 ## How to run a single-target scan
 
+> **Scan the upstream source, not `examples/`.** The two scan inputs are a **remit** (`remits/<target>.md`) and the **target's upstream source** cloned from the `Source:` URL below. The repo's [`examples/`](../examples/) directory holds finished demo *reports*, not agent source — pointing a scan there scans Praxen's own output, not the agent.
+
 For each target:
 
 1. Clone or re-extract the target repository (URLs below).
@@ -68,6 +70,8 @@ For each target:
 5. Open a Claude Code session with the working directory as CWD.
 6. Instruct Claude Code to read `skills/behavior-verifier/SKILL.md` and analyze the workspace path.
 7. Review `<target>-analysis-<timestamp>.html` in `reports/`.
+
+> **On Codex:** the same single-target flow works — link the skill per [`docs/installation.md`](../docs/installation.md#option-b--openai-codex-agent-skill) Option B and invoke `$praxen:behavior-verifier` against the workspace (same remit + source inputs). [Quickstart](../docs/quickstart.md) has a worked `codex exec` example.
 
 ## Full Suite Run protocol
 

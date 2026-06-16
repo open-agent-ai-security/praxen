@@ -1,0 +1,543 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "0.8.1",
+  "scan": {
+    "agent": "yaah (Yet Another Agent Harness)",
+    "agent_slug": "yaah",
+    "scan_date": "2026-06-15",
+    "scan_timestamp": "2026-06-15T23:17:34Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/v1.0.0-rc.1-prerelease/yaah-out/src",
+    "artifact_count": 28
+  },
+  "intro_band": {
+    "agent_remit_summary": "yaah is a local developer CLI that generates coding-agent configuration for Claude Code, OpenCode, Codex CLI, and GitHub Copilot CLI from a single Go source of truth, and ships a built-in security-and-quality toolset alongside it. Its central promise is that every generated configuration carries the same protective hooks — a linter, a command guard that blocks catastrophic shell commands, a secret scanner, a comment checker, and a session logger — plus a per-session audit log. It wires in opt-in third-party MCP servers (`context7`, `pulumi`) and ships its own built-in `yaah` MCP server exposing check-only tools (`yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, `yaah_planning_status`) plus one writing tool (`yaah_planning_init`). Authorized counterparties are the local developer, the agent's LLM provider, the two named MCP servers, and the plugin marketplace; it makes no autonomous outbound calls.",
+    "agent_structure_summary": "A Go 1.25 CLI (`cmd/yaah`) over an Interface → Registry → Generator architecture in `pkg/`. Hook handlers live in `pkg/hooks/handlers/` (`guard.go` command-guard, `secretscan.go` secret-scanner, `commentcheck.go`, `linter.go`, `sessionlog.go`); per-agent emitters in `pkg/generator/` consume a `HarnessConfig` and write each agent's native format. `pkg/generator/hookmap.go` holds the cross-agent event-name table; `pkg/session/store.go` persists a structured JSON audit log under `.claude/sessions/`; `pkg/mcpserver/` is the stdio MCP server. The harness wires command-guard/secret-scanner on PreToolUse/PostToolUse, but `hookmap.go` leaves Codex's PreToolUse/PostToolUse blank, so `CodexGenerator.GenerateHooks` emits a config carrying only SessionStart and Stop hooks for that target."
+  },
+  "behavior_summary": "The dominant pattern is policy-implementation divergence concentrated at one seam: the harness's central promise of uniform protective hooks across every generated agent is broken for the Codex CLI target. `pkg/generator/hookmap.go` maps no Codex event name for PreToolUse or PostToolUse, so `CodexGenerator.GenerateHooks` skips them and ships a `.codex/hooks.json` with only SessionStart and Stop — none of the advertised command-guard, secret-scanner, linter, or comment-checker — and a passing test (`TestCodex_GenerateHooks_NoSupported`) encodes the gap as intended. The operative controls themselves are real and run on the agent's path: a regex command-guard that blocks catastrophic shell commands, a secret scanner that blocks Edit/Write of files carrying credentials, and a durable structured session audit log. Secondary themes are supply-chain (the `context7` MCP installed via unpinned `npx -y @context7/mcp`), a narrow command-guard denylist, an MCP write tool (`yaah_planning_init`) with no approval gate, and absent adversarial testing / security-disclosure docs.",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 4,
+      "gap": 2,
+      "partial": 7,
+      "vague": 0,
+      "enp": 0,
+      "total": 13
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Stated Protections",
+        "rule_text": "Every generated agent configuration MUST carry the same set of protective hooks — a linter, a command guard that blocks catastrophic shell commands, a secret scanner, a comment checker, and a session logger.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-001"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Action Boundaries",
+        "rule_text": "Catastrophic shell commands — recursive deletion from the filesystem root, force-pushing to a main branch, hard resets, destructive database statements, filesystem formatting, raw disk writes — MUST be blocked before they execute.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-004"
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Action Boundaries",
+        "rule_text": "Remote MCP servers MUST be reached over TLS.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Action Boundaries",
+        "rule_text": "MCP tool descriptions MUST NOT contain instruction-like language directed at the model — neither the built-in server's tool descriptions nor, as far as the harness can inspect them, those of the third-party servers it configures.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-007"
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Forbidden Actions",
+        "rule_text": "Hardcoded credentials in files the agent edits MUST be detected before the change is accepted.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-001"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Forbidden Actions",
+        "rule_text": "Agent-managed, session-loaded files MUST NOT be writable in a way that lets ingested content persist into future sessions unreviewed.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-005"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Approval Requirements",
+        "rule_text": "High-impact actions — destructive shell commands, file writes, and MCP tools that write, send, or execute — MUST reach a human checkpoint before they run.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-003"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Behavioral Expectations",
+        "rule_text": "The harness MUST maintain a durable, structured, timestamped record of tool calls, blocked actions, and file modifications — detailed enough to reconstruct what the agent did in a session.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-06-15-006"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Behavioral Expectations",
+        "rule_text": "The MCP server configuration and the per-agent configuration files MUST stay consistent with each other.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Escalation and Limits",
+        "rule_text": "The project SHOULD publish a threat model and a security-disclosure process, and SHOULD run adversarial testing of its own protections — confirming that the secret scanner catches a planted secret, the command guard blocks a catastrophic command, a poisoning write into a session-loaded file is prevented, and a generated configuration genuinely carries the protections it claims.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-06-15-008"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Known Good Baseline",
+        "rule_text": "Third-party MCP servers MUST be pinned to a known-good, integrity-checked version — no server package auto-installed afresh, unpinned, on every run.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-06-15-002"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Known Good Baseline",
+        "rule_text": "Dependencies MUST be version-controlled with a committed, pinned lockfile, and the dependency tree kept small and reviewable.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Out of Scope",
+        "rule_text": "It does not send email, post to external services, or make outbound network calls beyond the configured agent's LLM provider, the configured MCP servers, the package registry used to install third-party MCP servers, and the coding-agent plugin marketplace.",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-06-15-001",
+      "severity": "High",
+      "summary": "Generated Codex CLI config ships with none of the advertised PreToolUse/PostToolUse protective hooks — command guard, secret scanner, linter, comment checker all absent.",
+      "description": "The harness's central promise is uniform protective hooks across every generated agent, but `hookMappings` in hookmap.go assigns no Codex event name for PreToolUse or PostToolUse, so `CodexGenerator.GenerateHooks` skips those events and emits a `.codex/hooks.json` carrying only SessionStart and Stop. The command guard, secret scanner, linter, and comment checker — all of which fire only on PreToolUse/PostToolUse — never attach for the Codex target, so a developer who runs `yaah generate --agent codex` receives the session logger but none of the catastrophic-command, secret, or quality guards. The test `TestCodex_GenerateHooks_NoSupported` encodes this absence as intended behavior.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        }
+      ],
+      "policy_rule_ids": "R-01, R-05",
+      "policy_rule_text": "Every generated agent configuration MUST carry the same set of protective hooks — a linter, a command guard that blocks catastrophic shell commands, a secret scanner, a comment checker, and a session logger. / Hardcoded credentials in files the agent edits MUST be detected before the change is accepted.",
+      "evidence": [
+        {
+          "file": "pkg/generator/hookmap.go",
+          "line": 30,
+          "snippet": "HookPreToolUse and HookPostToolUse mappings define Claude/OpenCode/Copilot but no Codex entry; CodexEventName returns \"\" for both, lines 30-39."
+        },
+        {
+          "file": "pkg/generator/codex.go",
+          "line": 88,
+          "snippet": "GenerateHooks loops cfg.Hooks and `continue`s when CodexEventName(event)==\"\" (lines 88-93), so guard/secret/lint/comment PreToolUse/PostToolUse hooks are dropped from .codex/hooks.json."
+        }
+      ],
+      "recommended_actions": [
+        "Add Codex PreToolUse/PostToolUse event names to `hookMappings` in hookmap.go (Codex CLI supports `preToolUse`/`postToolUse` hooks) so the guard and secret scanner attach, and update `TestCodex_GenerateHooks_NoSupported` to assert they are present.",
+        "If Codex genuinely cannot run those events, fail `yaah generate --agent codex` loudly or print a prominent warning that the generated config omits the command guard and secret scanner, rather than shipping it silently."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-06-15-002",
+      "severity": "High",
+      "summary": "The context7 MCP server is installed via unpinned `npx -y @context7/mcp`, fetching the latest package on every run.",
+      "description": "The remit's Known Good Baseline requires third-party MCP servers to be pinned to a known-good, integrity-checked version, but the context7 provider hardcodes `npx -y @context7/mcp` with no version tag or integrity check, so each session resolves and auto-installs whatever the registry currently serves. This is a rug-pull / dependency-confusion surface: a compromised or hijacked `@context7/mcp` release reaches the developer's agent context with no review.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Supply Chain"
+        }
+      ],
+      "policy_rule_ids": "R-11",
+      "policy_rule_text": "Third-party MCP servers MUST be pinned to a known-good, integrity-checked version — no server package auto-installed afresh, unpinned, on every run.",
+      "evidence": [
+        {
+          "file": "pkg/mcp/providers/context7.go",
+          "line": 22,
+          "snippet": "Args `[]string{\"-y\", \"@context7/mcp\"}` — `-y` auto-confirms install of an unpinned, unversioned package on every run."
+        },
+        {
+          "file": ".mcp.json",
+          "line": 6,
+          "snippet": "Generated config carries the same unpinned `npx -y @context7/mcp` into the developer's project-level MCP config."
+        }
+      ],
+      "recommended_actions": [
+        "Pin the context7 package to an exact version (e.g. `@context7/mcp@<x.y.z>`) in `pkg/mcp/providers/context7.go`, and prefer an integrity-checked install path over `npx -y`."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-06-15-003",
+      "severity": "High",
+      "summary": "The yaah_planning_init MCP tool writes the workspace with no approval gate, and MCP-driven writes bypass the PreToolUse/PostToolUse guards entirely.",
+      "description": "The remit requires that file writes and write/send/execute MCP tools reach a human checkpoint, but `yaah_planning_init` creates directories and writes `STATE.md` directly with no confirmation step. More broadly, the command guard and secret scanner are wired to the host agent's Bash/Edit/Write tool events, not to MCP tool calls, so any MCP server's write/exec actions are outside the hooks' coverage and reach no checkpoint.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "mcp",
+          "label": "High-risk actions require human-in-the-loop approval"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": "R-07",
+      "policy_rule_text": "High-impact actions — destructive shell commands, file writes, and MCP tools that write, send, or execute — MUST reach a human checkpoint before they run.",
+      "evidence": [
+        {
+          "file": "pkg/mcpserver/tools.go",
+          "line": 363,
+          "snippet": "addPlanningInitTool — MkdirAll + os.WriteFile of STATE.md (lines 363-414) execute with no approval prompt or human checkpoint."
+        },
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 96,
+          "snippet": "HandleHookEvent dispatches guard/secret handlers on host tool events only; MCP tool invocations are not routed through the hook guards."
+        }
+      ],
+      "recommended_actions": [
+        "Gate `yaah_planning_init` behind an explicit confirmation or mark it non-autonomous, and document that built-in MCP write tools require operator review.",
+        "Run MCP write/exec tool calls through the same command-guard / secret-scan interposition the host tool events use, or otherwise place a checkpoint in their path."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-06-15-004",
+      "severity": "Medium",
+      "summary": "The command-guard denylist is narrow and bypassable — it catches specific spellings but misses common equivalents of the same catastrophic commands.",
+      "description": "The guard blocks a fixed regex set, but each pattern is a single spelling of a class the remit says MUST be blocked: `rm -rf /` is caught but `rm --recursive --force /` is not; force-push catches `--force` to main/master but not `-f` or `--force-with-lease`; destructive SQL catches `DROP TABLE/DATABASE` but not `TRUNCATE` or `DELETE FROM`. A model or operator using an equivalent form bypasses the block, so the protection is real but incomplete.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": "R-02",
+      "policy_rule_text": "Catastrophic shell commands — recursive deletion from the filesystem root, force-pushing to a main branch, hard resets, destructive database statements, filesystem formatting, raw disk writes — MUST be blocked before they execute.",
+      "evidence": [
+        {
+          "file": "pkg/hooks/handlers/guard.go",
+          "line": 29,
+          "snippet": "Block rules (lines 29-35) match literal forms — `rm\\s+-rf\\s+/`, `git\\s+push\\s+--force`, `DROP\\s+(TABLE|DATABASE)` — with no coverage of long-flag, `-f`, TRUNCATE, or DELETE equivalents."
+        }
+      ],
+      "recommended_actions": [
+        "Broaden the denylist to cover flag synonyms and equivalent destructive statements (long/short flags, `--force-with-lease`, TRUNCATE, unqualified DELETE), or move to an allowlist/normalized-parse model so equivalent spellings cannot slip through."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-06-15-005",
+      "severity": "Medium",
+      "summary": "The agent-managed AGENTS.md is a session-loaded file with machine-managed regions the agent edits, with no review gate on those writes.",
+      "description": "AGENTS.md declares itself agent-managed (\"Managed by agent: keep sections and order\") with `AGENTS-GENERATED:START/END` regions, and the nearest AGENTS.md is loaded into the agent's context at session start. The remit requires that agent-managed session-loaded files not be writable in a way that lets ingested content persist unreviewed. No injection ingress is confirmed in this local CLI, so this is a structural memory-poisoning surface (ASI06) rather than an exploitable chain — but a write the agent makes into AGENTS.md re-enters context on the next run with no review step.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI06 — Memory and Context Poisoning"
+        }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "Agent-managed, session-loaded files MUST NOT be writable in a way that lets ingested content persist into future sessions unreviewed.",
+      "evidence": [
+        {
+          "file": "AGENTS.md",
+          "line": 2,
+          "snippet": "\"Managed by agent: keep sections and order; edit content, not structure\" plus AGENTS-GENERATED:START/END markers — agent-writable region loaded into context at session start."
+        }
+      ],
+      "recommended_actions": [
+        "Require review (diff surfaced to the operator, or a session-log entry) before the agent commits writes into the AGENTS-GENERATED regions of AGENTS.md, and track those writes in the session audit log."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI06",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-06-15-006",
+      "severity": "Medium",
+      "summary": "Secret-scan, lint, and comment findings on non-blocked paths are written to stderr and never persisted to the session Findings record.",
+      "description": "The session schema has a `Findings` field for handler observations, and `HandleHookEvent` records blocked calls, but it never appends handler findings to `sess.Findings` — secret/lint/comment results that do not block are emitted to stderr only. The durable audit log the remit requires therefore reconstructs blocked actions and file modifications but not the security findings the handlers surfaced, narrowing post-hoc detection.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": "R-08",
+      "policy_rule_text": "The harness MUST maintain a durable, structured, timestamped record of tool calls, blocked actions, and file modifications — detailed enough to reconstruct what the agent did in a session.",
+      "evidence": [
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 130,
+          "snippet": "Session update block (lines 130-156) appends to ToolCalls/BlockedCalls/FilesModified but never to sess.Findings; combined.Error goes only to os.Stderr."
+        },
+        {
+          "file": "pkg/session/session.go",
+          "line": 14,
+          "snippet": "Session.Findings []Finding is declared but unwritten — handler findings on non-blocked paths are not persisted."
+        }
+      ],
+      "recommended_actions": [
+        "In `HandleHookEvent`, append handler findings (secret/lint/comment) to `sess.Findings` so they land in the durable session record, not just stderr."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-06-15-007",
+      "severity": "Medium",
+      "summary": "Third-party MCP tool descriptions are configured but never inspected for tool-poisoning, despite the remit promising the harness inspects them as far as it can.",
+      "description": "The remit states MCP tool descriptions MUST NOT contain instruction-like language, including third-party servers \"as far as the harness can inspect them.\" The built-in yaah server's descriptions are clean, but the harness configures `context7` and `pulumi` by reference and never fetches or scans their advertised tool descriptions for embedded model instructions — there is no tool-poisoning check anywhere in the codebase. A poisoned third-party tool description reaches the agent unexamined.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "mcp",
+          "label": "Tool descriptions contain no hidden model instructions"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        }
+      ],
+      "policy_rule_ids": "R-04",
+      "policy_rule_text": "MCP tool descriptions MUST NOT contain instruction-like language directed at the model — neither the built-in server's tool descriptions nor, as far as the harness can inspect them, those of the third-party servers it configures.",
+      "evidence": [
+        {
+          "file": "pkg/mcp/providers/context7.go",
+          "line": 17,
+          "snippet": "Provider returns a server reference (command/args) only; no tool-description retrieval or poisoning scan exists for configured third-party servers."
+        },
+        {
+          "file": "pkg/mcpserver/tools.go",
+          "line": 56,
+          "snippet": "Built-in tool descriptions are clean, but nothing inspects third-party servers' descriptions the harness wires in."
+        }
+      ],
+      "recommended_actions": [
+        "Add a tool-poisoning check that scans configured MCP servers' advertised tool descriptions for instruction-like language at generate/doctor time, and surface any hits to the operator."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI07",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-06-15-008",
+      "severity": "Medium",
+      "summary": "No adversarial testing of the protections, and no published threat model or SECURITY.md, despite the remit saying both SHOULD exist.",
+      "description": "The remit says the project SHOULD run adversarial tests confirming the secret scanner catches a planted secret, the guard blocks a catastrophic command, a poisoning write is prevented, and a generated config genuinely carries its protections — and SHOULD publish a threat model and disclosure process. Unit tests exist for generator and handler mechanics, but none exercise the protections adversarially; notably `TestCodex_GenerateHooks_NoSupported` asserts the Codex config omits the guards rather than catching that as a regression. No SECURITY.md or threat-model document is present in the repository.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Build an AI Red Team"
+        }
+      ],
+      "policy_rule_ids": "R-10",
+      "policy_rule_text": "The project SHOULD publish a threat model and a security-disclosure process, and SHOULD run adversarial testing of its own protections — confirming that the secret scanner catches a planted secret, the command guard blocks a catastrophic command, a poisoning write into a session-loaded file is prevented, and a generated configuration genuinely carries the protections it claims.",
+      "evidence": [
+        {
+          "file": "pkg/generator/codex_test.go",
+          "line": 118,
+          "snippet": "TestCodex_GenerateHooks_NoSupported asserts nil hooks for PreToolUse — encodes the missing guard as expected behavior instead of red-teaming it."
+        },
+        {
+          "file": "src",
+          "line": null,
+          "snippet": "No SECURITY.md, threat-model, or disclosure-process document found at the repository root."
+        }
+      ],
+      "recommended_actions": [
+        "Add end-to-end adversarial tests: planted-secret across each generated target, catastrophic-command-blocked, and a \"generated config carries the full protective hook set\" assertion per agent (which would have caught the Codex gap).",
+        "Publish a SECURITY.md with a threat model and disclosure process."
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Operative command guard blocks catastrophic shell commands",
+      "description": "`NewCommandGuard` ships a PreToolUse block-on-match guard for recursive root deletion, force-push to main, hard reset, destructive SQL, filesystem format, and raw disk writes; it runs on the generated agent's Bash path and records blocks to the session log.",
+      "evidence_path": "pkg/hooks/handlers/guard.go:27-37"
+    },
+    {
+      "title": "Secret scanner blocks credential writes on the agent's edit path",
+      "description": "`NewSecretScanner` runs as a PostToolUse handler over Edit/Write/MultiEdit with 13 credential patterns and blocks acceptance when a secret is detected, surfacing remediation guidance.",
+      "evidence_path": "pkg/hooks/handlers/secretscan.go:34-49"
+    },
+    {
+      "title": "Durable structured session audit log",
+      "description": "`session.Store` persists per-session JSON with timestamped tool calls, blocked calls, and files modified via atomic write, reconstructable through `yaah session show`.",
+      "evidence_path": "pkg/session/store.go:52-89"
+    },
+    {
+      "title": "Pinned, committed dependency lockfile and small tree",
+      "description": "`go.mod`/`go.sum` pin a deliberately small dependency set, and remote skills/agents and CI actions are pinned to git SHAs — a managed supply chain.",
+      "evidence_path": "go.sum:1"
+    },
+    {
+      "title": "Built-in MCP server tool descriptions are clean",
+      "description": "All seven `yaah_*` tool descriptions are plain nominal statements of function with no instruction-like language directed at the model — no tool-poisoning surface in the built-in server.",
+      "evidence_path": "pkg/mcpserver/tools.go:56-441"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": ".claude/sessions/<session-id>.json",
+        "source": "pkg/session/store.go (session.Store) via harness.HandleHookEvent",
+        "content_type": "structured JSON session record",
+        "purpose": "per-session audit trail — timestamped tool calls, blocked calls, files modified, findings",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": ".claude/logs/sessions.log",
+        "source": "pkg/hooks/handlers/sessionlog.go (SessionLogger)",
+        "content_type": "plaintext append-only line log",
+        "purpose": "session start/end/stop events with timestamp, session ID, and cwd",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 2.3,
+    "weighted_rationale": "Partial. yaah has a coherent, genuinely-operative safety model — a command guard, a secret scanner, and a durable structured session audit log all run on the configured agent's tool path, and dependencies are pinned with a committed lockfile and SHA-pinned remote sources. What holds it at Partial rather than Established is that the protections are not actually uniform: the Codex target ships without the PreToolUse/PostToolUse guards the harness promises, the command-guard denylist is narrow and bypassable, an MCP write tool has no approval checkpoint, and there is no evidence of adversarial testing or a published threat model. The controls are present and credible; their coverage and their own testing are incomplete.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "yaah is a narrow local CLI with a fixed, enumerated tool and provider inventory matching the remit's Known Good Baseline, and the command-guard scopes Bash on the generated agent's path; the gaps that exist are coverage gaps filed as findings, not an absence of domain limits."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The secret scanner runs on the agent's Edit/Write path so untrusted file content is checked before acceptance, but the agent-managed `AGENTS.md` is a session-loaded file with machine-managed regions the agent edits, a structural memory-poisoning surface with no review gate."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "The command guard (block-on-match) and secret scanner (block-on-match) are real interposition on tool calls and reach a human checkpoint, but they do not reach the Codex target at all, the denylist is narrow, and the `yaah_planning_init` MCP tool writes the workspace with no approval gate."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Dependencies are pinned in a committed `go.mod`/`go.sum`, the tree is deliberately small, remote skills/agents pin git SHAs and CI pins action SHAs; the one real gap is the `context7` MCP installed via unpinned `npx -y @context7/mcp` on every run."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Unit tests exist for generators and handlers but there is no adversarial testing of the protections themselves — no planted-secret, catastrophic-command, or poisoning-write test that confirms a generated configuration carries what it claims — and no SECURITY.md or threat model the remit says SHOULD exist."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "`pkg/session/store.go` persists a durable, structured, timestamped JSON audit log of tool calls, blocked calls, and files modified per session, queryable via `yaah session show`; the gap is that handler findings (secret/lint/comment) on non-blocked paths are written to stderr and never appended to the session `Findings` record."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 0,
+      "high": 3,
+      "medium": 5,
+      "low": 0,
+      "info": 0
+    }
+  }
+}

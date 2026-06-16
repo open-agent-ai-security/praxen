@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier · Version 0.8.1**
+**agent behavior verifier**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/open-agent-ai-security/praxen?sort=semver)](https://github.com/open-agent-ai-security/praxen/releases)
@@ -83,7 +83,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 ## Get started
 
 - [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin / skill folder, or unzipped release)
-- [**Quickstart**](docs/quickstart.md) — first report against the bundled `finbot` example in about five minutes
+- [**Quickstart**](docs/quickstart.md) — your first end-to-end report in about five minutes: scan the FinBot agent (source cloned from upstream) against the bundled remit
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
 - [**Interpreting Reports**](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
@@ -92,11 +92,15 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 **Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
 
+**Model tier matters.** Praxen runs on a **frontier model** — Anthropic Sonnet-class or higher on Claude Code, a comparable tier (validated on GPT-5-class) on OpenAI Codex. Smaller models don't reliably do the remit-to-implementation cross-referencing Praxen depends on. And because the RAISE maturity bands are calibrated per model tier, **compare scores only within a fixed model** — a score produced on one model tier is not directly comparable to one from another. See [Understanding Run-to-Run Variability](docs/understanding-variability.md).
+
 ---
 
 ## Examples
 
 The [`examples/`](examples/) directory contains real analyses against deliberately vulnerable agents from the OWASP Agentic AI CTF and the Damn Vulnerable AI Agent project. Each example ships with the Worker Remit we wrote, the HTML report, and the JSON findings — see [`examples/README.md`](examples/README.md) for the walkthrough.
+
+> **`examples/` holds completed reports, not scan targets.** These directories are showcase output — what Praxen *produces*, not what it *scans*. A scan always needs two separate inputs: a **Worker Remit** and a **separate agent source tree**. To reproduce an example, use its remit (or the matching one under [`tests/remits/`](tests/remits/)) and clone the upstream source linked in [`examples/README.md`](examples/README.md). See [Quickstart](docs/quickstart.md) for the full walkthrough.
 
 ---
 
@@ -107,6 +111,7 @@ The [`examples/`](examples/) directory contains real analyses against deliberate
 - [`tests/`](tests/) — pre-release regression suite (twelve targets, source repo only — not in the distribution zip)
 - [`CHANGELOG.md`](CHANGELOG.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`PRAXEN_SPEC.md`](PRAXEN_SPEC.md) — full technical specification
+- [`STABILITY.md`](STABILITY.md) — the 1.0 stability contract + semver/compatibility policy
 
 ---
 

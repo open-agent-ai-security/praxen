@@ -62,18 +62,28 @@ MERMAID_BLOCK = re.compile(
 )
 
 # Loaded only on pages that actually contain a diagram. The guide/ site is the
-# public, online clone (not the shipped self-contained report), so a pinned CDN
-# module is acceptable here; themed to match the dark navy docs.
-MERMAID_SCRIPT = """<script type="module">
-import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-mermaid.initialize({
+# public, online clone (not the shipped self-contained report). Mermaid (MIT) is
+# loaded from the jsDelivr CDN, pinned to an EXACT version with a Subresource
+# Integrity (SRI) hash + crossorigin so the browser refuses any bytes that don't
+# match — a tampered/substituted CDN artifact can't execute. The classic UMD
+# build is used (not the ESM module) because a bare `import` specifier cannot
+# carry an `integrity` attribute. To bump Mermaid, change MERMAID_VERSION and
+# regenerate MERMAID_SRI:
+#   curl -sL https://cdn.jsdelivr.net/npm/mermaid@<ver>/dist/mermaid.min.js \
+#     | openssl dgst -sha384 -binary | openssl base64 -A
+MERMAID_VERSION = "11.15.0"
+MERMAID_SRI = "sha384-yQ4mmBBT+vhTAwjFH0toJXNYJ6O4usWnt6EPIdWwrRvx2V/n5lXuDZQwQFeSFydF"
+MERMAID_SCRIPT = f"""<script src="https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.min.js"
+        integrity="{MERMAID_SRI}" crossorigin="anonymous"></script>
+<script>
+mermaid.initialize({{
   startOnLoad: false,
   theme: 'dark',
   fontFamily: '"Inter", system-ui, sans-serif',
-  themeVariables: { primaryColor: '#13233b', primaryBorderColor: '#2a3b57',
-    primaryTextColor: '#e8eef7', lineColor: '#8aa0bd', fontSize: '14px' },
-});
-mermaid.run({ querySelector: '.prose pre.mermaid' });
+  themeVariables: {{ primaryColor: '#13233b', primaryBorderColor: '#2a3b57',
+    primaryTextColor: '#e8eef7', lineColor: '#8aa0bd', fontSize: '14px' }},
+}});
+mermaid.run({{ querySelector: '.prose pre.mermaid' }});
 </script>"""
 
 

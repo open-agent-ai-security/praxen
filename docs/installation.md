@@ -5,7 +5,7 @@
 
 # Installation
 
-Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce identical analyses — only the install/packaging differs. Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
+Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce the same JSON / HTML / TXT report format — only the install/packaging differs. On the same inputs, findings should cover the same major themes, but exact counts, grouping, and RAISE maturity scores can vary by model and context (see [Understanding Run-to-Run Variability](understanding-variability.md)). Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
 
 ## Prerequisites
 
@@ -30,35 +30,24 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 
 ## Option B — OpenAI Codex (agent skill)
 
-Codex reads skills from `.agents/skills/` (in the repo/working directory) and from `~/.agents/skills/` (user-wide). From a repo checkout or an unzipped release (Option C), link the bundled skill so Codex discovers it:
+Codex discovers skills from a `.agents/skills/` directory. The first-class path is a **user-wide skill link** — set it up once and every Codex session can invoke Praxen, from any directory:
 
 ```bash
-# repo-local (this project only):
-mkdir -p .agents/skills
-ln -sf "$(pwd)/skills/behavior-verifier" .agents/skills/behavior-verifier
-
-# …or user-wide (every Codex session):
+cd /path/to/praxen          # your checkout or unzipped release (Option C)
 mkdir -p "$HOME/.agents/skills"
-ln -sf "$(pwd)/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
+ln -sfn "$PWD/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
 ```
 
-Codex surfaces the skill as **`praxen:behavior-verifier`**. Invoke it by name and point it at a target:
-
-```text
-Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./target.
-Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.
-```
-
-**Permissions.** Praxen needs to create `./reports/` and run two bundled Python scripts, so Codex must allow workspace writes. With `codex exec`, pass a workspace-write sandbox:
+Codex surfaces the skill as **`praxen:behavior-verifier`** — invoke it by that plugin-qualified name (`$praxen:behavior-verifier`, not `$behavior-verifier`) and point it at a target. Praxen needs workspace writes (it creates `./reports/` and runs two bundled Python scripts), so run `codex exec` with a workspace-write sandbox:
 
 ```bash
-codex exec --sandbox workspace-write -C /path/to/working-dir \
+codex exec --sandbox workspace-write -C /path/to/scan-dir \
   'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./target. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
 ```
 
-In an interactive Codex session, approve workspace writes when prompted (or start the session with a workspace-write posture). No special approval is needed beyond that — Praxen's reads, the two Python scripts, and the `./reports/` writes all run under a workspace-write sandbox.
+That's the whole happy path; for an end-to-end first run, see [Quickstart](quickstart.md). (To scope the skill to a single project instead of user-wide, link it into that repo's own `.agents/skills/`. A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.)
 
-> **Codex skill name.** Codex shows the skill to the model as `praxen:behavior-verifier` (plugin-qualified) — invoke it as `$praxen:behavior-verifier`, not `$behavior-verifier`.
+> **Two Codex gotchas.** `codex exec -C <dir>` refuses to run outside a trusted git repo (`Not inside a trusted directory…`) — run from a git checkout, or add `--skip-git-repo-check`. And on load Codex may print warnings about *other* installed plugins or a telemetry metric-tag on the `praxen:behavior-verifier` id; those are Codex-side and don't affect the scan.
 
 ## Option C — Run from an unzipped release (either agent)
 
@@ -83,9 +72,9 @@ claude plugin list
 
 If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
-**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` (e.g. it shows in Codex's skill list), then run a scoped scan and check that JSON / HTML / TXT land under `./reports/`.
+**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` in Codex's skill list. That's the parity check — it confirms discovery, the same way `claude plugin list` does for Claude Code.
 
-For an end-to-end first run that actually exercises the analysis pipeline — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the bundled `finbot` example in about five minutes.
+For the first **end-to-end run** on either platform — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes, with the exact Claude Code and Codex commands.
 
 ## Updating
 
@@ -117,6 +106,6 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — first end-to-end report against the bundled `finbot` example
+- [Quickstart](quickstart.md) — first end-to-end report: scan the FinBot agent (source cloned from upstream) against the bundled remit
 - [Writing Worker Remits](writing-remits.md) — authoring the policy document Praxen verifies against
 - [Usage](usage.md) — the full running-an-analysis reference

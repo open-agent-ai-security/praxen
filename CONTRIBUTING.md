@@ -134,6 +134,46 @@ A scheduled CI check (`.github/workflows/branch-drift.yml`) asserts `main` is an
 ancestor of `dev` and fails the day the histories diverge — catching a missed
 fast-forward (or an accidental squash promotion) before it accumulates.
 
+## Releasing and rolling back
+
+*(Maintainers.)* Releases are tag-driven: pushing a `v*` tag runs `release.yml`,
+which version-guards the tag against `PRAXEN_SPEC.md`, builds
+`praxen-<version>.zip`, and publishes the GitHub release. Fresh marketplace
+installs pull `main@HEAD`, so **`main` is the live release channel** — a
+regression that lands on `main` reaches new installers immediately, even without
+a tag.
+
+**Cutting a release**
+
+1. Land all changes on `dev`; bump the version everywhere the 4-way guard checks
+   (`PRAXEN_SPEC.md` + the three plugin manifests) plus `README.md` and
+   `CHANGELOG.md`; run `./build.sh` locally to confirm the version guard and the
+   `guide/` docs-freshness check pass.
+2. Promote `dev → main` (merge commit, never squash), then fast-forward `dev`
+   back up so `main` stays an ancestor of `dev`.
+3. Push the matching `v<version>` tag to fire `release.yml`.
+4. Verify the published release zip and run the post-tag marketplace install
+   check (`claude plugin marketplace add … && claude plugin install …`) on both
+   platforms — the manifest schema is not gated by CI.
+
+**Rolling back a bad release**
+
+1. **Stop the bleed first.** Revert the offending change on `main` with a *new
+   forward commit* (e.g. `git revert`), then fast-forward `dev`. Because installs
+   track `main@HEAD`, the fix reaches new installers as soon as it lands — this,
+   not the tag, is what users actually pull.
+2. **Cut a hotfix patch.** Bump the PATCH version and tag `v<patched>` so a clean
+   release artifact supersedes the bad one.
+3. **Retire the bad artifact.** Mark the bad GitHub release as a pre-release or
+   delete it (`gh release delete v<bad>`), and delete the bad tag
+   (`git push origin :refs/tags/v<bad>`) so nobody installs the unzipped build.
+   The marketplace re-points to the new `main@HEAD` automatically.
+4. Record the incident and the fix in `CHANGELOG.md`.
+
+**Never force-push `main` or `dev` to "undo" a release.** Once a tag is public, a
+forward revert plus a hotfix tag is the only safe path — rewriting history breaks
+every clone and the `main`-ancestor-of-`dev` invariant.
+
 ## Before you open a PR
 
 - Run the test suite: `python3 tests/render/test_render.py` — it should report all checks passing.

@@ -45,7 +45,7 @@ flowchart LR
   R --> TXT["analysis.txt"]
 ```
 
-The output is a self-contained HTML analysis report, a machine-readable JSON findings file, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
+The output is a self-contained HTML analysis report, a machine-readable findings JSON, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
 
 ## Four input shapes
 
@@ -74,6 +74,6 @@ For an overview of the OWASP Gen AI Security Project and a one-line gloss on eac
 - Install: `claude plugin marketplace add open-agent-ai-security/praxen` then `claude plugin install praxen@open-agent-ai-security` (or the in-session `/plugin ...` equivalents — see [Installation](installation.md))
 - Skill name: `behavior-verifier`
 - Output directory: `./reports/` relative to where you run the analysis
-- Output files: `<agent>-analysis-<timestamp>.html`, `<agent>-findings-<date>.json`, `<agent>-analysis-<timestamp>.txt`
+- Output files: `<agent-slug>-analysis-<timestamp>.html`, `<agent-slug>-findings-<date>.json`, `<agent-slug>-analysis-<timestamp>.txt`
 
 For the full specification, see [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) at the repo root.

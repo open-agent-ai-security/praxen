@@ -90,13 +90,15 @@ against ./my-agent-repo/. Worker Remit is at ./WORKER_REMIT.md. Output to
 
 This is also the right pattern when the scan follows a remit-authoring session — if Praxen drafted the remit and then immediately scans, the same context holds everything it just read, and Step 4 will be shallow. Finish the remit, confirm it, then start a fresh scan session.
 
-Praxen reads the evidence, evaluates it against the RAISE framework and the Worker Remit, and writes three files to `./reports/`:
+Praxen reads the evidence, evaluates it against the RAISE Framework and the Worker Remit, and writes three files to `./reports/`:
 
 | File | Purpose |
 |---|---|
 | `<agent-slug>-analysis-<timestamp>.html` | Self-contained human-readable report. Open in a browser; no server needed. |
 | `<agent-slug>-findings-<date>.json` | Machine-readable findings. Use for automation, ticketing, dashboards, diffing across runs. |
 | `<agent-slug>-analysis-<timestamp>.txt` | Plain-text summary suitable for terminal output, email body, or Slack message. |
+
+The findings JSON is keyed by **date** (`<YYYY-MM-DD>` — one per agent per day); the HTML and TXT carry a full **per-run timestamp** (`<YYYY-MM-DD-HHMMSS>`), so re-running the same day keeps each report distinct. Praxen also writes a working `<agent-slug>-draft-<timestamp>.md` checkpoint during the run — a recovery artifact, not a deliverable, and safe to delete.
 
 The `.txt` summary is also printed to stdout during the analysis, so you can read it as the run completes.
 
@@ -181,7 +183,7 @@ The LLM wrote a `findings.json` that didn't pass schema validation, so the deter
 This is usually a context-pressure symptom — the analysis was synthesised under stress and the JSON came out malformed. Options:
 
 - **Re-run** in a larger context window or with a tighter input scope. See *Large workspaces and context sizing* above.
-- **Recover from the draft manifest** if Praxen wrote one (`./reports/<agent>-draft-<timestamp>.md` — Step 9.9 writes this before the JSON). Tell the agent: *"the canonical JSON failed validation — read the draft manifest and rebuild from it."*
+- **Recover from the draft manifest** if Praxen wrote one (`./reports/<agent-slug>-draft-<timestamp>.md` — Step 9.9 writes this before the JSON). Tell the agent: *"the findings JSON failed validation — read the draft manifest and rebuild from it."*
 
 If the same JSON-shape error reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-agent-ai-security/praxen/issues/new/choose) with the schema error and the agent slug.
 

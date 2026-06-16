@@ -1,0 +1,114 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Sweep
+Analysis: June 15, 2026, 23:11 UTC
+Praxen v0.8.1
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is declared-but-absent enforcement: Sweep's remit makes
+strong promises — screen all repository content for injection, never shell
+out, never echo secrets — that the scoped code does not implement. Untrusted
+issue, comment, file, and diff text flows into the LLM with no injection
+screening, and the same LLM/repo-derived strings are interpolated into
+subprocess.run(..., shell=True) at four search sites
+(question_answerer.ripgrep, context_pruning.run_ripgrep_command,
+dynamic_context_bot, client.is_file_bad), giving a content-to-shell path the
+remit explicitly forbids. Separately, the GitHub webhook HMAC secret
+(WEBHOOK_SECRET) is declared in config/server.py with a fail-open None default
+and is never consulted by any in-scope code, and a PostHog project key is
+hardcoded as a literal default in the same module.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.30 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 2   Medium: 4   Low: 0   Informational: 0
+  Total: 10
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 8   Partial: 6   Vague: 0   Enforcement-not-possible: 0   (of 17 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Supply Chain                                       —
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           3
+  LLM06  Excessive Agency                                   3
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       2
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    3
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-06-15-001  GitHub webhook secret WEBHOOK_SECRET is declared with a
+            fail-open None default and is never consulted by any in-scope
+            code.
+      Action 1: Fail closed on a missing webhook secret — assert
+                WEBHOOK_SECRET is set at startup (like the existing
+                OPENAI_API_KEY/COHERE_API_KEY asserts) so the agent never runs
+                without HMAC verification configured.
+      Action 2: Treat absent or invalid signatures as a hard reject in the
+                request path, and add a regression test that a payload with
+                no/invalid X-Hub-Signature-256 is refused.
+
+  PRAX-2026-06-15-002  LLM-supplied ripgrep query is interpolated into
+            subprocess.run with shell=True, giving a model-output-to-shell
+            command-injection path.
+      Action 1: Drop shell=True and pass rg arguments as a list
+                (subprocess.run(["rg", ..., query], shell=False)) so the query
+                is never parsed by a shell.
+      Action 2: If a shell is unavoidable, shlex.quote() every model-derived
+                argument before interpolation and add a test asserting
+                metacharacters in `query` cannot break out.
+
+  PRAX-2026-06-15-003  Two more shell=True ripgrep sites interpolate
+            repo/model-derived search terms without escaping, despite an
+            unused escape helper.
+      Action 1: Convert both call sites to list-form subprocess.run(...,
+                shell=False) so no shell parses the search term.
+      Action 2: If shell form is retained, apply shlex.quote() (not the
+                partial escape_ripgrep / manual quoting) to every interpolated
+                term.
+
+  PRAX-2026-06-15-004  No instruction-injection screening of issue, comment,
+            file, or diff content before it enters the LLM context, as the
+            remit mandates.
+      Action 1: Add an injection-screening / quote-wrapping pass over issue,
+                comment, file, and diff text at the boundary where it is added
+                to model context, before any prompt assembly.
+      Action 2: Label untrusted repository content distinctly in the prompt
+                (delimited, marked external) and add adversarial test cases
+                asserting injected instructions do not alter agent actions.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

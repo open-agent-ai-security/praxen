@@ -3,31 +3,33 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Quickstart — your first Praxen report in 5 minutes
+# Quickstart — your first Praxen report in five minutes
 
-This walks you from "Praxen is installed" to "I have a real report" against one of the bundled examples — `finbot`, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required.
+This walks you from "Praxen is installed" to "I have a real report" against **FinBot**, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required. (FinBot is small, so five minutes is realistic; a real-world target typically takes longer — see [Usage](usage.md).)
 
-If you haven't installed yet, do [Installation](installation.md) first (one command from the marketplace).
+Every Praxen scan needs **two separate inputs**: a **Worker Remit** (the policy) and a **separate agent source tree** (the evidence). Here you'll use the bundled FinBot remit and clone FinBot's source from upstream. The `examples/finbot/` report files are the *reference output* — what your run should approximately produce — **not** the thing you scan.
 
-## 1. Get a copy of the example workspace
+If you haven't installed yet, do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex.
 
-If you don't have a local copy of the Praxen repository yet, clone it (or unzip a release):
+## 1. Get a copy of the Praxen repository
+
+If you don't have a local copy of the Praxen repository yet, clone it:
 
 ```bash
 git clone https://github.com/open-agent-ai-security/praxen.git
 cd praxen
 ```
 
-The pieces you'll point Praxen at are already inside `examples/finbot/`:
+The only thing you'll take from `examples/finbot/` is the **remit** — the rest of that folder is the reference report:
 
 ```
 examples/finbot/
-  WORKER_REMIT.md          ← the policy doc you'll verify against
-  finbot-analysis.html     ← the committed report (what your run should approximately produce)
-  finbot-findings.json     ← the same content as canonical JSON
+  WORKER_REMIT.md          ← the policy doc you'll verify against  (the one input you use)
+  finbot-analysis.html     ← reference report — what your run should approximately produce (NOT a scan target)
+  finbot-findings.json     ← the same reference findings, as JSON                          (NOT a scan target)
 ```
 
-A real first scan would use *your* agent's source plus a remit you wrote. We're using the pre-staged ones so the first run has no moving parts.
+You'll get the *other* input — the agent source to scan — by cloning FinBot from upstream in the next step. A real first scan would use *your* agent's source plus a remit you wrote; we're using the pre-staged remit so the first run has no moving parts.
 
 ## 2. Get the FinBot source
 
@@ -49,6 +51,13 @@ Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
 to ./reports/finbot-quickstart/.
 ```
 
+**On Codex** the flow is identical. After the one-time user-wide skill link ([Installation](installation.md#option-b--openai-codex-agent-skill) Option B), run the same request via `codex exec` from the `praxen` repo directory:
+
+```bash
+codex exec --sandbox workspace-write -C "$(pwd)" \
+  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ../finbot-src. Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs to ./reports/finbot-quickstart/.'
+```
+
 That's the whole prompt. Praxen will:
 
 1. Read the Worker Remit
@@ -56,7 +65,7 @@ That's the whole prompt. Praxen will:
 3. Score the six RAISE categories
 4. Audit every remit rule
 5. Surface compound attack chains
-6. Write three files to `./reports/finbot-quickstart/`
+6. Write three files to `./reports/finbot-quickstart/` (plus a working draft checkpoint it may clean up)
 
 The skill prints an interim overview to stdout while it works. When it finishes you'll have:
 
@@ -102,4 +111,4 @@ See the [Troubleshooting](usage.md#troubleshooting) section in `usage.md`. The m
 
 - **"behavior-verifier skill not found"** — restart Claude Code or run `/reload-plugins`
 - **`render.py` errored at the end** — the LLM produced a malformed findings JSON; re-run with more context window or a more focused workspace path
-- **Context window auto-compacted during the run** — Praxen wrote a draft manifest in `./reports/<agent>-draft-<timestamp>.md`; tell the agent to read it and finish from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).
+- **Context window auto-compacted during the run** — Praxen wrote a draft manifest in `./reports/<agent-slug>-draft-<timestamp>.md`; tell the agent to read it and finish from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).

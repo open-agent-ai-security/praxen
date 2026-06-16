@@ -50,5 +50,6 @@ Security fixes ship in the **latest** released `0.x` line. Praxen is pre-`1.0` a
 
 | Version | Receiving security fixes |
 |---|---|
-| `0.7.x` | ✓ Yes — current release line |
+| **Latest tagged release** | ✓ Yes — always upgrade to the newest release before reporting |
+| Anything older than the latest release | No — no back-porting while pre-`1.0`; no LTS branch yet |
 | `0.6.x` and earlier (under the former name `Praxa`, at `Exabeam/deckard`) | No — superseded by the rename, not maintained |

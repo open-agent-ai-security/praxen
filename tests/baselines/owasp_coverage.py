@@ -224,8 +224,8 @@ def target_cards(per_target, out_dir: Path):
         if info.get("report"):
             try:
                 rel = Path(os.path.relpath(info["report"], out_dir)).as_posix()
-            except ValueError:
-                rel = info["report"].as_uri()
+            except ValueError:                       # Windows cross-drive relpath
+                rel = Path(info["report"]).as_uri()  # tolerate a path-like str, not only Path
             report_link = (
                 f'<a class="card-link card-link-report" href="{html.escape(rel)}" '
                 f'target="_blank" rel="noopener">Baseline report ↗</a>'
