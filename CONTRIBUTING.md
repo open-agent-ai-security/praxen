@@ -145,10 +145,13 @@ a tag.
 
 **Cutting a release**
 
-1. Land all changes on `dev`; bump the version everywhere the 4-way guard checks
-   (`PRAXEN_SPEC.md` + the three plugin manifests) plus `README.md` and
-   `CHANGELOG.md`; run `./build.sh` locally to confirm the version guard and the
-   `guide/` docs-freshness check pass.
+1. Land all changes on `dev`; bump the version everywhere the version guards
+   check — `PRAXEN_SPEC.md` + the three plugin manifests (`build.sh`'s 4-way
+   guard) **and** the static `release-v<version>` badge in `README.md`
+   (the 6-way unit guard in `tests/render/test_plugin_manifests.py`; remember
+   to escape the SemVer `-` as `--`, e.g. `release-v1.0.0--rc.1-blue`) — plus
+   `CHANGELOG.md`; run `./build.sh` and `python3 tests/render/test_plugin_manifests.py`
+   locally to confirm the version guards and the `guide/` docs-freshness check pass.
 2. Promote `dev → main` (merge commit, never squash), then fast-forward `dev`
    back up so `main` stays an ancestor of `dev`.
 3. Push the matching `v<version>` tag to fire `release.yml`.

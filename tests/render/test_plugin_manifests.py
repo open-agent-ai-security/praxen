@@ -105,14 +105,25 @@ def main():
     m = re.search(r"\*\*Version:\*\*\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)",
                   SPEC.read_text(encoding="utf-8"))
     spec_ver = m.group(1) if m else None
+
+    # README release pill is a STATIC shields badge (no GitHub-API dependency, so
+    # it can't error or lag) — but a static badge can drift, so the version it
+    # displays must agree with the manifests too. shields escapes a literal '-'
+    # in the badge message as '--', e.g. release-v1.0.0--rc.1-blue → 1.0.0-rc.1.
+    README = REPO_ROOT / "README.md"
+    rb = re.search(r"img\.shields\.io/badge/release-v(.+?)-(?:blue|orange|green|brightgreen|lightgrey|informational)\b",
+                   README.read_text(encoding="utf-8"))
+    readme_ver = rb.group(1).replace("--", "-") if rb else None
+
     versions = {
         "claude plugin.json": cp.get("version"),
         "codex plugin.json": xp.get("version"),
         "marketplace plugins[0]": entry.get("version"),
         "marketplace metadata": (mp.get("metadata") or {}).get("version"),
         "PRAXEN_SPEC.md": spec_ver,
+        "README release badge": readme_ver,
     }
-    check("all manifest versions + PRAXEN_SPEC.md agree",
+    check("all manifest versions + PRAXEN_SPEC.md + README badge agree",
           None not in versions.values() and len(set(versions.values())) == 1,
           f"versions={versions}")
     check("version is semver (MAJOR.MINOR.PATCH)",
