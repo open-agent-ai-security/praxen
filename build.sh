@@ -128,9 +128,13 @@ rm -rf "$STAGE_DIR"
 SIZE=$(du -h "$ZIP_PATH" | awk '{print $1}')
 echo "  → $ZIP_PATH ($SIZE)"
 
-# Summarize contents for sanity
+# Summarize contents for sanity.
+# Use `sed -n '1,40p'` rather than `head -40`: head closes the pipe after 40
+# lines, which sends SIGPIPE up to unzip/awk and — under `set -o pipefail` —
+# fails the whole build (exit 141) intermittently on larger zips. sed reads the
+# stream to EOF, so the upstream never sees a broken pipe.
 echo ""
 echo "Contents:"
-unzip -l "$ZIP_PATH" | awk 'NR>3 && $4!="" {print "  " $4}' | head -40
+unzip -l "$ZIP_PATH" | awk 'NR>3 && $4!="" {print "  " $4}' | sed -n '1,40p'
 echo ""
 echo "Done."

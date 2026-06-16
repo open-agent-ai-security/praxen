@@ -5,7 +5,7 @@
 
 # Praxen — Specification
 
-**Version:** 0.8.1
+**Version:** 1.0.0-rc.1
 **Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 

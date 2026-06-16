@@ -11,9 +11,15 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ## [Unreleased]
 
-Staging work toward **1.0**. Nothing here is tagged yet — fresh installs still get `0.8.1` until the next release.
+_Nothing yet — staging the next change set._
+
+## [1.0.0-rc.1] — 2026-06-15
+
+**First 1.0 release candidate.** Ships the 1.0 stability contract, code-enforced security backstops, and an operator-UX docs pass — published to the default channel as a GitHub pre-release so it can soak before the final `1.0.0`. The scan engine's *logic* is unchanged from `0.8.1` (`schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical; `schema_version` stays `"2.0"`), and the candidate cleared a full **12-target regression suite** on Claude Opus 4.8 — all targets in-band against the `v0.7.7-claude48` baseline, no Critical theme dropped.
 
 ### Added
+- **Codex operator-UX docs pass** ([#107](https://github.com/open-agent-ai-security/praxen/pull/107)) — loud "`examples/` are completed reports, not scan targets" callouts; a single user-wide-link golden path for the Codex install; a lightweight discovery **parity check** for "Verifying the install" (mirroring `claude plugin list`); and the first end-to-end run, including the concrete `codex exec` command, consolidated into a checkout-only Quickstart.
+- **SemVer pre-release support in the release tooling** — `release.yml` marks pre-release tags (any `-suffix`, e.g. `v1.0.0-rc.1`) as GitHub **pre-releases** so they are not flagged "Latest"; `test_plugin_manifests.py` accepts pre-release version suffixes in the cross-manifest version-agreement check. A future entropy-based secret-redaction backstop is tracked in [#104](https://github.com/open-agent-ai-security/praxen/issues/104).
 - **1.0 stability contract** — [`STABILITY.md`](STABILITY.md) defines what 1.0 holds stable (findings JSON schema, RAISE category set + weights, the skill invocation/output contract, the Worker Remit section structure) versus what is free to evolve, plus a one-paragraph semver/compatibility policy.
 - **Agent Behavior Verification concept page + docs authoring/style guide** ([#99](https://github.com/open-agent-ai-security/praxen/pull/99)).
 - **Security regression tests** — the self-contained HTML report is verified (with crafted payloads) to escape untrusted evidence so no `<script>`/event-handler/`javascript:` markup executes; and a best-effort **secret-leak backstop** in `render.py` **redacts** a credential-shaped evidence snippet (replacing the value with `[REDACTED — <pattern>]`) before it reaches the rendered report, and warns on stderr — so the shareable HTML/TXT never carries the literal value even if the model's own redaction missed it.

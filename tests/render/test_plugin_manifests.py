@@ -98,7 +98,12 @@ def main():
 
     # Version consistency — the 4-way guard build.sh enforces, here as a unit test
     # (so it runs on every PR, even when build.sh's docs-freshness path is skipped).
-    m = re.search(r"\*\*Version:\*\*\s*([0-9]+\.[0-9]+\.[0-9]+)", SPEC.read_text(encoding="utf-8"))
+    # Capture the full version INCLUDING any SemVer pre-release suffix (e.g.
+    # 1.0.0-rc.1). A numeric-only capture silently drops the suffix and makes
+    # this agreement check fail spuriously the moment we ship a release
+    # candidate — build.sh reads the whole string, so the test must too.
+    m = re.search(r"\*\*Version:\*\*\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)",
+                  SPEC.read_text(encoding="utf-8"))
     spec_ver = m.group(1) if m else None
     versions = {
         "claude plugin.json": cp.get("version"),
