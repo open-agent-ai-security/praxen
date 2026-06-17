@@ -177,6 +177,8 @@ def page_html(theme_css: str, title: str, nav: str, body: str, src: str, body_en
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · Praxen Docs</title>
 <style>{theme_css}</style>
+<!-- Privacy-friendly, cookieless analytics (GoatCounter) — docs/landing pages only, never the reports. -->
+<script data-goatcounter="https://open-agent-ai-security.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body class="docs-page">
 <header class="docs-top">
