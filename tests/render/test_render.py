@@ -143,6 +143,14 @@ def main():
           and "<b>2</b><span>Medium</span>" in html)
     check("TXT summary is non-empty and names the agent", "FinBot" in txt and len(txt) > 200)
     check("TXT lists Critical findings", "CRITICAL FINDINGS" in txt)
+    # The report must stay self-contained — it renders offline (file://) and
+    # nothing phones home (PRAXEN_SPEC §7). It must carry NO external script or
+    # analytics beacon; web analytics live only on the docs/landing pages, never
+    # here. Guards against a "consistency" edit copying the docs analytics snippet
+    # into report_template.html.
+    check("report HTML loads no external script / analytics beacon (self-contained, no phone-home)",
+          re.search(r"<script\b[^>]*\bsrc\s*=", html, re.I) is None
+          and "goatcounter" not in html.lower() and "gc.zgo.at" not in html.lower())
 
     # 3. determinism
     out_html2 = os.path.join(tmp, "b.html")
