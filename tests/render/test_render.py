@@ -336,11 +336,18 @@ def main():
     xss = json.loads(json.dumps(data))
     # esc() paths — plain fields the renderer emits as text/attribute content
     xss["scan"]["agent"] += P_SCRIPT
-    xss["findings"][0]["summary"] += " " + P_SCRIPT
     xss["findings"][0]["evidence"][0]["snippet"] = (
         P_IMG + " // " + xss["findings"][0]["evidence"][0]["snippet"])
-    xss["raise_posture"]["categories"][0]["rationale"] += " " + P_IMG
-    # render_rich() path — behavior_summary allows only the bare tags <p>/<strong>/<em>/<code>
+    # render_rich() paths — prose fields with the bare-tag allowlist (<code>/<strong>/<em>,
+    # plus <p> for behavior_summary). Smuggle a handler-on-allowlisted-tag payload (P_CODE)
+    # into EACH so the allowlist's attribute-stripping is proven on every rich field, not
+    # just behavior_summary — finding summary, RAISE category + weighted rationale, and
+    # positive description all render rich, so these injections guard that they stay inert.
+    xss["findings"][0]["summary"] += " " + P_SCRIPT + P_CODE
+    xss["raise_posture"]["categories"][0]["rationale"] += " " + P_IMG + P_CODE
+    xss["raise_posture"]["weighted_rationale"] += " " + P_SCRIPT + P_CODE
+    if xss.get("positives"):
+        xss["positives"][0]["description"] += " " + P_SCRIPT + P_CODE
     xss["behavior_summary"] = (P_SCRIPT + P_CODE + P_AHREF
                                + " Legit <strong>prose</strong> survives.")
     xss_path = os.path.join(tmp, "xss.json")
