@@ -143,6 +143,14 @@ def main():
           and "<b>2</b><span>Medium</span>" in html)
     check("TXT summary is non-empty and names the agent", "FinBot" in txt and len(txt) > 200)
     check("TXT lists Critical findings", "CRITICAL FINDINGS" in txt)
+    # The report must stay self-contained — it renders offline (file://) and
+    # nothing phones home (PRAXEN_SPEC §7). It must carry NO external script or
+    # analytics beacon; web analytics live only on the docs/landing pages, never
+    # here. Guards against a "consistency" edit copying the docs analytics snippet
+    # into report_template.html.
+    check("report HTML loads no external script / analytics beacon (self-contained, no phone-home)",
+          re.search(r"<script\b[^>]*\bsrc\s*=", html, re.I) is None
+          and "goatcounter" not in html.lower() and "gc.zgo.at" not in html.lower())
 
     # 3. determinism
     out_html2 = os.path.join(tmp, "b.html")
@@ -336,11 +344,18 @@ def main():
     xss = json.loads(json.dumps(data))
     # esc() paths — plain fields the renderer emits as text/attribute content
     xss["scan"]["agent"] += P_SCRIPT
-    xss["findings"][0]["summary"] += " " + P_SCRIPT
     xss["findings"][0]["evidence"][0]["snippet"] = (
         P_IMG + " // " + xss["findings"][0]["evidence"][0]["snippet"])
-    xss["raise_posture"]["categories"][0]["rationale"] += " " + P_IMG
-    # render_rich() path — behavior_summary allows only the bare tags <p>/<strong>/<em>/<code>
+    # render_rich() paths — prose fields with the bare-tag allowlist (<code>/<strong>/<em>,
+    # plus <p> for behavior_summary). Smuggle a handler-on-allowlisted-tag payload (P_CODE)
+    # into EACH so the allowlist's attribute-stripping is proven on every rich field, not
+    # just behavior_summary — finding summary, RAISE category + weighted rationale, and
+    # positive description all render rich, so these injections guard that they stay inert.
+    xss["findings"][0]["summary"] += " " + P_SCRIPT + P_CODE
+    xss["raise_posture"]["categories"][0]["rationale"] += " " + P_IMG + P_CODE
+    xss["raise_posture"]["weighted_rationale"] += " " + P_SCRIPT + P_CODE
+    if xss.get("positives"):
+        xss["positives"][0]["description"] += " " + P_SCRIPT + P_CODE
     xss["behavior_summary"] = (P_SCRIPT + P_CODE + P_AHREF
                                + " Legit <strong>prose</strong> survives.")
     xss_path = os.path.join(tmp, "xss.json")

@@ -137,6 +137,10 @@ _RICH_FIELDS = {
     "agent_structure_summary": ("code", "strong", "em"),
     "behavior_summary": ("p", "code", "strong", "em"),
     "recommended_actions": ("code", "strong", "em"),
+    "raise_rationale": ("code", "strong", "em"),
+    "weighted_rationale": ("code", "strong", "em"),
+    "finding_summary": ("code", "strong", "em"),
+    "positive_description": ("code", "strong", "em"),
 }
 
 
@@ -400,7 +404,7 @@ def _finding_ctx(finding, _idx):
         "SEVERITY_CLASS": _SEV_CLASS[finding["severity"]],
         "SEVERITY_LABEL": _SEV_LABEL[finding["severity"]],
         "FINDING_ID": esc(finding["id"]),
-        "FINDING_SUMMARY": esc(finding["summary"]),
+        "FINDING_SUMMARY": render_rich(finding["summary"], allow=_RICH_FIELDS["finding_summary"]),
         "EVIDENCE": _format_evidence(finding["evidence"]),
         "RECOMMENDED_ACTION": _format_recommended_actions(finding["recommended_actions"]),
     }
@@ -434,7 +438,7 @@ def _format_recommended_actions(actions):
 def _positive_ctx(p, _idx):
     return {
         "POSITIVE_TITLE": esc(p["title"]),
-        "POSITIVE_DESCRIPTION": esc(p["description"]),
+        "POSITIVE_DESCRIPTION": render_rich(p["description"], allow=_RICH_FIELDS["positive_description"]),
         "POSITIVE_EVIDENCE_PATH": esc(p["evidence_path"]),
     }
 
@@ -461,7 +465,7 @@ def _raise_card_ctx(cat, _idx):
         "CONFIDENCE": esc(cat["confidence"]),
         "WEIGHT_PCT": str(round(weight * 100)),
         "WEIGHTED_CONTRIBUTION": f"{score * weight:.2f}",
-        "RATIONALE": esc(cat["rationale"]),
+        "RATIONALE": render_rich(cat["rationale"], allow=_RICH_FIELDS["raise_rationale"]),
     }
 
 
@@ -497,7 +501,7 @@ def _owasp_chip_ctx(finding, _idx):
     return {
         "FINDING_ANCHOR": esc(finding["id"]),
         "SEVERITY_CLASS": _SEV_CLASS[finding["severity"]],
-        "FINDING_SUMMARY": esc(finding["summary"]),
+        "FINDING_SUMMARY": render_rich(finding["summary"], allow=_RICH_FIELDS["finding_summary"]),
     }
 
 
@@ -597,7 +601,7 @@ def _global_ctx(data):
         "RAISE_PCT": str(round(wo / 5 * 100)),
         "MATURITY_BAND_CLASS": _maturity_band_class(wo),
         "MATURITY_LABEL": maturity_label(wo),
-        "WEIGHTED_RATIONALE": esc(posture["weighted_rationale"]),
+        "WEIGHTED_RATIONALE": render_rich(posture["weighted_rationale"], allow=_RICH_FIELDS["weighted_rationale"]),
         "NO_LOGS_NOTE": esc(lf["no_logs_note"]) if not lf["present"] else "",
     }
 
@@ -732,7 +736,7 @@ def render_txt(data: dict) -> str:
         out.append("CRITICAL FINDINGS")
         out.append(sub)
         for f in crits:
-            out.extend(_wrap(f"{f['id']}  {f['summary']}", indent="  ", subsequent="            "))
+            out.extend(_wrap(f"{f['id']}  {strip_tags(f['summary'])}", indent="  ", subsequent="            "))
             actions = f["recommended_actions"]
             for k, action in enumerate(actions):
                 prefix = "Action: " if len(actions) == 1 else f"Action {k+1}: "

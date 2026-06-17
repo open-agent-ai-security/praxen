@@ -78,16 +78,48 @@ For the first **end-to-end run** on either platform — Worker Remit + agent sou
 
 ## Updating
 
-**Claude Code (plugin marketplace):**
+Every Praxen release bumps the version string, so a new version is always picked up once you refresh — the only question is whether you refresh by hand or let Claude Code do it for you. Check what you currently have with:
 
 ```bash
-claude plugin marketplace update open-agent-ai-security
-claude plugin update praxen@open-agent-ai-security
+claude plugin list      # shows praxen@open-agent-ai-security and its installed version
 ```
 
-Restart Claude Code to apply. (In-session equivalents are the same commands as `/plugin …`.)
+### Claude Code — manual update
 
-**OpenAI Codex / unzipped release:** pull the latest checkout or download the new release zip and replace it — a symlinked skill folder picks up the new version automatically. There is no migration step; Praxen is stateless across analyses.
+Two steps (the catalog refresh and the install are independent), then restart:
+
+```bash
+claude plugin marketplace update open-agent-ai-security   # refresh the catalog from the repo
+claude plugin update praxen@open-agent-ai-security         # install the latest version
+```
+
+Restart Claude Code (or run `/reload-plugins`) to apply. **Don't skip the first command** — on its own, `plugin update` only moves you to the newest version in your *local* catalog cache, which may be stale. The in-session `/plugin marketplace update …` and `/plugin update …` do exactly the same thing.
+
+### Claude Code — auto-update (opt-in)
+
+Auto-update is a **per-marketplace** setting, and for third-party marketplaces like Praxen's it is **off by default** — so out of the box you're on manual updates, and **Claude Code does not notify you** when a newer version exists. To turn it on:
+
+- **Interactively:** `/plugin` → **Marketplaces** tab → select `open-agent-ai-security` → **enable auto-update**. Claude Code then checks for a newer version **at startup** (not on a schedule) and updates automatically.
+- **Fleet-wide (admins)** — in managed `settings.json`:
+
+  ```json
+  {
+    "extraKnownMarketplaces": {
+      "open-agent-ai-security": {
+        "source": { "source": "github", "repo": "open-agent-ai-security/praxen" },
+        "autoUpdate": true
+      }
+    }
+  }
+  ```
+
+- **Disable updates globally:** `DISABLE_AUTOUPDATER=1` turns off Claude Code's automatic updates. For Praxen specifically, the per-marketplace toggle above is the reliable control; for the exact scope of the env var, see Claude Code's own settings documentation.
+
+> Because Praxen is a security tool, staying current matters — enabling auto-update (or updating on a regular cadence) is recommended.
+
+### OpenAI Codex / unzipped release
+
+There's no marketplace, so updating is manual: `git pull` the checkout (a symlinked skill folder picks up the new version automatically), or download the new release zip and replace it. There's no migration step; Praxen is stateless across analyses.
 
 ## Uninstalling
 
