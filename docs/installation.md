@@ -113,7 +113,7 @@ Auto-update is a **per-marketplace** setting, and for third-party marketplaces l
   }
   ```
 
-- **Global override (env vars):** `DISABLE_AUTOUPDATER=1` turns off *all* auto-updates; add `FORCE_AUTOUPDATE_PLUGINS=1` alongside it to keep plugin auto-updates while disabling Claude Code's own self-update.
+- **Disable updates globally:** `DISABLE_AUTOUPDATER=1` turns off Claude Code's automatic updates. For Praxen specifically, the per-marketplace toggle above is the reliable control; for the exact scope of the env var, see Claude Code's own settings documentation.
 
 > Because Praxen is a security tool, staying current matters — enabling auto-update (or updating on a regular cadence) is recommended.
 
