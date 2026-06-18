@@ -177,9 +177,12 @@ def page_html(theme_css: str, title: str, nav: str, body: str, src: str, body_en
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · Praxen Docs</title>
 <style>{theme_css}</style>
-<!-- Privacy-friendly, cookieless analytics (GoatCounter) — docs/landing pages only, never the reports.
-     count.js is self-hosted (assets/count.js, ISC) so no third-party executable JS runs on the page; only data posts to the GoatCounter endpoint. -->
+<!-- Cookieless web analytics — docs/landing pages only, never the reports.
+     Two tools run side by side (temporary A/B comparison):
+     (1) GoatCounter — self-hosted count.js (../assets/count.js, ISC); only data posts to the endpoint.
+     (2) Cloudflare Web Analytics — a third-party beacon from static.cloudflareinsights.com. -->
 <script data-goatcounter="https://open-agent-ai-security.goatcounter.com/count" async src="../assets/count.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token": "223642421cad463daf91bd9429a5f9a0"}}'></script>
 </head>
 <body class="docs-page">
 <header class="docs-top">
