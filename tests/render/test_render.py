@@ -150,7 +150,8 @@ def main():
     # into report_template.html.
     check("report HTML loads no external script / analytics beacon (self-contained, no phone-home)",
           re.search(r"<script\b[^>]*\bsrc\s*=", html, re.I) is None
-          and "goatcounter" not in html.lower() and "gc.zgo.at" not in html.lower())
+          and "goatcounter" not in html.lower() and "gc.zgo.at" not in html.lower()
+          and "cloudflareinsights" not in html.lower() and "beacon.min.js" not in html.lower())
 
     # 3. determinism
     out_html2 = os.path.join(tmp, "b.html")
