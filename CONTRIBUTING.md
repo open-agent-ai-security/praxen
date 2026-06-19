@@ -155,9 +155,23 @@ a tag.
 2. Promote `dev → main` (merge commit, never squash), then fast-forward `dev`
    back up so `main` stays an ancestor of `dev`.
 3. Push the matching `v<version>` tag to fire `release.yml`.
-4. Verify the published release zip and run the post-tag marketplace install
-   check (`claude plugin marketplace add … && claude plugin install …`) on both
-   platforms — the manifest schema is not gated by CI.
+4. Verify the published release zip, then run the **post-tag plugin install
+   smoke** — a required step of every promotion. (It is deliberately *not* in
+   CI: the `claude` CLI is not run in GitHub Actions, so this stays a
+   maintainer-run check, and the manifest schema is otherwise ungated.)
+   - **Primary — the script:** `scripts/release/plugin-smoke.sh` (run after the
+     tag is pushed). It runs both real journeys against throwaway scratch
+     `$CLAUDE_CONFIG_DIR`s — a **clean install** from the GitHub marketplace and
+     an **upgrade** from the prior tag — and asserts the resulting version, never
+     touching your live install. Target/prior auto-resolve from `PRAXEN_SPEC.md`
+     and the most recent prior tag; override with
+     `scripts/release/plugin-smoke.sh v<target> v<prior>`.
+   - **Fallback — the manual commands it automates** (use if the script can't
+     run): in a scratch config,
+     `claude plugin marketplace add open-agent-ai-security/praxen && claude plugin install praxen@open-agent-ai-security && claude plugin list`
+     (expect the new version, enabled); for the upgrade leg, install the prior
+     tag first, then `claude plugin marketplace update … && claude plugin update …`.
+     Confirm the Codex symlink path surfaces the new version too.
 
 **Rolling back a bad release**
 
