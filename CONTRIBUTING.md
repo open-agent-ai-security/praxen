@@ -160,18 +160,22 @@ a tag.
    CI: the `claude` CLI is not run in GitHub Actions, so this stays a
    maintainer-run check, and the manifest schema is otherwise ungated.)
    - **Primary — the script:** `scripts/release/plugin-smoke.sh` (run after the
-     tag is pushed). It runs both real journeys against throwaway scratch
-     `$CLAUDE_CONFIG_DIR`s — a **clean install** from the GitHub marketplace and
-     an **upgrade** from the prior tag — and asserts the resulting version, never
-     touching your live install. Target/prior auto-resolve from `PRAXEN_SPEC.md`
-     and the most recent prior tag; override with
-     `scripts/release/plugin-smoke.sh v<target> v<prior>`.
+     tag is pushed). It runs both real **Claude Code** journeys against throwaway
+     scratch `$CLAUDE_CONFIG_DIR`s — a **clean install** from the GitHub
+     marketplace and an **upgrade** from the prior tag — and asserts the
+     resulting version, never touching your live install. Target/prior
+     auto-resolve from `PRAXEN_SPEC.md` and the most recent prior tag; override
+     with `scripts/release/plugin-smoke.sh v<target> v<prior>`.
    - **Fallback — the manual commands it automates** (use if the script can't
      run): in a scratch config,
      `claude plugin marketplace add open-agent-ai-security/praxen && claude plugin install praxen@open-agent-ai-security && claude plugin list`
      (expect the new version, enabled); for the upgrade leg, install the prior
      tag first, then `claude plugin marketplace update … && claude plugin update …`.
-     Confirm the Codex symlink path surfaces the new version too.
+   - **Codex (always manual):** the script covers only the Claude Code
+     marketplace. Separately confirm the Codex skill-folder path surfaces the new
+     version — re-link / `git pull` (or re-unzip) and check `praxen:behavior-verifier`
+     resolves at `v<version>`. (Codex installs via a symlinked skill folder, not a
+     marketplace, so there is nothing for the script to drive.)
 
 **Rolling back a bad release**
 
