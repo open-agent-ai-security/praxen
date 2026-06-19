@@ -13,6 +13,16 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 _Nothing yet — staging the next change set._
 
+## [1.0.0] — 2026-06-19
+
+**Praxen 1.0 — general availability.** Promotes [`1.0.0-rc.1`](https://github.com/open-agent-ai-security/praxen/releases/tag/v1.0.0-rc.1) to the final `1.0.0` after its soak; the [1.0 stability contract](STABILITY.md) is now in force. The scan engine's *logic* is unchanged from the RC (and from `0.8.1`): `SKILL.md`, `schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical, and `schema_version` stays `"2.0"`. The RC cleared a full **12-target regression suite** on Claude Opus 4.8; the GA engine is byte-identical to it, and a single-target FinBot sanity scan reproduced the committed baseline exactly (weighted RAISE 0.45 / 5.0, identical category vector, every canonical theme caught).
+
+### Added
+- **Real-world example — Salesforce Help Agent Accelerator** ([#77](https://github.com/open-agent-ai-security/praxen/pull/77)) — the first showcase scan against a real, shipping open-source product (vs. the deliberately-vulnerable training agents), contributed by [@rossja](https://github.com/rossja); listed in `examples/README.md`.
+
+### Changed
+- **Prose fields render rich** ([#114](https://github.com/open-agent-ai-security/praxen/pull/114)) — RAISE rationales, the executive/structure/behavior summaries, finding summaries, and What's-Working notes now render their inline `<code>`/`<strong>`/`<em>` markup (previously shown as literal tags), with a monospace inline-code "chip" style. `render.py` + `report_template.html` only — presentational; every committed baseline re-renders byte-identically from its unchanged JSON.
+
 ## [1.0.0-rc.1] — 2026-06-15
 
 **First 1.0 release candidate.** Ships the 1.0 stability contract, code-enforced security backstops, and an operator-UX docs pass — published as the **Latest** release on the default channel (pre-1.0 there is no separate "stable" channel; the newest candidate is what to install) so it can soak before the final `1.0.0`. The scan engine's *logic* is unchanged from `0.8.1` (`schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical; `schema_version` stays `"2.0"`), and the candidate cleared a full **12-target regression suite** on Claude Opus 4.8 — all targets in-band against the `v0.7.7-claude48` baseline, no Critical theme dropped.
