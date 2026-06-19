@@ -5,7 +5,7 @@
 
 # Example Scans
 
-Real analyses from **Praxen** against two deliberately vulnerable AI agents, so you can see Praxen in action.
+Real analyses from **Praxen** against three AI agents — two deliberately vulnerable training agents and one real-world open-source product — so you can see Praxen in action.
 
 > **These are completed reports, not scan targets.** This directory is showcase *output* — what Praxen produces — plus the remit each analysis used. It is **not** a source tree to point a scan at. A Praxen scan always takes two separate inputs: a **Worker Remit** and a **separate agent source tree**. To reproduce one of these, use the remit here (or the matching one under [`../tests/remits/`](../tests/remits/)) and clone the upstream **Source** linked below — see [Quickstart](../docs/quickstart.md) for the step-by-step.
 
@@ -40,3 +40,16 @@ A general-purpose assistant whose remit assumes path-scoped `read_file`/`write_f
 - [`helperbot/WORKER_REMIT.md`](helperbot/WORKER_REMIT.md) — intended-scope policy
 - [`helperbot-analysis.html`](https://open-agent-ai-security.github.io/praxen/examples/helperbot/helperbot-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`helperbot/helperbot-findings.json`](helperbot/helperbot-findings.json) — machine-readable findings (preferred for automated ingestion)
+
+---
+
+## Salesforce Help Agent Accelerator — real-world open-source product
+
+**Source:** [salesforce/help-agent-accelerator](https://github.com/salesforce/help-agent-accelerator) — Salesforce's open-source Help Agent Accelerator (HAA), an Agentforce knowledge-answering assistant. Unlike the two CTF/training agents above, this is a **real, shipping open-source product**; the scan ran against the public codebase as-is (no deployed agent or live Salesforce org). Contributed by [@rossja](https://github.com/rossja).
+
+Praxen produced 7 findings (1 Critical, 3 High, 3 Medium), weighted RAISE posture 1.15 / 5.0 (Ad hoc) — the agent earns partial credit for a narrow, platform-enforced tool inventory and explicit grounding instructions, but nearly all enforcement lives in the system prompt: Knowledge-article content flows into the LLM context unfiltered (indirect prompt-injection exposure, the Critical), every post-retrieval and output control is prompt-only with no code-level output filter, injection detection, or content sanitization at any layer, an `off_topic` topic offers human escalation the remit prohibits, there is no durable action-level logging (tool calls and topic routing surface only in the browser console under an opt-in debug flag), `citations_enabled` defaults to `False`, the LWC query path drops the 1,000-character input cap present in the standalone JS implementation, and no adversarial-testing artifacts exist for the highest-risk vector.
+
+- [`salesforce-help-agent-accelerator/README.md`](salesforce-help-agent-accelerator/README.md) — how this remit and report were generated (Claude Sonnet 4.6, medium effort)
+- [`salesforce-help-agent-accelerator/WORKER_REMIT.md`](salesforce-help-agent-accelerator/WORKER_REMIT.md) — intended-scope policy
+- [`salesforce-help-agent-accelerator-analysis.html`](https://open-agent-ai-security.github.io/praxen/examples/salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
+- [`salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-findings.json`](salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-findings.json) — machine-readable findings (preferred for automated ingestion)
