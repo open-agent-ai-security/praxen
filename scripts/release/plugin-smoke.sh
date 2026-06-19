@@ -53,14 +53,14 @@ git rev-parse -q --verify "refs/tags/${TARGET_TAG}" >/dev/null \
 
 # --- resolve PRIOR_TAG for the upgrade leg (most recent OTHER tag) ---
 PRIOR_TAG="${2:-}"
-[ -n "$PRIOR_TAG" ] || PRIOR_TAG="$(git tag --sort=-creatordate | grep -vxF "$TARGET_TAG" | head -1 || true)"
+[ -n "$PRIOR_TAG" ] || PRIOR_TAG="$(git tag -l 'v*' --sort=-creatordate | grep -vxF "$TARGET_TAG" | head -1 || true)"
 
 # cleanup state
 SCRATCH=()
 WORKTREE=""
 cleanup() {
   [ -n "$WORKTREE" ] && git worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
-  local d; for d in "${SCRATCH[@]:-}"; do [ -n "$d" ] && rm -rf "$d"; done
+  local d; for d in ${SCRATCH[@]+"${SCRATCH[@]}"}; do [ -n "$d" ] && rm -rf "$d"; done
 }
 trap cleanup EXIT
 
@@ -79,8 +79,8 @@ echo "[1/2] clean install from the GitHub marketplace (${REPO_SLUG})"
 CONFIG1="$(mktemp -d)"; SCRATCH+=("$CONFIG1")
 (
   export CLAUDE_CONFIG_DIR="$CONFIG1"
-  claude plugin marketplace add "$REPO_SLUG" >/dev/null
-  claude plugin install "$PLUGIN" >/dev/null
+  claude plugin marketplace add "$REPO_SLUG" >/dev/null </dev/null
+  claude plugin install "$PLUGIN" >/dev/null </dev/null
 )
 CLAUDE_CONFIG_DIR="$CONFIG1" assert_version "$TARGET"
 
@@ -96,15 +96,15 @@ else
   git worktree add -q "$WORKTREE" "$PRIOR_TAG"
   (
     export CLAUDE_CONFIG_DIR="$CONFIG2"
-    claude plugin marketplace add "$WORKTREE" >/dev/null   # local marketplace @ PRIOR_TAG
-    claude plugin install "$PLUGIN" >/dev/null
+    claude plugin marketplace add "$WORKTREE" >/dev/null </dev/null   # local marketplace @ PRIOR_TAG
+    claude plugin install "$PLUGIN" >/dev/null </dev/null
   )
   CLAUDE_CONFIG_DIR="$CONFIG2" assert_version "$PRIOR_VER"
   git -C "$WORKTREE" checkout -q "$TARGET_TAG"             # bump the marketplace source to GA
   (
     export CLAUDE_CONFIG_DIR="$CONFIG2"
-    claude plugin marketplace update "$MARKET" >/dev/null
-    claude plugin update "$PLUGIN" >/dev/null
+    claude plugin marketplace update "$MARKET" >/dev/null </dev/null
+    claude plugin update "$PLUGIN" >/dev/null </dev/null
   )
   CLAUDE_CONFIG_DIR="$CONFIG2" assert_version "$TARGET"
 fi
