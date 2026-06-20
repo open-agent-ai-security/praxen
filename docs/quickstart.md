@@ -7,13 +7,13 @@
 
 A complete Praxen run, end to end: you'll have Claude **author a security policy** for a real agent, **verify the agent's code against it**, and read the report — all from plain-English instructions. The target is **FinBot**, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF, so the divergences are dramatic and easy to learn from.
 
+This walkthrough uses **Claude Code**; **OpenAI Codex** works the same way — wherever it says `claude` or "ask Claude," substitute your Codex invocation, and the steps are identical.
+
 You do very little here — four short instructions; Claude does the work: fetching docs, writing the policy, cloning the code, running the analysis, and rendering the report. Budget about 15 minutes, most of it Claude thinking while you watch.
 
 > Not installed yet? Do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex. There's nothing else to clone or download; Claude pulls what it needs.
 
 ## Set up
-
-This walkthrough uses **Claude Code**; **OpenAI Codex** works the same way. Wherever it says `claude` or "ask Claude," substitute your Codex invocation, and the four plain-English requests below work unchanged.
 
 Start a Claude Code session in a fresh, empty folder — that's where the remit and the `reports/` will land:
 
