@@ -74,7 +74,7 @@ If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, 
 
 **Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` in Codex's skill list. That's the parity check — it confirms discovery, the same way `claude plugin list` does for Claude Code.
 
-For the first **end-to-end run** on either platform — Worker Remit + agent source → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through scanning the FinBot agent (source cloned from upstream) against the bundled remit in about five minutes, with the exact Claude Code and Codex commands.
+For the first **end-to-end run** — declared intent → evidence → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through having Claude author a Worker Remit for the FinBot demo agent, scan the code against it, and read the report, in about 15 minutes — all from plain-English instructions.
 
 ## Updating
 
@@ -138,6 +138,6 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — first end-to-end report: scan the FinBot agent (source cloned from upstream) against the bundled remit
+- [Quickstart](quickstart.md) — first end-to-end report: have Claude author a remit for the FinBot demo agent, scan it, and read the report
 - [Writing Worker Remits](writing-remits.md) — authoring the policy document Praxen verifies against
 - [Usage](usage.md) — the full running-an-analysis reference

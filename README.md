@@ -83,7 +83,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 ## Get started
 
 - [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin / skill folder, or unzipped release)
-- [**Quickstart**](docs/quickstart.md) — your first end-to-end report in about five minutes: scan the FinBot agent (source cloned from upstream) against the bundled remit
+- [**Quickstart**](docs/quickstart.md) — your first end-to-end report in about 15 minutes: have Claude author a remit for the FinBot demo agent, scan it, and read the report
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
 - [**Interpreting Reports**](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
