@@ -138,6 +138,6 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — first end-to-end report: scan the FinBot agent (source cloned from upstream) against the bundled remit
+- [Quickstart](quickstart.md) — first end-to-end report: have Claude author a remit for the FinBot demo agent, scan it, and read the report
 - [Writing Worker Remits](writing-remits.md) — authoring the policy document Praxen verifies against
 - [Usage](usage.md) — the full running-an-analysis reference
