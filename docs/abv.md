@@ -121,7 +121,7 @@ As AI agents become operational actors inside business systems, *is this agent b
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — first report against the bundled `finbot` example in five minutes
+- [Quickstart](quickstart.md) — have Claude author a remit for the FinBot demo agent, scan it, and read the report, in about 15 minutes
 - [Writing Worker Remits](writing-remits.md) — author the policy document ABV verifies against
 - [The RAISE Framework](RAISE.md) — the six-category maturity model Praxen scores
 - [Interpreting Reports](interpreting-reports.md) — how to read what Praxen produces

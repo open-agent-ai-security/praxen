@@ -3,112 +3,96 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Quickstart — your first Praxen report in five minutes
+# Quickstart — your first Praxen report in about 15 minutes
 
-This walks you from "Praxen is installed" to "I have a real report" against **FinBot**, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF. No editing your own agent required. (FinBot is small, so five minutes is realistic; a real-world target typically takes longer — see [Usage](usage.md).)
+A complete Praxen run, end to end: you'll have Claude **author a security policy** for a real agent, **verify the agent's code against it**, and read the report — all from plain-English instructions. The target is **FinBot**, a deliberately vulnerable invoice-processing agent from the OWASP Agentic AI CTF, so the divergences are dramatic and easy to learn from.
 
-Every Praxen scan needs **two separate inputs**: a **Worker Remit** (the policy) and a **separate agent source tree** (the evidence). Here you'll use the bundled FinBot remit and clone FinBot's source from upstream. The `examples/finbot/` report files are the *reference output* — what your run should approximately produce — **not** the thing you scan.
+You do very little here — four short instructions; Claude does the work: fetching docs, writing the policy, cloning the code, running the analysis, and rendering the report. Budget about 15 minutes, most of it Claude thinking while you watch.
 
-If you haven't installed yet, do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex.
+> Not installed yet? Do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex. There's nothing else to clone or download; Claude pulls what it needs.
 
-## 1. Get a copy of the Praxen repository
+## Set up
 
-If you don't have a local copy of the Praxen repository yet, clone it:
-
-```bash
-git clone https://github.com/open-agent-ai-security/praxen.git
-cd praxen
-```
-
-The only thing you'll take from `examples/finbot/` is the **remit** — the rest of that folder is the reference report:
-
-```
-examples/finbot/
-  WORKER_REMIT.md          ← the policy doc you'll verify against  (the one input you use)
-  finbot-analysis.html     ← reference report — what your run should approximately produce (NOT a scan target)
-  finbot-findings.json     ← the same reference findings, as JSON                          (NOT a scan target)
-```
-
-You'll get the *other* input — the agent source to scan — by cloning FinBot from upstream in the next step. A real first scan would use *your* agent's source plus a remit you wrote; we're using the pre-staged remit so the first run has no moving parts.
-
-## 2. Get the FinBot source
-
-The example was developed against the **CineFlow Productions finbot** from the OWASP Agentic AI CTF (see [`examples/README.md`](../examples/README.md) for the full provenance). Clone the source so Praxen has a real workspace to read:
+Start a Claude Code session in a fresh, empty folder — that's where the remit and the `reports/` will land:
 
 ```bash
-git clone https://github.com/OWASP-ASI/finbot-ctf-demo.git ../finbot-src
+mkdir finbot-quickstart && cd finbot-quickstart
+claude
 ```
 
-(Any directory will do — `../finbot-src` keeps the clone outside the Praxen tree and works the same on macOS, Linux, and Windows.)
+As you go, Claude will ask permission to do things like clone the repo, write the remit, and run the renderer — approve them.
 
-## 3. Run the analysis
+## 1. Have Claude author the Worker Remit
 
-From a Claude Code session in the `praxen` repo directory, ask the agent:
+A Praxen scan checks an agent against a **Worker Remit** — a plain-language policy of what the agent is *supposed* to do. Rather than hand-write one, have Claude do it:
 
-```
-Please run the behavior-verifier skill against ../finbot-src.
-Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs
-to ./reports/finbot-quickstart/.
-```
+> *Author a Worker Remit for this agent from its repo docs. It's an intentionally vulnerable bot, so build the remit from the **intended** ("desired") behavior in the docs — don't read the implementation code: https://github.com/OWASP-ASI/finbot-ctf-demo*
 
-**On Codex** the flow is identical. After the one-time user-wide skill link ([Installation](installation.md#option-b--openai-codex-agent-skill) Option B), run the same request via `codex exec` from the `praxen` repo directory:
+**What Claude does:** loads the Praxen skill, reads the repo's README and design/walkthrough docs (not the code), and — because FinBot's docs are an *attack* walkthrough — inverts each documented exploit into the secure behavior it violates. It writes `WORKER_REMIT.md` and appends a short **Open Questions** list for what it can't infer (the real approval thresholds, whether vendors are allowlisted, whether MFA is required). A couple of minutes.
 
-```bash
-codex exec --sandbox workspace-write -C "$(pwd)" \
-  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ../finbot-src. Use the Worker Remit at examples/finbot/WORKER_REMIT.md. Write outputs to ./reports/finbot-quickstart/.'
-```
+**Why "don't read the code" matters:** the remit is the standard the scan judges the code against. If you author it *from* the implementation, it just mirrors what the code already does — and the scan finds nothing. Building it from stated intent is what gives the scan something real to measure against. (This discipline is built into the skill; see [Writing Worker Remits](writing-remits.md).) Skim `WORKER_REMIT.md` — it's your policy, and you can tighten it or answer the Open Questions before scanning if you want a sharper result.
 
-That's the whole prompt. Praxen will:
+## 2. Have Claude run the scan
 
-1. Read the Worker Remit
-2. Sweep the workspace at `../finbot-src`
-3. Score the six RAISE categories
-4. Audit every remit rule
-5. Surface compound attack chains
-6. Write three files to `./reports/finbot-quickstart/` (plus a working draft checkpoint it may clean up)
+Now point Praxen at the agent's actual code, using the remit it just wrote:
 
-The skill prints an interim overview to stdout while it works. When it finishes you'll have:
+> *Run the scan now, using the remit you built.*
 
-```
-./reports/finbot-quickstart/
-  finbot-findings-YYYY-MM-DD.json     ← canonical record
-  finbot-analysis-YYYY-MM-DD-HHMMSS.html  ← human-readable report
-  finbot-analysis-YYYY-MM-DD-HHMMSS.txt   ← plain-text summary
-```
+**What Claude does:** clones FinBot itself, sweeps the workspace, scores the six RAISE categories, audits every remit rule, checkpoints the analysis to a draft manifest (so a long run survives a context-window compaction), and renders the report. Several minutes — this is the long pole of the run.
 
-## 4. Open the report
+**What you'll see:** FinBot lands at a RAISE posture of **"Absent"** — a near-floor score, expected for a deliberately-broken agent — with a dozen-plus findings, **Criticals first**. The headline is a compound chain: an unauthenticated admin plane → attacker text written into the agent's goals → no approval gate on payments → no audit log — the exact goal-hijack-to-autonomous-payment path the CTF is built around. It also notes what FinBot gets *right* (no code-execution capability, a bounded agent loop), so the report isn't only a list of failures.
 
-```bash
-open ./reports/finbot-quickstart/finbot-analysis-*.html
-```
+*(Exact counts and the score shift from run to run — synthesis is an act of judgment, not a fixed function. The themes are the stable signal; see [Run-to-Run Variability](understanding-variability.md).)*
 
-(`open` is macOS; on Linux use `xdg-open`, on Windows the file works in any browser.)
+## 3. Read the report
 
-What you should see, top to bottom:
+> *Show me the report in the browser.*
 
-- A red **CRITICAL** status badge — FinBot is deliberately broken
-- An **Agent Remit** panel restating what the remit says, alongside an **Agent Structure** panel summarising what Praxen found in the workspace
-- A **Behavior Summary** — the dominant pattern (typically something like *"framework offers safe primitives, code uses none of them"*)
-- A **Remit Coverage** table listing every rule with status (`Verified` / `Gap` / `Partial` / `Vague` / `ENP`)
-- A **Findings Register** — Critical first, then High, Medium, Low, Informational, each with evidence and a recommended action
-- A **RAISE Maturity Posture** wrap-up — a 0–5 weighted score across six categories
+Claude opens the self-contained HTML report. Read it top to bottom:
 
-You can compare your fresh report against the [published FinBot example report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html) (rendered on GitHub Pages). It won't be byte-identical (LLM analyses have run-to-run variance) but the dominant Critical themes, the broad RAISE shape, and the remit-coverage counts should be close. See [tests/README.md](../tests/README.md) for what "close" actually means for this target.
+- **Behavior Summary + RAISE scorecard** — the one-line story (something like *"safe primitives offered, none used"*) and the 0–5 weighted maturity score across six categories, color-graded by score.
+- **Findings register** — Critical first, then High → Informational. Each card carries its **`file:line` evidence** and the **remit rule(s) it violates**, plus a recommended action.
+- **Remit Coverage table** — every rule you authored, marked `Verified` / `Gap` / `Partial` / `Vague` / `ENP` (exists-not-proven). This is where you see how much of your policy the code actually honors.
+- **OWASP heatmaps** + **Positives** — the findings mapped to the OWASP LLM and Agentic risk catalogs, and the controls that *are* present and working.
 
-## 5. Now try your own agent
+Ask Claude to walk through any finding — *"explain PRAX-005"*, *"why is this Critical?"* — and it re-examines the evidence with you. The analysis is conversational, so you can challenge or revise it; see [Challenging and Revising Findings](challenging-findings.md).
 
-The pattern is identical with a real target:
+## Bonus — don't just measure, improve
 
-1. [Write a Worker Remit](writing-remits.md) for the agent
-2. Point Praxen at whatever evidence you have — source, deployment files, behavioral logs, governance docs
-3. Read the report; [iterate](challenging-findings.md) on the remit and the agent as needed
+At this point Praxen has done its core job: you have a report that tells you exactly where FinBot diverges from its remit. But a verifier that only measures is half a tool. A Praxen finding isn't just a label — it carries `file:line` evidence and a recommended action — so it's something you can act on. Close the loop.
+
+Ask Claude to fix the worst one:
+
+> *Find the most critical finding and create a fix.*
+
+**What Claude does:** it identifies the highest-priority finding, targets a fix in the agent's code, verifies the change, and reports back what it changed and what's still open. Which finding it leads with and how it fixes it will vary — that's a judgment call on a live codebase — but the shape is consistent: one concrete, load-bearing fix, verified, not a vague to-do list.
+
+*In one run, for example,* it targeted FinBot's missing payment-approval gate, added a deterministic check that routes high-value or manipulation-flagged invoices to human review before any payment, then verified it end-to-end — running a manipulated "CEO-approved, $25k, urgent" invoice through the real decision path and confirming it now stops at review while clean invoices still pass.
+
+Now re-verify — run the same loop again:
+
+> *Re-run the Praxen scan and show me what changed.*
+
+The finding you fixed should resolve or downgrade, its remit rule should move toward `Verified`, and the RAISE posture should tick up. It won't jump to green — FinBot has plenty more deliberate holes, and the report now points you at the next one. That's the model: **measure → remediate → re-verify**, one link at a time, with the report as your worklist.
+
+That loop — verify intent, fix the divergence, prove the fix landed — is the whole idea. Praxen doesn't just tell you an agent is unsafe; it hands you an actionable, re-checkable path to making it safe.
+
+## Now point it at your own agent
+
+Same moves, your target:
+
+1. Ask Claude to **author a remit** from your agent's docs and intended behavior (or [write one yourself](writing-remits.md))
+2. Ask it to **scan** your agent's evidence against it — source, deployment files, behavioral logs, governance docs
+3. **Read** the report, then [iterate](challenging-findings.md) on the remit and the agent
 
 See [Usage](usage.md) for the full set of input shapes and the running-an-analysis details.
+
+> **Want a fixed, repeatable result** — a regression baseline rather than a tutorial? Use a pinned remit instead of authoring one each time. The bundled `examples/finbot/WORKER_REMIT.md` and its [reference report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html) are exactly that; see [tests/README.md](../tests/README.md).
 
 ## If something went wrong
 
 See the [Troubleshooting](usage.md#troubleshooting) section in `usage.md`. The most common first-run snags:
 
 - **"behavior-verifier skill not found"** — restart Claude Code or run `/reload-plugins`
-- **`render.py` errored at the end** — the LLM produced a malformed findings JSON; re-run with more context window or a more focused workspace path
-- **Context window auto-compacted during the run** — Praxen wrote a draft manifest in `./reports/<agent-slug>-draft-<timestamp>.md`; tell the agent to read it and finish from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).
+- **`render.py` errored at the end** — the model produced malformed findings JSON; ask Claude to re-render from the draft manifest it wrote, or re-run with a tighter workspace path
+- **Context window auto-compacted during the run** — Praxen wrote a draft manifest at `./reports/<agent-slug>-draft-<timestamp>.md`; tell Claude to read it and finish the report from there. See [Usage § Large workspaces and context sizing](usage.md#large-workspaces-and-context-sizing).
