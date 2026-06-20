@@ -13,6 +13,8 @@ You do very little here — four short instructions; Claude does the work: fetch
 
 ## Set up
 
+This walkthrough uses **Claude Code**; **OpenAI Codex** works the same way. Wherever it says `claude` or "ask Claude," substitute your Codex invocation — `$praxen:behavior-verifier` run via `codex exec` (see [Installation](installation.md#option-b--openai-codex-agent-skill)) — and the four plain-English requests below work unchanged.
+
 Start a Claude Code session in a fresh, empty folder — that's where the remit and the `reports/` will land:
 
 ```bash
