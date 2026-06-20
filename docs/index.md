@@ -17,7 +17,7 @@
 |---|---|
 | New to the concept and want the "why" | [What is Agent Behavior Verification?](abv.md) |
 | Setting up Praxen for the first time | [Installation](installation.md) |
-| Trying it out for the first time | [Quickstart](quickstart.md) — first report against the bundled `finbot` example in five minutes |
+| Trying it out for the first time | [Quickstart](quickstart.md) — have Claude author a remit for the FinBot demo agent, scan it, and read the report, in about 15 minutes |
 | Ready to run your first real analysis | [Usage](usage.md) |
 | Writing a Worker Remit for an agent | [Writing Worker Remits](writing-remits.md) |
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
