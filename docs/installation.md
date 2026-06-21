@@ -28,9 +28,28 @@ claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v0.8.
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
 
-## Option B — OpenAI Codex (agent skill)
+## Option B — OpenAI Codex (plugin marketplace)
 
-Codex discovers skills from a `.agents/skills/` directory. The first-class path is a **user-wide skill link** — set it up once and every Codex session can invoke Praxen, from any directory:
+Codex has its own plugin marketplace, and Praxen installs from the **same repo** as the Claude Code path. From your terminal:
+
+```bash
+codex plugin marketplace add open-agent-ai-security/praxen
+codex plugin add praxen@open-agent-ai-security
+codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.0.0+
+```
+
+Codex surfaces the bundled skill to the model as **`praxen:behavior-verifier`** — the plugin-qualified `plugin:skill` id, the same shape Codex uses for its own first-party skills (`pdf`, `presentations`, …). Invoke it by naming that skill and pointing Codex at a target. Praxen needs workspace writes (it creates `./reports/` and runs two bundled Python scripts), so run `codex exec` with a workspace-write sandbox:
+
+```bash
+codex exec --sandbox workspace-write -C /path/to/scan-dir \
+  'Use the praxen:behavior-verifier skill. Run a Praxen behavior analysis against ./target. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
+```
+
+That's the whole happy path; for an end-to-end first run, see [Quickstart](quickstart.md).
+
+### Alternative — link the skill folder directly
+
+No marketplace required: Codex also discovers skills from an `.agents/skills/` directory. A **user-wide skill link** makes Praxen available from every Codex session, from any directory:
 
 ```bash
 cd /path/to/praxen          # your checkout or unzipped release (Option C)
@@ -38,16 +57,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -sfn "$PWD/skills/behavior-verifier" "$HOME/.agents/skills/behavior-verifier"
 ```
 
-Codex surfaces the skill as **`praxen:behavior-verifier`** — invoke it by that plugin-qualified name (`$praxen:behavior-verifier`, not `$behavior-verifier`) and point it at a target. Praxen needs workspace writes (it creates `./reports/` and runs two bundled Python scripts), so run `codex exec` with a workspace-write sandbox:
-
-```bash
-codex exec --sandbox workspace-write -C /path/to/scan-dir \
-  'Use $praxen:behavior-verifier. Run a Praxen behavior analysis against ./target. Use the Worker Remit at ./WORKER_REMIT.md. Write outputs to ./reports/.'
-```
-
-That's the whole happy path; for an end-to-end first run, see [Quickstart](quickstart.md). (To scope the skill to a single project instead of user-wide, link it into that repo's own `.agents/skills/`. A public Codex *marketplace* install mirroring Option A is [tracked as a future enhancement](https://github.com/open-agent-ai-security/praxen/issues/102), not yet available.)
-
-> **Two Codex gotchas.** `codex exec -C <dir>` refuses to run outside a trusted git repo (`Not inside a trusted directory…`) — run from a git checkout, or add `--skip-git-repo-check`. And on load Codex may print warnings about *other* installed plugins or a telemetry metric-tag on the `praxen:behavior-verifier` id; those are Codex-side and don't affect the scan.
+To scope the skill to a single project instead, link it into that repo's own `.agents/skills/`.
 
 ## Option C — Run from an unzipped release (either agent)
 
@@ -72,7 +82,7 @@ claude plugin list
 
 If `praxen@open-agent-ai-security` appears at `v0.8.0` or later with `enabled`, the marketplace install is working. From within a session the same plugin shows under `/plugin list`, and the skill is invocable as `behavior-verifier`.
 
-**Codex:** confirm the skill appears to the model as `praxen:behavior-verifier` in Codex's skill list. That's the parity check — it confirms discovery, the same way `claude plugin list` does for Claude Code.
+**Codex (marketplace):** run `codex plugin list` — if `praxen@open-agent-ai-security` shows `installed, enabled` at `v1.0.0` or later, the install is working. Inside a session the skill appears to the model as `praxen:behavior-verifier` (or browse with `/skills`). That's the parity check, the same way `claude plugin list` is for Claude Code.
 
 For the first **end-to-end run** — declared intent → evidence → HTML / JSON / TXT report — see [Quickstart](quickstart.md). It walks through having Claude author a Worker Remit for the FinBot demo agent, scan the code against it, and read the report, in about 15 minutes — all from plain-English instructions.
 
@@ -117,9 +127,20 @@ Auto-update is a **per-marketplace** setting, and for third-party marketplaces l
 
 > Because Praxen is a security tool, staying current matters — enabling auto-update (or updating on a regular cadence) is recommended.
 
-### OpenAI Codex / unzipped release
+### OpenAI Codex — marketplace
 
-There's no marketplace, so updating is manual: `git pull` the checkout (a symlinked skill folder picks up the new version automatically), or download the new release zip and replace it. There's no migration step; Praxen is stateless across analyses.
+Refresh the catalog snapshot, then re-install — the same two-step shape as Claude Code:
+
+```bash
+codex plugin marketplace upgrade open-agent-ai-security   # refresh the snapshot from the repo
+codex plugin add praxen@open-agent-ai-security             # install the refreshed version
+```
+
+(If `codex plugin add` reports the plugin is already installed, run `codex plugin remove praxen@open-agent-ai-security` first, then add again.)
+
+### OpenAI Codex (skill link) / unzipped release
+
+If you linked the skill folder or run from an unzipped release, updating is manual: `git pull` the checkout (a symlinked skill folder picks up the new version automatically), or download the new release zip and replace it. There's no migration step; Praxen is stateless across analyses.
 
 ## Uninstalling
 
@@ -132,7 +153,14 @@ claude plugin marketplace remove open-agent-ai-security
 
 The marketplace is removed by its registered name (`open-agent-ai-security`, from `.claude-plugin/marketplace.json`) — which here matches the repo owner used to add it.
 
-**OpenAI Codex:** remove the skill link — `rm .agents/skills/behavior-verifier` (or `rm ~/.agents/skills/behavior-verifier`).
+**OpenAI Codex (marketplace):**
+
+```bash
+codex plugin remove praxen@open-agent-ai-security
+codex plugin marketplace remove open-agent-ai-security
+```
+
+**OpenAI Codex (skill link):** remove the link — `rm .agents/skills/behavior-verifier` (or `rm ~/.agents/skills/behavior-verifier`).
 
 **Unzipped release:** delete the directory. No system state is left behind.
 
