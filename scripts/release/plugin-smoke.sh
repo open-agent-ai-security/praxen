@@ -68,6 +68,7 @@ trap cleanup EXIT
 installed_version() { claude plugin list 2>/dev/null | awk '/praxen@/{f=1} f&&/Version:/{print $2; exit}'; }
 assert_version() {
   local want="$1" got; got="$(installed_version)"
+  got="${got#v}"                       # normalize a possible 'v' prefix (want is already bare)
   [ "$got" = "$want" ] || fail "expected version '$want', got '${got:-<none>}'"
   echo "  ✓ reports $got"
 }
