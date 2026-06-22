@@ -25,7 +25,7 @@ Each of these has a different remediation path.
 
 If the finding is correct given the evidence Praxen saw but wrong because Praxen didn't see something it should have:
 
-- **Add the missing evidence to the next analysis.** Point Praxen at the additional directory, log file, or transcript that contains the missing control. Re-run.
+- **Add the missing evidence to the next analysis.** Point Praxen at the additional directory, log file, or transcript that contains the missing control. Re-run. (See [Results tuning](usage.md#results-tuning) for the operational loop, including image/screenshot evidence.)
 - **Don't loosen the remit just to silence the finding.** A finding that disappears because the remit was weakened is now a real gap that won't be caught next time.
 - **Document the dependency.** If the missing control lives outside the agent's repository (a sidecar, an upstream gateway, a platform-enforced policy), record this in the remit's *Trusted Services / Integrations* section and explicitly note that the control is enforced externally. Praxen can then mark the rule as `Enforcement Not Possible` (in code) rather than as a Gap.
 

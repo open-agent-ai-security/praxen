@@ -11,7 +11,7 @@ This walkthrough uses **Claude Code**; **OpenAI Codex** works the same way — w
 
 You do very little here — four short instructions; Claude does the work: fetching docs, writing the policy, cloning the code, running the analysis, and rendering the report. Budget about 15 minutes, most of it Claude thinking while you watch.
 
-> Not installed yet? Do [Installation](installation.md) first — one marketplace command on Claude Code, or a one-line skill link on Codex. There's nothing else to clone or download; Claude pulls what it needs.
+> Not installed yet? Do [Installation](installation.md) first — one marketplace command on Claude Code or Codex. There's nothing else to clone or download; Claude pulls what it needs.
 
 ## Set up
 
