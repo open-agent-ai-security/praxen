@@ -9,7 +9,7 @@ A complete Praxen run, end to end: you'll have Claude **author a security policy
 
 This walkthrough uses **Claude Code**; **OpenAI Codex** works the same way — wherever it says `claude` or "ask Claude," substitute your Codex invocation, and the steps are identical.
 
-You do very little here — a few short instructions; Claude does the work: fetching docs, writing the policy, cloning the code, running the analysis, and rendering the report. Budget about 15 minutes, most of it Claude thinking while you watch.
+You do very little here — a few short instructions; Claude does the work: fetching docs, writing the policy, cloning the code, running the analysis, and rendering the report. Budget about 15 minutes for your first report, most of it Claude thinking while you watch. (The optional **Bonus** at the end — fix a finding and re-scan — adds a few more.)
 
 > Not installed yet? Do [Installation](installation.md) first — one marketplace command on Claude Code or Codex. There's nothing else to clone or download; Claude pulls what it needs.
 
@@ -40,7 +40,9 @@ Now point Praxen at the agent's actual code, using the remit it just wrote:
 
 > *Run the scan now, using the remit you built.*
 
-**What Claude does:** clones FinBot itself, sweeps the workspace, scores the six RAISE categories, audits every remit rule, and renders the report. This is the longest step — a few minutes while Claude works.
+*(For this tutorial, scanning in the same session is fine. On your own targets you'll get a sharper scan from a fresh session — see [Usage § fresh context](usage.md#for-highest-scan-fidelity-run-in-a-fresh-context).)*
+
+**What Claude does:** clones FinBot itself, sweeps the workspace, scores the agent across the six **RAISE** security-maturity categories (a 0–5 scale — see [RAISE](RAISE.md)), audits every remit rule, and renders the report. This is the longest step — a few minutes while Claude works.
 
 **What you'll see:** FinBot lands at a RAISE posture of **"Absent"** — a near-floor score, expected for a deliberately-broken agent — with a dozen-plus findings, **Criticals first**. The headline is a compound chain: an unauthenticated admin plane → attacker text written into the agent's goals → no approval gate on payments → no audit log — the exact goal-hijack-to-autonomous-payment path the CTF is built around. It also notes what FinBot gets *right* (no code-execution capability, a bounded agent loop), so the report isn't only a list of failures.
 

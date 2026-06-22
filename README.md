@@ -98,7 +98,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 ## Examples
 
-The [`examples/`](examples/) directory contains real analyses against deliberately vulnerable agents from the OWASP Agentic AI CTF and the Damn Vulnerable AI Agent project. Each example ships with the Worker Remit we wrote, the HTML report, and the JSON findings — see [`examples/README.md`](examples/README.md) for the walkthrough.
+The [`examples/`](examples/) directory contains real analyses against three agents — two deliberately vulnerable training agents (from the OWASP Agentic AI CTF and the Damn Vulnerable AI Agent project) and one real-world open-source product (the Salesforce Help Agent Accelerator). Each example ships with the Worker Remit we wrote, the HTML report, and the JSON findings — see [`examples/README.md`](examples/README.md) for the walkthrough.
 
 > **`examples/` holds completed reports, not scan targets.** These directories are showcase output — what Praxen *produces*, not what it *scans*. A scan always needs two separate inputs: a **Worker Remit** and a **separate agent source tree**. To reproduce an example, use its remit (or the matching one under [`tests/remits/`](tests/remits/)) and clone the upstream source linked in [`examples/README.md`](examples/README.md). See [Quickstart](docs/quickstart.md) for the full walkthrough.
 
