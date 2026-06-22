@@ -33,7 +33,7 @@ Use GitHub's private security advisory:
 
 GitHub will create a private advisory thread between you and the project maintainers. We will respond there.
 
-If GitHub Security Advisories are unavailable to you for any reason, email **open-agent-ai-security@exabeam.com** with the subject line **`Praxen security report`** and the same level of detail.
+If GitHub Security Advisories are unavailable to you for any reason, email **developer@exabeam.com** with the subject line **`Praxen security report`** and the same level of detail.
 
 ## What to expect
 
