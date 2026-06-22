@@ -68,7 +68,7 @@ Most production AI agents today score between **Ad hoc (1)** and **Established (
 
 ## Weighted overall score
 
-Each category contributes to the overall score with a fixed weight. **Implement Zero Trust counts double** because it covers the broadest attack surface and the most immediately exploitable gaps; the other five each carry 15%.
+Each category contributes to the overall score with a fixed weight. **Implement Zero Trust carries the heaviest weight** — 25%, against 15% for each of the other five — because it covers the broadest attack surface and the most immediately exploitable gaps.
 
 | Category | Weight | Why |
 |---|:-:|---|

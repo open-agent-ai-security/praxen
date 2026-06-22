@@ -5,7 +5,7 @@
 
 # Interpreting Reports
 
-Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). The HTML and TXT are byte-identical for a given JSON; the JSON is the thing automation should consume. (The skill also writes a working `<agent-slug>-draft-<timestamp>.md` checkpoint mid-run — a recovery artifact, not a deliverable, and safe to delete.)
+Praxen produces three output files per analysis: a **findings JSON** (the canonical, complete record — written by the skill), and — rendered deterministically from it by the bundled `render.py` — an **HTML report** (the primary deliverable for humans) and a **`.txt` summary** (stdout-style). Both are rendered deterministically — the same JSON always produces the same HTML and the same TXT — and the JSON is the thing automation should consume. (The skill also writes a working `<agent-slug>-draft-<timestamp>.md` checkpoint mid-run — a recovery artifact, not a deliverable, and safe to delete.)
 
 ```mermaid
 flowchart LR

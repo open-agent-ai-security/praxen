@@ -7,7 +7,7 @@
 
 Running a Praxen analysis takes two inputs: a **Worker Remit** (the agent's declared policy) and **evidence** (whatever the agent's code, deployment state, behavioral records, or development/governance docs can provide). Praxen produces three output files in `./reports/`.
 
-**Praxen is designed as a read-only external observer.** It reads the artifacts you point it at and writes a local report; it does not modify the agent, sit in its control path, or call any service Praxen itself controls. This read-only posture is a discipline of the skill's instructions, not a technical sandbox: the analysis runs with the coding agent's ordinary Bash/Write access. That discipline is what keeps Praxen an independent verifier, rather than self-attestation by the agent under analysis.
+**Praxen is a read-only observer.** It reads the artifacts you point it at and writes a report to `./reports/` — it never changes the agent it's analyzing or sits in its control path.
 
 This page covers the end-to-end run. For installing Praxen, see [Installation](installation.md). For authoring the Worker Remit, see [Writing Worker Remits](writing-remits.md). For the verification model Praxen implements, see [Agent Behavior Verification](abv.md).
 
@@ -78,7 +78,7 @@ Coverage and confidence increase with each additional input shape — see the [E
 
 ### For highest scan fidelity: run in a fresh context
 
-A scan run in the same session that explored the workspace earlier (while authoring the remit, reading code, or doing prep work) will systematically **under-read** during the artifact sweep — the scanner pattern-matches against what it already knows rather than doing a full cold discovery. On a large codebase the gap is real: a cold-context scan reads materially more of the workspace, and that extra evidence can move RAISE scores upward — so a warm-context scan tends to *under*-report.
+If the scan runs in a session that already explored the workspace (while authoring the remit or reading code), it tends to **skim** — recognizing what it's already seen instead of reading the workspace cold. A fresh, cold-context scan reads materially more, which can raise the RAISE scores. So for the most thorough result, give it a clean slate.
 
 **The recommended approach for a high-confidence scan:** run it in a subagent or a fresh session that carries no prior context, and point it at the workspace:
 
@@ -116,7 +116,7 @@ Praxen is stateless across analyses. Each run is independent. To re-analyze afte
 Please re-run the behavior-verifier skill against the same workspace and remit.
 ```
 
-A new pair of timestamped files is written. Prior reports are not overwritten — you can compare runs by diffing the `findings-<date>.json` files or by opening multiple HTML reports side by side.
+Each run writes a fresh timestamped HTML and TXT, so prior reports stay on disk side by side. (The findings JSON is keyed by date — one per agent per day — so a second run on the *same day* replaces it: diff the JSON across days, or compare the timestamped HTML within a day.)
 
 ## Results tuning
 
@@ -147,22 +147,12 @@ Because Praxen is stateless and emits machine-readable JSON, CI integration is s
 
 ## Large workspaces and context sizing
 
-A Praxen analysis is read-heavy: it loads the skill procedure, the knowledge bases, and every artifact in the workspace, holds the findings in working memory, and writes the report in a single synthesis pass. On a large target this can exceed the coding agent's context window, and the session **auto-compacts mid-analysis** — which can thin or over-summarize findings gathered early in the run before the report is written. It's recoverable, not catastrophic: Praxen checkpoints the full analysis to disk just before rendering (the draft manifest, below), and a compacted run leaves visible signs — a compaction notice during the run, and a final report that reads thinner than the interim summary Praxen prints to stdout. Still, the cleanest result comes from keeping the whole scan inside one context window.
+A big scan reads a lot — the skill procedure, the knowledge bases, every artifact in the workspace, plus the findings it builds up. On a very large target this can exceed your agent's context window, and the session **auto-compacts mid-run**, thinning the findings before the report is written. That's recoverable (below), but cleaner to avoid:
 
-**To keep a scan inside the window:**
+1. **Give the scan room.** Run it in the largest-context session you have, and start it **fresh** — don't run Praxen at the tail of a long conversation that's already used up the window. (A fresh session also scans better: an agent that already explored the code tends to skim it the second time — see [For highest scan fidelity](#for-highest-scan-fidelity-run-in-a-fresh-context) above.)
+2. **Scope to the agent, not the whole repo.** Point Praxen at the agent's own surface — prompts, skill files, code, config, and the Worker Remit — and leave out `node_modules`, vendored dependencies, `.git`, build output, and large data/log files. The Worker Remit defines what's in scope; the input path should match.
 
-1. **Use the largest context window available.** This is the biggest lever. In Claude Code, run the analysis in the largest-context session you have access to — a 1M-context (Opus) session if you have one. A 200k-class window can compact partway through a non-trivial agent scan once the procedure, knowledge bases, file reads, and synthesis are all resident at once.
-2. **Start a fresh session for the scan.** Don't run Praxen at the tail of a long conversation that has already consumed most of the window — give the analysis the full budget. A fresh session also gives you a better scan: prior workspace familiarity causes the artifact sweep to under-read (see *For highest scan fidelity* above).
-3. **Scope the input to the agent, not the whole repo.** Point Praxen at the agent's core surface — its prompts, skill files, code, config, and the Worker Remit — and leave out what isn't the agent: `node_modules` and vendored dependencies, `.git`, `dist` / `build` output, large data and log files, test fixtures. The Worker Remit defines what's in scope; the input path should match. (Praxen already samples large logs and lockfiles rather than reading them whole — but the cleanest fix is to not hand it the bulk in the first place.)
-
-**If a run compacts anyway:** Praxen checkpoints itself. Just before it writes the report, it saves a **draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — a complete record of the analysis (every finding, the RAISE scores, the remit audit). So if you see the auto-compaction notice during a run, or the final report looks thinner than the interim overview Praxen prints to stdout, you have two recovery options:
-
-- **Recover from the manifest.** Tell the agent: *"the session compacted — read `./reports/<agent-slug>-draft-<timestamp>.md` and finish the report from it."* It rebuilds the findings JSON and re-renders from the checkpoint, without re-analyzing the workspace.
-- **Re-run** the analysis with a tighter scope or a larger context window.
-
-A report produced *through* a mid-synthesis compaction should be treated as possibly incomplete until you've done one of those — not authoritative.
-
-This is guidance, not a guarantee — a genuinely large workspace can still compact even when scoped well. Scoping tighter and giving the run a fresh, large context window is the most reliable thing you can do today; the draft manifest is the safety net for when it compacts regardless.
+**If a run compacts anyway, you don't lose the work.** Just before rendering, Praxen saves a **draft manifest** to `./reports/<agent-slug>-draft-<timestamp>.md` — the complete analysis (every finding, the RAISE scores, the remit audit). Tell the agent *"the session compacted — read the draft manifest and finish the report from it,"* and it rebuilds the report from the checkpoint without re-scanning. (Or just re-run with a tighter scope.)
 
 ## Troubleshooting
 
