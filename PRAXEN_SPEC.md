@@ -6,7 +6,7 @@
 # Praxen — Specification
 
 **Version:** 1.0.0
-**Status:** Public release (1.0 GA)
+**Status:** Internal release
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
 ---
@@ -270,7 +270,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 ```json
 {
   "schema_version": "2.0",
-  "praxen_version": "1.0.0",
+  "praxen_version": "0.8.1",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -296,7 +296,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
       "id": "PRAX-YYYY-MM-DD-NNN",
       "severity": "Critical | High | Medium | Low | Informational",
       "summary": "<one sentence, specific — drives the finding-card header>",
-      "description": "<OPTIONAL — short paragraph of longer-form context; may contain inline <code>/<strong>/<em>. Carried in the JSON; the report card currently shows summary only — a future look-and-feel revisit may surface description. Omit the field entirely if you have nothing to add beyond summary.>",
+      "description": "<OPTIONAL — short paragraph of longer-form context; may contain inline <code>/<strong>/<em>. Carried in the JSON; the report card currently shows summary only — the deferred L&F revisit surfaces description (design/DEFERRED.md). Omit the field entirely if you have nothing to add beyond summary.>",
       "tags": [
         { "kind": "raise",         "label": "Implement Zero Trust" },
         { "kind": "owasp_llm",     "label": "LLM01 — Prompt Injection" },
