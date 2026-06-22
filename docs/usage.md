@@ -207,7 +207,7 @@ A long scan can exceed the context window and **auto-compact mid-run** — silen
 
 ### Scan stopped emitting output for several minutes (streaming hiccup)
 
-Praxen scans typically take 8–15 minutes of wallclock; larger codebases scoped to a subdirectory sit at the high end. If a scan goes quiet for ~10 minutes with no progress messages or tool activity, you've likely hit a streaming hiccup — usually during the long-form drafting of the findings JSON. Symptoms:
+Praxen scans ran 3–10 minutes of wallclock across our test suite; larger codebases scoped to a subdirectory sit at the high end. Your mileage will vary — target size and scope, model tier, and provider capacity at the time all move the number. If a scan goes quiet for ~5 minutes with no progress messages or tool activity, you've likely hit a streaming hiccup — usually during the long-form drafting of the findings JSON. Symptoms:
 
 - The agent emitted an analysis plan and started drafting findings, then went silent mid-document.
 - No new files appear in the output directory; any partial JSON on disk is still valid but incomplete.
