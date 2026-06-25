@@ -123,14 +123,14 @@ def page(commentary):
     P.append(f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Praxen Launch — Traffic{" Report" if commentary else " (Data)"}</title><style>{CSS}</style></head><body><div class="wrap">')
     P.append(f'<span class="tag">GoatCounter · open-agent-ai-security</span><h1>Praxen Launch — Traffic{" Report" if commentary else " Data"}</h1>')
     P.append(f'<p class="sub">Window <b>{days[0]} → {days[-1]}</b> (UTC, complete). Shared community account; Praxen broken out. GoatCounter only — the Cloudflare half of the A/B is not in this export.</p>')
-    P.append(f'<div class="cards"><div class="card"><b>{total}</b><span>total pageviews (all sites)</span></div><div class="card"><b>{praxen}</b><span>Praxen pageviews ({praxen/total*100:.0f}%)</span></div><div class="card"><b>{byday["2026-06-24"]}</b><span>peak day (Jun 24)</span></div><div class="card"><b>{byday["2026-06-25"]}</b><span>Jun 25 (sustained)</span></div></div>')
+    P.append(f'<div class="cards"><div class="card"><b>{total}</b><span>total pageviews (all sites)</span></div><div class="card"><b>{praxen}</b><span>Praxen pageviews ({praxen/total*100:.0f}%)</span></div><div class="card"><b>{byday.get("2026-06-24", 0)}</b><span>peak day (Jun 24)</span></div><div class="card"><b>{byday.get("2026-06-25", 0)}</b><span>Jun 25 (sustained)</span></div></div>')
 
     # press
     press_rows = "".join(f'<a href="{u}" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;gap:14px;padding:9px 2px;border-bottom:1px solid var(--bd);text-decoration:none"><span style="color:var(--mut)"><b style="color:var(--or2)">{o}</b> — {t}</span><span style="color:var(--mut2);flex:none">&#8599;</span></a>' for o, t, u in PRESS)
     synd_line = " &middot; ".join(f'<a href="{u}" target="_blank" rel="noopener">{n}</a>' for n, u in SYND)
     P.append('<h2>Press coverage — a strong launch pickup</h2>')
-    P.append('<p class="sub">~25 placements across cybersecurity, AI, and enterprise-technology media; no negative coverage. The earned media:</p>')
-    P.append('<div class="cards"><div class="card"><b>1</b><span>announcement</span></div><div class="card"><b>10</b><span>editorial</span></div><div class="card"><b>13</b><span>syndications</span></div><div class="card"><b>0</b><span>negative</span></div></div>')
+    P.append('<p class="sub">~23 placements across cybersecurity, AI, and enterprise-technology media; no negative coverage. The earned media:</p>')
+    P.append('<div class="cards"><div class="card"><b>1</b><span>announcement</span></div><div class="card"><b>10</b><span>editorial</span></div><div class="card"><b>12</b><span>syndications</span></div><div class="card"><b>0</b><span>negative</span></div></div>')
     P.append(f'<div class="sec" style="padding:6px 22px">{press_rows}</div>')
     P.append(f'<p class="sub" style="margin:14px 0 0"><b style="color:var(--mut)">Also syndicated to:</b> {synd_line}</p>')
     P.append(cm('<div class="callout"><h3>Great earned media — but did it drive traffic?</h3><p>A strong footprint for a launch. The rest of this report asks the harder question: <b>did the coverage send people to the site (or the repo)?</b> The referrers — and the GitHub section — hold the answer.</p></div>'))
@@ -153,6 +153,7 @@ def page(commentary):
     P.append('<h2>Referrers to the Praxen landing page (<code>/praxen</code>)</h2>')
     P.append(cm(f'<div class="callout warn"><h3>The editorial press isn’t converting to <i>this site</i></h3><p>Of <b>{px_total}</b> referrals to <code>/praxen</code>, the editorial coverage drove just <b>{press}</b>. Under default browser referrer policy those outlets <i>would</i> appear if readers clicked through — so the absence is real, not hidden in "direct."</p><p><b>What converted were audience-owned channels:</b> <b>LinkedIn ({lk})</b> (the launch post) and <b>Direct ({px_cat.get("Direct",0)})</b> (much of it the Jun 18 ISSA LA talk audience plus typed/app links). Big <i>awareness</i> from ~25 placements; little measured conversion to the Pages site — <b>but press that links the repo instead <i>does</i> convert there</b> (see <b>GitHub repository — traffic</b> below).</p></div>'))
     P.append(f'<div class="sec">{refcat}</div>')
+    P.append(cm('<p class="sub" style="margin:8px 0 18px"><b style="color:var(--mut)">What "direct" means:</b> a visit with no referrer attached — typed or pasted URLs, bookmarks, and clicks from anywhere that strips the referrer: native apps (the LinkedIn, Slack, or Teams apps), email clients, PDFs/slides, and QR codes. So "direct" isn\'t only "people who typed it in" — here it also captures the ISSA-talk audience and app-based shares.</p>'))
     P.append('<h3 style="font-size:14px;color:var(--mut);margin:18px 0 4px">External referrers to <code>/praxen</code>, itemized</h3>')
     P.append(f'<div class="sec"><table><tr><td><b style="color:var(--tx)">Referrer</b></td><td class="n"><b style="color:var(--tx)">Hits</b></td></tr>{ext_rows}</table></div>')
 
