@@ -18,7 +18,7 @@ reports (no external dependencies — open in a browser, or attach to an email a
 
 ## The headline finding
 
-Coverage **converts to wherever it links.** The ~23 press placements that named Praxen
+Coverage **converts to wherever it links.** The ~24 press placements that named Praxen
 drove **~0** measured traffic to the **Pages hero site** (most didn't link it). **Help Net
 Security** linked straight to the **GitHub repo** and drove 18 repo views / 16 unique — the
 top external press referrer to the repo. The Pages-site traffic that *did* land came from
