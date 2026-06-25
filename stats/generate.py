@@ -62,7 +62,7 @@ px_ext = sorted([(refs.get(rid, "(unknown)"), c) for rid, c in pxref.items() if 
 lk = px_cat.get("LinkedIn", 0); press = px_cat.get("Editorial press", 0)
 byloc = collections.Counter()
 for l in locs: byloc[l["location"]] += l["count"]
-us = sum(c for loc, c in byloc.items() if loc.startswith("US-"))
+us = sum(c for loc, c in byloc.items() if loc and loc.startswith("US-"))
 bypath = collections.Counter()
 for h in hits: bypath[h["path_id"]] += h["count"]
 pxpaths = sorted([(paths.get(pid), c) for pid, c in bypath.items() if paths.get(pid, "").startswith("/praxen")], key=lambda x: -x[1])
@@ -128,7 +128,7 @@ def page(commentary):
     P.append(f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Praxen Launch — Traffic{" Report" if commentary else " (Data)"}</title><style>{CSS}</style></head><body><div class="wrap">')
     P.append(f'<span class="tag">GoatCounter · open-agent-ai-security</span><h1>Praxen Launch — Traffic{" Report" if commentary else " Data"}</h1>')
     P.append(f'<p class="sub">Window <b>{days[0]} → {days[-1]}</b> (UTC, complete). Shared community account; Praxen broken out. GoatCounter only — the Cloudflare half of the A/B is not in this export.</p>')
-    P.append(f'<div class="cards"><div class="card"><b>{total}</b><span>total pageviews (all sites)</span></div><div class="card"><b>{praxen}</b><span>Praxen pageviews ({praxen/total*100:.0f}%)</span></div><div class="card"><b>{byday.get("2026-06-24", 0)}</b><span>peak day (Jun 24)</span></div><div class="card"><b>{byday.get("2026-06-25", 0)}</b><span>Jun 25 (sustained)</span></div></div>')
+    P.append(f'<div class="cards"><div class="card"><b>{total}</b><span>total pageviews (all sites)</span></div><div class="card"><b>{praxen}</b><span>Praxen pageviews ({(praxen/total*100) if total else 0:.0f}%)</span></div><div class="card"><b>{byday.get("2026-06-24", 0)}</b><span>peak day (Jun 24)</span></div><div class="card"><b>{byday.get("2026-06-25", 0)}</b><span>Jun 25 (sustained)</span></div></div>')
 
     # press
     press_rows = "".join(f'<a href="{u}" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;gap:14px;padding:9px 2px;border-bottom:1px solid var(--bd);text-decoration:none"><span style="color:var(--mut)"><b style="color:var(--or2)">{o}</b> — {t}</span><span style="color:var(--mut2);flex:none">&#8599;</span></a>' for o, t, u in PRESS)
@@ -153,7 +153,7 @@ def page(commentary):
     present = [(k, px_cat[k]) for k in order if px_cat.get(k)]
     cmax = max(c for _, c in present)
     def cc(k): return "#5b8def" if k == "LinkedIn" else ("#e8621d" if k == "Editorial press" else ("#6f819a" if k == "Direct" else "#ff9d4d"))
-    refcat = "".join(bar(k, c, cmax, sub=f"{c/px_total*100:.0f}%", color=cc(k)) for k, c in present)
+    refcat = "".join(bar(k, c, cmax, sub=f"{(c/px_total*100) if px_total else 0:.0f}%", color=cc(k)) for k, c in present)
     ext_rows = "".join(f"<tr><td>{r}</td><td class='n'>{c}</td></tr>" for r, c in px_ext[:14])
     P.append('<h2>Referrers to the Praxen landing page (<code>/praxen</code>)</h2>')
     P.append(cm(f'<div class="callout warn"><h3>The editorial press isn’t converting to <i>this site</i></h3><p>Of <b>{px_total}</b> referrals to <code>/praxen</code>, the editorial coverage drove just <b>{press}</b>. Under default browser referrer policy those outlets <i>would</i> appear if readers clicked through — so the absence is real, not hidden in "direct."</p><p><b>What converted were audience-owned channels:</b> <b>LinkedIn ({lk})</b> (the launch post) and <b>Direct ({px_cat.get("Direct",0)})</b> (much of it the Jun 18 ISSA LA talk audience plus typed/app links). Big <i>awareness</i> from ~25 placements; little measured conversion to the Pages site — <b>but press that links the repo instead <i>does</i> convert there</b> (see <b>GitHub repository — traffic</b> below).</p></div>'))
