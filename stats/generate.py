@@ -20,9 +20,13 @@ import json, collections, datetime, glob, os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Point this at your unzipped GoatCounter export. Last run: export 20260625T140651Z.
 _cands = glob.glob(os.path.join(SCRIPT_DIR, "goatcounter-export*", "")) + glob.glob("/tmp/gc2/goatcounter-*")
+if not _cands:
+    raise SystemExit("No GoatCounter export found. Unzip one into stats/ (goatcounter-export*/) — see stats/README.md.")
 EXPORT_DIR = _cands[0]
 
-def load(f): return [json.loads(l) for l in open(os.path.join(EXPORT_DIR, f)) if l.strip()]
+def load(f):
+    with open(os.path.join(EXPORT_DIR, f), encoding="utf-8") as fh:
+        return [json.loads(l) for l in fh if l.strip()]
 paths = {p["id"]: p["path"] for p in load("paths.jsonl")}
 refs  = {r["id"]: (r["ref"] or "(direct)") for r in load("refs.jsonl")}
 hits  = load("hit_stats.jsonl"); locs = load("location_stats.jsonl")
@@ -54,7 +58,7 @@ for h in hits:
 px_total = sum(pxref.values())
 px_cat = collections.Counter()
 for rid, c in pxref.items(): px_cat[catf(refs.get(rid, ""))] += c
-px_ext = sorted([(refs.get(rid), c) for rid, c in pxref.items() if catf(refs.get(rid, "")) not in ("Internal site nav", "Direct")], key=lambda x: -x[1])
+px_ext = sorted([(refs.get(rid, "(unknown)"), c) for rid, c in pxref.items() if catf(refs.get(rid, "")) not in ("Internal site nav", "Direct")], key=lambda x: -x[1])
 lk = px_cat.get("LinkedIn", 0); press = px_cat.get("Editorial press", 0)
 byloc = collections.Counter()
 for l in locs: byloc[l["location"]] += l["count"]
@@ -83,9 +87,10 @@ PRESS = [("Exabeam (press release)","Launches Open-Source Praxen to Bring Agent 
 ("LinkedIn · Joanne Pei Lee Wong","Frontier AI is Changing Cyber Risk: Agent Behavior Needs a New Approach","https://www.linkedin.com/pulse/frontier-ai-changing-cyber-risk-agent-behavior-needs-part-wong-oxptc/")]
 SYND = [("Yahoo Finance","https://finance.yahoo.com/technology/ai/articles/exabeam-launches-open-source-praxen-130000884.html"),("Zawya","https://www.zawya.com/en/press-release/companies-news/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers-q1c0rggt"),("FinancialContent","https://www.financialcontent.com/article/bizwire-2026-6-23-exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers"),("TMCnet","https://www.tmcnet.com/usubmit/-exabeam-launches-open-source-praxen-bring-agent-behavior-/2026/06/23/10404217.htm"),("CIO Influence","https://cioinfluence.com/security/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("iTWire","https://itwire.com/business-it-news/data/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers"),("AdTechToday","https://adtechtoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("InAI Today","https://inaitoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers/"),("FinTech Gate","https://fintechgate.net/2026/06/23/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("TechRound","https://techround.co.uk/artificial-intelligence/exabeam-open-source-praxen-agent-behaviour-verification-ai-agents-digital-workers/"),("Africa Business Communities","https://africabusinesscommunities.com/tech-24/exabeam-launches-praxen-to-verify-ai-agent-behavior/"),("Anbaa Al-Youm","https://www.anbaaalyoumeg.com/655510")]
 
-svg = open(os.path.join(SCRIPT_DIR, "praxen-stars.svg")).read().replace(
-    'width="800" height="533.333" style="stroke-width:3;font-family:xkcd;background:#fff"',
-    'viewBox="0 0 800 533.333" width="100%" style="stroke-width:3;font-family:xkcd;background:#fff;max-width:760px;height:auto;display:block;margin:0 auto;border-radius:10px"')
+with open(os.path.join(SCRIPT_DIR, "praxen-stars.svg"), encoding="utf-8") as _svg_fh:
+    svg = _svg_fh.read().replace(
+        'width="800" height="533.333" style="stroke-width:3;font-family:xkcd;background:#fff"',
+        'viewBox="0 0 800 533.333" width="100%" style="stroke-width:3;font-family:xkcd;background:#fff;max-width:760px;height:auto;display:block;margin:0 auto;border-radius:10px"')
 today = datetime.date.today().isoformat()
 
 def bar(label, val, vmax, sub="", color="#ff7a2e"):
@@ -216,6 +221,7 @@ def page(commentary):
     return "".join(P)
 
 for fn, comm in [("launch-traffic-report.html", True), ("launch-traffic-facts.html", False)]:
-    open(os.path.join(SCRIPT_DIR, fn), "w").write(page(comm))
+    with open(os.path.join(SCRIPT_DIR, fn), "w", encoding="utf-8") as f:
+        f.write(page(comm))
     print("wrote", fn)
 print(f"data: total={total} praxen={praxen} /praxen-refs={px_total} LinkedIn={lk} press={press} stars={STARS}")
