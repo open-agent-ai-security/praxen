@@ -18,20 +18,20 @@ reports (no external dependencies — open in a browser, or attach to an email a
 
 ## The headline finding
 
-Coverage **converts to wherever it links.** The ~25 press placements that named Praxen
+Coverage **converts to wherever it links.** The ~26 press placements that named Praxen
 drove **~0** measured traffic to the **Pages hero site** (most didn't link it). **Help Net
-Security** linked straight to the **GitHub repo** and drove 18 repo views / 16 unique — the
+Security** linked straight to the **GitHub repo** and drove 42 repo views / 38 unique — the
 top external press referrer to the repo. The Pages-site traffic that *did* land came from
-**audience-owned, directly-linked channels**: the **LinkedIn launch post** (164 clicks ≈ 90%
+**audience-owned, directly-linked channels**: the **LinkedIn launch post** (191 clicks ≈ 88%
 of LinkedIn referrals) and the **ISSA Los Angeles preview talk** (the Jun 18 direct spike).
 
 ## Data sources (all hand-captured into `generate.py` — point-in-time snapshots)
 
 | Source | What it gives | How captured |
 |---|---|---|
-| **GoatCounter export** (`open-agent-ai-security` community account) | Pages-site pageviews, referrers, geography, top pages | Unzipped export → `generate.py` computes the aggregates. **Not committed** (per-account analytics; keep it local). Snapshot used: export `20260625T140651Z` (complete Jun 18–25). |
-| **LinkedIn post analytics** | Impressions / reach / video / engagements / **link clicks** | Hand-keyed into the `LI = {...}` dict from the post's analytics screenshot (2026-06-25). |
-| **GitHub repo Insights → Traffic** | Repo views (14-day) + referring sites | Hand-keyed into `GH_DAILY` / `GH_REFS` from the Insights screenshot (2026-06-25). |
+| **GoatCounter export** (`open-agent-ai-security` community account) | Pages-site pageviews, referrers, geography, top pages | Unzipped export → `generate.py` computes the aggregates. **Not committed** (per-account analytics; keep it local). Snapshot used: export `20260629T185950Z` (Jun 17–29; the Jun 29 export day is partial). |
+| **LinkedIn post analytics** | Impressions / reach / video / engagements / **link clicks** | Hand-keyed into the `LI = {...}` dict from the post's analytics screenshot (2026-06-29). |
+| **GitHub repo Insights → Traffic** | Repo views (14-day) + referring sites | Hand-keyed into `GH_DAILY` / `GH_REFS` from the Insights screenshot (2026-06-29). |
 | **GitHub API** | Star count + per-day adds | `gh api repos/open-agent-ai-security/praxen` (+ the star+json stargazers endpoint). |
 | **star-history.com** | The star chart SVG | `curl -sL "https://api.star-history.com/svg?repos=open-agent-ai-security/praxen&type=Date" -o praxen-stars.svg` |
 
