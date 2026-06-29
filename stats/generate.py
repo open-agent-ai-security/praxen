@@ -18,7 +18,7 @@ Regenerate:  python3 stats/generate.py
 import json, collections, datetime, glob, os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Point this at your unzipped GoatCounter export. Last run: export 20260625T140651Z.
+# Point this at your unzipped GoatCounter export. Last run: export 20260629T185950Z.
 _cands = glob.glob(os.path.join(SCRIPT_DIR, "goatcounter-export*", "")) + glob.glob("/tmp/gc2/goatcounter-*")
 if not _cands:
     raise SystemExit("No GoatCounter export found. Unzip one into stats/ (goatcounter-export*/) — see stats/README.md.")
@@ -68,11 +68,11 @@ for h in hits: bypath[h["path_id"]] += h["count"]
 pxpaths = sorted([(paths.get(pid), c) for pid, c in bypath.items() if paths.get(pid, "").startswith("/praxen")], key=lambda x: -x[1])
 
 # ---- hand-keyed inputs ----
-LI = dict(impr=5279, reach=3331, vid=2212, eng=220, clicks=164, react=144, com=32, save=23, rep=17, send=4, prof=37, foll=7, watch="9h&nbsp;12m", avg="14s")
-STARS = 28
-GH_TOTAL = 442
-GH_DAILY = [("06/11",31),("06/12",23),("06/13",0),("06/14",3),("06/15",13),("06/16",15),("06/17",22),("06/18",54),("06/19",39),("06/20",3),("06/21",10),("06/22",30),("06/23",51),("06/24",148)]
-GH_REFS = [("open-agent-ai-security.github.io (Pages hero)",157,48),("github.com",68,15),("helpnetsecurity.com",18,16),("Bing",9,3),("MS Teams (onecdn)",4,3),("DuckDuckGo",3,3),("Google",2,1)]
+LI = dict(impr=6487, reach=4140, vid=2745, eng=243, clicks=191, react=161, com=34, save=26, rep=17, send=5, prof=43, foll=9, watch="11h&nbsp;16m", avg="14s")
+STARS = 34
+GH_TOTAL = 662
+GH_DAILY = [("06/15",13),("06/16",15),("06/17",22),("06/18",54),("06/19",39),("06/20",3),("06/21",10),("06/22",30),("06/23",51),("06/24",148),("06/25",181),("06/26",42),("06/27",29),("06/28",25)]
+GH_REFS = [("open-agent-ai-security.github.io (Pages hero)",243,72),("github.com",66,22),("helpnetsecurity.com",42,38),("t.co (X/Twitter)",38,30),("Bing",13,4),("MS Teams (onecdn)",6,4),("DuckDuckGo",4,4),("MS Teams (office.net)",3,3),("Google",3,2)]
 PRESS = [("Exabeam (press release)","Launches Open-Source Praxen to Bring Agent Behavior Verification to AI Agents and Digital Workers","https://www.exabeam.com/press-releases/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),
 ("SiliconANGLE","Exabeam launches Praxen, an open-source tool to verify AI agent behavior","https://siliconangle.com/2026/06/23/exabeam-launches-praxen-open-source-tool-verify-ai-agent-behavior/"),
 ("Help Net Security","Praxen: Open-source AI agent behavior verification","https://www.helpnetsecurity.com/2026/06/24/praxen-open-source-ai-agent-behavior-verification/"),
@@ -85,7 +85,7 @@ PRESS = [("Exabeam (press release)","Launches Open-Source Praxen to Bring Agent 
 ("SOC News","Exabeam launches Praxen for AI agent security","https://soc-news.com/exabeam-launches-praxen-for-ai-agent-security/"),
 ("IT News Africa","Exabeam launches open-source Praxen for AI agent verification","https://www.itnewsafrica.com/2026/06/exabeam-launches-open-source-praxen-for-ai-agent-verification/"),
 ("LinkedIn · Joanne Pei Lee Wong","Frontier AI is Changing Cyber Risk: Agent Behavior Needs a New Approach","https://www.linkedin.com/pulse/frontier-ai-changing-cyber-risk-agent-behavior-needs-part-wong-oxptc/")]
-SYND = [("Yahoo Finance","https://finance.yahoo.com/technology/ai/articles/exabeam-launches-open-source-praxen-130000884.html"),("Zawya","https://www.zawya.com/en/press-release/companies-news/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers-q1c0rggt"),("FinancialContent","https://www.financialcontent.com/article/bizwire-2026-6-23-exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers"),("TMCnet","https://www.tmcnet.com/usubmit/-exabeam-launches-open-source-praxen-bring-agent-behavior-/2026/06/23/10404217.htm"),("CIO Influence","https://cioinfluence.com/security/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("iTWire","https://itwire.com/business-it-news/data/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers"),("AdTechToday","https://adtechtoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("InAI Today","https://inaitoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers/"),("FinTech Gate","https://fintechgate.net/2026/06/23/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("TechRound","https://techround.co.uk/artificial-intelligence/exabeam-open-source-praxen-agent-behaviour-verification-ai-agents-digital-workers/"),("Africa Business Communities","https://africabusinesscommunities.com/tech-24/exabeam-launches-praxen-to-verify-ai-agent-behavior/"),("Anbaa Al-Youm","https://www.anbaaalyoumeg.com/655510"),("The NextGen Tech Insider","https://thenextgentechinsider.com/pulse/praxen-open-source-framework-enables-ai-agent-behavior-verification"),("Subagentic.ai","https://subagentic.ai/posts/praxen-open-source-agent-behavior-verification/")]
+SYND = [("Yahoo Finance","https://finance.yahoo.com/technology/ai/articles/exabeam-launches-open-source-praxen-130000884.html"),("Zawya","https://www.zawya.com/en/press-release/companies-news/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers-q1c0rggt"),("FinancialContent","https://www.financialcontent.com/article/bizwire-2026-6-23-exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers"),("TMCnet","https://www.tmcnet.com/usubmit/-exabeam-launches-open-source-praxen-bring-agent-behavior-/2026/06/23/10404217.htm"),("CIO Influence","https://cioinfluence.com/security/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("iTWire","https://itwire.com/business-it-news/data/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers"),("AdTechToday","https://adtechtoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("InAI Today","https://inaitoday.com/exabeam-launches-open-source-praxen-to-bring-agent-behaviour-verification-to-ai-agents-and-digital-workers/"),("FinTech Gate","https://fintechgate.net/2026/06/23/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/"),("TechRound","https://techround.co.uk/artificial-intelligence/exabeam-open-source-praxen-agent-behaviour-verification-ai-agents-digital-workers/"),("Africa Business Communities","https://africabusinesscommunities.com/tech-24/exabeam-launches-praxen-to-verify-ai-agent-behavior/"),("Anbaa Al-Youm","https://www.anbaaalyoumeg.com/655510"),("The NextGen Tech Insider","https://thenextgentechinsider.com/pulse/praxen-open-source-framework-enables-ai-agent-behavior-verification"),("Subagentic.ai","https://subagentic.ai/posts/praxen-open-source-agent-behavior-verification/"),("Safety &amp; Security Review Africa","https://safetyandsecurityafrica.com/exabeam-launches-open-source-praxen-to-bring-agent-behavior-verification-to-ai-agents-and-digital-workers/")]
 
 with open(os.path.join(SCRIPT_DIR, "praxen-stars.svg"), encoding="utf-8") as _svg_fh:
     svg = _svg_fh.read().replace(
@@ -127,15 +127,15 @@ def page(commentary):
     P = []
     P.append(f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Praxen Launch — Traffic{" Report" if commentary else " (Data)"}</title><style>{CSS}</style></head><body><div class="wrap">')
     P.append(f'<span class="tag">GoatCounter · open-agent-ai-security</span><h1>Praxen Launch — Traffic{" Report" if commentary else " Data"}</h1>')
-    P.append(f'<p class="sub">Window <b>{days[0]} → {days[-1]}</b> (UTC, complete). Shared community account; Praxen broken out. GoatCounter only — the Cloudflare half of the A/B is not in this export.</p>')
+    P.append(f'<p class="sub">Window <b>{days[0]} → {days[-1]}</b> (UTC · {days[-1]} is the export day, still partial). Shared community account; Praxen broken out. GoatCounter only — the Cloudflare half of the A/B is not in this export.</p>')
     P.append(f'<div class="cards"><div class="card"><b>{total}</b><span>total pageviews (all sites)</span></div><div class="card"><b>{praxen}</b><span>Praxen pageviews ({(praxen/total*100) if total else 0:.0f}%)</span></div><div class="card"><b>{byday.get("2026-06-24", 0)}</b><span>peak day (Jun 24)</span></div><div class="card"><b>{byday.get("2026-06-25", 0)}</b><span>Jun 25 (sustained)</span></div></div>')
 
     # press
     press_rows = "".join(f'<a href="{u}" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;gap:14px;padding:9px 2px;border-bottom:1px solid var(--bd);text-decoration:none"><span style="color:var(--mut)"><b style="color:var(--or2)">{o}</b> — {t}</span><span style="color:var(--mut2);flex:none">&#8599;</span></a>' for o, t, u in PRESS)
     synd_line = " &middot; ".join(f'<a href="{u}" target="_blank" rel="noopener">{n}</a>' for n, u in SYND)
     P.append('<h2>Press coverage — a strong launch pickup</h2>')
-    P.append('<p class="sub">~25 placements across cybersecurity, AI, and enterprise-technology media; no negative coverage. The earned media:</p>')
-    P.append('<div class="cards"><div class="card"><b>1</b><span>announcement</span></div><div class="card"><b>10</b><span>editorial</span></div><div class="card"><b>14</b><span>syndications</span></div><div class="card"><b>0</b><span>negative</span></div></div>')
+    P.append('<p class="sub">~26 placements across cybersecurity, AI, and enterprise-technology media; no negative coverage. The earned media:</p>')
+    P.append('<div class="cards"><div class="card"><b>1</b><span>announcement</span></div><div class="card"><b>10</b><span>editorial</span></div><div class="card"><b>15</b><span>syndications</span></div><div class="card"><b>0</b><span>negative</span></div></div>')
     P.append(f'<div class="sec" style="padding:6px 22px">{press_rows}</div>')
     P.append(f'<p class="sub" style="margin:14px 0 0"><b style="color:var(--mut)">Also syndicated to:</b> {synd_line}</p>')
     P.append(cm('<div class="callout"><h3>Great earned media — but did it drive traffic?</h3><p>A strong footprint for a launch. The rest of this report asks the harder question: <b>did the coverage send people to the site (or the repo)?</b> The referrers — and the GitHub section — hold the answer.</p></div>'))
@@ -145,7 +145,7 @@ def page(commentary):
     dl = {"2026-06-18": "  ← ISSA LA talk", "2026-06-23": "  ← launch", "2026-06-24": "  ← peak"}
     timeline = "".join(bar(d + dl.get(d, ""), byday[d], mx, sub=f"{byday_px[d]} praxen") for d in days)
     P.append('<h2>Daily traffic</h2>')
-    cap_daily = '<b>Jun 18 (220)</b> is the ISSA Los Angeles talk where Praxen was previewed — ~80% direct, docs-engaged (the room going straight to the site). Launch on <b>Jun 23</b> (283) into the <b>Jun 24</b> peak (403). <b>Jun 25 held at 210</b> — the post-launch tail didn’t crater, and the mix shifted toward organic Search as the social spike faded.' if commentary else 'Jun 18 = the ISSA Los Angeles preview talk. Launch Jun 23 (283); peak Jun 24 (403); Jun 25 complete at 210.'
+    cap_daily = '<b>Jun 18 (220)</b> is the ISSA Los Angeles talk where Praxen was previewed — ~80% direct, docs-engaged (the room going straight to the site). Launch on <b>Jun 23</b> (283) into the <b>Jun 24</b> peak (403). The post-launch tail held rather than cratered — <b>Jun 25 (330)</b>, <b>Jun 26 (188)</b>, and a <b>Jun 29 (169)</b> second wind — as the mix shifted toward organic Search and direct once the social spike faded. (Jun 29 is the export day, so it is still partial.)' if commentary else 'Jun 18 = the ISSA Los Angeles preview talk. Launch Jun 23 (283); peak Jun 24 (403); Jun 25 (330). Tail through Jun 29 (169, the export day — partial).'
     P.append(f'<div class="sec">{timeline}<p class="sub" style="margin:12px 0 0">{cap_daily}</p></div>')
 
     # referrers
@@ -156,7 +156,7 @@ def page(commentary):
     refcat = "".join(bar(k, c, cmax, sub=f"{(c/px_total*100) if px_total else 0:.0f}%", color=cc(k)) for k, c in present)
     ext_rows = "".join(f"<tr><td>{r}</td><td class='n'>{c}</td></tr>" for r, c in px_ext[:14])
     P.append('<h2>Referrers to the Praxen landing page (<code>/praxen</code>)</h2>')
-    P.append(cm(f'<div class="callout warn"><h3>The editorial press isn’t converting to <i>this site</i></h3><p>Of <b>{px_total}</b> referrals to <code>/praxen</code>, the editorial coverage drove just <b>{press}</b>. Under default browser referrer policy those outlets <i>would</i> appear if readers clicked through — so the absence is real, not hidden in "direct."</p><p><b>What converted were audience-owned channels:</b> <b>LinkedIn ({lk})</b> (the launch post) and <b>Direct ({px_cat.get("Direct",0)})</b> (much of it the Jun 18 ISSA LA talk audience plus typed/app links). Big <i>awareness</i> from ~25 placements; little measured conversion to the Pages site — <b>but press that links the repo instead <i>does</i> convert there</b> (see <b>GitHub repository — traffic</b> below).</p></div>'))
+    P.append(cm(f'<div class="callout warn"><h3>The editorial press isn’t converting to <i>this site</i></h3><p>Of <b>{px_total}</b> referrals to <code>/praxen</code>, the editorial coverage drove just <b>{press}</b>. Under default browser referrer policy those outlets <i>would</i> appear if readers clicked through — so the absence is real, not hidden in "direct."</p><p><b>What converted were audience-owned channels:</b> <b>LinkedIn ({lk})</b> (the launch post) and <b>Direct ({px_cat.get("Direct",0)})</b> (much of it the Jun 18 ISSA LA talk audience plus typed/app links). Big <i>awareness</i> from ~26 placements; little measured conversion to the Pages site — <b>but press that links the repo instead <i>does</i> convert there</b> (see <b>GitHub repository — traffic</b> below).</p></div>'))
     P.append(f'<div class="sec">{refcat}</div>')
     P.append(cm('<p class="sub" style="margin:8px 0 18px"><b style="color:var(--mut)">What "direct" means:</b> a visit with no referrer attached — typed or pasted URLs, bookmarks, and clicks from anywhere that strips the referrer: native apps (the LinkedIn, Slack, or Teams apps), email clients, PDFs/slides, and QR codes. So "direct" isn\'t only "people who typed it in" — here it also captures the ISSA-talk audience and app-based shares.</p>'))
     P.append('<h3 style="font-size:14px;color:var(--mut);margin:18px 0 4px">External referrers to <code>/praxen</code>, itemized</h3>')
@@ -186,7 +186,7 @@ def page(commentary):
         + f'<div class="row"><span class="rl">Social engagements</span><span class="rbar"><i style="width:5%;background:#ff9d4d"></i></span><span class="rv">{LI["eng"]}</span></div>'
         + f'<div class="row"><span class="rl">Link clicks &#8594; /praxen</span><span class="rbar"><i style="width:4%;background:#ff7a2e"></i></span><span class="rv">{LI["clicks"]}</span></div>'
         + f'<p class="sub" style="margin:12px 0 0">~{ctr_i:.1f}% click-through on impressions, ~{ctr_r:.1f}% on members reached. Avg video watch {LI["avg"]} across {LI["vid"]:,} views ({LI["watch"]} total); {LI["prof"]} profile viewers and {LI["foll"]} new followers.</p></div>')
-    P.append(cm(f'<div class="callout"><h3>One post drove ~90% of LinkedIn traffic</h3><p>LinkedIn counts <b>{LI["clicks"]} visits</b> to the post’s link (<code>open-agent-ai-security.github.io/praxen/</code>) — about <b>{lk_share:.0f}% of GoatCounter’s {lk} LinkedIn referrals</b> to <code>/praxen</code> (the rest from the {LI["rep"]} reposts).</p><p><b>The pattern, restated:</b> a direct, trackable link converts. The launch post and the ISSA LA talk — both audience-owned, both linking straight in — did the work. Press placements that linked the Pages site drove ~0 there; the one that linked the repo (Help Net) converted to GitHub. The variable is always the link.</p></div>'))
+    P.append(cm(f'<div class="callout"><h3>One post drove ~88% of LinkedIn traffic</h3><p>LinkedIn counts <b>{LI["clicks"]} visits</b> to the post’s link (<code>open-agent-ai-security.github.io/praxen/</code>) — about <b>{lk_share:.0f}% of GoatCounter’s {lk} LinkedIn referrals</b> to <code>/praxen</code> (the rest from the {LI["rep"]} reposts).</p><p><b>The pattern, restated:</b> a direct, trackable link converts. The launch post and the ISSA LA talk — both audience-owned, both linking straight in — did the work. Press placements that linked the Pages site drove ~0 there; the one that linked the repo (Help Net) converted to GitHub. The variable is always the link.</p></div>'))
     P.append(f'<h3 style="font-size:14px;color:var(--mut);margin:18px 0 4px">Engagement breakdown ({LI["eng"]} social engagements)</h3>')
     P.append('<div class="sec">'
         + f'<div class="row"><span class="rl">Reactions</span><span class="rbar"><i style="width:100%;background:#ff9d4d"></i></span><span class="rv">{LI["react"]}</span></div>'
@@ -197,17 +197,17 @@ def page(commentary):
 
     # github repo traffic (separate property)
     ghmax = max(v for _, v in GH_DAILY)
-    ghtl = "".join(bar(d + ("  ← ISSA LA" if d == "06/18" else ("  ← launch" if d == "06/23" else ("  ← peak" if d == "06/24" else ""))), v, ghmax, color="#67d98b") for d, v in GH_DAILY)
+    ghtl = "".join(bar(d + ("  ← ISSA LA" if d == "06/18" else ("  ← launch" if d == "06/23" else ("  ← peak" if d == "06/25" else ""))), v, ghmax, color="#67d98b") for d, v in GH_DAILY)
     ghrows = "".join(f"<tr><td>{s}</td><td class='n'>{v}</td><td class='n'>{u}</td></tr>" for s, v, u in GH_REFS)
     P.append('<h2>GitHub repository — traffic <span style="font-size:13px;color:var(--mut2);font-weight:400">(github.com · separate property from the Pages-site numbers above)</span></h2>')
     P.append(f'<p class="sub">The repo’s own GitHub Insights — a different property from the Pages hero measured above; the two are <b>not</b> additive. Repo views, last 14 days: <b>{GH_TOTAL}</b>.</p>')
-    P.append(f'<div class="sec">{ghtl}<p class="sub" style="margin:12px 0 0">Same shape as the Pages site: a <b>Jun 18</b> bump (54 — the ISSA LA talk), then the launch on <b>Jun 23</b> (51) into the <b>Jun 24</b> peak (148).</p></div>')
+    P.append(f'<div class="sec">{ghtl}<p class="sub" style="margin:12px 0 0">Same shape as the Pages site: a <b>Jun 18</b> bump (54 — the ISSA LA talk), then the launch on <b>Jun 23</b> (51) climbing through <b>Jun 24</b> (148) to the <b>Jun 25</b> peak (181), then tapering across the week.</p></div>')
     P.append('<h3 style="font-size:14px;color:var(--mut);margin:18px 0 4px">Referring sites to the repo</h3>')
     P.append(f'<div class="sec"><table><tr><td><b style="color:var(--tx)">Site</b></td><td class="n"><b style="color:var(--tx)">Views</b></td><td class="n"><b style="color:var(--tx)">Unique</b></td></tr>{ghrows}</table></div>')
     if commentary:
-        P.append('<div class="callout"><h3>Press DOES convert — when it links the repo</h3><p><b>Help Net Security linked directly to GitHub</b> (not the Pages hero) and drove <b>18 repo views / 16 unique visitors</b> — the top external <i>press</i> referrer to the repo. GoatCounter never saw this (it only measures the Pages site), which is exactly why the Pages-side press referrals read ~0.</p><p>So the conversion finding sharpens rather than breaks: <b>coverage converts to wherever it links.</b> And the Pages hero is itself the #1 driver of repo traffic (157 views) — the hero &#8594; repo funnel works.</p></div>')
+        P.append('<div class="callout"><h3>Press DOES convert — when it links the repo</h3><p><b>Help Net Security linked directly to GitHub</b> (not the Pages hero) and drove <b>42 repo views / 38 unique visitors</b> — the top external <i>press</i> referrer to the repo. GoatCounter never saw this (it only measures the Pages site), which is exactly why the Pages-side press referrals read ~0.</p><p>So the conversion finding sharpens rather than breaks: <b>coverage converts to wherever it links.</b> And the Pages hero is itself the #1 driver of repo traffic (243 views) — the hero &#8594; repo funnel works.</p></div>')
     else:
-        P.append('<p class="sub">Help Net Security: 18 views / 16 unique — it linked to the repo, not the Pages hero. The Pages hero is the #1 referrer to the repo (157).</p>')
+        P.append('<p class="sub">Help Net Security: 42 views / 38 unique — it linked to the repo, not the Pages hero. The Pages hero is the #1 referrer to the repo (243).</p>')
 
     # stars
     P.append('<h2>GitHub stars</h2>')
@@ -216,7 +216,7 @@ def page(commentary):
     P.append(cm(f'<p class="sub" style="margin:10px 0 0">Chart: star-history.com · snapshot {today}. A launch is a spike; the slope over the coming weeks is the real adoption signal.</p>'))
 
     P.append('<div class="callout"><h3>Caveats</h3><p>GoatCounter undercounts (privacy blockers, no-JS) and this is only the GoatCounter half of the Cloudflare A/B — true Pages traffic is higher. The GitHub-repo numbers are a separate property (GitHub Insights), not additive with the Pages numbers.</p></div>')
-    P.append(f'<div class="foot">Sources: GoatCounter export 20260625T140651Z (Jun 18–25) · LinkedIn post analytics 2026-06-25 · GitHub repo Insights 2026-06-25 · stars via GitHub API · star-history.com · generated {today}.</div>')
+    P.append(f'<div class="foot">Sources: GoatCounter export 20260629T185950Z (Jun 17–29) · LinkedIn post analytics 2026-06-29 · GitHub repo Insights 2026-06-29 · stars via GitHub API · star-history.com · generated {today}.</div>')
     P.append('</div></body></html>')
     return "".join(P)
 
