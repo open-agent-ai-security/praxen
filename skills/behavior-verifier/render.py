@@ -733,11 +733,11 @@ def render_txt(data: dict) -> str:
 
     # Detailed, actionable blocks for the two top tiers — Critical then High.
     # Medium/Low/Informational stay summarized in the counts above (advisory).
-    for _sev, _heading in (("Critical", "CRITICAL FINDINGS"), ("High", "HIGH FINDINGS")):
-        sev_findings = [f for f in findings if f["severity"] == _sev]
+    for sev, heading in (("Critical", "CRITICAL FINDINGS"), ("High", "HIGH FINDINGS")):
+        sev_findings = [f for f in findings if f["severity"] == sev]
         if not sev_findings:
             continue
-        out.append(_heading)
+        out.append(heading)
         out.append(sub)
         for f in sev_findings:
             out.extend(_wrap(f"{f['id']}  {strip_tags(f['summary'])}", indent="  ", subsequent="            "))
