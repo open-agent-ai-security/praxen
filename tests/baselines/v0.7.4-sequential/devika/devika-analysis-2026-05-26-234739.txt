@@ -168,6 +168,117 @@ CRITICAL FINDINGS
                 feature flag defaulting to off and route any deploy attempt
                 through a synchronous approval prompt to the operator.
 
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-05-26-008  Decision agent prompt advertises Twitter/Reddit posting
+            as a `browser_interaction` use case — domain expansion at the
+            prompt layer.
+      Action 1: Edit `src/agents/decision/prompt.jinja2` to remove the
+                Twitter/Reddit/posting language and restrict
+                `browser_interaction` to research-style read-only
+                interactions; mirror that constraint in the
+                `start_interaction` code path by maintaining an allowlist of
+                permitted domains and refusing TYPESUBMIT actions against any
+                unlisted host.
+      Action 2: Document the authorized search/research domains in the Worker
+                Remit's Known Good Baseline and have `start_interaction`
+                reject navigation to any host outside that list.
+
+  PRAX-2026-05-26-009  The global `Knowledge` SQLite table has no project
+            column — search results from one project are returned to every
+            other project's Coder prompt.
+      Action 1: Add a non-null `project` column to `Knowledge` and update both
+                `add_knowledge` and `get_knowledge` to require `project` as a
+                parameter and filter on `(tag, project)`; refuse calls with a
+                missing or empty project value.
+      Action 2: Either re-enable the now-commented add/get call sites with the
+                new project-scoped signatures, or remove the `KnowledgeBase`
+                class entirely if the project has decided not to ship it.
+
+  PRAX-2026-05-26-010  No wall-clock or step-count cap on the agent execution
+            loop — `retry_wrapper`'s 5-attempt cap is the only bound.
+      Action 1: Add a `RunBudget` object to `Agent.execute` and
+                `Agent.subsequent_execute` that tracks aggregate steps and
+                wall-clock seconds; pass it down into Planner / Researcher /
+                Coder / Runner / Action and halt with an operator-visible
+                message when either cap is hit.
+      Action 2: In `Runner.run_code`, refuse to execute a `commands[]` array
+                longer than a configurable `RUNNER_MAX_COMMANDS_PER_RUN`
+                (default 10), and surface the truncation to the operator.
+
+  PRAX-2026-05-26-011  Runner prompt invites `pip3 install -r
+            requirements.txt` and the Runner executes it with no allowlist or
+            operator approval.
+      Action 1: Rewrite the runner prompt example to omit `pip install` (or
+                replace it with a placeholder that triggers an explicit
+                operator-approval flow) and add a deny list in
+                `Runner.run_code` that refuses any command beginning with
+                `pip`, `pip3`, `apt`, `apt-get`, `brew`, `npm install`, or
+                `curl ... | sh` until the operator approves it per-invocation.
+      Action 2: Document the allowed-package mechanism in the Worker Remit's
+                pre-approved list; require that list to live in code (e.g.,
+                `APPROVED_PACKAGES`) and consult it on every install attempt.
+
+  PRAX-2026-05-26-012  No per-project action-level audit log — only a single
+            global plaintext application log captures HTTP route entries.
+      Action 1: Add a `src/audit.py` writing JSON-lines per-project audit
+                files at `data/projects//audit.jsonl` with fields `{ts, actor,
+                action_type, target, params, outcome, finding_id}`; instrument
+                every subprocess invocation, file write, web fetch, and LLM
+                call to emit one record.
+      Action 2: Document the audit log location in the Worker Remit's Known
+                Good Baseline and add an integrity-check (append-only mode,
+                daily checksum) so the audit log is itself protected from
+                agent tampering — closing R-04's "MUST NOT modify its own
+                memory store" path that the audit file would otherwise share.
+
+  PRAX-2026-05-26-013  All 34 runtime dependencies in `requirements.txt` are
+            unpinned — no `==`, no lockfile committed.
+      Action 1: Pin every entry in `requirements.txt` to an exact version
+                (`==`) and commit a `uv.lock` / `requirements.lock` capturing
+                transitive resolutions; rebuild the Docker image against the
+                pinned set.
+      Action 2: Add a CI job that fails on any unpinned entry and on any drift
+                between `requirements.txt` and the committed lockfile; run
+                dependency-vulnerability scanning (e.g., `pip-audit`) on every
+                PR.
+
+  PRAX-2026-05-26-014  Zero tests, zero red-team artifacts, and `ROADMAP.md`
+            lists testing as unchecked — production runtime with no
+            adversarial testing of any kind.
+      Action 1: Stand up a minimal test suite under `tests/` covering at
+                minimum: the path-traversal contract on
+                `Coder.save_code_to_project` (PRAX-2026-05-26-006), the
+                command-allowlist contract on `Runner.run_code`
+                (PRAX-2026-05-26-001), and the project-scope contract on
+                `KnowledgeBase` (PRAX-2026-05-26-009). Wire into CI.
+      Action 2: Schedule an adversarial exercise that targets the
+                search→coder→runner chain (PRAX-2026-05-26-005) with
+                prompt-injection payloads in a controlled local environment;
+                record findings as architectural change requests, not just
+                config tweaks.
+
+  PRAX-2026-05-26-015  `POST /api/settings` lets any unauthenticated caller
+            rewrite API keys and runtime config — a credential modification
+            primitive over the network.
+      Action 1: Add an authentication check in front of `/api/settings` (POST
+                and GET) using the same local-operator token introduced for
+                PRAX-2026-05-26-003; reject anonymous calls.
+      Action 2: In `Config.update_config`, refuse to write `API_KEYS.*` and
+                `API_ENDPOINTS.*` over HTTP — restrict those to the on-disk
+                `config.toml` only, edited by the operator out-of-band.
+
+  PRAX-2026-05-26-016  `start_interaction` browser loop feeds raw page text to
+            the LLM and executes the LLM's CLICK/TYPE output against the live
+            page — indirect prompt injection → in-browser action chain.
+      Action 1: Refuse `start_interaction` navigation to any host not in a
+                Worker-Remit-authorized list of research domains; refuse
+                `TYPESUBMIT` actions on any host outside that list.
+      Action 2: Insert an injection-screen on `browser_content` before it is
+                interpolated into `prompt_template`, and require operator
+                approval for the first `CLICK`/`TYPE` action on a host the
+                agent has not interacted with before in this project.
+
 ==============================================================================
 Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
 Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)

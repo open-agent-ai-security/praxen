@@ -143,6 +143,7 @@ def main():
           and "<b>2</b><span>Medium</span>" in html)
     check("TXT summary is non-empty and names the agent", "FinBot" in txt and len(txt) > 200)
     check("TXT lists Critical findings", "CRITICAL FINDINGS" in txt)
+    check("TXT lists High findings", "HIGH FINDINGS" in txt)
     # The report must stay self-contained — it renders offline (file://) and
     # nothing phones home (PRAXEN_SPEC §7). It must carry NO external script or
     # analytics beacon; web analytics live only on the docs/landing pages, never
