@@ -40,7 +40,7 @@ Before functional work on **1.1** (which will deliberately move scoring, detecti
 
 ## Target roster refresh — stepwise, not all at once
 
-Do the roster change in **two ordered phases. Add and prove out the new targets first; only then evaluate who gets replaced.** This way we never drop coverage before its replacement is validated, and the retirement calls are made with real evidence about what the additions actually exercise. Don't churn the whole roster in one motion.
+Do the roster change in **three ordered phases: (1) add and prove out the new targets, (2) health-check the retained remits, (3) then evaluate who gets replaced.** This way we never drop coverage before its replacement is validated, and the retirement calls are made with real evidence about what the additions actually exercise. Regenerate the OWASP + RAISE coverage pages at every phase boundary so the evolution is diffable. Don't churn the whole roster in one motion.
 
 ### Phase 1 — Add the new targets and prove them out
 
