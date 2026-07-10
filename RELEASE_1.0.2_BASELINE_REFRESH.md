@@ -38,32 +38,54 @@ Before functional work on **1.1** (which will deliberately move scoring, detecti
 - Calibration/detection changes, schema changes, new detection patterns.
 - New *harness* support (e.g. #151 Google Antigravity) — that's a skill/functional change, not a test target.
 
-## Target roster refresh
+## Target roster refresh — stepwise, not all at once
 
-Since we're re-freezing anyway and functionality is stable, this is the right moment to do all target churn at once and freeze it into one clean set. Rolling in the target-freshening RFEs:
+Do the roster change in **two ordered phases. Add and prove out the new targets first; only then evaluate who gets replaced.** This way we never drop coverage before its replacement is validated, and the retirement calls are made with real evidence about what the additions actually exercise. Don't churn the whole roster in one motion.
 
-| Change | Target | Issue | Rationale |
+### Phase 1 — Add the new targets and prove them out
+
+Add each new/promoted target, get it **running cleanly end-to-end**, and confirm the **results are good** before it's frozen into the baseline. A target earns its place only if it scans clean and produces substantive, correct findings — not noise.
+
+| Add | Target | Issue | Brings |
 |---|---|---|---|
-| **Replace** | `sweep` → fresh non-coding archetype | **#69** | Dead upstream + redundant archetype; swap for an under-covered archetype on a live upstream |
-| **Replace** | `langchain-sql` → live NL-to-SQL/DB agent | **#70** | Upstream archived/deprecated. **Replace, not drop** — it's the only DB-query archetype in the suite |
-| **Add** | CraftBot (`CraftOS-dev/CraftBot`) | **#116** | Self-hosted general assistant; introduces 3 finding types + 1 scoring pattern not exercised today |
-| **Add** | fetchai/uAgents | **#64** | Multi-agent framework archetype (may also cover the #69 "non-coding archetype" gap — see decision) |
-| **Add (candidate)** | Agentforce — `examples/salesforce-help-agent-accelerator` | — | Already an **example** with a committed `WORKER_REMIT.md` + analysis, but **not** a baseline. Real-world enterprise (Salesforce Agentforce) agent — strong candidate to promote into the baseline suite |
+| Add | CraftBot (`CraftOS-dev/CraftBot`) | **#116** | Self-hosted general assistant; 3 finding types + 1 scoring pattern not exercised today |
+| Add | fetchai/uAgents | **#64** | Multi-agent framework archetype (candidate to also cover the #69 "non-coding" gap — evaluated in Phase 2) |
+| Promote | Agentforce — `examples/salesforce-help-agent-accelerator` | — | Already an example (committed `WORKER_REMIT.md` + analysis); the only real-world enterprise (Salesforce Agentforce) agent — strong promote candidate |
 
-**Decisions to make before freezing:**
-1. **Does uAgents (#64) double as the `sweep` replacement (#69)?** #69 wants a non-coding archetype; uAgents is a multi-agent framework. If yes, that's one target, not two — keeps the suite leaner.
-2. **Pick the `langchain-sql` replacement (#70)** — a specific live NL-to-SQL/DB agent to preserve the DB-query archetype.
-3. **Promote Agentforce?** It already has a remit and an example analysis, so promotion cost is low (median-of-3 + freeze + bands). Recommended — it's the only real-world enterprise SaaS agent available.
-4. **Watch suite size / runtime.** The full suite is ~90 min (parallel subagent) / 3–4 hr (sequential) at **12** targets; each add extends that. Net roster after the changes above is ~**13–15** — keep it deliberate, don't over-grow. Retire, don't just accumulate.
+**Per-target acceptance — all must hold before a target is frozen in:**
+- [ ] Worker Remit in place (`tests/remits/<slug>.md`). Agentforce's exists at `examples/salesforce-help-agent-accelerator/WORKER_REMIT.md` — decide move/copy vs reference. Remits are held constant across the three runs.
+- [ ] **Clean end-to-end scan** — no harness / discovery / manifest errors.
+- [ ] **Median-of-3 characterization is stable** (variance within the usual ±0.3–0.5 band); freeze the median run as the exemplar.
+- [ ] **Results are good** — findings are substantive and correct for the target, themes make sense, nothing garbage or hallucinated. This is a *judgment* gate, not just "it ran."
+- [ ] `tests/render/test_render.py` passes on the new baseline JSON (schema + byte-render + remit-verbatim).
+- [ ] Initial bands set from the 3-run mean ± spread.
 
-**Remits:** new/promoted targets need a Worker Remit under `tests/remits/<slug>.md` (Agentforce's already exists at `examples/salesforce-help-agent-accelerator/WORKER_REMIT.md` — decide whether to move/copy it into `tests/remits/` or reference in place). Remits are held constant across the three characterization runs.
+Freezing the additions grows the roster **temporarily** (12 → up to ~15); that's expected — Phase 3 brings it back down.
+
+### Phase 2 — Remit health check on the retained targets
+
+The retained targets' Worker Remits were authored during the **0.7.x** line, and the remit format/conventions may have **evolved substantially** since (see `docs/writing-remits.md`, `PRAXEN_SPEC.md`, and the multi-component remit guidance added in `[0.7.7]`). Re-baselining the 1.0.x skill against **stale-format remits** would grade current behavior on outdated intent specs — undermining the point of a clean current baseline. So, after the additions land, **audit every retained remit and bring drifted ones up to the current format** before re-characterizing that target.
+
+- [ ] **Audit** each retained `tests/remits/<slug>.md` against the current remit format — use the freshly-authored Phase-1 remits as the reference for "good shape." Look for structural drift, missing sections the current format expects, and outdated conventions.
+- [ ] **Refresh** drifted remits to the current format, **holding intent constant** — modernize the *expression*, not *what the agent is allowed to do*. A refresh must not silently change scope (that conflates format modernization with a coverage change).
+- [ ] **Re-characterize + re-freeze** any target whose remit changed — the byte-render gate requires each baseline's `rule_text` to quote its remit **verbatim** (`tests/render/test_render.py` enforces this from `praxen_version` 0.6.0 on), so a remit edit *forces* a fresh median-of-3 for that target.
+- [ ] Skip retirement candidates you're about to drop in Phase 3 — don't modernize a remit for a target that's leaving.
+
+### Phase 3 — Then evaluate who gets replaced
+
+**Only after** the additions are proven, make the retirement/replacement calls — informed by what the new targets now cover:
+
+- **`sweep` (#69)** — retire once we've confirmed the additions cover the archetype it held (does uAgents fill the non-coding / multi-agent archetype role? if yes, `sweep` can go without losing coverage).
+- **`langchain-sql` (#70)** — the only DB-query archetype. **Replace, not drop:** retire it only once a live NL-to-SQL/DB target has been added and proven to Phase 1's bar. If no DB replacement is ready, keep `langchain-sql` (from a pinned snapshot) rather than lose the archetype.
+
+**Runtime discipline.** The full suite is ~90 min (parallel subagent) / 3–4 hr (sequential) at **12** targets; each net add extends it. Land near **12–14**, not 15+ — retire as you add, don't just accumulate.
 
 ## The re-baseline procedure
 
 Follows `tests/README.md` › *Re-baselining (multi-run characterization)*:
 
 1. **Confirm the reference model** is Opus 4.8 (the `-claude48` variant). If the reference tier has moved, name the set accordingly.
-2. **Retained targets:** characterize over **3 independent runs** on identical inputs (1.0.x skill, sources, remits constant) and confirm they land where `v0.7.7-claude48` did — expected, since 0.7.7→1.0 was polish. Any material, unexplained shift is investigated before freeze.
+2. **Retained targets:** characterize over **3 independent runs** on identical inputs (1.0.x skill, sources, and the **Phase-2-refreshed remits** held constant) and confirm they land where `v0.7.7-claude48` did — expected, since 0.7.7→1.0 was polish. A remit that was modernized in Phase 2 may legitimately move its target's numbers (new intent expression) — that's an intended shift, not a regression. Any *unexplained* shift is investigated before freeze.
 3. **New / replaced targets:** characterize from scratch over 3 runs; set initial bands from mean ± spread.
 4. **Freeze the median run** per target as the committed exemplar (one real, unedited run — keeps the byte-render gate honest).
 5. **Set each band from the 3-run mean ± observed spread.** Move *stable-but-offset* targets; widen *noisy-but-centred* ones. Diff by theme and rule text, never by `R-NN` id.
@@ -78,9 +100,10 @@ Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-
 
 ## Deliverables checklist
 - [ ] Reference model confirmed
-- [ ] Target-roster decisions made (#69 replacement / uAgents overlap · #70 DB replacement · promote Agentforce · final count)
-- [ ] Remits in place for new/promoted targets (`tests/remits/`)
-- [ ] 3-run characterization: retained targets confirmed stable; new/replaced targets characterized
+- [ ] **Phase 1** — new targets (CraftBot #116, uAgents #64, Agentforce) added, running clean, results validated, frozen; remits authored in current format
+- [ ] **Phase 2** — retained remits audited vs the current format; drifted ones refreshed (intent held constant) and affected targets re-characterized
+- [ ] **Phase 3** — retirement/replacement calls made with Phase-1 evidence (#69 sweep · #70 langchain-sql); final count 12–14
+- [ ] 3-run characterization: retained targets confirmed stable on refreshed remits; additions characterized clean
 - [ ] `tests/baselines/v1.0.2-claude48/` frozen (median exemplars + `BASELINE.md`)
 - [ ] Bands + pointer updated in `tests/README.md` and `tests/baselines/README.md`
 - [ ] `owasp-coverage-report.html` (+ RAISE view) regenerated
