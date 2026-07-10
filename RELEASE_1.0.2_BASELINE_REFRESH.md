@@ -74,7 +74,7 @@ Follows `tests/README.md` › *Re-baselining (multi-run characterization)*:
 
 ## Version bump (1.0.1 → 1.0.2)
 
-Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, root `plugin.json`, root `marketplace.json`, `.codex-plugin/*`, the README badge, and add a `[1.0.2]` CHANGELOG entry framed as: *"Regression baseline re-frozen on the 1.0.x skill; test-target roster refreshed (retired dead upstreams `sweep`/`langchain-sql`, added CraftBot/uAgents/Agentforce). No functional changes."* `release.yml` checks the tag matches `PRAXEN_SPEC.md`'s version.
+Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, root `plugin.json`, root `marketplace.json`, `.codex-plugin/*`, and add a `[1.0.2]` CHANGELOG entry framed as: *"Regression baseline re-frozen on the 1.0.x skill; test-target roster refreshed (retired dead upstreams `sweep`/`langchain-sql`, added CraftBot/uAgents/Agentforce). No functional changes."* `release.yml` checks the tag matches `PRAXEN_SPEC.md`'s version. (The README **release pill** is now the dynamic shields.io `github/v/release` badge — it auto-updates from the latest tag and is no longer part of the bump.)
 
 ## Deliverables checklist
 - [ ] Reference model confirmed
