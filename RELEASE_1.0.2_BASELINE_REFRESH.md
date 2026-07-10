@@ -42,6 +42,10 @@ Before functional work on **1.1** (which will deliberately move scoring, detecti
 
 Do the roster change in **three ordered phases: (1) add and prove out the new targets, (2) health-check the retained remits, (3) then evaluate who gets replaced.** This way we never drop coverage before its replacement is validated, and the retirement calls are made with real evidence about what the additions actually exercise. Regenerate the OWASP + RAISE coverage pages at every phase boundary so the evolution is diffable. Don't churn the whole roster in one motion.
 
+### Foundation — re-baseline the retained majority (do this first)
+
+Before the roster phases, re-characterize the ~10 **retained** targets on the 1.0.x skill (their current remits) and freeze them into `tests/baselines/v1.0.2-claude48/`. This is the bulk of the re-baseline (procedure steps 1–8) and — since 0.7.7→1.0 was polish — is expected to reproduce the `v0.7.7-claude48` numbers closely. **This seeds the new set,** so the coverage pages regenerated at each phase boundary summarize a *complete* suite rather than just the additions. (Phase 2 re-freezes the subset whose remits get modernized.)
+
 ### Phase 1 — Add the new targets and prove them out
 
 Add each new/promoted target, get it **running cleanly end-to-end**, and confirm the **results are good** before it's frozen into the baseline. A target earns its place only if it scans clean and produces substantive, correct findings — not noise.
@@ -105,10 +109,13 @@ Follows `tests/README.md` › *Re-baselining (multi-run characterization)*:
 
 ## Version bump (1.0.1 → 1.0.2)
 
-Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, root `plugin.json`, root `marketplace.json`, `.codex-plugin/*`, and add a `[1.0.2]` CHANGELOG entry framed as: *"Regression baseline re-frozen on the 1.0.x skill; test-target roster refreshed (retired dead upstreams `sweep`/`langchain-sql`, added CraftBot/uAgents/Agentforce). No functional changes."* `release.yml` checks the tag matches `PRAXEN_SPEC.md`'s version. (The README **release pill** is now the dynamic shields.io `github/v/release` badge — it auto-updates from the latest tag and is no longer part of the bump.)
+Update the version in the three plugin manifests — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.codex-plugin/plugin.json` — plus `PRAXEN_SPEC.md`, and add a `[1.0.2]` CHANGELOG entry framed as: *"Regression baseline re-frozen on the 1.0.x skill; test-target roster refreshed (retired dead upstreams `sweep`/`langchain-sql`, added CraftBot/uAgents/Agentforce). No functional changes."* `release.yml` checks the tag matches `PRAXEN_SPEC.md`'s version. (The README **release pill** is now the dynamic shields.io `github/v/release` badge — it auto-updates from the latest tag and is no longer part of the bump.)
+
+Because this release edits every plugin manifest, run the **manual plugin-marketplace install check** — `tests/README.md` pre-release checklist **step 2** (`claude plugin marketplace add … && claude plugin install … && claude plugin list`, or the fast pre-flight `claude plugin validate .`). It is **not covered by CI**, and a bad manifest `source` silently broke marketplace install from v0.6.1 until 0.6.2 — a manifest-editing release is exactly when it bites.
 
 ## Deliverables checklist
 - [ ] Reference model confirmed
+- [ ] **Foundation** — retained targets re-characterized on 1.0.x, seeding `tests/baselines/v1.0.2-claude48/`
 - [ ] **Phase 1** — new targets (CraftBot #116, uAgents #64, Agentforce) added, running clean, results validated, frozen; remits authored in current format
 - [ ] **Phase 2** — retained remits audited vs the current format; drifted ones refreshed (intent held constant) and affected targets re-characterized
 - [ ] **Phase 3** — retirement/replacement calls made with Phase-1 evidence (#69 sweep · #70 langchain-sql); final count 12–14
@@ -118,8 +125,9 @@ Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-
 - [ ] Both summary pages (`owasp-coverage-report.html` + `raise-coverage-report.html`) regenerated **at each phase boundary**, and **again after Phase 3** to match the frozen `v1.0.2-claude48` set
 - [ ] `tests/runs/v1.0.2-prerelease/SUITE_RUN.md` committed
 - [ ] `v0.7.7-claude48/` retired in place
-- [ ] `python3 tests/render/test_render.py` green; CI green 3.9/3.12/3.13
-- [ ] Version bumped to 1.0.2; CHANGELOG `[1.0.2]` entry
+- [ ] `./build.sh` + `python3 tests/render/test_render.py` green; CI green 3.9/3.12/3.13
+- [ ] Version bumped to 1.0.2 (three plugin manifests + `PRAXEN_SPEC.md`); CHANGELOG `[1.0.2]` entry
+- [ ] **Plugin-marketplace install check** run — manual, non-CI (`tests/README.md` step 2)
 - [ ] Closes: #69, #70, #116, #64 (and the Agentforce promotion)
 
 ## Fold-down
