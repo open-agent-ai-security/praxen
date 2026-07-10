@@ -7,6 +7,15 @@
 
 Praxen is a security tool. We take vulnerabilities in Praxen itself seriously. This document describes how to report one privately, what is in scope, and what to expect after you report.
 
+## Security model and assumptions
+
+Praxen runs as a skill *inside* your coding agent (Claude Code, OpenAI Codex, or similar) — not as a standalone, sandboxed service. Two properties are worth stating plainly before you run it:
+
+- **Read-only by convention, not by isolation.** Praxen is designed to operate read-only on the agent's workspace: it reads artifacts (code, config, logs, governance docs) and writes output only to its own `./reports/` directory. It does not act on the agent's behalf and does not modify the agent's code, skill files, configuration, or dependencies. But this is a **behavioral contract of the skill's instructions, not a technical sandbox** — Praxen runs with the coding agent's ordinary tool access (including Bash and Write), so the read-only posture is enforced by convention rather than by an isolation boundary. (This is the same declared-versus-enforced distinction Praxen itself flags when it scans other agents.) Run Praxen only where you already trust the coding agent to operate.
+- **Local by default.** Reports are written locally to `./reports/` (HTML, JSON, text). Nothing phones home.
+
+For guidance on interpreting Praxen's *output* — a model-assisted expert review rather than a deterministic gate — see [Working with Praxen](README.md#working-with-praxen).
+
 ## Scope
 
 **In scope** — vulnerabilities in Praxen itself:

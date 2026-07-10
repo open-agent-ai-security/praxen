@@ -23,6 +23,7 @@
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
 | Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
+| Getting the most out of a Praxen report | [Working with Praxen](#working-with-praxen) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
 | Trying to understand the RAISE maturity scoring | [The RAISE Framework](RAISE.md) |
@@ -46,6 +47,12 @@ flowchart LR
 ```
 
 The output is a self-contained HTML analysis report, a machine-readable findings JSON, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
+
+## Working with Praxen
+
+Praxen produces an **expert review that focuses human attention.** Each report is a model-assisted analysis of where an agent's behavior may diverge from its remit. Treat the findings and RAISE maturity score as judgments to act on — a senior reviewer's notes, not an automated pass/fail. Scores are calibrated per model tier and vary run to run (see [Understanding Run-to-Run Variability](understanding-variability.md)), and you can [challenge and revise any finding](challenging-findings.md).
+
+Praxen works by **reading your agent's real workspace in place** — its actual code, config, and logs. It writes findings only to `./reports/` and never modifies the agent. It runs as a skill inside your coding agent, using that agent's own tools rather than a separate sandbox, so run Praxen where you already trust that agent to operate. The [security model and assumptions](../SECURITY.md#security-model-and-assumptions) covers this in full.
 
 ## Four input shapes
 
