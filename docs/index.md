@@ -23,6 +23,7 @@
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
 | Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
+| Wondering whether Praxen is a pass/fail gate or a sandbox | [What Praxen is (and isn't)](#what-praxen-is-and-isnt) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
 | Trying to understand the RAISE maturity scoring | [The RAISE Framework](RAISE.md) |
@@ -46,6 +47,12 @@ flowchart LR
 ```
 
 The output is a self-contained HTML analysis report, a machine-readable findings JSON, and a plain-text summary. Open the HTML in a browser; ingest the JSON in your pipeline.
+
+## What Praxen is (and isn't)
+
+Praxen is **decision support, not an enforcement gate.** Findings and the RAISE maturity score are model-assisted expert judgments meant to focus a human reviewer — not a deterministic pass/fail signal. Scores vary run to run and are calibrated per model tier, so read a report as an expert review to act on, not a rubber stamp to automate against. See [Understanding Run-to-Run Variability](understanding-variability.md), and [Challenging and Revising Findings](challenging-findings.md) when you disagree with a finding.
+
+Praxen is **read-only by design — but by convention, not by a sandbox.** It reads your agent's real workspace (code, config, logs) and writes only to `./reports/`, never modifying the agent. But it runs inside your coding agent with that agent's ordinary tool access (Bash, Write), so the read-only posture is a behavioral contract, not an isolation boundary — the same declared-versus-enforced distinction Praxen flags when it scans other agents. Run it where you'd already trust that agent to operate; see [Security model and assumptions](../SECURITY.md#security-model-and-assumptions).
 
 ## Four input shapes
 
