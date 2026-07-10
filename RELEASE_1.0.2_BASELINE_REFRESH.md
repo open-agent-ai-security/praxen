@@ -28,7 +28,7 @@ Before functional work on **1.1** (which will deliberately move scoring, detecti
 - **Refresh the target roster** (drop dead upstreams, add fresher archetypes — see below).
 - Recompute per-target bands + the active-baseline pointer in `tests/README.md` and `tests/baselines/README.md`.
 - Write the new `BASELINE.md` (per-target table, provenance, band deltas vs `v0.7.7-claude48`, model-lean note).
-- Regenerate `tests/baselines/owasp-coverage-report.html` (and the RAISE coverage view) from the new set.
+- Regenerate **both** baseline-derived summary pages from the new set — `tests/baselines/owasp-coverage-report.html` (OWASP) **and** `tests/baselines/raise-coverage-report.html` (RAISE). Both are committed artifacts served live on GitHub Pages, so both go stale the moment the baseline set changes.
 - Commit the pre-release evidence run `tests/runs/v1.0.2-prerelease/` with a `SUITE_RUN.md` verdict.
 - Retire `v0.7.7-claude48/` in place (kept for diff archaeology).
 - Version bump 1.0.1 → 1.0.2 across the manifest set; CHANGELOG `[1.0.2]` entry.
@@ -80,6 +80,8 @@ The retained targets' Worker Remits were authored during the **0.7.x** line, and
 
 **Runtime discipline.** The full suite is ~90 min (parallel subagent) / 3–4 hr (sequential) at **12** targets; each net add extends it. Land near **12–14**, not 15+ — retire as you add, don't just accumulate.
 
+**Regenerate the coverage pages at every phase boundary.** After each of Phases 1, 2, and 3, re-run both summary generators (re-baseline procedure step 7) and commit the refreshed `owasp-coverage-report.html` + `raise-coverage-report.html`. Doing it per phase — not only at the end — makes the coverage **evolution** easy to compare across the stepwise motion (additions → remit refresh → retirements). And the **final** regen after Phase 3 is mandatory: it guarantees the shipped pages match the frozen `v1.0.2-claude48` set exactly.
+
 ## The re-baseline procedure
 
 Follows `tests/README.md` › *Re-baselining (multi-run characterization)*:
@@ -90,7 +92,14 @@ Follows `tests/README.md` › *Re-baselining (multi-run characterization)*:
 4. **Freeze the median run** per target as the committed exemplar (one real, unedited run — keeps the byte-render gate honest).
 5. **Set each band from the 3-run mean ± observed spread.** Move *stable-but-offset* targets; widen *noisy-but-centred* ones. Diff by theme and rule text, never by `R-NN` id.
 6. **Name the set `tests/baselines/v1.0.2-claude48/`**, retire `v0.7.7-claude48/` in place, update the pointer + bands in both READMEs.
-7. **Regenerate coverage:** `python3 tests/baselines/owasp_coverage.py --baseline-dir tests/baselines/v1.0.2-claude48 --out tests/baselines/owasp-coverage-report.html` (+ the `raise_coverage.py` equivalent).
+7. **Regenerate both baseline-derived summary pages** — run at **every phase boundary** (Phase 1 → 2 → 3) *and* again for the **final** freeze, so the committed pages always match the current baseline set and the coverage evolution stays diffable:
+   ```bash
+   python3 tests/baselines/owasp_coverage.py --baseline-dir tests/baselines/v1.0.2-claude48 \
+     --out tests/baselines/owasp-coverage-report.html
+   python3 tests/baselines/raise_coverage.py  --baseline-dir tests/baselines/v1.0.2-claude48 \
+     --out tests/baselines/raise-coverage-report.html
+   ```
+   The **last** run — after Phase 3 — is the one that ships: both pages must match the frozen `v1.0.2-claude48` set exactly in the final commit.
 8. **Verify integrity:** `python3 tests/render/test_render.py` must pass — every new baseline JSON validates against `schema.py`, re-renders byte-for-byte, and each `rule_text` quotes its remit verbatim. CI green on 3.9 / 3.12 / 3.13.
 9. **Write `BASELINE.md`** (worked example: the current `v0.7.7-claude48/BASELINE.md`).
 
@@ -106,7 +115,7 @@ Update the version in: `PRAXEN_SPEC.md`, `.claude-plugin/plugin.json`, `.claude-
 - [ ] 3-run characterization: retained targets confirmed stable on refreshed remits; additions characterized clean
 - [ ] `tests/baselines/v1.0.2-claude48/` frozen (median exemplars + `BASELINE.md`)
 - [ ] Bands + pointer updated in `tests/README.md` and `tests/baselines/README.md`
-- [ ] `owasp-coverage-report.html` (+ RAISE view) regenerated
+- [ ] Both summary pages (`owasp-coverage-report.html` + `raise-coverage-report.html`) regenerated **at each phase boundary**, and **again after Phase 3** to match the frozen `v1.0.2-claude48` set
 - [ ] `tests/runs/v1.0.2-prerelease/SUITE_RUN.md` committed
 - [ ] `v0.7.7-claude48/` retired in place
 - [ ] `python3 tests/render/test_render.py` green; CI green 3.9/3.12/3.13
