@@ -80,11 +80,11 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, *
 
 ---
 
-## What Praxen is (and isn't)
+## Working with Praxen
 
-Praxen is **decision support, not an enforcement gate.** Its findings and RAISE maturity score are model-assisted expert judgments meant to focus a human reviewer — not a deterministic pass/fail signal. Scores vary run to run and are calibrated per model tier ([details](docs/understanding-variability.md)), so read a report as an expert review to act on, not a rubber stamp to automate against — and when you disagree with a finding, [challenge and revise it](docs/challenging-findings.md).
+Praxen produces an **expert review that focuses human attention.** Each report is a model-assisted analysis of where an agent's behavior may diverge from its remit. Treat the findings and RAISE maturity score as judgments to act on — a senior reviewer's notes, not an automated pass/fail. Scores are calibrated per model tier and vary run to run ([details](docs/understanding-variability.md)), and you can [challenge and revise any finding](docs/challenging-findings.md).
 
-Praxen is **read-only by design — but by convention, not by a sandbox.** It reads your agent's real workspace (code, config, logs) and writes only to `./reports/`, never modifying the agent. But it runs inside your coding agent with that agent's ordinary tool access (Bash, Write), so the read-only posture is a behavioral contract, not an isolation boundary — the same declared-versus-enforced distinction Praxen flags when it scans other agents. Run it where you'd already trust that agent to operate; see [Security model and assumptions](SECURITY.md#security-model-and-assumptions).
+Praxen works by **reading your agent's real workspace in place** — its actual code, config, and logs. It writes findings only to `./reports/` and never modifies the agent. It runs as a skill inside your coding agent, using that agent's own tools rather than a separate sandbox, so run Praxen where you already trust that agent to operate. The [security model and assumptions](SECURITY.md#security-model-and-assumptions) covers this in full.
 
 ---
 
