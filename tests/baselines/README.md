@@ -5,7 +5,7 @@
 
 # Test-suite baselines
 
-Frozen runs of the **twelve** test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v0.7.7-claude48/`** — all twelve targets on the Praxen v0.7.7 skill under **Anthropic Claude Opus 4.8**, against the intent-level Worker Remits, frozen via a **median-of-3** process (see its [`BASELINE.md`](v0.7.7-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The same skill on Opus 4.7 is retained as [`v0.7.7-sequential/`](v0.7.7-sequential/BASELINE.md) for diff archaeology.
+Frozen runs of the test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v1.0.2-claude48/`** — **12 targets** on the Praxen 1.0.x skill under **Anthropic Claude Opus 4.8**, against the intent-level Worker Remits, frozen via a **median-of-3** process (see its [`BASELINE.md`](v1.0.2-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The prior **`v0.7.7-claude48/`** set (and the older `v0.7.x-sequential/` sets) are retained on disk as **archival diff-history** — schema + byte-render still checked, but the remit-verbatim check is scoped to the current set only (`test_render.py:CURRENT_BASELINE`), since archival findings quote the remits as they were at freeze time.
 
 ## Layout
 
@@ -14,7 +14,10 @@ baselines/
   README.md                       ← this file
   owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
   owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
-  v0.7.7-claude48/                 ← CURRENT — all twelve targets, Praxen v0.7.7 on Opus 4.8 (median-of-3, schema 2.0)
+  v1.0.2-claude48/                 ← CURRENT — 12 targets, Praxen 1.0.x on Opus 4.8 (median-of-3, schema 2.0)
+  v0.7.7-claude48/                 ← archival (superseded; remit-verbatim not re-checked)
+  suite-health-report.html         ← committed snapshot; popularity + freshness companion
+  raise-coverage-report.html       ← committed snapshot; RAISE coverage companion
   v0.7.7-sequential/         retired — same skill on Opus 4.7; kept for diff archaeology
   v0.7.4-sequential/         retired — see CHANGELOG [0.7.7]
   v0.7.0-sequential/         retired — see CHANGELOG [0.7.4]
@@ -27,7 +30,7 @@ baselines/
     GATE-NOTES.md            ← the A/B record and the "drop the parallel path" verdict
 ```
 
-When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v0.7.7-claude48/`** set re-froze the suite on **Opus 4.8** using the **median-of-3** characterization process — see its [`BASELINE.md`](v0.7.7-claude48/BASELINE.md) for the per-target table, the model-lean analysis, and the five band changes. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
+When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.0.2-claude48/`** set (12 targets, Praxen 1.0.x on Opus 4.8, median-of-3) is the reference — see its [`BASELINE.md`](v1.0.2-claude48/BASELINE.md). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is now retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
 
 `v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 
@@ -37,7 +40,7 @@ The renderer is deterministic — a baseline's committed HTML/TXT re-render byte
 
 ```bash
 python3 skills/behavior-verifier/render.py \
-  --findings tests/baselines/v0.7.7-claude48/<target>/<target>-findings-<date>.json \
+  --findings tests/baselines/v1.0.2-claude48/<target>/<target>-findings-<date>.json \
   --template skills/behavior-verifier/report_template.html \
   --out-html /tmp/<target>.html --out-txt /tmp/<target>.txt
 ```
@@ -51,7 +54,7 @@ The snapshot is produced by `owasp_coverage.py`, which walks every `<target>/<ta
 ```bash
 # regenerate the committed snapshot in place (canonical form)
 python3 tests/baselines/owasp_coverage.py \
-  --baseline-dir tests/baselines/v0.7.7-claude48 \
+  --baseline-dir tests/baselines/v1.0.2-claude48 \
   --out tests/baselines/owasp-coverage-report.html
 
 # or render somewhere else for ad-hoc browsing

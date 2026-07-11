@@ -61,16 +61,10 @@ TARGETS = [
      "OWASP Agentic AI CTF — invoice processor"),
     ("helperbot",               "HelperBot",                    "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
      "Damn Vulnerable AI Agent — training agent"),
-    ("langchain-sql",           "LangChain SQL Agent",          "https://github.com/langchain-ai/langchain-community",
-     "create_sql_agent toolkit"),
     ("openai-customer-service", "OpenAI Customer Service",      "https://github.com/openai/openai-agents-python",
      "OpenAI Agents SDK example"),
     ("autogen-code-executor",   "AutoGen Code Executor",        "https://github.com/microsoft/autogen",
      "Microsoft AutoGen code-executor family"),
-    ("sweep",                   "Sweep",                        "https://github.com/sweepai/sweep",
-     "GitHub issue-to-code agent"),
-    ("devika",                  "Devika",                       "https://github.com/stitionai/devika",
-     "Autonomous software engineer"),
     ("aider",                   "Aider",                        "https://github.com/Aider-AI/aider",
      "Interactive pair-programming agent"),
     ("openhands",               "OpenHands",                    "https://github.com/All-Hands-AI/OpenHands",
@@ -81,6 +75,12 @@ TARGETS = [
      "Yet Another Agent Harness (MCP coverage)"),
     ("hermes-agent-desktop",    "Hermes (Agent + Desktop)",     "https://github.com/NousResearch/hermes-agent",
      "Multi-component LLM agent + desktop control layer"),
+    ("craftbot",                "CraftBot",                     "https://github.com/CraftOS-dev/CraftBot",
+     "Self-hosted general-purpose agent that builds and operates its own SaaS tools"),
+    ("uagents",                 "uAgents",                      "https://github.com/fetchai/uAgents",
+     "Fetch.ai decorator-based autonomous multi-agent framework runtime"),
+    ("salesforce-help-agent-accelerator", "Agentforce Help Agent", "https://github.com/salesforce/help-agent-accelerator",
+     "Salesforce Agentforce customer-service agent (Knowledge-article RAG)"),
 ]
 
 LLM_TITLES = [
@@ -288,6 +288,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       <div class="stat-block"><strong>{llm_total}</strong><span>LLM-classified</span></div>
       <div class="stat-block"><strong>{asi_total}</strong><span>Agentic-classified</span></div>
     </div>
+    <p class="intro" style="margin-top:16px">Companion views · <a href="raise-coverage-report.html">RAISE coverage</a> · <a href="suite-health-report.html">Suite Health — popularity &amp; freshness</a></p>
   </header>
 
   <section>
