@@ -20,8 +20,8 @@ Provisional **single-run** exemplars (median-of-3 + bands pending, O2). Source c
 
 ## Open issues
 
-### O1 — Confirm the reference model for the freeze
-The baseline set is named `v1.0.2-**claude48**`, implying **Opus 4.8** as the reference tier. The Phase-1 scans ran on the current session model; confirm that matches the intended reference model before we treat these as the reference exemplars. *(Model tier affects RAISE band calibration — `tests/README.md` › Calibration posture.)*
+### O1 — Reference model ✅ RESOLVED
+Confirmed by Steve (2026-07-10): **Opus 4.8 remains the base/reference model** — matches the `-claude48` set name. Phase-1 scans ran on 4.8; no change needed.
 
 ### O2 — Median-of-3 not yet complete (blocks final freeze, not review)
 Phase 1's per-target acceptance calls for a **median-of-3** characterization to set stable bands and freeze the median run. This first pass is a **single run per target** — enough to review the analysis quality, not enough to freeze final bands. Decision needed: spend the compute on 2 more runs each (6 more scans) to complete the characterization, then set bands.

@@ -81,6 +81,12 @@ TARGETS = [
      "Yet Another Agent Harness (MCP coverage)"),
     ("hermes-agent-desktop",    "Hermes (Agent + Desktop)",     "https://github.com/NousResearch/hermes-agent",
      "Multi-component LLM agent + desktop control layer"),
+    ("craftbot",                "CraftBot",                     "https://github.com/CraftOS-dev/CraftBot",
+     "Self-hosted general-purpose agent that builds and operates its own SaaS tools"),
+    ("uagents",                 "uAgents",                      "https://github.com/fetchai/uAgents",
+     "Fetch.ai decorator-based autonomous multi-agent framework runtime"),
+    ("salesforce-help-agent-accelerator", "Agentforce Help Agent", "https://github.com/salesforce/help-agent-accelerator",
+     "Salesforce Agentforce customer-service agent (Knowledge-article RAG)"),
 ]
 
 LLM_TITLES = [
