@@ -23,15 +23,15 @@ Provisional **single-run** exemplars (median-of-3 + bands pending, O2). Source c
 ### O1 — Reference model ✅ RESOLVED
 Confirmed by Steve (2026-07-10): **Opus 4.8 remains the base/reference model** — matches the `-claude48` set name. Phase-1 scans ran on 4.8; no change needed.
 
-### O2 — Median-of-3 not yet complete (blocks final freeze, not review)
-Phase 1's per-target acceptance calls for a **median-of-3** characterization to set stable bands and freeze the median run. This first pass is a **single run per target** — enough to review the analysis quality, not enough to freeze final bands. Decision needed: spend the compute on 2 more runs each (6 more scans) to complete the characterization, then set bands.
+### O2 — Median-of-3 ✅ COMPLETE (new targets)
+All three new targets characterized **median-of-3** and frozen on their median run, bands set (`BASELINE.md`): craftbot **1.15** (σ 0.19), salesforce-help-agent-accelerator **1.70** (σ 0.07), uagents **2.00** (σ 0.25). One Agentforce run hit a mid-response API error and was cleanly re-run. Retained targets are now being characterized ×1 (Foundation wave).
 
 ### O3 — Results-quality sign-off (the judgment gate)
 Phase 1 requires a human "**results are good**" call per target — findings substantive and correct, themes sensible, nothing hallucinated. The provisional exemplars are for exactly this review.
 
 ### O4 — New-target remit scope + Agentforce remit format
 - **CraftBot / uAgents:** no prior remit existed — the scan drafted one (now committed to `tests/remits/{craftbot,uagents}.md`, each with an "Open Questions for the operator" appendix). Confirm the *intended-job* scope before treating it as final.
-- **Agentforce remit needs a Phase-2 format refresh.** The 0.7.8 remit expresses rules as **tables and bullet fragments**; under the current skill the scan quoted them with editorial bracket completions (e.g. `Any tool not explicitly listed under Allowed Tools above [is forbidden].`), so **11 rule quotes failed the remit-verbatim gate** and were **trimmed to their exact remit substrings** to pass — *no finding, severity, or score changed, only the quotes*. The real fix is to rewrite the remit into current declarative-rule format and re-scan (exactly the Phase-2 remit health check). Until then Agentforce is frozen on the trimmed quotes.
+- **Agentforce remit — ✅ REFRESHED.** The 0.7.8 table/fragment remit was **rewritten into current declarative-rule format** (intent held constant), committed to `tests/remits/salesforce-help-agent-accelerator.md`, and the 3 median-of-3 runs used it — verbatim gate now passes cleanly with **no quote-trimming**. Side effect: the clearer rules raised the score **1.15 → 1.70** (more operative controls credited — an intended remit-refresh effect, not drift). *Still worth a human confirm the rewrite preserved intent exactly (the redraft subagent reported it held scope constant).*
 
 ### O5 — uAgents: framework vs. deployed-agent framing
 uAgents is a **framework/library**, not a single deployed agent. Phase 1 analyzed the framework's own runtime posture/defaults. Confirm this framing is what we want (vs. scanning a specific example agent built on it) — this also bears on whether uAgents satisfies the #69 "non-coding archetype" gap in Phase 3.
