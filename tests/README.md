@@ -22,7 +22,7 @@ Three named tiers, escalating in scope and wallclock. Pick the one that matches 
 
 ### Smoke harness — `python3 tests/render/test_render.py` (~30 s, runs in CI)
 
-Renderer + schema validator + golden-byte checks. Sweeps every committed baseline JSON through `schema.py`, re-renders each post-relicense baseline byte-for-byte from its JSON, validates the canonical FinBot fixture's golden HTML/TXT outputs, and exercises entity normalisation + negative-case mutations. CI runs this on every push and PR across Python 3.9 / 3.12 / 3.13 (`.github/workflows/ci.yml`). A failure here means a renderer change silently desynced a committed report, or a baseline's `rule_text` drifted from its remit. **No Praxen analysis runs — this tier doesn't scan any agents.**
+Renderer + schema validator + golden-byte checks. Sweeps every committed baseline JSON through `schema.py`, re-renders each post-relicense baseline byte-for-byte from its JSON, validates the canonical FinBot fixture's golden HTML/TXT outputs, exercises entity normalisation + negative-case mutations, and gates every showcase example under [`examples/`](../examples/) the same way on schema validation and byte-identical re-render (its `*-findings.json` → committed `*-analysis.html` / `.txt`). CI runs this on every push and PR across Python 3.9 / 3.12 / 3.13 (`.github/workflows/ci.yml`). A failure here means a renderer change silently desynced a committed report or example, or a baseline's `rule_text` drifted from its remit. **No Praxen analysis runs — this tier doesn't scan any agents.**
 
 ### Single-target scan (~10 min)
 

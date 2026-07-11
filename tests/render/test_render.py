@@ -22,6 +22,8 @@ Covers:
   * every committed regression baseline under tests/baselines/ validates against
     schema.py, and the post-relicense ones re-render byte-identically from their
     JSON and quote their remit doc verbatim
+  * every showcase example under examples/ validates against schema.py and
+    re-renders byte-identically from its JSON
   * negative cases (legacy bare list, missing field, count mismatch, bad enum,
     missing RAISE category, broken anchor) all fail loudly with a non-zero exit
 """
@@ -91,6 +93,24 @@ def load_json(path):
 
 def dump_json(path, obj) -> None:
     Path(path).write_text(json.dumps(obj), encoding="utf-8")
+
+
+def _norm_remit_quote(s: str) -> str:
+    # rule_text / policy_rule_text quote the remit's policy *text*; Markdown
+    # emphasis (** * `) is formatting, not content, and the skill strips it.
+    return re.sub(r"\s+", " ", s.replace("**", "").replace("*", "").replace("`", "")).strip()
+
+
+def _remit_quote_violations(bdata, remit_text: str):
+    norm_remit = _norm_remit_quote(remit_text)
+    quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
+              for rule in bdata["remit_coverage"]["rules"]]
+    for f in bdata["findings"]:
+        for seg in (f.get("policy_rule_text") or "").split(" / "):
+            if seg.strip():
+                quoted.append(("policy_rule_text", f["id"], seg.strip()))
+    return [(kind, who, txt) for (kind, who, txt) in quoted
+            if _norm_remit_quote(txt) not in norm_remit]
 
 
 def main():
@@ -553,23 +573,50 @@ def main():
             if slug not in remit_cache:
                 remit_cache[slug] = read_text(remit_path)
             remit = remit_cache[slug]
-            # rule_text / policy_rule_text quote the remit's policy *text*; Markdown
-            # emphasis (** * `) is formatting, not content, and the skill strips it.
-            # Compare modulo emphasis markers and whitespace runs — but the quote must
-            # still be a contiguous verbatim span (no eliding the middle with "...").
-            def _norm(s):
-                return re.sub(r"\s+", " ", s.replace("**", "").replace("*", "").replace("`", "")).strip()
-            norm_remit = _norm(remit)
-            quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
-                      for rule in bdata["remit_coverage"]["rules"]]
-            for f in bdata["findings"]:
-                for seg in (f.get("policy_rule_text") or "").split(" / "):
-                    if seg.strip():
-                        quoted.append(("policy_rule_text", f["id"], seg.strip()))
-            missing = [(kind, who, txt) for (kind, who, txt) in quoted if _norm(txt) not in norm_remit]
+            missing = _remit_quote_violations(bdata, remit)
             check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from tests/remits/{slug}.md",
                   not missing,
                   "; ".join(f"{kind} of {who}: {txt[:60]!r}" for kind, who, txt in missing[:3]))
+
+    # 7. showcase examples under examples/. Same contract as baselines: the
+    #    committed *-findings.json is canonical; *-analysis.html / .txt must
+    #    re-render byte-identically. Examples use de-timestamped filenames.
+    examples_root = os.path.join(REPO_ROOT, "examples")
+    example_dirs = sorted(d for d in glob.glob(os.path.join(examples_root, "*")) if os.path.isdir(d))
+    check("found showcase examples under examples/", len(example_dirs) > 0)
+    for edir in example_dirs:
+        slug = os.path.basename(edir)
+        rel_dir = os.path.relpath(edir, REPO_ROOT)
+        ej = next(iter(glob.glob(os.path.join(edir, "*-findings.json"))), None)
+        c_html = next(iter(glob.glob(os.path.join(edir, "*-analysis.html"))), None)
+        c_txt = next(iter(glob.glob(os.path.join(edir, "*-analysis.txt"))), None)
+        check(f"example {rel_dir}: has *-findings.json, *-analysis.html, and *-analysis.txt",
+              bool(ej and c_html and c_txt))
+        if not (ej and c_html and c_txt):
+            continue
+        rel = os.path.relpath(ej, REPO_ROOT)
+        edata = load_json(ej)
+        sv = str(edata.get("schema_version", ""))
+        if not sv.startswith("2."):
+            check(f"example {rel}: schema_version {sv!r} — pre-2.0 artifact, checks skipped", True)
+            continue
+        try:
+            schema.validate(edata)
+            check(f"example {rel}: validates against schema.py", True)
+        except schema.SchemaError as e:
+            check(f"example {rel}: validates against schema.py", False, str(e))
+            continue
+        r_html = os.path.join(tmp, "ex.html")
+        r_txt = os.path.join(tmp, "ex.txt")
+        r = run_render(["--findings", ej, "--template", TEMPLATE, "--out-html", r_html, "--out-txt", r_txt])
+        check(f"example {rel}: render exits 0", r.returncode == 0, r.stderr.strip())
+        if r.returncode == 0:
+            check(f"example {rel}: HTML re-renders byte-identical from its JSON",
+                  read_bytes(c_html) == read_bytes(r_html),
+                  "committed HTML differs from a fresh render of the committed JSON")
+            check(f"example {rel}: TXT re-renders byte-identical from its JSON",
+                  read_bytes(c_txt) == read_bytes(r_txt),
+                  "committed TXT differs from a fresh render of the committed JSON")
 
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0
