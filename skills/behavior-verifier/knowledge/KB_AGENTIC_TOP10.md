@@ -277,6 +277,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Monitoring or logging that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
+**Tag ASI10 when:** the *conditions that let an agent go rogue undetected* are present — **even statically, before any active compromise**. A consequential capability with **no audit trail, self-approval in place of human or independent review, or monitoring that is absent / degraded / disableable** is an ASI10 finding — "failure of oversight" and "running without any oversight mechanism" are in the definition above. Do **not** leave *"no audit log," "self-approves," "no oversight mechanism"* findings uncategorised; they are the ASI10 precondition. Pair with **LLM06 (Excessive Agency)** for the underlying capability.
+
 **Praxen relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxen's mission is to detect the drift toward ASI10 before it becomes irreversible.
 
 ---
@@ -294,6 +296,25 @@ These multi-step patterns appear in documented real-world agent incidents:
 | Trust expansion | New sender impersonates known party → trust granted → data exfiltrated | ASI03, ASI09, ASI01 |
 
 **Praxen compound finding rule:** When findings from two or more of these steps appear together, escalate the combined severity one level above the highest individual finding. Note the chain in `related_findings`.
+
+---
+
+## Resolving adjacent categories (pick the dominant code by mechanism)
+
+Findings slide between neighbouring categories run-to-run when the boundary is left to intuition. Choose the dominant code by the **mechanism that produces the harm**, not the surface symptom; put genuinely co-applicable codes in `tags[]`.
+
+| If the finding is fundamentally about… | Dominant code | Not… |
+|---|---|---|
+| Executing code / shell / commands | **ASI05** (Unexpected Code Execution) | ASI02 — that's for non-exec tools |
+| Misusing a **non-exec** tool (email, file, API) for a wrong purpose | **ASI02** (Tool Misuse) | ASI05 |
+| The **identity / credential** scope — shared account, broad OAuth, trust on an unverified identity | **ASI03** (Identity & Privilege Abuse) | ASI02 (tool capability) |
+| A failure **propagating / amplifying** through a tool chain or sub-agents | **ASI08** (Cascading Failures) | LLM10 — that's resource exhaustion |
+| Resource / cost / token exhaustion, runaway spend, denial-of-wallet | **LLM10** (Unbounded Consumption) | ASI08 |
+| Poisoning a **vector / embedding** store | **LLM08** (Vector & Embedding) | ASI06 (non-vector memory) |
+| Poisoning **non-vector** memory / session / context files | **ASI06** (Memory & Context Poisoning) | LLM08 |
+| An **oversight / accountability gap** over a consequential capability (no audit trail, self-approval, monitoring off) | **ASI10** (Rogue Agents) **+ LLM06** | leaving it untagged |
+
+**Rule of thumb:** name the code by the *mechanism*, not the symptom. An oversight/accountability gap is always **ASI10 (+ LLM06)** — never uncategorised. A capability the remit forbids is always **LLM06** — even when it surfaced as a missing control.
 
 ---
 

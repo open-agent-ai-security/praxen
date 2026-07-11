@@ -52,6 +52,7 @@ CURRENT_BASELINE = "v1.0.2-claude48"
 
 sys.path.insert(0, SKILL_DIR)
 import schema  # noqa: E402
+import render  # noqa: E402
 
 _passed = 0
 _failed = 0
@@ -187,6 +188,31 @@ def main():
                 "--out-html", out_html2, "--out-txt", out_txt2])
     check("HTML render is byte-deterministic", read_bytes(out_html) == read_bytes(out_html2))
     check("TXT render is byte-deterministic", read_bytes(out_txt) == read_bytes(out_txt2))
+
+    # ── #111: OWASP tag-label separator normalisation (deterministic layer) ───
+    _canon = render._canon_owasp_tag_label
+    check("#111 hyphen separator canonicalises to em-dash",
+          _canon("LLM01 - Prompt Injection") == "LLM01 — Prompt Injection")
+    check("#111 colon separator canonicalises to em-dash",
+          _canon("LLM01: Prompt Injection") == "LLM01 — Prompt Injection")
+    check("#111 padded em-dash collapses to single spaces",
+          _canon("ASI05  —  Unexpected Code Execution (RCE)") == "ASI05 — Unexpected Code Execution (RCE)")
+    check("#111 already-canonical label is unchanged (goldens stay byte-stable)",
+          _canon("LLM06 — Excessive Agency") == "LLM06 — Excessive Agency")
+    check("#111 name-internal hyphen preserved (only the separator is rewritten)",
+          _canon("ASI09 - Human-Agent Trust Exploitation") == "ASI09 — Human-Agent Trust Exploitation")
+    check("#111 non-OWASP label passes through untouched",
+          _canon("Implement Zero Trust") == "Implement Zero Trust")
+    check("#111 unknown code (LLM99) is not rewritten",
+          _canon("LLM99 - Not A Category") == "LLM99 - Not A Category")
+    _demo = {"findings": [{"tags": [
+        {"kind": "owasp_llm", "label": "LLM01 - Prompt Injection"},
+        {"kind": "raise", "label": "Implement Zero Trust"},
+    ]}]}
+    render._normalize_owasp_tag_labels(_demo)
+    check("#111 normalize rewrites the owasp tag in place, leaves raise tag alone",
+          _demo["findings"][0]["tags"][0]["label"] == "LLM01 — Prompt Injection"
+          and _demo["findings"][0]["tags"][1]["label"] == "Implement Zero Trust")
 
     # 3b. golden-file fixtures — the rendered HTML/TXT for the canonical fixture
     #     must match what's committed, byte for byte. This is the regression net

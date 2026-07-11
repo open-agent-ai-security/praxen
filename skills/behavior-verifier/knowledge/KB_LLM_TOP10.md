@@ -147,6 +147,10 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Agent performing actions beyond the scope of the task it was given
 - Agent performing actions that were in its instructions as examples, not directives
 
+**Tag LLM06 when:** a capability the remit forbids or doesn't grant is present **and reachable** — *even if the finding reads as a control gap* ("no approval gate," "auto-approve," "no confirmation step," "no audit trail over a consequential action"). A reachable remit-forbidden capability **is** excessive agency; don't leave it untagged because it was framed as a missing control. A high-impact action with no human-in-the-loop gate is excessive **autonomy** — tag LLM06, and pair with **ASI10 (Rogue Agents)** on the agentic side when there's no accountability or oversight over it.
+
+**Boundary:** LLM06 is *having or using* the capability; **LLM05** is insufficient scrutiny of the output that drives it. Logging, monitoring, and rate-limiting do **not** prevent excessive agency — they only *limit damage* — so their absence over a consequential capability is a co-applicable LLM06 signal (with ASI10), **not** a separate uncategorised "logging/audit" finding.
+
 **Praxen relevance:** Praxen — capability audit against the remit is a named high-priority check. Flag every tool and permission present in code but absent from the remit. This is the highest-priority RAISE Zero Trust category.
 
 ---
@@ -171,19 +175,26 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 
 ## LLM08 — Vector and Embedding Weaknesses
 
-**What it is:** Vulnerabilities in RAG systems and vector databases — poisoned embeddings, unauthorized retrieval, cross-context leakage, or adversarial manipulation of retrieved content.
+**What it is:** Vulnerabilities in how a RAG system's vectors and embeddings are **generated, stored, or retrieved** — exploited intentionally or unintentionally to inject harmful content, manipulate model outputs, or access sensitive data. This is the category for **any agent backed by a vector or embedding store** (RAG, semantic memory, a vector-indexed knowledge base).
 
-**What to look for in agent artifacts:**
-- RAG retrieval that doesn't scope results to the current user or context (cross-user leakage risk)
-- Vector database with write access from the agent (agent can modify its own knowledge base)
-- No access controls on the vector database — any query returns any document
-- Retrieved content injected into LLM context without labeling it as external/untrusted
+**First detect the store, then audit it.** LLM08 is chronically under-tagged because the analyzer skips it when it doesn't notice the store. *Before* concluding LLM08 doesn't apply, check the agent's code for a vector/embedding store:
+- Signals: `chromadb`, `faiss`, `pinecone`, `weaviate`, `qdrant`, `milvus`, `pgvector`, `lancedb`, `sentence-transformers`, `text-embedding*`, `embeddings.create`, `vectorstore`/`vector_store`, `similarity_search`, `embed_query`/`embed_documents`, `cosine_similarity`.
+- If an **in-scope** store is present, LLM08 **applies** — audit it against the five weaknesses below and record LLM08 even when LLM01 (untrusted input), LLM04 (poisoning), or ASI06 (self-persistence) also apply. When the **agent can write to its own store from its own conversation**, LLM08 is the *dominant* frame, not a secondary tag.
+
+**The five weaknesses to check (artifacts):**
+1. **Unauthorized access / data leakage** — no fine-grained, permission-aware access on the store; any query can return any document; embeddings hold sensitive data with no logical/access partitioning.
+2. **Cross-context leak / federation conflict** — one shared vector DB across users/tenants with no per-user scoping (cross-user retrieval); or RAG content that contradicts/overrides the model's grounding with no conflict handling.
+3. **Embedding inversion** — embeddings or raw vectors exposed/exportable such that source text could be reconstructed; the vector store not treated as sensitive data.
+4. **Data poisoning of the store** — the KB ingests unvetted content (user uploads, live web, or **the agent's own generated output**) with no validation, hidden-content detection, or review, and/or an unauthenticated write path. *(The canonical case is a hidden-instruction document — e.g. white-text "ignore all previous instructions" in an ingested file — but an agent that distils its own conversation back into the store is the same poisoning surface.)*
+5. **Behavior alteration** — retrieved content silently shifts the model's behavior/persona; retrieval injected into context without being labeled external/untrusted.
 
 **What to look for in agent behavior:**
-- Agent returning information that appears to come from another user's context
-- Agent behavior that changes after documents are added to the knowledge base in unexpected ways
+- Returning information that appears to come from another user's or tenant's context.
+- Behavior that shifts after documents enter the store; the agent acting on instructions that were embedded in retrieved content.
 
-**Praxen relevance:** Praxen — audit RAG architecture and access controls, check whether retrieved content is validated before entering the prompt, verify the knowledge base write path requires authentication.
+**Boundary — LLM08 vs neighbors:** the presence of a **vector/embedding store** is the LLM08 signal. Poisoning of *training/fine-tuning* data or a non-vector knowledge base is **LLM04**; untrusted retrieved content driving behavior *without* a vector store is **LLM01**; an agent rewriting its *own* store/identity is **ASI06** — but when the mechanism is the vector store itself, tag **LLM08** (co-applicable codes go in `tags[]`).
+
+**Praxen relevance:** Praxen — first detect a vector/embedding store; if one is in scope, audit access controls, the write/ingest path (authentication + validation + hidden-content detection), per-user scoping, and whether retrieved content is labeled/validated before entering the prompt. Record LLM08 whenever an in-scope store exists — an agent-writable store (a self-poisoning surface) is a **dominant**-LLM08 finding.
 
 ---
 
