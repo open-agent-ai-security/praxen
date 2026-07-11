@@ -3,76 +3,126 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen 1.1 — Plan & Issue Triage
-
-> **Branch:** `1.1` · **Type:** first functional line since 1.0 GA · **Grades against:** the `v1.0.2-claude48` baseline (see `RELEASE_1.0.2_BASELINE_REFRESH.md`, folded in first)
+# Praxen 1.1 — Scoring & Tagging Rigour
 
 ## Objective
 
-1.1 is the first **functional** release since 1.0 GA: **scoring rigour**, **detection coverage**, **skill-flow & output quality**, and (deliberately) **schema evolution**. It is developed against the stable `v1.0.2-claude48` baseline so regressions are detectable and *intended* number movement is distinguishable from drift.
+**Tightly scoped.** 1.1 fixes the *metadata layer* that sits on top of Praxen's detection —
+and **only** that. The 1.0.2 re-baseline (stable detection engine, frozen `v1.0.2-claude48`
+reference) surfaced that the two judgment/classification subsystems are **volatile across
+runs**, while detection itself is solid and even improved (114 findings vs the prior 107).
+1.1 tightens those two subsystems against the unchanged engine, so the fix is **measurable in
+isolation** against the stable baseline.
 
-## Prerequisite — fold in 1.0.2 first
+This is **not** the broad functional refactor. Output-quality/stream-flow, schema evolution,
+engine reliability, new detection patterns, and harness support are explicitly **deferred to
+1.2** (`RELEASE_1.2_PLAN.md`).
 
-**Do not start 1.1 functional work until the `1.0.2` baseline + target-roster refresh is folded in.** Grading 1.1 changes against a 0.7.7-era exemplar would make intended calibration movement indistinguishable from noise. The 1.0.2 branch:
-- re-freezes the suite on the stable 1.0.x skill, and
-- refreshes the target roster (retires dead `sweep`/`langchain-sql`, adds CraftBot/uAgents/Agentforce).
+**One principle for both halves:** sharpen the **judgment guidance the analyzer reads** —
+the RAISE scoring guidance (control-ledger / boundary rules) for #48, the OWASP distillations for #169 —
+so identical inputs resolve the same way twice. We do **not** add post-scoring or post-tagging
+rules, edit the analyzer's record, or touch the schema. (Same discipline as #117: fix the input,
+never the output.)
 
-Once `1.0.2` is green, merge it into `1.1`; `1.1` then carries `v1.0.2-claude48` (and the refreshed roster) as its reference.
+## The two problems (evidence from the 1.0.2 baseline)
 
-## Regression discipline (important)
+Detection is strong; the noise is in the classification/scoring **metadata**:
 
-Several 1.1 items **intentionally move the numbers** — #48 (scoring rigour), #104 (new secret detection), #41 (new detection pattern), #7 (schema change), #111 (deterministic-layer normalization). The v1.0.2 baseline is the reference: grade every change against it, and for each moved number decide **intended vs regression** (`tests/README.md` › *What a release review looks like*). An intended calibration/detection/schema change is fine — note it, and **at 1.1 release re-freeze `v1.1-claude48`**. So 1.1 begins on a fresh baseline and ends with another.
+1. **Scoring — RAISE weighted maturity.** Run-to-run variance on the "how much credit does a
+   *weak-but-present* control earn" judgment, concentrated in **mid-maturity** targets.
+   - Evidence: across identical-input runs the widest current spread is **uAgents (σ ≈ 0.245)**;
+     **openai-cs** tightened **σ 0.284 → 0.071** after the remit refresh; only **uAgents** and
+     **craftbot** still breach their frozen bands. This is what 1.1 targets: **scatter (σ)**.
+   - Bounded: the posture *bucket* (Absent/Ad hoc/Partial/Established) is stable for most; σ ≤
+     0.15 for the majority. It's the decimal, not the verdict.
+   - **Caveat (review finding):** post-1.0.2 the scoring problem is *narrower* than first read —
+     most targets sit in-band with no headroom, so #48's reproducibility proof needs the targets
+     that still actually move (uAgents, craftbot), not the whole suite.
+   - **Directional *lean* is a watch-item, not a 1.1 goal.** A possible category-level bias
+     (Zero Trust up, Limit-Your-Domain stricter) shows old→new — but that's *bias*, not scatter:
+     a tight cluster can still sit off-center, and σ won't catch it. Measuring bias needs a
+     human-anchored reference we don't have, so **1.1 does not gate on lean; lean-correction → 1.2**
+     (paired with #48's rubric + a reference anchor). 1.1 adds only a lightweight, non-gating check:
+     does the ZT / Limit-Your-Domain category-mean move the *same* direction again vs v1.0.2? If
+     yes, it's structural → hand to 1.2.
 
-## Issue triage (open issues → 1.1 buckets)
+2. **Tagging — OWASP LLM/ASI classification.** The tagger's per-finding judgment is
+   **under-specified**, so real findings under-tag and churn — a *guidance-quality* problem,
+   not a mechanics problem.
+   - Evidence: untagged findings jumped **7% → 21%** — a *symptom*, not a "no home" class. Most
+     untagged are "agent can do a forbidden thing, no accountability," which *is* Excessive Agency
+     (LLM06) + often Rogue Agents (ASI10); the guidance just didn't steer the tagger there.
+     Adjacent categories also redistributed (ASI02 20→10 / ASI03 19→11 → ASI05 8→13, LLM09 2→5)
+     because the boundaries between distillations are fuzzy.
+   - Proven cause: **LLM08** — a real vector/embedding finding didn't tag because
+     `KB_LLM_TOP10.md`'s LLM08 entry is thinner than the real OWASP LLM08:2025 (no
+     embedding-inversion / operationalized poisoning / federated-conflict for it to match).
+   - Bounded: detection unaffected (114 vs 107 findings). The behaviors are found; the labels
+     churn. (LLM05 is the one category guidance *can't* recover — its output-handling targets were
+     retired → 1.2 backfill.)
 
-### A. Scoring rigour & consistency — the headline theme
-- **#48** — RAISE scoring rigour: reduce per-category variance via a structured control-ledger + boundary decision rules. *Directly answers the "±0.3–0.5 variability / risk of being over-read as deterministic" critique from the project evaluation. Moves numbers — intended.*
-- **#111** — normalize the OWASP tag-label separator in the deterministic layer (cross-model report consistency).
-- **#117** — `challenging-findings.md`: add a 'damage model wrong' path + category-score cascade guidance.
+## Scope — three items, one theme
 
-### B. Detection coverage
-- **#104** — entropy-based secret detection in `render.py`'s redaction backstop (catch unrecognized high-entropy credentials). *May add findings — intended.*
-- **#41** — new named detection pattern: external API response → filesystem write (path-traversal class).
-- **#65** — tool feedback from the uAgents scan: framework scanning, manifest resilience, discovery gaps.
-- **#169** — **LLM08 (Vector & Embedding Weaknesses) systematically under-tagged** (1/15 despite ≥3 targets having in-scope vector stores). Root cause: co-applicable LLM08 starved by single-`owasp_llm`-scalar counting + a too-narrow `KB_LLM_TOP10` §LLM08. Fix = expand the LLM08 KB entry (+5 OWASP sub-risks; add a *detect vector store → audit* step), count secondary OWASP codes from `tags[]` in `owasp_coverage.py`, re-scan craftbot/sweep. **Schema-neutral — `schema_version` stays 2.0; NOT part of #7 / §D (schema evolution), and NOT an engine-reliability item (distinct from #65).** Surfaced by the 1.0.2 retirement-impact analysis (would falsely zero LLM08 on retiring devika).
+### A · Scoring rigour (RAISE weighted)
+- **#48** — RAISE scoring rigour: a structured **control-ledger** + **boundary decision rules**
+  so the mid-maturity credit call is reproducible. *(The eval's headline critique.)* **Moves
+  numbers — intended.** 1.1's scoring half is now **#48 only**.
 
-### C. Skill-flow & output quality
-- **#33** — interleave finding emission with analysis (eliminate the Step 9.9 synthesis burst / stream-stall).
-- **#29** — Step 8.5: emit a finding-themes outline first (decomposition primer, stream-stall prevention).
-- **#113** — wrap technical tokens in `<code>` consistently across ALL prose fields (SKILL).
-- **#27** — report: finding default-state (collapsed vs expanded) + expand-all/collapse-all buttons.
-- **#25** — split output-authoring conventions out of `SKILL.md` (rendering/MVC split).
-- **#6** — `render.py` polish: finding-card confidence, Medium/Low badge. *(TXT High-findings shipped in 1.0.1 — confirm remaining scope.)*
+> **#117 moved to 1.2.** The *human-challenge-workflow* docs item (`challenging-findings.md`
+> damage-model path + category-score *independence*, not "cascade") is a different axis from
+> 1.1's automated run-to-run variance, and its load-bearing dependency (#118, curated-output
+> direction) is unsettled. → `RELEASE_1.2_PLAN.md` bucket F, gated on #118.
 
-### D. Schema evolution — careful: schema changes force a re-baseline
-- **#7** — structure `policy_rule_text` / `policy_rule_ids` as arrays; fold into the render-pipeline refactor. *Largest blast radius: moves the byte-render gate and requires a re-baseline. Plan as one coherent migration or hold for 1.2 — see open questions.*
-- **#5** — `schema.py` validator round 2: `policy_rule_ids` ↔ remit-rule cross-check.
+### B · Tagging consistency (OWASP LLM/ASI)
+- **#169** (reframed — was "LLM08 vector/embedding") — **the OWASP distillations are too
+  vague/incomplete, so the tagger's judgment churns.** Fix is **guidance specificity, not
+  post-tagging rules** (schema-neutral): sharpen the distillations in `KB_LLM_TOP10.md` /
+  `KB_AGENTIC_TOP10.md` — complete the thin entries (start with the proven-thin LLM08) and
+  disambiguate adjacent-category boundaries (LLM06 vs ASI10 vs ASI02; ASI02 vs ASI05) so the
+  judgment resolves the same way twice. The tagger stays a judgment call — **no** forced codes,
+  **no** secondary-code counting in the coverage generator, **no** output post-processing.
+  *(RAISE category/scoring guidance is #48's surface, not #169's — see A. Same discipline, two KBs.)*
+- **#111** — normalize the OWASP tag-label separator in the deterministic layer (cosmetic;
+  cross-model/cross-run report consistency). *(Minor — a one-liner, not a co-equal pillar.)*
 
-### E. Harness support
-- **#151** — add Google Antigravity (`agy` CLI) as a supported harness. *Functional (a new agent host, alongside Claude Code / Codex), distinct from a baseline target.*
-- *(Baseline **target** roster — CraftBot #116, uAgents #64, dead-upstream swaps #69/#70, Agentforce — is handled in **1.0.2**, not here.)*
+## Explicit non-goals (→ 1.2)
+Output-quality & stream-flow (#33/#29/#113/#27/#25/#6), **schema arrays #7** + validator #5,
+new **detection patterns** #104/#41, **engine reliability** #65, harness #151, docs #117/#135/#4/
+#118/#90/#2 (#117 gated on #118). See `RELEASE_1.2_PLAN.md`. *(Time-sensitive **#120** — the Gemini review-gate
+sunset 2026-07-17 — is pulled **independently** of both 1.1 and 1.2; it does not belong to
+either theme.)*
 
-### F. CI / infra
-- **#120** — replace the retired Gemini code-review gate. **Time-sensitive: Gemini Code Assist sunsets 2026-07-17 — pull this early**, independent of the rest of 1.1.
-- **#127** — gate `examples/` in `test_render.py` (schema-validate + byte-render, like `tests/baselines/`).
+## Prerequisite
+Fold **1.0.2** in first. 1.1 is developed **on top of the fresh `v1.0.2-claude48` baseline** —
+that stable reference is what makes the volatility visible and the fix gradable. Grading 1.1
+against a 0.7.7-era set would reconflate skill and remit change.
 
-### G. Docs / low / defer
-- **#135** — docs simplicity pass (Tier 3): trim remaining over-complexity.
-- **#4** — `SKILL.md` authoring aids & docs polish.
-- **#118** — operator override + finding-revision records with provenance. *Explicitly post-1.0/1.x — 1.1 stretch or 1.2.*
-- **#137** — chore: GA metadata in `PRAXEN_SPEC` + drop dangling `design/DEFERRED.md` ref. *Non-functional; verify/close — could ride 1.0.2.*
-- **#90** — shared org-level brand/design system (Praxen side). *Cross-org coordination; not blocking.*
-- **#2** — durable version-independent "standing config". *Explicitly deferred — not 1.1.*
+## Regression discipline & success metric
+Every item here **intentionally moves numbers** — so 1.1 **re-freezes `v1.1-claude48`** at
+release, graded against `v1.0.2-claude48`. Success is **reduced scoring variance + correct,
+stable tagging**, measured, not just "it ran":
+- **Scoring:** mid-maturity run-to-run σ **down** on the targets that still have headroom —
+  re-characterize **uAgents + craftbot** ×3+ and show tighter spread than v1.0.2's. (openai-cs
+  already tightened 0.284→0.071 post-refresh — it's the existence proof, not a target to re-prove;
+  Hermes is already in-band.) *Scatter only — directional lean is tracked, not gated (→ 1.2).*
+- **Tagging (health signals, not enforcement):** untagged-rate **down** from 21% toward the ~7%
+  prior **because the sharpened guidance steers correctly** — not because a rule backfilled the
+  blanks. **Excessive-agency test:** a clear "agent can do the forbidden thing" finding lands on
+  LLM06 (+ often ASI10) *without being told to*; if it doesn't, the guidance is still too vague.
+  Category coverage **stable across two independent re-scans** of the same target. LLM05 is the one
+  gap guidance can't close (retired targets) → 1.2 new-baseline-app add (bucket D).
+- **Schema stays `2.0`** — no #7, no forced render-pipeline migration. Detection engine
+  (`SKILL.md` analysis logic, `manifest_to_findings.py`, KBs' *detection* content) unchanged
+  except the scoring/tagging *guidance* edits.
 
-## Proposed 1.1 shape (recommendation)
+## Deliverables checklist
+- [ ] #48 control-ledger + boundary rules authored in `SKILL.md`/KB; scoring reproducibility validated
+- [ ] #169 (reframed) OWASP + RAISE distillations sharpened (LLM08 first, boundaries disambiguated); untagged-rate down + excessive-agency test passes
+- [ ] #111 tag-label normalization in the deterministic layer
+- [ ] Re-freeze `v1.1-claude48` (median-of-3), graded vs `v1.0.2-claude48`; variance/untagged metrics reported
+- [ ] `schema_version` still `2.0`; `test_render.py` + `build.sh` green; CI 3.9/3.12/3.13
+- [ ] Version bump 1.1.0 (manifests + `PRAXEN_SPEC` + CHANGELOG); coverage pages regenerated
+- [ ] Closes: #48, #111, #169
 
-- **Must-have core:** **A** (scoring rigour #48/#111/#117) + **B** (detection #104/#41/#65), plus the time-sensitive **#120** (Gemini sunset). These deliver the eval-flagged improvements and keep CI healthy.
-- **Strong candidates:** **C** (skill-flow / output quality #33/#29/#113/#27/#25/#6).
-- **Decide deliberately:** **D** (schema #7) — the biggest single change; it forces a re-baseline. Either make it a 1.1 centerpiece or hold for 1.2. #5 can land regardless.
-- **Opportunistic:** **E** (#151 harness), **F** (#127).
-- **Defer:** **G** (except #120, and #137 which can ride 1.0.2).
-
-## Open questions
-1. **Schema change (#7) in 1.1 or 1.2?** Largest blast radius; gates the re-baseline strategy and the render-pipeline refactor.
-2. **Reference model for the 1.1 re-baseline** — same Opus 4.8, or does 1.1 validate a new tier?
-3. **How much of C** ships in 1.1 vs slips — the skill-flow items (#33/#29) touch the analysis path and could themselves move numbers.
+## Fold-down
+`1.0.2 → 1.1` first (baseline), then 1.1 work on `1.1`. 1.2 branches from 1.1 once 1.1 is frozen.
