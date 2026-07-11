@@ -17,6 +17,8 @@ For each example we followed the standard Praxen analysis workflow:
 
 **HTML vs. JSON:** The `*-analysis.html` file is a human-readable pretty-print of the findings data. The `*-findings.json` file is the same information structured for automated ingestion — use it for dashboards, ticketing, compliance pipelines, or diffing results across analyses.
 
+**CI contract:** `python3 tests/render/test_render.py` schema-validates every example's `*-findings.json` and re-renders its HTML/TXT byte-identically from that JSON. When `render.py` or `report_template.html` changes, regenerate the example reports from the canonical JSON before merging — same workflow as [`tests/baselines/`](../tests/baselines/).
+
 ---
 
 ## FinBot — invoice processing agent
