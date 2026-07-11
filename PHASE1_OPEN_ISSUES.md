@@ -42,6 +42,9 @@ Scopes used: CraftBot → `agent_core/ agents/ agent_file_system/ craftos_integr
 ### O7 — Agentforce source basis
 Scanned against the `salesforce/help-agent-accelerator` repo **as-is** (not a deployed Salesforce org), matching the existing example's stated basis. Confirm that's the intended basis for the baseline exemplar.
 
+### O8 — Hermes upstream drifted from its remit (Foundation spot-check flag)
+`hermes-agent-desktop` re-ran at **2.55 vs baseline 3.15** (−0.60, Established → Partial) — the **only** retained target out of bounds in the Foundation spot-check (11/12 in-bounds; see `FOUNDATION_SPOTCHECK.md`). Cause is **upstream drift, not skill drift**: the current Nous Research Electron desktop has **no SSH Tunnel mode**, so 6 SSH-specific remit rules are now enforcement-not-possible. **Needs a Phase-2 remit refresh** to match the current upstream before Hermes is re-frozen median-of-3. *(Secondary: `openhands` also evolved to V1 — SDK split into separate pinned packages — but scanned in-band.)*
+
 ## Per-target judgment calls (from the scans — for your results-quality review, O3)
 
 **CraftBot** (14 findings, weighted 1.00): remit drafted from README/docs treats it as a single-operator local agent; **4 operator open-questions** appended to the remit (shell/code exec → isolate-or-approve; inbound auto-reply → sender check; outbound sends → approval; third-party MCP/imported-project provenance) — several Critical/High grade against these. **Shell execution** is arguably an *intended* capability for a general local agent — flagged for a ruling. The living-UI sidecar (`0.0.0.0` + wildcard CORS) scored Medium (it's a generated project's sidecar, not the agent's own control plane) — reasonable people could rate it High.
@@ -52,5 +55,5 @@ Scanned against the `salesforce/help-agent-accelerator` repo **as-is** (not a de
 
 ## Deferred to later phases (tracked, not Phase-1 blockers)
 - **Bands + `BASELINE.md`** for the new targets — set after median-of-3 (O2).
-- **Retained-target Foundation re-baseline** and **Phase 2 remit health check** — separate from Phase 1.
+- **Retained-target Foundation ✅ spot-checked** (single 1.0.x run each, 11/12 in-bounds — `FOUNDATION_SPOTCHECK.md`); the **median-of-3 re-freeze** into `v1.0.2-claude48` is still pending, and **Hermes needs its remit refreshed first** (O8). Both deprecated targets (`sweep`, `langchain-sql`) confirmed live/clonable.
 - **Phase 3 retirements** (#69 `sweep`, #70 `langchain-sql`) — evaluated only after additions are proven.
