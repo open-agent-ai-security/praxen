@@ -45,6 +45,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 
 **Risk if exploited:** Unauthorized data access, privilege escalation, execution of commands in connected systems, manipulation of decision-making, exfiltration via crafted outputs.
 
+**Also — material subtypes (2025):** multimodal injection (instructions hidden in images alongside benign text); jailbreaking (input that makes the model disregard safety *entirely*, vs behavior-steering injection); adversarial-suffix strings; encoded / multilingual / obfuscated payloads (Base64, emoji) to evade filters; payload splitting (fragments recombined by the model); unintentional injection (benign content that triggers it — not only malicious actors).
+
 **Praxen relevance:** Praxen — detect injection-vulnerable code patterns, flag external content entering the LLM context without sanitization, check for content-origin labeling in prompt construction.
 
 ---
@@ -65,6 +67,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Agent including sensitive context fields (credentials, personal data) in messages sent to external parties
 
 **Risk if exploited:** Privacy violations, credential theft, intellectual property exposure, compliance failures.
+
+**Also — disclosure through the model, not just a file:** model inversion / training-data reconstruction / membership inference; **cross-user leakage** (a user receives another user's PII from inadequate sanitisation — OWASP's canonical case); proprietary algorithm / source exposure; user-supplied sensitive data absorbed into the training set. *(Boundary: cross-user leakage overlaps LLM08 cross-context; inversion/extraction overlaps LLM10 model-theft.)*
 
 **Praxen relevance:** Praxen — detect credentials in unexpected locations, check system prompts and config files for embedded secrets, verify vault references are used instead of literal values.
 
@@ -87,6 +91,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - A new plugin appeared in the agent's tool inventory with no documented source
 - Library versions not pinned — susceptible to dependency confusion or version-swap attacks
 
+**Also — ML-specific supply chain (the 2025 additions):** malicious LoRA/PEFT fine-tuning adapters; poisoned model-merge / format-conversion services (HuggingFace); tampered pre-trained model / backdoors (ROME-style); on-device / edge model tampering (repackaged mobile apps); dataset/model licensing + ML-BOM tracking; weak model provenance (Model Cards, supplier-account compromise); unclear operator T&Cs (your data used for training). *(Boundary: LLM03 = risk arriving via a supplier; LLM04 = poisoning of your own data.)*
+
 **Praxen relevance:** Praxen (supply chain category). Every new tool, plugin, or dependency that appears in the agent workspace is a supply chain event requiring evaluation.
 
 ---
@@ -105,6 +111,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Agent behavior that shifts over time without obvious cause (slow drift in how it responds to similar inputs)
 - Agent consistently favoring certain outcomes, parties, or recommendations in ways not explained by its instructions
 
+**Also:** backdoors / "sleeper agents" (behavior normal until a trigger fires — auth bypass, exfil, hidden exec; hard to test for); malicious model-file pickling (loading a shared model executes embedded code — overlaps LLM03); named techniques Split-View and Frontrunning poisoning; DVC / CycloneDX ML-BOM as the provenance control.
+
 **Praxen relevance:** Praxen — audit data source provenance, flag unvetted fine-tuning or RAG inputs, verify data sources are listed in the remit.
 
 ---
@@ -121,6 +129,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Tool call parameters built from raw LLM output strings
 
 **Why this matters for agents:** Agents execute tool calls based on their own outputs. If those outputs can be influenced via prompt injection, the injection → tool execution chain is direct. The model is a confused deputy between the attacker and the downstream system.
+
+**Also:** SSRF / CSRF among the downstream outcomes. *(Boundary: LLM05 = validating output *before* a downstream sink; LLM09/overreliance = trusting the output's accuracy.)*
 
 **Praxen relevance:** Praxen (code patterns that pass LLM output to system functions without validation).
 
@@ -169,6 +179,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Agent revealing system prompt contents in response to user queries
 - Agent revealing operational details (tool names, endpoints, credentials) that were in its instructions
 
+**The core risk is delegation, not just leakage.** The real danger is an app relying on the system prompt for **session management, authorization, or guardrails** — a leak matters because it reveals *bypassable* controls that should never have lived in the prompt (attackers can also infer them by probing, without the exact text). **Also flag:** exposure of internal business rules (e.g. "$5000/day limit"), the model's own content-filtering criteria, and role/permission structure → privilege-escalation targets. *(Fix ties to LLM06: enforce controls independently of the LLM.)*
+
 **Praxen relevance:** Praxen — audit system prompt storage and contents, flag confidential operational details (tool names, endpoints, credentials) embedded in the prompt.
 
 ---
@@ -210,6 +222,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 
 **Why this matters for agents:** An agent that hallucinates doesn't just give a wrong answer — it may take wrong actions. An agent that believes it completed a task when it didn't creates evidence-mismatch problems that only become visible when someone reviews the logs.
 
+**Also — the marquee agentic subtypes:** unsafe code generation / hallucinated package names (**"slopsquatting"** — attackers pre-publish malicious packages under the hallucinated name; bridges LLM03); **overreliance** (unverified output fed into critical decisions without scrutiny); misrepresentation of expertise (medical/legal); unsupported / fabricated claims (bogus legal cases); training-data bias as a source. No active attacker is required — this is a reliability failure too.
+
 **Praxen relevance:** Praxen — flag system prompt instructions that invite speculation (e.g., "be creative," "fill in missing details"), check whether the agent is instructed to confirm completion with verifiable output.
 
 ---
@@ -230,6 +244,8 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - Same task triggered multiple times without state change
 - Session count or API cost spiking above baseline
 - Agent loop that appears to be running but not completing
+
+**Also — model theft / IP extraction (LLM10 explicitly folds this in):** model extraction via crafted API queries + prompt injection (shadow-model replication); functional replication (use the target to generate synthetic training data, then fine-tune an equivalent); side-channel weight/architecture harvesting; limit `logit_bias` / `logprobs` exposure (they enable extraction). **Also input-side:** continuous context-window overflow and variable-length input floods (distinct from "no rate limit"). *(Boundary: LLM10 = theft via inference/consumption; LLM02 = disclosure of internals through output.)*
 
 **Praxen relevance:** Praxen — verify rate limiting and cost controls are present in config, flag absent request-per-session caps, check for timeout configuration on LLM API calls.
 

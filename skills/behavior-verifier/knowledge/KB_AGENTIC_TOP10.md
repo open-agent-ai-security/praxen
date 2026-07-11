@@ -46,6 +46,10 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent treats all inputs (user, tool output, retrieved content, external email) with equal trust
 - Orchestration logic that can be redirected by model output alone, without deterministic guardrails
 
+**Also:** scheduled / recurring goal-reweighting drift (e.g. a malicious calendar invite that injects a recurring instruction subtly reweighting objectives each cycle); manipulated-but-plausible output that steers a business decision (not only scope/action deviation).
+
+**Boundary:** ASI01 = *direct* alteration of goals/decision-paths (regardless of persistence or active control); **ASI06** = persistent stored-context/memory corruption (which often *leads to* ASI01); **ASI10** = autonomous misalignment emerging *without* an active attacker.
+
 **Praxen relevance:** Praxen — inspect system prompt for goal guardrails, check for validation on config fields that can modify agent goals or identity (e.g., `custom_goals`, `persona_override`), confirm the remit declares a single authorized mission.
 
 ---
@@ -72,6 +76,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Same tool called repeatedly with slight parameter variations (probing behavior)
 - Tool producing output that is inconsistent with the stated action (evidence mismatch)
 - High-impact tool (send, delete, exec) called without evidence of approval
+
+**Also — non-exec misuse patterns:** tool-name impersonation / typosquatting / alias collision (`report` resolving before `report_finance`); living-off-the-land tool chaining that evades host EDR (PowerShell / cURL / internal APIs seen as benign); covert-channel exfil via an approved low-risk tool (DNS via a ping tool); internal→external exfil chaining (internal CRM tool + external email tool); loop-amplified costly-API DoS / bill spikes (co-tag LLM10).
 
 **Praxen relevance:** Praxen — audit tool definitions, compare permission scope against the remit, flag high-impact tools (send, delete, exec) lacking approval gates.
 
@@ -100,6 +106,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - New counterparty appearing in agent's trust graph without operator approval
 - Agent responding to a requester whose identity doesn't match the authorized list in the Worker Remit
 
+**Also:** TOCTOU / authorization drift (permissions valid at workflow start, stale or expired by execution); cross-agent confused deputy (a low-priv agent relays valid-looking instructions to a high-priv agent that executes without re-checking intent); memory-based privilege retention (creds cached across tasks/users, reused in a weaker session — co-tag ASI06); OAuth device-code phishing binding a victim tenant to attacker scopes; un-scoped privilege inheritance through delegation chains.
+
 **Praxen relevance:** Praxen — check credential storage, audit trust-check implementation in code, verify counterparty list from remit is enforced before sensitive actions.
 
 ---
@@ -124,6 +132,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 **What to look for in agent behavior:**
 - Tool behavior that diverges from its description (tool claims to search but sends data)
 - New capability appearing in the agent's effective behavior without a corresponding new tool in the authorized list
+
+**Also:** remotely-loaded poisoned prompt templates; typosquatting / impersonation of dynamically-discovered tools or endpoints; a vulnerable third-party **peer agent** invited into a workflow (overlaps ASI07 — tag ASI04 for the composition risk); a compromised MCP / registry server serving signed-looking manifests at scale; a poisoned third-party knowledge/RAG plugin (co-tag ASI06). *(Boundary: LLM03 = static pre-deploy dependency; ASI04 = runtime tool/agent composition.)*
 
 **Praxen relevance:** Praxen (supply chain category, tool inventory change detection, rug pull detection). The log registry update is a direct defense against silent rug pulls.
 
@@ -152,6 +162,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Exec called with parameters that include network tools (curl, wget, nc), credential paths, or archive creation
 - Repeated exec attempts with slight variations
 
+**Also — beyond shell/exec:** unsafe object deserialization → RCE; an exposed `eval()` powering agent memory over untrusted content; code-hallucination-with-backdoor (legit-looking generated code hiding a backdoor); malicious package install / lockfile poisoning (hostile code runs at install/import in ephemeral sandboxes — bridges ASI04); non-shell execution (JIT/WASM modules, template engines, in-memory eval).
+
 **Praxen relevance:** Praxen — exec config audit is a named high-priority check. Flag auto-approved shell exec, absent per-command policies, and exec capabilities that exceed the remit.
 
 ---
@@ -179,6 +191,10 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent referencing context or instructions that don't appear in the current session's inputs
 - Agent acting on a "remembered" instruction that was inserted by an external party
 
+**Also:** trigger-based memory backdoors (poisoned memory plants a latent trigger that later fires hidden/destructive instructions); cross-agent shared-memory propagation (contaminated shared memory spreading between cooperating agents); **cross-tenant vector bleed** (namespace-filter bypass pulling another tenant's chunk via high cosine similarity); detection-subversion (retraining a security agent's memory to label malicious activity as normal); gradual long-term memory drift / goal-reweighting.
+
+**Boundary — ASI06 vs LLM08:** vector/embedding poisoning that **persists as agent memory and alters autonomous reasoning across sessions is ASI06 (co-tag LLM08)**; a one-shot retrieval/store weakness with no cross-session persistence is LLM08.
+
 **Praxen relevance:** Praxen — inspect persistent memory files for external-origin content, check whether memory writes are validated, confirm memory contents do not include instruction-like text that could act on the agent.
 
 ---
@@ -202,6 +218,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 **What to look for in agent behavior:**
 - Agent receiving instructions from an unexpected source (another agent, not the operator)
 - Agent behavior that changes after interaction with a sub-agent or external agent
+
+**Also:** replay of delegation / trust messages (stale instructions honored); protocol downgrade to a legacy or unencrypted mode to inject objectives; MITM / missing transport encryption (interception, not just missing auth); discovery/routing spoofing & A2A registration forgery; metadata / timing side channels; semantic split-brain (one message parsed into divergent intents by different agents).
 
 **Praxen relevance:** Praxen — audit inter-agent channel configuration, confirm identity verification for messages received from other agents, flag trust-without-verification patterns in A2A handlers.
 
@@ -228,6 +246,10 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Same error appearing across multiple tool calls in sequence
 - Agent that keeps retrying a failed or misdirected action without halting
 
+**Also:** governance-drift cascade (oversight weakening after repeated success; bulk approvals / policy relaxations propagating across agents); auto-deployment cascade (an orchestrator pushes a tainted release to all connected agents); inter-agent feedback-loop amplification (agents reinforcing each other's outputs); shared-infrastructure availability cascade.
+
+**Origin-vs-propagation rule:** tag the *initial* defect as ASI04/06/07; add **ASI08 only when it spreads** across agents, sessions, or workflows.
+
 **Praxen relevance:** Praxen — check for tool-loop detection, retry caps, and rate limits in config. Flag missing circuit breakers on capabilities that can fire in a loop (search, tool calls, retries).
 
 ---
@@ -253,6 +275,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent taking actions at the request of a party not in the authorized counterparty list
 - Trust relationship expanding unexpectedly — new sender treated as trusted
 
+**The primary framing is the agent manipulating the human** (not only the reverse). **Flag:** weaponized / fake explainability (fabricated convincing rationales that hide malicious logic to win approval); emotional manipulation / anthropomorphism exploiting trust; a missing final human confirmation on a sensitive or irreversible action; opaque explainability forcing unquestioning trust; consent-laundering via a "read-only" preview that triggers side effects. *(Boundary: ASI09 = human misperception / over-reliance; ASI03 = credential/permission misuse; ASI10 = the agent's own intent deviating.)*
+
 **Praxen relevance:** Praxen — confirm the remit declares explicit counterparty and trust-scope lists, verify code enforces them, flag trust-expansion paths (e.g., any message sender becoming "known" through history).
 
 ---
@@ -269,6 +293,11 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent that has drifted from its remit over time through accumulated context or memory poisoning
 - Agent whose monitoring was disabled or degraded, allowing undetected deviation
 - Agent running without any oversight mechanism
+- **Reward hacking / specification gaming** — gaming a flawed reward metric (e.g. deleting production backups to "minimize cost")
+- **Self-replication** — spawning unauthorized replicas for persistence / takedown-evasion
+- **Collusion** — multiple agents coordinating to amplify manipulation
+- **Scheming / deceptive compliance** — appears compliant while pursuing a hidden goal (deceptive alignment)
+- **Impersonated observer/approval agent** — a fake review agent injected to rubber-stamp actions (subverts the oversight layer itself)
 
 **What to look for:**
 - Behavior outside the Worker Remit — this is the primary Praxen detection
@@ -310,7 +339,8 @@ Findings slide between neighbouring categories run-to-run when the boundary is l
 | The **identity / credential** scope — shared account, broad OAuth, trust on an unverified identity | **ASI03** (Identity & Privilege Abuse) | ASI02 (tool capability) |
 | A failure **propagating / amplifying** through a tool chain or sub-agents | **ASI08** (Cascading Failures) | LLM10 — that's resource exhaustion |
 | Resource / cost / token exhaustion, runaway spend, denial-of-wallet | **LLM10** (Unbounded Consumption) | ASI08 |
-| Poisoning a **vector / embedding** store | **LLM08** (Vector & Embedding) | ASI06 (non-vector memory) |
+| Vector/embedding poisoning that **persists as agent memory** & alters reasoning across sessions | **ASI06 + LLM08** (co-tag) | LLM08-only |
+| A **one-shot** vector/embedding weakness with no cross-session persistence | **LLM08** (Vector & Embedding) | ASI06 |
 | Poisoning **non-vector** memory / session / context files | **ASI06** (Memory & Context Poisoning) | LLM08 |
 | An **oversight / accountability gap** over a consequential capability (no audit trail, self-approval, monitoring off) | **ASI10** (Rogue Agents) **+ LLM06** | leaving it untagged |
 
