@@ -34,6 +34,7 @@ Several 1.1 items **intentionally move the numbers** — #48 (scoring rigour), #
 - **#104** — entropy-based secret detection in `render.py`'s redaction backstop (catch unrecognized high-entropy credentials). *May add findings — intended.*
 - **#41** — new named detection pattern: external API response → filesystem write (path-traversal class).
 - **#65** — tool feedback from the uAgents scan: framework scanning, manifest resilience, discovery gaps.
+- **#169** — **LLM08 (Vector & Embedding Weaknesses) systematically under-tagged** (1/15 despite ≥3 targets having in-scope vector stores). Root cause: co-applicable LLM08 starved by single-`owasp_llm`-scalar counting + a too-narrow `KB_LLM_TOP10` §LLM08. Fix = expand the LLM08 KB entry (+5 OWASP sub-risks; add a *detect vector store → audit* step), count secondary OWASP codes from `tags[]` in `owasp_coverage.py`, re-scan craftbot/sweep. **Schema-neutral — `schema_version` stays 2.0; NOT part of #7 / §D (schema evolution), and NOT an engine-reliability item (distinct from #65).** Surfaced by the 1.0.2 retirement-impact analysis (would falsely zero LLM08 on retiring devika).
 
 ### C. Skill-flow & output quality
 - **#33** — interleave finding emission with analysis (eliminate the Step 9.9 synthesis burst / stream-stall).
