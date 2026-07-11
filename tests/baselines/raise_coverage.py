@@ -64,16 +64,10 @@ TARGETS = [
      "OWASP Agentic AI CTF — invoice processor"),
     ("helperbot",               "HelperBot",                    "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
      "Damn Vulnerable AI Agent — training agent"),
-    ("langchain-sql",           "LangChain SQL Agent",          "https://github.com/langchain-ai/langchain-community",
-     "create_sql_agent toolkit"),
     ("openai-customer-service", "OpenAI Customer Service",      "https://github.com/openai/openai-agents-python",
      "OpenAI Agents SDK example"),
     ("autogen-code-executor",   "AutoGen Code Executor",        "https://github.com/microsoft/autogen",
      "Microsoft AutoGen code-executor family"),
-    ("sweep",                   "Sweep",                        "https://github.com/sweepai/sweep",
-     "GitHub issue-to-code agent"),
-    ("devika",                  "Devika",                       "https://github.com/stitionai/devika",
-     "Autonomous software engineer"),
     ("aider",                   "Aider",                        "https://github.com/Aider-AI/aider",
      "Interactive pair-programming agent"),
     ("openhands",               "OpenHands",                    "https://github.com/All-Hands-AI/OpenHands",
@@ -460,6 +454,7 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
       <div class="stat-block"><strong>{n_scored}</strong><span>with RAISE scores</span></div>
       <div class="stat-block"><strong>{pop_avg}</strong><span>population avg weighted overall</span></div>
     </div>
+    <p class="intro" style="margin-top:16px">Companion views · <a href="owasp-coverage-report.html">OWASP coverage</a> · <a href="suite-health-report.html">Suite Health — popularity &amp; freshness</a></p>
   </header>
 
   <section>

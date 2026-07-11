@@ -1,4 +1,8 @@
 <!--
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
+-->
+<!--
   Worker Remit for CraftBot (CraftOS-dev/CraftBot)
   Authored by Praxen from CraftBot's public documentation (README.md and product
   description). States declared intent; Praxen discovers the implementation.

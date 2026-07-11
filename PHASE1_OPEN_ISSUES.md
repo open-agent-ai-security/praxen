@@ -42,8 +42,15 @@ Scopes used: CraftBot → `agent_core/ agents/ agent_file_system/ craftos_integr
 ### O7 — Agentforce source basis
 Scanned against the `salesforce/help-agent-accelerator` repo **as-is** (not a deployed Salesforce org), matching the existing example's stated basis. Confirm that's the intended basis for the baseline exemplar.
 
-### O8 — Hermes upstream drifted from its remit (Foundation spot-check flag)
-`hermes-agent-desktop` re-ran at **2.55 vs baseline 3.15** (−0.60, Established → Partial) — the **only** retained target out of bounds in the Foundation spot-check (11/12 in-bounds; see `FOUNDATION_SPOTCHECK.md`). Cause is **upstream drift, not skill drift**: the current Nous Research Electron desktop has **no SSH Tunnel mode**, so 6 SSH-specific remit rules are now enforcement-not-possible. **Needs a Phase-2 remit refresh** to match the current upstream before Hermes is re-frozen median-of-3. *(Secondary: `openhands` also evolved to V1 — SDK split into separate pinned packages — but scanned in-band.)*
+### O8 — Hermes remit currency + freeze correction ✅ RESOLVED
+The current Nous Research Electron desktop has **no SSH Tunnel mode** (local/remote/cloud only), so the old remit's SSH rules no longer apply. A first hand-edited remit refresh (v1.1) froze Hermes at **2.55 vs old baseline 3.15** and read as a −0.60 drop — which looked alarming, so it was investigated three ways:
+1. **Old-remit control** (current code, original SSH remit, ×3): **2.70 / 2.90 / 3.15 → median 2.90**.
+2. **Diff-review** of the hand-edited rewrite: found it **added two HALT-severity obligations** (at-rest token encryption; OAuth cookie-partition isolation) and dropped the host-key/cert-pin intent while claiming "intent held constant" — i.e. it moved goalposts down.
+3. **Fresh docs-only remit** (independently authored per the skill, ×3): **2.85 / 2.85 / 3.15 → median 2.85**.
+
+Two independently-sourced remits agree at **~2.85–2.90**; the hand-edited remit's **2.55 was the low outlier** (~0.3 low), confirming the diff-review. **Resolution:** the **fresh docs-only remit is now the committed `tests/remits/hermes-agent-desktop.md`**, and Hermes is **re-frozen at 2.85** (band 2.55–3.15). Hermes is a **high-variance boundary target** (single runs spanned 2.55–3.15; 2 of 6 independent-remit runs hit Established). The real gap vs old 3.15 is ~−0.30 — within noise, **not a security regression** (Zero Trust held 3/Established nearly every run; 0–1 Criticals across all 9 runs). *(Secondary: `openhands` also evolved to V1 — SDK split into pinned packages — scanned in-band, median 2.15.)*
+
+> **Resolved (2026-07-11).** Refreshing the shared remits broke the remit-verbatim quotes in the **superseded `v0.7.7-claude48`** (and older archival) sets. Rather than defer, `test_render.py` now **scopes the remit-verbatim check to the current baseline set** (`CURRENT_BASELINE = "v1.0.2-claude48"`) — archival sets keep their schema + byte-render checks but are no longer re-bound to evolving remits. The harness is **406 passed, 0 failed**, and all **12 `v1.0.2-claude48` targets pass clean** (schema · byte-render · remit-verbatim).
 
 ## Per-target judgment calls (from the scans — for your results-quality review, O3)
 

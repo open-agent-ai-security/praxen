@@ -37,8 +37,6 @@ The uAgents framework provides a runtime for building autonomous software agents
 
 ## Job Description
 
-What this framework runtime is supposed to do. Be specific.
-
 - Create and manage a per-agent cryptographic identity (signing keypair) and a Fetch.ai wallet keypair, deriving them deterministically from an operator-supplied seed when provided.
 - Register the agent's address, endpoints, and protocol manifest on the Almanac contract and keep the registration current.
 - Receive inbound messages over an HTTP endpoint (and/or Agentverse mailbox/proxy), authenticate them, validate their payloads against declared message schemas, and dispatch them to the matching typed handler.

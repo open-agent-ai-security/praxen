@@ -133,3 +133,20 @@ Because this release edits every plugin manifest, run the **manual plugin-market
 ## Fold-down
 
 When the baseline is frozen and green, merge `1.0.2` → `1.1`; `1.1` then carries the fresh `v1.0.2-claude48` baseline (and refreshed roster) as its grading reference. Whether to *also* ship 1.0.2 as a standalone patch tag or absorb it into the 1.1 release is a release-management call — the re-baseline + target refresh stands on its own as a valid patch, but folding it into 1.1 avoids a release whose only user-visible change is a version number and a test-suite reshuffle.
+
+## Ride-along — `examples/` CI gate (PR #160 / #127)
+
+**Pulled into 1.0.2** (was triaged to 1.1 Bucket F). [PR #160](https://github.com/open-agent-ai-security/praxen/pull/160) (@Ayush7614, closes #127) extends `tests/render/test_render.py` to gate the `examples/` showcase reports the same way as `tests/baselines/` — schema-validate + byte-render, **schema+byte only, no remit-verbatim** (examples use paraphrase markers) — and extracts the remit-quote check into `_norm_remit_quote` / `_remit_quote_violations` (behavior-preserving).
+
+**Why 1.0.2, not 1.1:** it is **not skill-impacting** (only `test_render.py` + two READMEs — no `SKILL.md`/`schema.py`/`render.py`/KBs), so it clears 1.0.2's "no functional changes" bar; and it **collides with this release's heavy `test_render.py` edits** (the baseline gate), so integrating it here — in the branch already editing that file — resolves the conflict **once** and keeps the `1.0.2 → 1.1` fold clean, rather than deferring a guaranteed merge conflict.
+
+**Mechanic (single path, no double-apply):**
+1. Merge #160 to `dev` as authored (normal contribution flow; closes #127).
+2. Bring into `1.0.2` (`merge dev → 1.0.2`, or cherry-pick), integrate with the in-flight baseline-gate changes, re-run the harness.
+3. Move #127 tracking from #168 (1.1 umbrella, Bucket F) to #167 (1.0.2 tracker).
+
+**Timing:** integrate *after* the 1.0.2 baseline/remit work is committed, so we're not merging against a moving file. Eval + this plan posted to the PR (2026-07-11).
+
+### Deliverables (ride-along)
+- [ ] #160 merged to `dev`; brought into `1.0.2`; `test_render.py` integrated + harness green (examples gate passing)
+- [ ] #127 tracking moved #168 → #167

@@ -1,0 +1,713 @@
+{
+  "schema_version": "2.0",
+  "praxen_version": "1.0.1",
+  "scan": {
+    "agent": "OpenHands (Autonomous Software-Engineering Agent)",
+    "agent_slug": "openhands",
+    "scan_date": "2026-07-11",
+    "scan_timestamp": "2026-07-11T18:45:47Z",
+    "workspace": "/Users/steve.wilson/Documents/github/praxen/local/v1.0.2-phase1/src/openhands",
+    "artifact_count": 28
+  },
+  "intro_band": {
+    "agent_remit_summary": "OpenHands is an autonomous software-engineering agent that accepts natural-language tasks from an authenticated user and completes them end-to-end — writing code, executing it, browsing the web, and performing scoped Git / issue-tracker operations — with all agent-generated code and file I/O confined to a per-conversation sandboxed runtime. The remit covers two tightly-coupled components: the LLM-driven `CodeActAgent` from the pinned OpenHands Software Agent SDK (the primary RAISE subject) and the FastAPI app server that authenticates users, provisions sandboxes, brokers secrets, and stores events. Its authorized counterparties are the configured LLM provider, the user's explicitly connected Git/issue integrations, operator-configured MCP tool servers, and browser fetch targets — everything else is unauthorized by default. Standout obligations: secrets must be encrypted at rest and never leak into logs/trajectories/model context, high-impact actions (merge, force-push, cross-repo write) require human approval, and the agent must never execute on the host OS outside the sandbox.",
+    "agent_structure_summary": "Python FastAPI application server under `openhands/app_server/`, pinned to the OpenHands SDK trio (`openhands-sdk`, `openhands-agent-server`, `openhands-tools`, all `==1.35.0`); the agentic `CodeActAgent` itself lives in those external pinned packages, not in this tree. Per-conversation isolation is provided by a Docker sandbox by default (`docker_sandbox_service.py`), with Remote and Process/local runtimes as opt-ins. User secrets and provider tokens persist through `FileSecretsStore`, which serializes them to a plaintext `secrets.json`; a `JwtService` (`services/jwt_service.py`) provides JWS/JWE but the OSS secrets store does not use it. Request auth is pluggable: the OSS default `DefaultUserAuth` returns no user and `get_dependencies()` attaches no auth dependency unless `SESSION_API_KEY` is set. The app also hosts its own FastMCP server (`mcp/mcp_router.py`) exposing PR-creation tools plus a Tavily proxy, and records every tool action to a durable per-conversation event store; the logging layer (`utils/logger.py`) applies aggressive secret redaction."
+  },
+  "behavior_summary": "The dominant pattern is a capable, defensively-built server whose strongest safeguards (running-only session keys, per-user ownership checks, JWE token encryption, comprehensive log redaction, a durable event store, and a pinned CVE-tracked dependency set) are undercut by permissive OSS defaults on the exact controls the remit treats as mandatory. The default secrets store (`FileSecretsStore`) writes provider tokens and custom secrets to disk in plaintext despite a remit requirement to encrypt at rest; the default request path attaches no authentication (`get_dependencies()` returns an empty list unless `SESSION_API_KEY` is set); and CORS defaults to allowing any origin with credentials. These combine into a single exposure chain: an OSS instance reachable off-localhost serves unauthenticated, cross-origin reads of plaintext-at-rest credentials. Separately, the approval gates for high-impact Git actions depend on `confirmation_mode`, which resolves to `NeverConfirm()` when off (the headless default), so merges and force-pushes can execute without the human pause the remit requires.",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 11,
+      "gap": 0,
+      "partial": 7,
+      "vague": 0,
+      "enp": 2,
+      "total": 20
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Job Description",
+        "rule_text": "Execute agent-generated shell commands, Python / IPython, and other language runtimes inside the sandboxed runtime only, using the enabled agent tools (command, editor, Jupyter, browser, think, finish).",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Job Description",
+        "rule_text": "Record every action — the tool invoked, its arguments, the outcome, and the timestamp — to a durable per-conversation event store.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Job Description",
+        "rule_text": "Halt cleanly when a configured per-conversation cap (budget, iteration/step count, wall-clock, or max age) is reached.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-006"
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Non-Goals (Out of Scope)",
+        "rule_text": "Executing agent-generated code, or reading/writing files, on the host operating system outside the sandboxed runtime.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Approved Communication Channels",
+        "rule_text": "Adding a new server at runtime requires approval",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Data Boundaries",
+        "rule_text": "User-configured secrets held in the secrets store (must be encrypted at rest and returned masked by default).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-002"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Forbidden Data Movement",
+        "rule_text": "API keys, tokens, or secret values written into logs, error messages, trajectories, or the model's context window.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Forbidden Data Movement",
+        "rule_text": "Raw secret values returned to, or routed through, the SDK client rather than delivered SaaS→sandbox under the required dual authentication (Bearer token and an active-sandbox session key).",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Job Description",
+        "rule_text": "Accept a natural-language software-engineering task from an authenticated user and carry it out end-to-end: plan, write code, execute it, debug, and iterate within a single conversation.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-003"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Action Boundaries",
+        "rule_text": "Merging a pull request.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-004"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Action Boundaries",
+        "rule_text": "Destructive Git operations: force-push, branch deletion, history rewrite.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-004"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Action Boundaries",
+        "rule_text": "Any action that would exceed the configured per-conversation step/iteration, budget, or time cap.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-006"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Action Boundaries",
+        "rule_text": "Running agent-generated code on the host OS outside the sandbox.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Action Boundaries",
+        "rule_text": "Committing secrets, credentials, tokens, or .env contents to any Git branch.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Action Boundaries",
+        "rule_text": "Leaking API keys or session tokens into logs, error messages, trajectories, or model context.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Behavioral Expectations",
+        "rule_text": "Each user is limited to a bounded number of concurrent conversations (default 3), each with its own isolated sandbox.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-17",
+        "section": "Behavioral Expectations",
+        "rule_text": "Integration calls are re-authenticated per request against the requesting user's scoped credentials.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-18",
+        "section": "Approval Requirements",
+        "rule_text": "Any high-impact action (exec / send / delete outside the sandbox) when the deployment runs with confirmation mode enabled — the agent must pause for user confirmation before executing.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-11-004"
+      },
+      {
+        "rule_id": "R-19",
+        "section": "Risk Sensitivities",
+        "rule_text": "Cross-conversation and cross-user isolation of sandboxes, events, and credentials.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-20",
+        "section": "Escalation Rules",
+        "rule_text": "A secret value is detected in a location it should never occupy (log, error, trajectory, model context, or a Git diff).",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-07-11-001",
+      "severity": "Critical",
+      "summary": "OSS defaults compose into an unauthenticated, cross-origin read of plaintext-at-rest provider tokens and secrets on any exposed instance.",
+      "description": "With no `SESSION_API_KEY` set, `get_dependencies()` attaches no auth and `DefaultUserAuth` yields no user, so `/api/v1/secrets` and sandbox endpoints are reachable unauthenticated; `LocalhostCORSMiddleware` then serves any origin with credentials; and `FileSecretsStore` has already written those provider tokens and custom secrets to `secrets.json` in cleartext. An OpenHands OSS server bound off-localhost therefore exposes stored credentials to any web origin without authentication. Each default is individually defensible for localhost single-user use, but together they violate the remit's authenticated-user and encrypt-at-rest requirements.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-06, R-09",
+      "policy_rule_text": "User-configured secrets held in the secrets store (must be encrypted at rest and returned masked by default). / Accept a natural-language software-engineering task from an authenticated user and carry it out end-to-end: plan, write code, execute it, debug, and iterate within a single conversation.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/dependencies.py",
+          "line": 23,
+          "snippet": "get_dependencies() returns [] when SESSION_API_KEY is unset and app_mode is not SAAS — no auth dependency on the routers that mount it"
+        },
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 37,
+          "snippet": "is_allowed_origin returns True for any origin when permitted_cors_origins is empty (the default), with allow_credentials=True set at :29-35"
+        }
+      ],
+      "recommended_actions": [
+        "Ship a secure-by-default posture: require an auth credential (or bind strictly to loopback) unless the operator explicitly opts into open access, and refuse to serve wildcard-origin-with-credentials CORS when no origins are configured.",
+        "Encrypt secrets at rest in the default `FileSecretsStore` using the existing `JwtService.encrypt_value`/`decrypt_value` rather than persisting `expose_secrets=True` plaintext."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-07-11-002",
+        "PRAX-2026-07-11-003",
+        "PRAX-2026-07-11-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-11-002",
+      "severity": "High",
+      "summary": "The default secrets store writes provider tokens and custom secrets to disk in plaintext, contrary to the encrypt-at-rest requirement.",
+      "description": "`FileSecretsStore.store` serializes the `Secrets` model with `context={'expose_secrets': True}`, writing raw provider tokens and custom secret values to `secrets.json` via the file store. `server_config.ServerConfig` sets this class as the OSS default `secret_store_class`. A `JwtService` with JWE encryption exists in the codebase but is not used by this store, so at-rest protection reduces to filesystem permissions.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": "R-06",
+      "policy_rule_text": "User-configured secrets held in the secrets store (must be encrypted at rest and returned masked by default).",
+      "evidence": [
+        {
+          "file": "openhands/app_server/secrets/file_secrets_store.py",
+          "line": 32,
+          "snippet": "store() calls secrets.model_dump_json(context={'expose_secrets': True}) then writes the plaintext JSON to the file store"
+        },
+        {
+          "file": "openhands/app_server/server_config/server_config.py",
+          "line": 20,
+          "snippet": "secret_store_class defaults to '...file_secrets_store.FileSecretsStore' — the plaintext store is the OSS default"
+        }
+      ],
+      "recommended_actions": [
+        "Encrypt secret values before persistence (e.g. wrap each with `JwtService.encrypt_value`) and decrypt on load, or back the default store with an OS keyring/vault."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-11-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-11-003",
+      "severity": "High",
+      "summary": "In the OSS default the app-server API attaches no authentication, so secrets/sandbox/settings endpoints are unauthenticated unless SESSION_API_KEY is set.",
+      "description": "`get_dependencies()` returns an empty dependency list unless `SESSION_API_KEY` is configured (or SAAS mode is active), and `DefaultUserAuth` returns `user_id=None` for every request. The remit requires that tasks come from an authenticated user; by default there is no request authentication layer, leaving auth entirely to the operator remembering to set the key or to a reverse proxy.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": "R-09",
+      "policy_rule_text": "Accept a natural-language software-engineering task from an authenticated user and carry it out end-to-end: plan, write code, execute it, debug, and iterate within a single conversation.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/dependencies.py",
+          "line": 23,
+          "snippet": "get_dependencies() appends check_session_api_key only if _SESSION_API_KEY is truthy; otherwise no auth dependency is added for OSS mode"
+        },
+        {
+          "file": "openhands/app_server/user_auth/default_user_auth.py",
+          "line": 32,
+          "snippet": "DefaultUserAuth.get_user_id always returns None (no multi-tenancy / no authenticated principal)"
+        }
+      ],
+      "recommended_actions": [
+        "Default to requiring an authentication credential (session key or token) for all state-changing and secret-bearing routes, and fail closed with a clear startup error when an externally-bound server has no auth configured."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-11-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-11-004",
+      "severity": "High",
+      "summary": "Human-approval gates for merge, force-push, and cross-repo writes are inert unless confirmation mode is enabled, which is off by default headless.",
+      "description": "`_select_confirmation_policy` returns `NeverConfirm()` whenever `confirmation_mode` is false, and `config.template.toml` / headless defaults leave confirmation mode off; the `LLMSecurityAnalyzer` is likewise only attached when configured. The remit requires the agent to pause for approval before high-impact Git actions, but with the default policy those actions proceed without a confirmation checkpoint. The enforcing tools run in the pinned SDK, so app-server-side visibility of the actual gating is partial.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": "R-10, R-11, R-18",
+      "policy_rule_text": "Merging a pull request. / Destructive Git operations: force-push, branch deletion, history rewrite. / Any high-impact action (exec / send / delete outside the sandbox) when the deployment runs with confirmation mode enabled — the agent must pause for user confirmation before executing.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/app_conversation/app_conversation_service_base.py",
+          "line": 681,
+          "snippet": "_select_confirmation_policy returns NeverConfirm() when confirmation_mode is false; ConfirmRisky/AlwaysConfirm only when enabled"
+        },
+        {
+          "file": "openhands/app_server/config.template.toml",
+          "line": 53,
+          "snippet": "max_budget_per_task/max_iterations shown but confirmation_mode not enabled by default; headless resolves confirmation_mode=false"
+        }
+      ],
+      "recommended_actions": [
+        "Default confirmation mode (or an equivalent deterministic approval gate) to on for high-impact Git operations, and make the enabled gate independent of whether an LLM security analyzer is configured."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-11-005",
+      "severity": "Medium",
+      "summary": "CORS defaults to allowing any origin with credentials when no permitted origins are configured.",
+      "description": "`LocalhostCORSMiddleware.is_allowed_origin` returns True for any origin when `permitted_cors_origins` is empty — the default from `get_default_permitted_cors_origins()` — while the middleware is constructed with `allow_credentials=True`. A warning is logged but the request is still allowed, so a browser on any site can make credentialed cross-origin calls to an exposed instance.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 44,
+          "snippet": "for missing configured origins the branch returns True for localhost AND for any other origin (development mode), with allow_credentials=True at :32"
+        },
+        {
+          "file": "openhands/app_server/config.py",
+          "line": 103,
+          "snippet": "get_default_permitted_cors_origins() returns [] by default, so the wildcard branch is the default path"
+        }
+      ],
+      "recommended_actions": [
+        "Do not combine wildcard-origin acceptance with `allow_credentials=True`; require an explicit origin allowlist for any non-loopback origin in production."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-11-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-006",
+      "severity": "Medium",
+      "summary": "Per-task budget cap is disabled by default, so only the iteration cap bounds a runaway conversation's cost.",
+      "description": "`max_budget_per_task` defaults to None in settings and `0.0` (no limit) in `config.template.toml`, leaving cost unbounded unless the operator sets a ceiling; the iteration/step cap (in the pinned SDK) still bounds turns. The remit's intent is that a configured cap must halt the agent, and the budget dimension of that cap is off by default.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM10 — Unbounded Consumption"
+        }
+      ],
+      "policy_rule_ids": "R-03, R-12",
+      "policy_rule_text": "Halt cleanly when a configured per-conversation cap (budget, iteration/step count, wall-clock, or max age) is reached. / Any action that would exceed the configured per-conversation step/iteration, budget, or time cap.",
+      "evidence": [
+        {
+          "file": "openhands/app_server/settings/settings_models.py",
+          "line": 369,
+          "snippet": "max_budget_per_task: float | None = None — no per-task budget ceiling by default"
+        },
+        {
+          "file": "openhands/app_server/config.template.toml",
+          "line": 53,
+          "snippet": "'#max_budget_per_task = 0.0' — commented, and 0.0 denotes no limit"
+        }
+      ],
+      "recommended_actions": [
+        "Ship a non-zero default `max_budget_per_task` (or refuse to start without one for hosted deployments) so cost caps halt runaway conversations without relying on operator configuration."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-007",
+      "severity": "Medium",
+      "summary": "The global rate limiter is in-memory and keyed on client IP, so it is neither durable nor effective across multiple app-server processes.",
+      "description": "`InMemoryRateLimiter` stores request history in a per-process dict keyed by `request.client.host`, wired globally at 10 req/s. Behind a reverse proxy every request may share the proxy's IP (rate-limiting all users together) or be spoofable via forwarded headers, and the limits reset on restart and are not shared across pods.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM10 — Unbounded Consumption"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "openhands/app_server/middleware.py",
+          "line": 78,
+          "snippet": "InMemoryRateLimiter keeps history in a process-local defaultdict keyed by request.client.host — no shared/distributed backing"
+        }
+      ],
+      "recommended_actions": [
+        "Back rate limiting with a shared store (e.g. Redis) and key it on the authenticated principal rather than client IP for multi-process/behind-proxy deployments."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-008",
+      "severity": "Medium",
+      "summary": "The master encryption/JWT key is generated and stored in a plaintext file at rest and doubles as both the JWS signing key and JWE encryption key.",
+      "description": "When no `JWT_SECRET` is set, `get_default_encryption_keys` generates a random master key and writes it in cleartext to `.keys` in the persistence directory (or reads a plaintext `.jwt_secret`). That same key both signs JWS tokens and derives the JWE symmetric key, so any read of the persistence directory yields the root of trust for all tokens and encrypted values.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/encryption_key.py",
+          "line": 82,
+          "snippet": "generated master key is dumped with expose_secrets=True and written to key_file (.keys) in cleartext"
+        },
+        {
+          "file": "openhands/app_server/services/jwt_service.py",
+          "line": 184,
+          "snippet": "same key.get_secret_value() is used to sign JWS (HS256) and to derive the A256GCM JWE key"
+        }
+      ],
+      "recommended_actions": [
+        "Source the master key from an OS keyring / KMS / vault rather than a cleartext file, and consider separating the signing key from the encryption key."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-009",
+      "severity": "Medium",
+      "summary": "No adversarial or prompt-injection testing evidence exists in the scanned tree for an agent that ingests untrusted web and repository content.",
+      "description": "The app-server ships a conventional pytest unit suite but no injection fixtures, red-team reports, or evidence that adversarial findings drove design changes. Given the agent routinely pulls untrusted web pages, issue bodies, and microagents into context, the absence of adversarial testing at the layer Praxen can see is a real gap.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Build an AI Red Team"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "tests/unit",
+          "line": null,
+          "snippet": "unit tests present but no adversarial/prompt-injection test artifacts or red-team documentation found in the scanned app-server tree"
+        }
+      ],
+      "recommended_actions": [
+        "Add an indirect-prompt-injection test suite exercising untrusted web/issue/microagent content and record how findings feed back into controls (e.g. the security analyzer default)."
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "Low",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-010",
+      "severity": "Medium",
+      "summary": "Structured JSON logging is disabled by default, so the app-server application log is unstructured for automated detection.",
+      "description": "`LOG_JSON` defaults to false, so the console/file app log is free-form colored text rather than structured JSON; automated detection rules must instead rely on the durable event store. Enabling structured logs is a single env flag, but the default weakens machine-parseable monitoring of the app-server layer.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "openhands/app_server/utils/logger.py",
+          "line": 30,
+          "snippet": "LOG_JSON defaults to False; JSON formatter only attached when LOG_JSON is truthy"
+        }
+      ],
+      "recommended_actions": [
+        "Default `LOG_JSON` to on (or document it as required) for hosted deployments so app-server logs are machine-parseable alongside the event store."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-11-011",
+      "severity": "Low",
+      "summary": "The Tavily MCP proxy embeds the configured API key in the connection URL query string.",
+      "description": "`init_tavily_proxy` builds the upstream MCP transport URL as `https://mcp.tavily.com/mcp/?tavilyApiKey={tavily_api_key}`, placing a live credential in a URL. The key comes from operator config (not hardcoded) and the design keeps it out of the sandbox, and `RedactURLParamsFilter` scrubs query strings from logs — but URL-embedded credentials remain an anti-pattern that can surface in proxy/referrer contexts.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "openhands/app_server/mcp/mcp_router.py",
+          "line": 66,
+          "snippet": "StreamableHttpTransport(url=f'https://mcp.tavily.com/mcp/?tavilyApiKey={tavily_api_key}') — API key in URL query string"
+        }
+      ],
+      "recommended_actions": [
+        "Pass the Tavily credential via an Authorization header or the transport's auth mechanism instead of the URL query string."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Layered secret redaction across all log surfaces",
+      "description": "`SensitiveDataFilter` scrubs env-derived secrets and known key patterns, `RedactURLParamsFilter` strips query-string secrets (e.g. `session_api_key`) from uvicorn access logs, LiteLLM loggers are disabled, and `DEBUG_LLM` requires an interactive confirmation — directly implementing the remit's never-leak-secrets-to-logs rule.",
+      "evidence_path": "openhands/app_server/utils/logger.py:248-300"
+    },
+    {
+      "title": "Session keys valid only for RUNNING sandboxes with ownership verification",
+      "description": "`validate_session_key` rejects keys for paused/stopped/deleted sandboxes and `validate_session_key_ownership` confirms the sandbox belongs to the caller, limiting the blast radius of a leaked session key.",
+      "evidence_path": "openhands/app_server/sandbox/session_auth.py:37-139"
+    },
+    {
+      "title": "Exactly-pinned, CVE-tracked dependency set with dual lockfiles",
+      "description": "The SDK trio is pinned `==1.35.0` and most dependencies carry exact pins with CVE-remediation comments, backed by committed `poetry.lock` and `uv.lock` and a `uv exclude-newer` guard.",
+      "evidence_path": "pyproject.toml:161-259"
+    },
+    {
+      "title": "Secret-name validation blocklist for reserved container/LLM env",
+      "description": "`validate_secret_name` blocks user secrets that would override agent-server container config, `LLM_*` controls, or webhook/CORS callback env vars, preventing a class of sandbox-config and callback-redirection abuse.",
+      "evidence_path": "openhands/app_server/constants.py:44-129"
+    },
+    {
+      "title": "Durable per-conversation event store recording every action",
+      "description": "The webhook `on_event` handler persists each event to the configured event store (filesystem/S3/GCS), giving an action-level, timestamped, durable record sufficient to reconstruct a conversation.",
+      "evidence_path": "openhands/app_server/event_callback/webhook_router.py:468-489"
+    },
+    {
+      "title": "JWE token encryption pinned to a single safe algorithm",
+      "description": "`JwtService` restricts its JWE registry to `dir`+`A256GCM` only, closing cryptographic-agility downgrade attacks on encrypted tokens.",
+      "evidence_path": "openhands/app_server/services/jwt_service.py:27-27"
+    },
+    {
+      "title": "Secrets serialized masked by default",
+      "description": "The `Secrets` model masks provider tokens and custom secret values unless an explicit `expose_secrets` serialization context is supplied, so ordinary API reads (e.g. `/secrets/search`) never return raw values.",
+      "evidence_path": "openhands/app_server/secrets/secrets_models.py:58-107"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": "openhands/app_server/<file_store>/events/<conversation_id>/*.json",
+        "source": "openhands/app_server/event/filesystem_event_service.py",
+        "content_type": "structured JSON event records",
+        "purpose": "durable per-conversation action/decision log (every tool invocation, args, outcome, timestamp)",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "logs/openhands.log",
+        "source": "openhands/app_server/utils/logger.py (TimedRotatingFileHandler)",
+        "content_type": "plaintext or JSON lines (LOG_JSON)",
+        "purpose": "app-server application log with layered secret redaction",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "logs/llm/<session>/{prompt,response}_NNN.log",
+        "source": "openhands/app_server/utils/logger.py (LlmFileHandler)",
+        "content_type": "plaintext LLM prompt/response transcripts",
+        "purpose": "LLM request/response debugging (DEBUG / LOG_TO_FILE only)",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 2.3,
+    "weighted_rationale": "Partial posture overall: OpenHands has real, operative controls across most of the framework but leaves several remit-mandated protections off by default. Supply-chain management and continuous monitoring are its strongest dimensions — an exactly-pinned, CVE-annotated dependency set with dual lockfiles, and a durable per-conversation event store backed by strong log redaction. Zero Trust, weighted double, is where the gaps concentrate: no request authentication in the OSS default, plaintext secrets at rest, default-open CORS with credentials, and approval gates that are inert unless confirmation mode is switched on. Domain limitation and knowledge-base balance sit in the middle — the sandbox and per-tool enable flags scope the agent, but untrusted web/repo content reaches the model with injection defenses (the LLM security analyzer) disabled by default, and there is no adversarial-testing evidence in the scanned tree.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The agent is scoped to software-engineering work inside a per-conversation sandbox with individually enable-flagged tools (`enable_cmd`, `enable_editor`, `enable_jupyter`, `enable_browsing`) in `config.template.toml`, but it is a deliberately general-purpose code agent and the domain enforcement beyond the sandbox boundary lives in the pinned SDK rather than an app-server code gate."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "External untrusted content (web pages via the browser tool, repository files, issue/PR bodies, microagents) flows into the model context by design, and the injection mitigation — the `LLMSecurityAnalyzer` selected in `app_conversation_service_base.py` — is only wired in when `confirmation_mode`/`security_analyzer` are configured, defaulting to none."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.25,
+        "rationale": "Genuine controls exist — running-only session-key validation with ownership checks (`sandbox/session_auth.py`), JWE with a restricted `dir`+`A256GCM` registry, and secret-name blocklists (`constants.py`) — but the OSS defaults leave the API unauthenticated (`utils/dependencies.py` `get_dependencies()` empty unless `SESSION_API_KEY` is set), secrets in plaintext at rest (`file_secrets_store.py`), CORS open to any origin with credentials (`middleware.py`), and high-impact approval gates inert under `NeverConfirm()`."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "The security-critical SDK trio is exactly pinned (`openhands-sdk`/`openhands-agent-server`/`openhands-tools` `==1.35.0`) and most dependencies carry exact pins with explicit CVE-remediation comments (`authlib`, `orjson`, `aiohttp`, `protobuf`) plus committed `poetry.lock` and `uv.lock`; a handful of floor/caret ranges (`fastmcp>=3.2,<4`, `kubernetes`, `pygithub`, `asyncpg`) remain but are constrained by the lockfiles."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Low",
+        "weight": 0.15,
+        "rationale": "The scanned app-server tree contains a conventional pytest unit-test suite but no adversarial or prompt-injection test artifacts, red-team reports, or evidence that adversarial findings drove architectural change for an agent that ingests untrusted web and repository content."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Every tool action is persisted to a durable per-conversation event store (`event/filesystem_event_service.py` via the `/webhooks/events` handler saving each event), and the logging layer applies layered secret redaction; structured JSON logging exists but is off by default (`LOG_JSON=false`), so the primary durable action record is the event store rather than the app log."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 1,
+      "high": 3,
+      "medium": 6,
+      "low": 1,
+      "info": 0
+    }
+  }
+}
