@@ -5,8 +5,9 @@ codes in tags[]), untagged rate, LLM08 recovery, and ASI10 (rogue/oversight) —
 the metrics the #169 tagging sharpening is supposed to move."""
 import json, glob, os, re, collections
 
-CK = "/private/tmp/claude-503/-Users-steve-wilson-Documents-github-observra/27532da3-db05-465d-b5fb-3041b38a6e4c/scratchpad/v1.1-checkpoint"
-FROZEN = "/Users/steve.wilson/Documents/github/praxen/tests/baselines/v1.0.2-claude48"
+HERE = os.path.dirname(os.path.abspath(__file__))
+CK = os.path.join(HERE, "scans")
+FROZEN = os.path.join(HERE, "..", "..", "baselines", "v1.0.2-claude48")
 CODE_RE = re.compile(r"(LLM\d{2}|ASI\d{2})")
 
 def codes_of(f):
@@ -19,7 +20,7 @@ def codes_of(f):
     for t in (f.get("tags") or []):
         s = t.get("label", "") if isinstance(t, dict) else str(t)
         m = CODE_RE.search(s)
-        if m and (not isinstance(t, dict) or t.get("kind", "").startswith("owasp") or m):
+        if m and (not isinstance(t, dict) or t.get("kind", "").startswith("owasp")):
             out.add(m.group(1))
     return out
 

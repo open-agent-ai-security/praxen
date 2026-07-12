@@ -381,7 +381,7 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
     cls = _TAG_CLASS[tag["kind"]]
     if tag["kind"] in ("owasp_llm", "owasp_agentic") and isinstance(tag.get("label"), str):
         m = re.match(r"\s*([A-Za-z]+\d+)", tag["label"])
-        if m and m.group(1) not in primary_codes:
+        if m and m.group(1).upper() not in primary_codes:
             cls += " tag-secondary"
     return {"TAG_CLASS": cls, "TAG_LABEL": esc(tag["label"]),
             "TAG_HREF": esc(_tag_href(tag))}
@@ -851,7 +851,7 @@ def _scrub_secrets(data) -> None:
 # regardless of the authoring model. Conservative: only the separator between a
 # *recognised* OWASP code prefix and the name is rewritten; hyphens/dashes inside
 # the name are left alone, and any non-OWASP label passes through untouched.
-_OWASP_TAG_LABEL_RE = re.compile(r"^\s*((?:LLM|ASI)\d{2})\s*[-–—:]\s*(.+?)\s*$")
+_OWASP_TAG_LABEL_RE = re.compile(r"^\s*((?:LLM|ASI)\d{2})\s*[-–—:]\s*(.+?)\s*$", re.IGNORECASE)
 
 
 def _canon_owasp_tag_label(label):
