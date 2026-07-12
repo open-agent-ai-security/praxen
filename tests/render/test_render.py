@@ -572,13 +572,21 @@ def main():
         r = run_render(["--findings", bj, "--template", TEMPLATE, "--out-html", r_html, "--out-txt", r_txt])
         check(f"baseline {rel}: render exits 0", r.returncode == 0, r.stderr.strip())
         committed_html = read_bytes(c_html)
-        if b"github.com/open-agent-ai-security/praxen" in committed_html and r.returncode == 0:   # post-relicense template
+        set_name = os.path.basename(os.path.dirname(bdir))
+        post_relicense = b"github.com/open-agent-ai-security/praxen" in committed_html
+        if set_name == CURRENT_BASELINE and post_relicense and r.returncode == 0:
+            # Only the CURRENT set is byte-gated against the live template. Archival
+            # sets are historical snapshots — re-rendering them with an evolved template
+            # would rewrite history, so they keep schema validation only (same scoping
+            # as the remit-verbatim check below).
             check(f"baseline {rel}: HTML re-renders byte-identical from its JSON",
                   committed_html == read_bytes(r_html),
                   "committed HTML differs from a fresh render of the committed JSON")
             check(f"baseline {rel}: TXT re-renders byte-identical from its JSON",
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
+        elif post_relicense:
+            check(f"baseline {rel}: archival set ({set_name}) — byte re-render not gated against the current template (only {CURRENT_BASELINE} is)", True)
         else:
             check(f"baseline {rel}: pre-relicense template — byte re-render comparison skipped", True)
         # remit-quote invariant (praxen_version >= 0.6.0)
@@ -587,7 +595,6 @@ def main():
         except ValueError:
             pv = (0,)
         slug = bdata.get("scan", {}).get("agent_slug") or os.path.basename(bdir)
-        set_name = os.path.basename(os.path.dirname(bdir))
         remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
         if pv < (0, 6, 0):
             check(f"baseline {rel}: praxen_version < 0.6.0 — remit-quote check skipped", True)

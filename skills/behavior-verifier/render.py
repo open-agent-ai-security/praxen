@@ -373,8 +373,17 @@ def _tag_href(tag) -> str:
     return _DOCS_BASE  # unreachable: kinds are schema-constrained
 
 
-def _finding_tag_ctx(tag, _idx):
-    return {"TAG_CLASS": _TAG_CLASS[tag["kind"]], "TAG_LABEL": esc(tag["label"]),
+def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
+    """Render one finding tag chip. An OWASP chip whose code is NOT the finding's
+    primary (dominant) classification — i.e. a co-applicable secondary recorded in
+    tags[] — gets an extra ``tag-secondary`` class so it shows outlined rather than
+    solid, distinguishing the finding's main category from the ones it also touches."""
+    cls = _TAG_CLASS[tag["kind"]]
+    if tag["kind"] in ("owasp_llm", "owasp_agentic"):
+        m = re.match(r"\s*([A-Za-z]+\d+)", tag["label"])
+        if m and m.group(1) not in primary_codes:
+            cls += " tag-secondary"
+    return {"TAG_CLASS": cls, "TAG_LABEL": esc(tag["label"]),
             "TAG_HREF": esc(_tag_href(tag))}
 
 
@@ -391,7 +400,9 @@ def _expand_finding_inner(block, finding):
     `finding_tag` repeats once per tag. `finding_policy` is a 0-or-1 block: it
     survives for a finding that cites a remit rule and is dropped for one whose
     `policy_rule_ids` is null (a RAISE-category / detection-pattern finding)."""
-    block = expand_repeat(block, "finding_tag", finding["tags"], _finding_tag_ctx)
+    primary_codes = frozenset(c for c in (finding.get("owasp_llm"), finding.get("owasp_agentic")) if c)
+    block = expand_repeat(block, "finding_tag", finding["tags"],
+                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes))
     has_rule = finding["policy_rule_ids"] is not None
     block = expand_repeat(block, "finding_policy",
                           [finding] if has_rule else [], _policy_ctx)
