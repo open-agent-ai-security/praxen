@@ -26,7 +26,7 @@ from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
-from theme_utils import load_theme_css  # noqa: E402
+from theme_utils import load_theme_css, masthead  # noqa: E402
 
 DEFAULT_BASELINE = THIS_DIR / "v1.0.2-claude48"
 DEFAULT_OUT = THIS_DIR / "suite-health-report.html"
@@ -212,13 +212,14 @@ def build_html(baseline_dir: Path, out_dir: Path):
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Praxen — Suite Health (Popularity &amp; Freshness)</title>
+<title>Praxen — Baseline Agent Suite Health (Popularity &amp; Freshness)</title>
 <style>{theme_css}
 {SUITE_CSS}</style>
 </head><body class="report-page">
 <div class="wrap">
+  {masthead()}
   <header class="hero">
-    <h1>Suite Health — Popularity &amp; Freshness</h1>
+    <h1>Baseline Agent Suite Health — Popularity &amp; Freshness</h1>
     <p class="subtitle">GitHub prominence and development activity of the {n} targets in the frozen <code>tests/baselines/{html.escape(baseline_name)}/</code> set — the "is this a live, mainstream agent?" companion to the OWASP and RAISE coverage.</p>
     <div class="topline">
       <div class="stat-block"><strong>{n}</strong><span>targets</span></div>

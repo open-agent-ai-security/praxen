@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, stdev
 
-from theme_utils import load_theme_css, DOCS_BASE
+from theme_utils import load_theme_css, DOCS_BASE, masthead
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -444,6 +444,8 @@ def build_report(baseline_dir: Path, out_path: Path) -> str:
 </head>
 <body class="report-page">
 <div class="wrap">
+
+  {masthead()}
 
   <header class="hero">
     <h1>RAISE Score Distribution Across Praxen Baseline Targets</h1>
