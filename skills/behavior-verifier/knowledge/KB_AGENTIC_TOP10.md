@@ -248,7 +248,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **Also:** governance-drift cascade (oversight weakening after repeated success; bulk approvals / policy relaxations propagating across agents); auto-deployment cascade (an orchestrator pushes a tainted release to all connected agents); inter-agent feedback-loop amplification (agents reinforcing each other's outputs); shared-infrastructure availability cascade.
 
-**Origin-vs-propagation rule:** tag the *initial* defect as ASI04/06/07; add **ASI08 only when it spreads** across agents, sessions, or workflows.
+**Origin-vs-propagation rule (finding-level secondary trigger):** tag the *initial* defect as its mechanism (ASI04/06/07, etc.) as primary. Then **add ASI08 as a `tags[]` secondary only when a *compromised or corrupted* state propagates beyond the initial action — to other agents or into future runs**: a poisoned output/artifact consumed by another agent or reused in a later session, an orchestrator decision that fans out to all workers, or an unbounded retry / tool-loop that amplifies a bad state. A single agent merely *having* multiple steps is **not** cascade — the corruption must actually **spread**. If the blast radius is one contained action, leave ASI08 off. ASI08 is a roll-up — secondary, never alone; tag it **primary only** when uncontrolled propagation *itself* is the finding.
 
 **Praxen relevance:** Praxen — check for tool-loop detection, retry caps, and rate limits in config. Flag missing circuit breakers on capabilities that can fire in a loop (search, tool calls, retries).
 
@@ -306,7 +306,18 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Monitoring or logging that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
-**ASI10 is an outcome, not a mechanism** — the end state that ASI01–09 (and LLM06) *lead to*. So **default to the specific mechanism as the primary tag** and let ASI10 roll up (a `tags[]` secondary, or the compound/escalation judgment below). Tag **ASI10 as *primary* only — legal but rare** — for a **self-contained rogue behavior with no upstream vector to name**: reward hacking / specification gaming, self-replication, collusion, scheming / deceptive compliance, or self-directed capability expansion beyond authorization. If you can name the vector — goal redirected → **ASI01**, identity abused → **ASI03**, memory poisoned → **ASI06**, excessive capability / no gate → **LLM06** — *that* is primary and ASI10 is the roll-up. A **"no audit log / no monitoring" gap is a RAISE auditability finding, not ASI10** (OWASP treats logging as a mitigation, not a vulnerability — don't force a code onto it). Same discipline as ASI08's origin-vs-propagation rule.
+**ASI10 is an outcome, not a mechanism** — the end state that ASI01–09 (and LLM06) *lead to*. So **name the specific mechanism as the primary tag**, then decide ASI10 by one test.
+
+**The test — does the deviation outlive the action?** A one-time, direct attack that causes one action — or a short burst of actions — is **not** a rogue agent; that is the *mechanism* (LLM01 injection, LLM06 excessive agency, ASI02 tool misuse, ASI03 identity abuse). The agent did a bad thing and it's over. Add **ASI10 as a `tags[]` secondary only when the finding reaches the *core* of the agent** so it operates **out of bounds beyond that short-lived action** — persistently or on its own. Concretely, one of:
+
+- **Persistent alteration of the agent itself** — poisoned memory/context that carries into later turns or sessions, a **stored** goal / instruction / config override, or a tool / permission set expanded past the authorized baseline. The agent stays off-mission after the triggering action ends.
+- **Standing autonomy without oversight** — a fail-open full-autonomy mode, or a removed / disabled / default-off approval layer, under which the agent runs **unsupervised and self-directed**, not merely one ungated action.
+
+Ask: *when the immediate action(s) finish, is the agent still operating out of bounds?* **Yes → ASI10 secondary. No → mechanism only, no ASI10.** So an ungated pay action, a missing auth check, or a one-shot prompt injection an attacker must re-trigger each time is **not** ASI10 — its mechanism already captures it. A **"no audit log" gap is never ASI10** (a missing log doesn't alter the agent's core; it's a RAISE auditability finding). **Self-check:** if you're tagging ASI10 on more than a *minority* of findings, you've slid back to "any weakness → rogue" — re-read the test.
+
+- **Primary — legal but rare.** Tag ASI10 *primary* only for a **self-contained rogue behavior with no upstream vector to name**: reward hacking / specification gaming, self-replication, collusion, scheming / deceptive compliance, or self-directed capability expansion beyond authorization.
+
+Same origin-vs-propagation discipline as ASI08.
 
 **Praxen relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxen's mission is to detect the drift toward ASI10 before it becomes irreversible.
 

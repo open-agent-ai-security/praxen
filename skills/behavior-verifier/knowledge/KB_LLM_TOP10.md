@@ -127,10 +127,11 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 - LLM output rendered as HTML without encoding (XSS vector)
 - LLM output used as file path, API parameter, or network request without sanitization
 - Tool call parameters built from raw LLM output strings
+- An LLM-generated command or code executed after an **incomplete or bypassable** safety screen — a denylist that misses variants, a regex guard over a Turing-complete shell — so unsafe model output still reaches the sink (the screen *exists* but is inadequate)
 
 **Why this matters for agents:** Agents execute tool calls based on their own outputs. If those outputs can be influenced via prompt injection, the injection → tool execution chain is direct. The model is a confused deputy between the attacker and the downstream system.
 
-**Also:** SSRF / CSRF among the downstream outcomes. *(Boundary: LLM05 = validating output *before* a downstream sink; LLM09/overreliance = trusting the output's accuracy.)*
+**Also:** SSRF / CSRF among the downstream outcomes. *(Boundary: LLM05 = validating output *before* a downstream sink; **LLM06** = there is simply no gate on the capability at all. The split for agent code-execution is **gate vs. validation** — if a safety screen exists but the model's command/code slips through it inadequately checked (incomplete denylist, bypassable filter), that is **LLM05**, not LLM06. LLM09/overreliance = trusting the output's accuracy.)*
 
 **Praxen relevance:** Praxen (code patterns that pass LLM output to system functions without validation).
 
@@ -159,7 +160,7 @@ When Praxen detects a behavioral or environmental signal, map it to the relevant
 
 **Tag LLM06 when:** a capability the remit forbids or doesn't grant is present **and reachable** — *even if the finding reads as a control gap* ("no approval gate," "auto-approve," "no confirmation step"). A reachable remit-forbidden capability, or a **high-impact action with no human-in-the-loop gate**, **is** excessive agency/autonomy — tag LLM06; don't leave it untagged because it was framed as a missing control.
 
-**Boundary:** LLM06 is *having or using* the capability; **LLM05** is insufficient scrutiny of the output that drives it. Note OWASP lists logging/monitoring/rate-limiting as controls that **do not prevent** excessive agency (they only limit damage) — so a **pure logging / monitoring / audit-trail gap is a RAISE auditability finding, not LLM06** (and not an OWASP vuln at all): OWASP cites logging as a mitigation, never a vulnerability. Tag LLM06 for the *unguarded consequential action itself*, not for the missing log.
+**Boundary — gate vs. validation.** LLM06 is *having or using* a consequential capability with **no gate / an absent or fail-open approval / no isolation** — the control is *missing*. **LLM05** is when a control *exists* but the **model's own output (a generated command, code, or query) is screened inadequately before it runs** — an incomplete denylist, a bypassable filter, a regex guard that misses variants, unsanitized output passed to a shell/eval/SQL. *No control at all → LLM06; the model's output slips through inadequate screening → LLM05.* They co-apply only when both are independently true (e.g. a shell exec that is both ungated **and** poorly filtered). Separately, OWASP lists logging/monitoring/rate-limiting as controls that **do not prevent** excessive agency (they only limit damage) — so a **pure logging / monitoring / audit-trail gap is a RAISE auditability finding, not LLM06** (OWASP cites logging as a mitigation, never a vulnerability). Tag LLM06 for the *unguarded consequential action itself*, not for the missing log.
 
 **Praxen relevance:** Praxen — capability audit against the remit is a named high-priority check. Flag every tool and permission present in code but absent from the remit. This is the highest-priority RAISE Zero Trust category.
 

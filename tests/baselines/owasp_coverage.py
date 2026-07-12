@@ -203,14 +203,20 @@ OWASP_HEAT_CSS = """
   .heat-wrap { overflow:visible; margin-top:6px; }
   .heat-grid { display:grid; grid-template-columns:auto repeat(var(--n), minmax(30px,1fr)); gap:3px; }
   .heat-corner { font-size:10px; color:var(--muted-2); align-self:end; padding:0 8px 3px 0; white-space:nowrap; line-height:1.2; }
-  .heat-colh { text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted); padding-bottom:3px; }
-  .heat-rowh { font-family:var(--mono); font-size:11px; color:var(--muted); display:flex; align-items:center;
-    justify-content:flex-end; padding-right:8px; white-space:nowrap; }
-  .heat-rowh .heat-code { color:var(--text); }
+  .heat-colh { position:relative; text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted);
+    padding-bottom:3px; cursor:help; }
+  .heat-rowh { position:relative; font-family:var(--mono); font-size:11px; color:var(--muted); display:flex;
+    align-items:center; justify-content:flex-end; padding-right:8px; white-space:nowrap; cursor:help; }
+  .heat-colh .heat-code, .heat-rowh .heat-code { color:var(--text); }
+  .v2-tip.htip { min-width:0; white-space:nowrap; padding:6px 10px; }
+  .heat-colh .v2-tip.htip { left:50%; transform:translate(-50%,-3px); top:128%; }
+  .heat-colh:hover .v2-tip, .heat-rowh:hover .v2-tip { opacity:1; visibility:visible; }
+  .heat-colh:hover .v2-tip.htip { transform:translate(-50%,0); }
+  .heat-rowh:hover .v2-tip { transform:translateY(0); }
   .heat-cell { position:relative; aspect-ratio:1/1; min-height:32px; border-radius:5px; display:flex;
     align-items:center; justify-content:center; font-size:12.5px; font-weight:700;
     font-variant-numeric:tabular-nums; cursor:default; }
-  .heat-cell.heat-empty { background:var(--panel); box-shadow:inset 0 0 0 1px var(--border); }
+  .heat-cell.heat-empty { background:#0c1018; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
   .heat-cell:not(.heat-empty) { box-shadow:0 1px 2px rgba(0,0,0,.30); }
   .heat-cell:not(.heat-empty):hover { outline:2px solid var(--text); outline-offset:1px; z-index:8; }
   .heat-n { pointer-events:none; }
@@ -219,8 +225,8 @@ OWASP_HEAT_CSS = """
   .heat-legend { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px;
     font-size:12.5px; color:var(--muted); }
   .heat-legend .lg { display:inline-flex; align-items:center; gap:7px; }
-  .heat-empty-sw { width:15px; height:15px; border-radius:4px; background:var(--panel);
-    box-shadow:inset 0 0 0 1px var(--border); }
+  .heat-empty-sw { width:15px; height:15px; border-radius:4px; background:#0c1018;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
   .heat-bar { width:170px; height:13px; border-radius:7px; }
   .heat-ends { display:inline-flex; gap:9px; align-items:center; font-variant-numeric:tabular-nums; }
   .heat-ends .mut { color:var(--muted-2); }
@@ -321,9 +327,6 @@ def v2_chart(rows, cat, max_cov, accent_var, froz):
         pw = prim / max_cov * 100 if max_cov else 0
         sw = sec / max_cov * 100 if max_cov else 0
         fz = froz.get(code, 0)
-        flag = ""
-        if prim == 0 and sec > 0:
-            flag = '<span class="v2-flag sec">secondary only</span>'
         segp = (f'<span class="v2-seg p{" solo" if sec == 0 else ""}" style="width:{pw:.1f}%">'
                 f'{_tip("Primary", prim, d["pf"])}</span>') if prim > 0 else ""
         segs = (f'<span class="v2-seg s{" solo" if prim == 0 else ""}" '
@@ -331,7 +334,7 @@ def v2_chart(rows, cat, max_cov, accent_var, froz):
         tick = f'<span class="v2-fz" style="left:{min(fz / max_cov * 100, 99.5):.1f}%"></span>' if (fz and max_cov) else ""
         out.append(f'''
         <div class="v2-row{empty}">
-          <div class="v2-label"><span class="v2-code">{esc(code)}</span>{esc(title)}{flag}</div>
+          <div class="v2-label"><span class="v2-code">{esc(code)}</span>{esc(title)}</div>
           <div class="v2-track" style="--seg-accent:{accent_var};">{segp}{segs}{tick}<span class="v2-count">{cover}</span></div>
         </div>''')
     out.append('</div>')
@@ -369,12 +372,16 @@ def target_cards(per_target, out_dir: Path):
     return "\n".join(out)
 
 
-# cool -> hot sequential ramp (dark/cool for low counts, bright/warm for high).
-HEAT_STOPS = [(0.00, (30, 43, 94)),     # deep navy — coolest
-              (0.30, (63, 63, 160)),    # indigo
-              (0.55, (139, 63, 160)),   # purple
-              (0.78, (210, 75, 102)),   # rose
-              (1.00, (246, 161, 60))]   # hot orange — hottest
+# Thermal ramp: cold pairings are blue, hot pairings are red (blank = black).
+# Low→high runs dark blue → light blue → yellow → orange → red. Red is the
+# hottest, orange hotter than yellow; a pale bridge between blue and yellow keeps
+# the interpolation out of muddy green.
+HEAT_STOPS = [(0.00, (26, 47, 122)),    # dark blue — coldest (rarest pairing)
+              (0.28, (74, 149, 221)),   # light blue
+              (0.42, (207, 230, 245)),  # pale (bridge — avoids blue→yellow green)
+              (0.55, (246, 224, 74)),   # yellow
+              (0.76, (247, 146, 15)),   # orange
+              (1.00, (238, 28, 28))]    # red — hottest (most frequent pairing)
 
 
 def _heat(t):
@@ -421,10 +428,13 @@ def heatmap_html(base: Path):
     out = [f'<div class="heat-wrap"><div class="heat-grid" style="--n:{len(ASI_TITLES)}">']
     out.append('<div class="heat-corner">LLM&nbsp;↓<br>ASI&nbsp;→</div>')
     for a, title in ASI_TITLES:
-        out.append(f'<div class="heat-colh" title="{esc(a)} — {esc(title)}">{esc(a[3:])}</div>')
+        out.append(f'<div class="heat-colh" aria-label="{esc(a)} — {esc(title)}">'
+                   f'<span class="heat-code">{esc(a)}</span>'
+                   f'<span class="v2-tip htip"><b>{esc(a)} — {esc(title)}</b></span></div>')
     for l, ltitle in LLM_TITLES:
-        out.append(f'<div class="heat-rowh" title="{esc(l)} — {esc(ltitle)}">'
-                   f'<span class="heat-code">{esc(l)}</span></div>')
+        out.append(f'<div class="heat-rowh" aria-label="{esc(l)} — {esc(ltitle)}">'
+                   f'<span class="heat-code">{esc(l)}</span>'
+                   f'<span class="v2-tip htip"><b>{esc(l)} — {esc(ltitle)}</b></span></div>')
         for a, atitle in ASI_TITLES:
             fl = mat[l][a]
             n = len(fl)
