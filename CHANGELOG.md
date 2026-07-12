@@ -13,6 +13,23 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 _Nothing yet — staging the next change set._
 
+## [1.1.0] — 2026-07-12
+
+**Tagging Rigour — OWASP classification accuracy.** `schema_version` stays `"2.0"`; detection and RAISE scoring are unchanged. A round-trip over all 114 baseline findings confirms only the OWASP fields differ from the frozen 1.0.2 exemplars, so the 1.0.2 median-of-3 freeze is preserved as the 1.1 median.
+
+### Classification
+- **Primary vs secondary** OWASP tagging is now surfaced end to end: per-agent reports render co-applicable (secondary) codes as outlined chips distinct from the solid primary category, and the coverage page separates the two.
+- Sharpened the OWASP knowledge bases (`KB_LLM_TOP10`, `KB_AGENTIC_TOP10`) (#169, #111):
+  - `ASI08` / `ASI10` are **outcomes** — they roll up as a secondary only when the deviation *outlives the triggering action* (persistent core alteration or a standing loss of oversight for ASI10; a corrupted state that actually spreads for ASI08). One-shot exploits are the mechanism, not the outcome.
+  - `LLM05` vs `LLM06` split on **gate vs. validation**: no control on a consequential capability → LLM06; the model's generated command/code slips an inadequate screen → LLM05.
+  - Logging / monitoring / audit-trail gaps are **RAISE** findings, never forced onto an OWASP code.
+
+### Baseline
+- Re-froze the current baseline as **`v1.1-claude48/`** — the 1.0.2 findings re-tagged under the corrected KBs from a clean, un-hinted classifier pass (identical harness across all 12 targets). `CURRENT` → `v1.1-claude48`; `v1.0.2-claude48` becomes archival. The byte-render gate is scoped to the current set (+ `examples/`); archival sets keep schema validation only.
+
+### Reports
+- OWASP coverage page gains an **LLM × ASI co-occurrence heat map** (thermal scale, hover tooltips) and drops the redundant "secondary only" flags.
+
 ## [1.0.2] — 2026-07-11
 
 **A test-suite release: the regression baseline is re-frozen on the stable 1.0.x skill and the target roster is refreshed. No functional or skill changes** — `SKILL.md`, `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are unchanged; `schema_version` stays `"2.0"`; RAISE scoring is untouched. No analysis *logic* changed.
