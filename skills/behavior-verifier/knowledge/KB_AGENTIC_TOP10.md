@@ -306,7 +306,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Monitoring or logging that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
-**Tag ASI10 when:** the *conditions that let an agent go rogue undetected* are present — **even statically, before any active compromise**. A consequential capability with **no audit trail, self-approval in place of human or independent review, or monitoring that is absent / degraded / disableable** is an ASI10 finding — "failure of oversight" and "running without any oversight mechanism" are in the definition above. Do **not** leave *"no audit log," "self-approves," "no oversight mechanism"* findings uncategorised; they are the ASI10 precondition. Pair with **LLM06 (Excessive Agency)** for the underlying capability.
+**ASI10 is an outcome, not a mechanism** — the end state that ASI01–09 (and LLM06) *lead to*. So **default to the specific mechanism as the primary tag** and let ASI10 roll up (a `tags[]` secondary, or the compound/escalation judgment below). Tag **ASI10 as *primary* only — legal but rare** — for a **self-contained rogue behavior with no upstream vector to name**: reward hacking / specification gaming, self-replication, collusion, scheming / deceptive compliance, or self-directed capability expansion beyond authorization. If you can name the vector — goal redirected → **ASI01**, identity abused → **ASI03**, memory poisoned → **ASI06**, excessive capability / no gate → **LLM06** — *that* is primary and ASI10 is the roll-up. A **"no audit log / no monitoring" gap is a RAISE auditability finding, not ASI10** (OWASP treats logging as a mitigation, not a vulnerability — don't force a code onto it). Same discipline as ASI08's origin-vs-propagation rule.
 
 **Praxen relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxen's mission is to detect the drift toward ASI10 before it becomes irreversible.
 
@@ -342,9 +342,11 @@ Findings slide between neighbouring categories run-to-run when the boundary is l
 | Vector/embedding poisoning that **persists as agent memory** & alters reasoning across sessions | **ASI06 + LLM08** (co-tag) | LLM08-only |
 | A **one-shot** vector/embedding weakness with no cross-session persistence | **LLM08** (Vector & Embedding) | ASI06 |
 | Poisoning **non-vector** memory / session / context files | **ASI06** (Memory & Context Poisoning) | LLM08 |
-| An **oversight / accountability gap** over a consequential capability (no audit trail, self-approval, monitoring off) | **ASI10** (Rogue Agents) **+ LLM06** | leaving it untagged |
+| A **self-approval / no approval gate** on a consequential action | **LLM06** (Excessive Agency) | ASI10 |
+| A **self-contained rogue behavior** (reward hacking, self-replication, collusion, scheming) | **ASI10** (Rogue Agents) — *primary is legal but rare* | a named mechanism (ASI01/03/06) |
+| **No audit log / no monitoring / no alerting** (pure observability gap) | **RAISE only** — no OWASP code | ASI10 / LLM06 |
 
-**Rule of thumb:** name the code by the *mechanism*, not the symptom. An oversight/accountability gap is always **ASI10 (+ LLM06)** — never uncategorised. A capability the remit forbids is always **LLM06** — even when it surfaced as a missing control.
+**Rule of thumb:** name the code by the *mechanism*, not the symptom — and **prefer a specific mechanism over an outcome category** (ASI08, ASI10). A capability the remit forbids, or an unguarded consequential action, is **LLM06**. A **pure logging / monitoring / audit gap is RAISE, not OWASP** — don't force a code onto it.
 
 ---
 
