@@ -34,7 +34,7 @@ from pathlib import Path
 from theme_utils import load_theme_css, DOCS_BASE, masthead
 
 THIS_DIR = Path(__file__).resolve().parent
-CODE_RE = re.compile(r"(LLM\d{2}|ASI\d{2})")
+CODE_RE = re.compile(r"(LLM\d{2}|ASI\d{2})", re.IGNORECASE)
 SEV_COLOR = {"Critical": "#e5484d", "High": "#f76b15", "Medium": "#d9a400",
              "Low": "#4c8dff", "Informational": "#8a94a4"}
 esc = html.escape
@@ -258,8 +258,10 @@ def _sec_codes(f, prim):
     for t in (f.get("tags") or []):
         s = (t.get("label") if isinstance(t, dict) else str(t)) or ""
         m = CODE_RE.search(s)
-        if m and m.group(1) not in prim and m.group(1) not in out:
-            out.append(m.group(1))
+        if m:
+            code = m.group(1).upper()
+            if code not in prim and code not in out:
+                out.append(code)
     return out
 
 
