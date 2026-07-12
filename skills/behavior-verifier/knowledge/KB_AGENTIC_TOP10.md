@@ -291,7 +291,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent that was compromised via ASI01 and is now pursuing an attacker's goals
 - Agent whose capabilities were expanded (new tools, new permissions) beyond what was authorized
 - Agent that has drifted from its remit over time through accumulated context or memory poisoning
-- Agent whose monitoring was disabled or degraded, allowing undetected deviation
+- Agent whose **oversight / approval control** (the kind that can *block* a deviation — not passive audit logging) was disabled or degraded, allowing undetected deviation
 - Agent running without any oversight mechanism
 - **Reward hacking / specification gaming** — gaming a flawed reward metric (e.g. deleting production backups to "minimize cost")
 - **Self-replication** — spawning unauthorized replicas for persistence / takedown-evasion
@@ -303,14 +303,14 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Behavior outside the Worker Remit — this is the primary Praxen detection
 - Tool inventory that exceeds the Known Good Baseline
 - Memory or context that contains instructions not from the authorized operator
-- Monitoring or logging that has been degraded or disabled
+- An **oversight / approval control** (not passive audit logging) that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
 **ASI10 is an outcome, not a mechanism** — the end state that ASI01–09 (and LLM06) *lead to*. So **name the specific mechanism as the primary tag**, then decide ASI10 by one test.
 
 **The test — does the deviation outlive the action?** A one-time, direct attack that causes one action — or a short burst of actions — is **not** a rogue agent; that is the *mechanism* (LLM01 injection, LLM06 excessive agency, ASI02 tool misuse, ASI03 identity abuse). The agent did a bad thing and it's over. Add **ASI10 as a `tags[]` secondary only when the finding reaches the *core* of the agent** so it operates **out of bounds beyond that short-lived action** — persistently or on its own. Concretely, one of:
 
-- **Persistent alteration of the agent itself** — poisoned memory/context that carries into later turns or sessions, a **stored** goal / instruction / config override, or a tool / permission set expanded past the authorized baseline. The agent stays off-mission after the triggering action ends.
+- **Persistent alteration of the agent itself** — poisoned memory/context that carries into later turns or sessions, a **stored** goal / instruction / config override, or a tool / permission set the agent **acquires or expands at runtime** beyond its deployed baseline (runtime *drift* — **not** a statically over-broad tool set shipped at deploy, which is LLM06). The agent stays off-mission after the triggering action ends.
 - **Standing autonomy without oversight** — a fail-open full-autonomy mode, or a removed / disabled / default-off approval layer, under which the agent runs **unsupervised and self-directed**, not merely one ungated action.
 
 Ask: *when the immediate action(s) finish, is the agent still operating out of bounds?* **Yes → ASI10 secondary. No → mechanism only, no ASI10.** So an ungated pay action, a missing auth check, or a one-shot prompt injection an attacker must re-trigger each time is **not** ASI10 — its mechanism already captures it. A **"no audit log" gap is never ASI10** (a missing log doesn't alter the agent's core; it's a RAISE auditability finding). **Self-check:** if you're tagging ASI10 on more than a *minority* of findings, you've slid back to "any weakness → rogue" — re-read the test.

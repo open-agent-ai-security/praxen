@@ -38,17 +38,18 @@ scoring pipeline moved, so copying the tables here would only risk them drifting
 
 | Measure | v1.0.2 | v1.1 | Note |
 |---|--:|--:|---|
-| Findings | 114 | 114 | detection frozen |
-| No-OWASP (null/null) | 24 (21%) | 27 (23%) | honest taxonomy-reach; logging/observability/config → RAISE-only |
-| Secondary (co-applicable) chips | 3 | 19 | the primary/secondary layer, now surfaced |
-| LLM08 — Vector & Embedding | 0P / 0S | 0P / **3S** | memory/RAG store weakness rides as secondary on its dominant mechanism (ASI06 poisoning, LLM01 injection) |
-| LLM06 — Excessive Agency | 19P | 18P | slight de-inflation |
-| LLM05 — Improper Output Handling | 0P | 2P | previously under-tagged |
-| LLM04 — Data & Model Poisoning | 1P | 0P | the hermes memory case → ASI06 + LLM08 |
-| ASI01 / ASI09 primary | 10 / 1 | 9 / 0 | mechanism kept primary; ASI09 demoted to secondary |
-| ASI08 / ASI10 (Cascading / Rogue) | 0 | 0 | **outcomes — legal but rare; none of the corpus is a self-contained end-state** |
+Counts are from a clean, un-hinted classifier pass (identical harness across all 12 targets); primary = the `owasp_llm`/`owasp_agentic` scalar, secondary = co-applicable codes in `tags[]`.
 
-**Primaries stayed stable** (the scoring frame is reproducible); the change is that
-**co-applicable categories are now recorded as secondary** instead of being forced into the
-single primary slot or dropped — the structural fix that makes tagging both accurate and
-stable. See `../../../CHANGELOG.md` and the 1.1 KBs for the full rationale.
+| Measure | v1.0.2 | v1.1 | Note |
+|---|--:|--:|---|
+| Findings | 114 | 114 | detection frozen |
+| No-OWASP (null/null) | 24 (21%) | 25 (22%) | honest taxonomy reach; logging/observability/config → RAISE-only |
+| Secondary (co-applicable) chips | 3 | 28 | the primary/secondary layer, now surfaced |
+| LLM06 — Excessive Agency | 19P / 1S | 23P / 6S | the largest LLM primary; co-applies with LLM05 on ungated raw-exec |
+| LLM05 — Improper Output Handling | 0P / 0S | 4P / 6S | raw model-output-to-sink (esp. code exec) now tagged — orthogonal to LLM06, co-occurs with ASI05 |
+| LLM01 / LLM02 primary | 12 / 15 | 13 / 16 | injection + credential-disclosure (LLM02×ASI03) each up one |
+| LLM04 / LLM08 primary | 1 / 0 | 1 / 0 | unchanged — LLM08 is not exercised as a primary in this corpus |
+| ASI01 / ASI09 primary | 10 / 1 | 9 / 0 | mechanism kept primary; ASI09 → secondary |
+| ASI10 (Rogue) / ASI08 (Cascading) | 0 / 0 | 0P + **5S** / 0 | outcomes — ASI10 rides secondary on the 5 findings whose deviation *outlives the action*; ASI08 doesn't attach at the finding level (cascade is system-level) |
+
+**Primaries stayed stable** across the corrected passes (the scoring frame is reproducible — LLM06 is robustly the largest, ~23–24 on independent cold runs); the change is that **co-applicable categories are now recorded as secondary** instead of being forced into one slot or dropped. The largest lift is the **LLM05/LLM06 orthogonality fix**: a raw `exec(model_output)` is *both* Improper Output Handling and Excessive Agency (plus ASI05), so those now co-tag rather than one excluding the other. See `../../../CHANGELOG.md` and the 1.1 KBs for the full rationale.
