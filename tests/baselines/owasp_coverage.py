@@ -199,6 +199,35 @@ OWASP_V2_CSS = """
   @media (max-width:720px){ .v2-row{ grid-template-columns:1fr; } .v2-label{ margin-bottom:4px; } }
 """
 
+OWASP_HEAT_CSS = """
+  .heat-wrap { overflow:visible; margin-top:6px; }
+  .heat-grid { display:grid; grid-template-columns:auto repeat(var(--n), minmax(30px,1fr)); gap:3px; }
+  .heat-corner { font-size:10px; color:var(--muted-2); align-self:end; padding:0 8px 3px 0; white-space:nowrap; line-height:1.2; }
+  .heat-colh { text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted); padding-bottom:3px; }
+  .heat-rowh { font-family:var(--mono); font-size:11px; color:var(--muted); display:flex; align-items:center;
+    justify-content:flex-end; padding-right:8px; white-space:nowrap; }
+  .heat-rowh .heat-code { color:var(--text); }
+  .heat-cell { position:relative; aspect-ratio:1/1; min-height:32px; border-radius:5px; display:flex;
+    align-items:center; justify-content:center; font-size:12.5px; font-weight:700;
+    font-variant-numeric:tabular-nums; cursor:default; }
+  .heat-cell.heat-empty { background:var(--panel); box-shadow:inset 0 0 0 1px var(--border); }
+  .heat-cell:not(.heat-empty) { box-shadow:0 1px 2px rgba(0,0,0,.30); }
+  .heat-cell:not(.heat-empty):hover { outline:2px solid var(--text); outline-offset:1px; z-index:8; }
+  .heat-n { pointer-events:none; }
+  .heat-cell:hover .v2-tip { opacity:1; visibility:visible; transform:translateY(0); }
+
+  .heat-legend { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px;
+    font-size:12.5px; color:var(--muted); }
+  .heat-legend .lg { display:inline-flex; align-items:center; gap:7px; }
+  .heat-empty-sw { width:15px; height:15px; border-radius:4px; background:var(--panel);
+    box-shadow:inset 0 0 0 1px var(--border); }
+  .heat-bar { width:170px; height:13px; border-radius:7px; }
+  .heat-ends { display:inline-flex; gap:9px; align-items:center; font-variant-numeric:tabular-nums; }
+  .heat-ends .mut { color:var(--muted-2); }
+
+  @media (max-width:640px){ .heat-wrap { overflow-x:auto; } .heat-grid { min-width:520px; } }
+"""
+
 
 def _load_findings(base: Path, slug: str):
     """Return (findings, agent_name) for a slug, from a nested baseline file
@@ -340,6 +369,85 @@ def target_cards(per_target, out_dir: Path):
     return "\n".join(out)
 
 
+# cool -> hot sequential ramp (dark/cool for low counts, bright/warm for high).
+HEAT_STOPS = [(0.00, (30, 43, 94)),     # deep navy — coolest
+              (0.30, (63, 63, 160)),    # indigo
+              (0.55, (139, 63, 160)),   # purple
+              (0.78, (210, 75, 102)),   # rose
+              (1.00, (246, 161, 60))]   # hot orange — hottest
+
+
+def _heat(t):
+    """Map t in [0,1] to (bg_hex, text_hex) along the cool->hot ramp."""
+    t = max(0.0, min(1.0, t))
+    rgb = HEAT_STOPS[-1][1]
+    for (t0, c0), (t1, c1) in zip(HEAT_STOPS, HEAT_STOPS[1:]):
+        if t <= t1:
+            f = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
+            rgb = tuple(round(a + (b - a) * f) for a, b in zip(c0, c1))
+            break
+    lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+    return "#%02x%02x%02x" % rgb, ("#17162b" if lum > 0.6 else "#ffffff")
+
+
+def cooccurrence(base: Path):
+    """mat[llm][asi] -> [(sev,agent,summary), ...] for findings carrying both
+    that LLM and that Agentic code (primary OR secondary); plus max cell, n_both."""
+    llm = [c for c, _ in LLM_TITLES]
+    asi = [c for c, _ in ASI_TITLES]
+    mat = {l: {a: [] for a in asi} for l in llm}
+    n_both = 0
+    for slug, name, _, _ in TARGETS:
+        findings, agent = _load_findings(base, slug)
+        for f in findings:
+            prim = _prim_codes(f)
+            codes = set(prim) | set(_sec_codes(f, prim))
+            ls = [c for c in codes if c in mat]
+            as_ = [c for c in codes if c in asi]
+            if ls and as_:
+                n_both += 1
+            sev = f.get("severity", "Informational")
+            summ = (f.get("summary") or "").strip()
+            for l in ls:
+                for a in as_:
+                    mat[l][a].append((sev, agent, summ))
+    maxv = max((len(mat[l][a]) for l in llm for a in asi), default=0)
+    return mat, maxv, n_both
+
+
+def heatmap_html(base: Path):
+    mat, maxv, n_both = cooccurrence(base)
+    used = sum(1 for l, _ in LLM_TITLES for a, _ in ASI_TITLES if mat[l][a])
+    out = [f'<div class="heat-wrap"><div class="heat-grid" style="--n:{len(ASI_TITLES)}">']
+    out.append('<div class="heat-corner">LLM&nbsp;↓<br>ASI&nbsp;→</div>')
+    for a, title in ASI_TITLES:
+        out.append(f'<div class="heat-colh" title="{esc(a)} — {esc(title)}">{esc(a[3:])}</div>')
+    for l, ltitle in LLM_TITLES:
+        out.append(f'<div class="heat-rowh" title="{esc(l)} — {esc(ltitle)}">'
+                   f'<span class="heat-code">{esc(l)}</span></div>')
+        for a, atitle in ASI_TITLES:
+            fl = mat[l][a]
+            n = len(fl)
+            if not n:
+                out.append('<div class="heat-cell heat-empty"></div>')
+                continue
+            t = (n - 1) / (maxv - 1) if maxv > 1 else 1.0
+            bg, txt = _heat(t)
+            tip = _tip(f"{l} × {a}", n, fl)
+            out.append(f'<div class="heat-cell" style="background:{bg};color:{txt}">'
+                       f'<span class="heat-n">{n}</span>{tip}</div>')
+    out.append('</div></div>')
+    grad = ", ".join(_heat(i / 8)[0] for i in range(9))
+    out.append(f'''
+    <div class="heat-legend">
+      <span class="lg"><span class="heat-empty-sw"></span> no co-occurrence</span>
+      <span class="lg"><span class="heat-bar" style="background:linear-gradient(90deg,{grad})"></span></span>
+      <span class="lg heat-ends"><span>1</span><span class="mut">cooler → hotter</span><span>{maxv}</span></span>
+      <span class="lg" style="margin-left:auto; color:var(--muted-2)">hover a cell for the findings behind it</span>
+    </div>''')
+    return "\n".join(out), n_both, used, maxv
+
+
 def build_report(base: Path, compare: Path, out_path: Path) -> str:
     cat, per_target, total = gather(base)
     out_dir = out_path.resolve().parent
@@ -352,6 +460,7 @@ def build_report(base: Path, compare: Path, out_path: Path) -> str:
     n_targets = len(per_target)
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y, %H:%M UTC")
     theme_css = load_theme_css()
+    heat_grid, heat_both, heat_used, heat_max = heatmap_html(base)
 
     legend = '''
     <div class="v2-legend">
@@ -368,7 +477,8 @@ def build_report(base: Path, compare: Path, out_path: Path) -> str:
 <title>Praxen — OWASP Coverage Across Baseline Targets</title>
 <style>{theme_css}
 {OWASP_CSS}
-{OWASP_V2_CSS}</style>
+{OWASP_V2_CSS}
+{OWASP_HEAT_CSS}</style>
 </head>
 <body class="report-page">
 <div class="wrap">
@@ -404,6 +514,12 @@ def build_report(base: Path, compare: Path, out_path: Path) -> str:
     <h2>OWASP Agentic Top 10 — coverage by category</h2>
     <p class="intro">How the <a href="https://genai.owasp.org/resource/agentic-ai-threats-and-mitigations/" target="_blank" rel="noopener">OWASP Top 10 for Agentic AI Applications 2026</a> categories apply. Outcome categories — Cascading Failures, Rogue Agents — appear hatched-only: they're real concerns, but a more specific category is usually the primary one.</p>
     {v2_chart(ASI_TITLES, cat, max_asi, "var(--accent-2)", froz)}
+  </section>
+
+  <section>
+    <h2>Where LLM and Agentic risks meet <span class="scope">co-occurrence heat map</span></h2>
+    <p class="intro">Every square counts the findings tagged with <em>both</em> that LLM category (row) and that Agentic category (column) — primary or secondary. It shows how a model-layer weakness and an agent-layer weakness combine in the same finding: <strong>{heat_both}</strong> of {total} findings span both layers, lighting <strong>{heat_used}</strong> of 100 pairings. Blank squares are pairings that never co-occur; hotter squares occur more often (peak {heat_max}).</p>
+    {heat_grid}
   </section>
 
   <section>
