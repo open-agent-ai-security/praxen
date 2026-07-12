@@ -48,7 +48,7 @@ FIXTURE = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.canonical.json")
 # tests/remits/<slug>.md. Only the CURRENT baseline set is gated this way; older
 # sets are retained on disk as archival diff-history and are NOT re-checked against
 # evolving remits (schema + byte-render still apply to them). Bump on each re-baseline.
-CURRENT_BASELINE = "v1.0.2-claude48"
+CURRENT_BASELINE = "v1.1-claude48"
 
 sys.path.insert(0, SKILL_DIR)
 import schema  # noqa: E402

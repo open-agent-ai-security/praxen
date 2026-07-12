@@ -28,7 +28,7 @@ THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 from theme_utils import load_theme_css, masthead  # noqa: E402
 
-DEFAULT_BASELINE = THIS_DIR / "v1.0.2-claude48"
+DEFAULT_BASELINE = THIS_DIR / "v1.1-claude48"
 DEFAULT_OUT = THIS_DIR / "suite-health-report.html"
 SNAPSHOT_DATE = "2026-07-11"
 

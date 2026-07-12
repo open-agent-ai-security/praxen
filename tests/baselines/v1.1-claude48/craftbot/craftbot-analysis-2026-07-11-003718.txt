@@ -1,0 +1,169 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    CraftBot
+Analysis: July 11, 2026, 00:37 UTC
+Praxen v1.0.1
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a full external-input-to-host-execution chain with no
+code-level interposition at any hop. Untrusted content (web pages via
+web_fetch, inbound messages, imported Living UI projects) reaches the LLM
+context unsanitized — the PromptSanitizer that exists is wired to nothing —
+and the model's output is executed as Python through exec()/subprocess in
+executor.py, where the "sandbox" is a same-user venv that shares the host
+filesystem, network, and environment. Every high-impact approval the remit
+requires lives only as instruction text in the system prompt
+(agent_core/core/prompts/context.py/action.py); there is no code-enforced
+approval gate. Layered on top, the agent's own system-prompt-injected identity
+file (SOUL.md) and scheduled auto-written MEMORY.md are writable without
+operator confirmation, turning the same injection path into an ASI06
+persistence chain. Genuine controls do exist — the operator control plane
+binds localhost, a consecutive-LLM-failure abort caps runaway loops, and error
+strings are redacted — but they sit beside the unguarded exec/approval core.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.15 / 5.0   (Ad hoc)
+  Limit Your Domain              1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 5   Medium: 4   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 2   Gap: 7   Partial: 4   Vague: 1   Enforcement-not-possible: 3   (of 17 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Supply Chain                                       2
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           1
+  LLM06  Excessive Agency                                   1
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       2
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-11-001  Model-generated Python is executed on the host via
+            exec()/subprocess with no isolation, no code approval, and the
+            operator's full environment.
+      Action 1: Run all model-generated code in a real isolation boundary
+                (container/microVM with dropped network and a scrubbed
+                environment) instead of a same-user venv, and strip
+                secret-bearing env vars before exec.
+      Action 2: Gate any state-changing or destructive execution behind a
+                code-enforced operator approval step in executor.py, not
+                prompt text.
+
+  PRAX-2026-07-11-002  Every high-impact approval the remit requires exists
+            only as system-prompt instructions; there is no code-enforced
+            approval gate.
+      Action 1: Introduce a code-level approval checkpoint in the action
+                executor/manager that blocks send/post/pay/delete/exec actions
+                until an explicit operator confirmation is recorded.
+      Action 2: Classify actions by impact and require approval for the
+                high-impact classes regardless of model output.
+
+  PRAX-2026-07-11-003  Inbound messaging defaults to auto_reply=true with no
+            sender-identity check, so an unknown sender can drive the agent as
+            the operator.
+      Action 1: Add an operator-identity allowlist check that runs before any
+                inbound message is treated as a command or auto-replied,
+                defaulting auto_reply to false.
+      Action 2: Route messages from unrecognized senders to an
+                approval/notification path rather than the command pipeline.
+
+  PRAX-2026-07-11-004  Untrusted external content reaches the LLM context
+            unsanitized and the model's output is executed as host code — a
+            one-hop injection-to-RCE chain.
+      Action 1: Treat all external/tool-returned content as untrusted: wire
+                the existing PromptSanitizer (or a stronger boundary) into the
+                ingestion path and mark such content
+                non-executable-provenance.
+      Action 2: Combine with the code-enforced exec approval and isolation
+                from findings 001/002 to break the chain end to end.
+
+  PRAX-2026-07-11-005  Writable system-prompt identity file (SOUL.md) and
+            auto-written MEMORY.md plus the injection-to-exec path form an
+            ASI06 persistence-and-execution chain.
+      Action 1: Require code-enforced operator confirmation before any write
+                to SOUL.md/AGENT.md/USER.md or the memory store, and keep
+                these files version-controlled/audited.
+      Action 2: Break the persistence chain by fixing the injection ingress
+                (004) and the exec/approval gaps (001/002).
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-11-006  A full PromptSanitizer injection-filter module exists
+            but is never called anywhere in the codebase.
+      Action 1: Invoke the sanitizer (or a stronger trust boundary) at every
+                ingestion point for user, web, and tool-returned content.
+      Action 2: Treat the regex denylist as defense-in-depth only; do not rely
+                on it as the sole injection control.
+
+  PRAX-2026-07-11-007  Operator secrets are stored as plaintext JSON at rest —
+            integration tokens in .credentials/ and LLM API keys in
+            settings.json — not in a keychain or encrypted store.
+      Action 1: Move secrets to an OS keychain (Keychain/DPAPI/libsecret) or
+                an encrypted store; keep only references in settings.json /
+                .credentials/.
+      Action 2: Migrate existing plaintext secrets on upgrade and scrub them
+                from the config files.
+
+  PRAX-2026-07-11-008  Living UI backends launch uvicorn bound to 0.0.0.0,
+            exposing agent-operated services to the whole local network
+            unauthenticated.
+      Action 1: Bind Living UI backends and the sidecar proxy to 127.0.0.1 by
+                default; require explicit operator opt-in and authentication
+                for any non-loopback bind.
+      Action 2: Remove shell=True from the Windows uvicorn launch to avoid
+                command-construction risk.
+
+  PRAX-2026-07-11-009  The agent can rewrite its own identity/policy files
+            (SOUL.md, AGENT.md, USER.md) and long-term MEMORY.md without
+            code-enforced operator confirmation.
+      Action 1: Require an explicit operator-confirmation step in code before
+                any write to the identity/policy files or the memory store.
+      Action 2: Version-control and audit these files so unattended edits are
+                detectable.
+
+  PRAX-2026-07-11-010  Third-party MCP servers and imported code run without
+            isolation or provenance vetting; the filesystem MCP is enabled by
+            default with broad write scope.
+      Action 1: Pin MCP server versions and require an operator-approved
+                allowlist before a server may run; scope the filesystem server
+                to a designated workspace path, not ".".
+      Action 2: Run MCP servers and imported projects in an isolated context
+                without access to the operator's credential store.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

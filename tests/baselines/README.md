@@ -5,7 +5,7 @@
 
 # Test-suite baselines
 
-Frozen runs of the test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v1.0.2-claude48/`** — **12 targets** on the Praxen 1.0.x skill under **Anthropic Claude Opus 4.8**, against the intent-level Worker Remits, frozen via a **median-of-3** process (see its [`BASELINE.md`](v1.0.2-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The prior **`v0.7.7-claude48/`** set (and the older `v0.7.x-sequential/` sets) are retained on disk as **archival diff-history** — schema + byte-render still checked, but the remit-verbatim check is scoped to the current set only (`test_render.py:CURRENT_BASELINE`), since archival findings quote the remits as they were at freeze time.
+Frozen runs of the test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v1.1-claude48/`** — the same **12 targets** as `v1.0.2-claude48` with OWASP classification **re-tagged** under the corrected 1.1 knowledge bases; detection, evidence, and every RAISE score are byte-identical, so the **median-of-3** freeze carries over unchanged (see its [`BASELINE.md`](v1.1-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The prior **`v1.0.2-claude48/`** and **`v0.7.7-claude48/`** sets (and the older `v0.7.x-sequential/` sets) are retained on disk as **archival diff-history** — schema + byte-render still checked, but the remit-verbatim check is scoped to the current set only (`test_render.py:CURRENT_BASELINE`), since archival findings quote the remits as they were at freeze time.
 
 ## Layout
 
@@ -14,7 +14,8 @@ baselines/
   README.md                       ← this file
   owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
   owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
-  v1.0.2-claude48/                 ← CURRENT — 12 targets, Praxen 1.0.x on Opus 4.8 (median-of-3, schema 2.0)
+  v1.1-claude48/                   ← CURRENT — v1.0.2 findings, OWASP re-tagged under the 1.1 KBs (scoring identical)
+  v1.0.2-claude48/                 ← archival (superseded; 12 targets, median-of-3, schema 2.0)
   v0.7.7-claude48/                 ← archival (superseded; remit-verbatim not re-checked)
   suite-health-report.html         ← committed snapshot; popularity + freshness companion
   raise-coverage-report.html       ← committed snapshot; RAISE coverage companion
