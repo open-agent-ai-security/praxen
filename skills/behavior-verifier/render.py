@@ -379,7 +379,7 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
     tags[] — gets an extra ``tag-secondary`` class so it shows outlined rather than
     solid, distinguishing the finding's main category from the ones it also touches."""
     cls = _TAG_CLASS[tag["kind"]]
-    if tag["kind"] in ("owasp_llm", "owasp_agentic"):
+    if tag["kind"] in ("owasp_llm", "owasp_agentic") and isinstance(tag.get("label"), str):
         m = re.match(r"\s*([A-Za-z]+\d+)", tag["label"])
         if m and m.group(1) not in primary_codes:
             cls += " tag-secondary"

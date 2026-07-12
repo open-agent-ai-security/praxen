@@ -256,7 +256,7 @@ def _prim_codes(f):
 def _sec_codes(f, prim):
     out = []
     for t in (f.get("tags") or []):
-        s = t.get("label", "") if isinstance(t, dict) else str(t)
+        s = (t.get("label") if isinstance(t, dict) else str(t)) or ""
         m = CODE_RE.search(s)
         if m and m.group(1) not in prim and m.group(1) not in out:
             out.append(m.group(1))

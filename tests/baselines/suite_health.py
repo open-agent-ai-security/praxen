@@ -77,7 +77,7 @@ def read_maturity(baseline_dir: Path, slug: str):
     if not js:
         return None, None
     d = json.loads(js[-1].read_text(encoding="utf-8"))
-    w = d.get("raise_posture", {}).get("weighted_overall")
+    w = (d.get("raise_posture") or {}).get("weighted_overall")
     return (float(w), maturity_label(float(w))) if w is not None else (None, None)
 
 
