@@ -50,6 +50,17 @@ re-baseline, 1.2 re-freezes `v1.2-claude48` at release.
   a category, **add new baseline app(s)** here in 1.2 to cover it — LLM05/output-handling is the
   known one to backfill. Measured against the `owasp_coverage.py` matrix (no zero columns).
 
+### G · Scoring rigour (#48) — *explicitly deferred from 1.1*
+- **#48** — RAISE scoring-guidance rigour. **Pushed out of 1.1 into 1.2 on purpose:** 1.1 held
+  scoring constant (tagging-only) precisely so `v1.1-claude48` is the clean, scoring-unchanged
+  *"before"* this work is graded against. 1.2 owns tightening the RAISE rubric — **severity
+  anchoring** (decidable Critical-vs-High / Medium-vs-Low criteria) and category-score guidance —
+  to shrink run-to-run score variance. Pairs with the **directional-lean** correction in
+  "Carried-forward watch-items" below (both need a **human-anchored reference**). Measure
+  **median-of-3 on both sides**, graded vs `v1.1-claude48`. Same over-steer/contamination
+  discipline the 1.1 tagging work hard-won applies here, amplified — scoring is even more
+  seductive to steer than tagging.
+
 ### E · Harness support
 - **#151** — Google Antigravity (`agy` CLI) as a supported harness.
 
@@ -83,3 +94,38 @@ re-baseline, 1.2 re-freezes `v1.2-claude48` at release.
 1.2 also intentionally moves numbers (#7 schema shape, #104/#41 add findings) → re-freeze
 `v1.2-claude48`, graded vs `v1.1-claude48`. Because #7 changes the schema contract, plan the
 re-baseline + render-pipeline refactor as one coherent migration.
+
+## Clean-run validation (2026-07-12) — empirical inputs for the buckets above
+Before prod, all **12 baseline targets were re-scanned by fresh independent agents** (new
+agents, source + remit only, no baseline peek) against `v1.1-claude48`. All 12 completed
+schema-valid with **zero watchdog deaths**, and **detection reproduced** — the major vulns were
+re-found on every target (verified by finding *content*; no genuine misses). The *divergences*
+map onto this plan and should inform the work:
+
+- **→ A (#5 / #7 stable rule IDs) — highest-value prod item.** `policy_rule_ids` (`R-NN`) are
+  assigned **per-scan** and not tied to the remit, so baseline `R-15` ≠ fresh `R-15`; a
+  scan-to-scan diff **can't join on them** (it took hand-matching finding content to confirm
+  detection held). With more users you need *mechanical* scan-vs-scan regression detection — #5's
+  remit cross-check + #7's arrays are exactly what makes that possible. The clean run is a live
+  demonstration of the need.
+- **→ B (#29 themes primer / #33 interleaved emission).** Finding *counts* varied widely at equal
+  substance (hermes 11 vs 5, aider 11 vs 6) — a decomposition/splitting inconsistency #29/#33
+  would stabilise; it also inflates apparent divergence and muddies score comparison.
+- **→ C (#65 / #33 reliability).** 0 deaths this run, but several scans ran **13–14 min, right at
+  the watchdog edge**; at prod scale (historical ~30% mortality) that's fragile — #65 resilience +
+  #33 killing the Step-9.9 synthesis burst address it directly.
+- **→ D (coverage) — UPDATE / likely strike.** **LLM05 is no longer a zero column:** 1.1's
+  LLM05/LLM06 orthogonality fix recovered it to **4P / 6S** on the code-exec findings. Verify
+  against the `owasp_coverage.py` matrix, then the "backfill output-handling targets for LLM05"
+  contingency here can likely be **removed**.
+- **→ G (#48 scoring) — empirical baseline.** RAISE-score reproducibility: **5/12 exact, mean
+  |drift| 0.17 / 5.0, max 0.55**, and it is **entirely severity-calibration on borderline
+  findings** (deepagents +0.55 and salesforce +0.45 lean *lenient* — a Critical scored as High).
+  This pinpoints **severity anchoring** as #48's lever and names the two worst-offender targets to
+  calibrate against. Caveat: single-pass fresh vs a median-of-3 baseline overstates true variance
+  slightly — #48 must measure median-of-3 on both sides.
+
+Bottom line for prod sequencing: the reliability wins here are **A (stable IDs, so regressions
+are detectable at all)** and **C (engine resilience, so scans don't die at scale)** — ahead of
+the output-polish items. 1.1 fixed the *visible* problem (tagging); this run says the
+*prod-reliability* problem is schema-stable-IDs + engine-resilience, which is what 1.2 carries.
