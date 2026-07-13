@@ -13,6 +13,41 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 _Nothing yet — staging the next change set._
 
+## [1.1.0] — 2026-07-12
+
+**Tagging Rigour — OWASP classification accuracy.** `schema_version` stays `"2.0"`; detection and RAISE scoring are unchanged. A round-trip over all 114 baseline findings confirms only the OWASP fields differ from the frozen 1.0.2 exemplars, so the 1.0.2 median-of-3 freeze is preserved as the 1.1 median.
+
+### Classification
+- **Primary vs secondary** OWASP tagging is now surfaced end to end: per-agent reports render co-applicable (secondary) codes as outlined chips distinct from the solid primary category, and the coverage page separates the two.
+- Sharpened the OWASP knowledge bases (`KB_LLM_TOP10`, `KB_AGENTIC_TOP10`) (#169, #111):
+  - `ASI08` / `ASI10` are **outcomes** — they roll up as a secondary only when the deviation *outlives the triggering action* (persistent core alteration or a standing loss of oversight for ASI10; a corrupted state that actually spreads for ASI08). One-shot exploits are the mechanism, not the outcome.
+  - `LLM05` vs `LLM06` split on **gate vs. validation**: no control on a consequential capability → LLM06; the model's generated command/code slips an inadequate screen → LLM05.
+  - Logging / monitoring / audit-trail gaps are **RAISE** findings, never forced onto an OWASP code.
+
+### Baseline
+- Re-froze the current baseline as **`v1.1-claude48/`** — the 1.0.2 findings re-tagged under the corrected KBs from a clean, un-hinted classifier pass (identical harness across all 12 targets). `CURRENT` → `v1.1-claude48`; `v1.0.2-claude48` becomes archival. The byte-render gate is scoped to the current set (+ `examples/`); archival sets keep schema validation only.
+
+### Reports
+- OWASP coverage page gains an **LLM × ASI co-occurrence heat map** (thermal scale, hover tooltips) and drops the redundant "secondary only" flags.
+
+## [1.0.2] — 2026-07-11
+
+**A test-suite release: the regression baseline is re-frozen on the stable 1.0.x skill and the target roster is refreshed. No functional or skill changes** — `SKILL.md`, `schema.py`, `render.py`, `manifest_to_findings.py`, and the four knowledge bases are unchanged; `schema_version` stays `"2.0"`; RAISE scoring is untouched. No analysis *logic* changed.
+
+### Baseline
+- Re-froze the regression suite as **`tests/baselines/v1.0.2-claude48/`** — 12 targets, Praxen 1.0.x on Opus 4.8, median-of-3. Supersedes `v0.7.7-claude48`, now retained as **archival diff-history**.
+- `test_render.py` now scopes the **remit-verbatim** check to the current baseline set (`CURRENT_BASELINE`), so refreshing a shared remit no longer retroactively breaks archived baselines' quotes (they keep schema + byte-render checks).
+
+### Target roster
+- **Added:** CraftBot (#116), uAgents (#64), Agentforce (`salesforce/help-agent-accelerator`).
+- **Retired:** `sweep` (#69), `langchain-sql` (#70), and `devika` — all dormant/archived upstreams. *Deviation from plan:* `langchain-sql` was **dropped rather than replaced** (the only DB / NL-to-SQL archetype), pending a future replacement; the LLM08 (vector/embedding) coverage hole that opens is tracked in #169.
+- **Remits:** the 8 retained remits that had drifted to the pre-template skeleton were **regenerated to the current template** (authored from docs, intent-preserving, quality-audited) and re-characterized median-of-3; the `hermes` remit was independently re-authored (SSH-tunnel mode retired upstream). Fuller, template-conformant remits credit operative controls a notch more — small intended upward movement, measured **old-remit → new-remit on the 1.0.x skill** to isolate the remit change (e.g. aider 1.70→2.00, deepagents 2.30→2.70; the "before" figures are the pre-refresh characterization, not the `v0.7.7-claude48` predecessor medians). Intent was preserved.
+
+### Docs
+- Added a **Suite Health** coverage companion (`tests/baselines/suite-health-report.html`, generator `suite_health.py`) — GitHub stars, development freshness, and an activity×maturity view — cross-linked with the OWASP and RAISE coverage pages; all three regenerated against the new set.
+
+Closes #69, #70, #116, #64.
+
 ## [1.0.1] — 2026-07-08
 
 **A behaviorally-inert patch: a plain-text report fix and public-metadata corrections.** The scan engine's analysis *logic* is unchanged — `schema.py`, `manifest_to_findings.py`, and the four knowledge bases are byte-identical to `1.0.0`, `schema_version` stays `"2.0"`, and RAISE scoring is untouched; the only `SKILL.md` edit is a dangling-reference cleanup in the optional-`description` field gloss (no detection or scoring change). So no analysis result can change. Every committed baseline's findings JSON and HTML re-render byte-identically; only the plain-text (`.txt`) renders change, by design (see below).

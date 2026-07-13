@@ -44,8 +44,19 @@ RENDER_PY = os.path.join(SKILL_DIR, "render.py")
 TEMPLATE = os.path.join(SKILL_DIR, "report_template.html")
 FIXTURE = os.path.join(REPO_ROOT, "tests", "fixtures", "finbot.canonical.json")
 
+# The remit-verbatim invariant binds a baseline's rule_text to the *current*
+# tests/remits/<slug>.md. Only the CURRENT baseline set is gated this way; older
+# sets are retained on disk as archival diff-history and are NOT re-checked against
+# evolving remits (schema + byte-render still apply to them). Bump on each re-baseline.
+# Single source of truth: the CURRENT marker file the coverage generators also read,
+# so the two can't drift and silently gate the wrong set on a re-baseline.
+CURRENT_BASELINE = (Path(REPO_ROOT) / "tests" / "baselines" / "CURRENT").read_text(encoding="utf-8").strip()
+assert (Path(REPO_ROOT) / "tests" / "baselines" / CURRENT_BASELINE).is_dir(), \
+    f"CURRENT names {CURRENT_BASELINE!r} but tests/baselines/{CURRENT_BASELINE}/ does not exist"
+
 sys.path.insert(0, SKILL_DIR)
 import schema  # noqa: E402
+import render  # noqa: E402
 
 _passed = 0
 _failed = 0
@@ -181,6 +192,33 @@ def main():
                 "--out-html", out_html2, "--out-txt", out_txt2])
     check("HTML render is byte-deterministic", read_bytes(out_html) == read_bytes(out_html2))
     check("TXT render is byte-deterministic", read_bytes(out_txt) == read_bytes(out_txt2))
+
+    # ── #111: OWASP tag-label separator normalisation (deterministic layer) ───
+    _canon = render._canon_owasp_tag_label
+    check("#111 hyphen separator canonicalises to em-dash",
+          _canon("LLM01 - Prompt Injection") == "LLM01 — Prompt Injection")
+    check("#111 colon separator canonicalises to em-dash",
+          _canon("LLM01: Prompt Injection") == "LLM01 — Prompt Injection")
+    check("#111 padded em-dash collapses to single spaces",
+          _canon("ASI05  —  Unexpected Code Execution (RCE)") == "ASI05 — Unexpected Code Execution (RCE)")
+    check("#111 already-canonical label is unchanged (goldens stay byte-stable)",
+          _canon("LLM06 — Excessive Agency") == "LLM06 — Excessive Agency")
+    check("#111 lowercase code canonicalises (case-insensitive) and uppercases the code",
+          _canon("llm01 - Prompt Injection") == "LLM01 — Prompt Injection")
+    check("#111 name-internal hyphen preserved (only the separator is rewritten)",
+          _canon("ASI09 - Human-Agent Trust Exploitation") == "ASI09 — Human-Agent Trust Exploitation")
+    check("#111 non-OWASP label passes through untouched",
+          _canon("Implement Zero Trust") == "Implement Zero Trust")
+    check("#111 unknown code (LLM99) is not rewritten",
+          _canon("LLM99 - Not A Category") == "LLM99 - Not A Category")
+    _demo = {"findings": [{"tags": [
+        {"kind": "owasp_llm", "label": "LLM01 - Prompt Injection"},
+        {"kind": "raise", "label": "Implement Zero Trust"},
+    ]}]}
+    render._normalize_owasp_tag_labels(_demo)
+    check("#111 normalize rewrites the owasp tag in place, leaves raise tag alone",
+          _demo["findings"][0]["tags"][0]["label"] == "LLM01 — Prompt Injection"
+          and _demo["findings"][0]["tags"][1]["label"] == "Implement Zero Trust")
 
     # 3b. golden-file fixtures — the rendered HTML/TXT for the canonical fixture
     #     must match what's committed, byte for byte. This is the regression net
@@ -540,13 +578,21 @@ def main():
         r = run_render(["--findings", bj, "--template", TEMPLATE, "--out-html", r_html, "--out-txt", r_txt])
         check(f"baseline {rel}: render exits 0", r.returncode == 0, r.stderr.strip())
         committed_html = read_bytes(c_html)
-        if b"github.com/open-agent-ai-security/praxen" in committed_html and r.returncode == 0:   # post-relicense template
+        set_name = os.path.basename(os.path.dirname(bdir))
+        post_relicense = b"github.com/open-agent-ai-security/praxen" in committed_html
+        if set_name == CURRENT_BASELINE and post_relicense and r.returncode == 0:
+            # Only the CURRENT set is byte-gated against the live template. Archival
+            # sets are historical snapshots — re-rendering them with an evolved template
+            # would rewrite history, so they keep schema validation only (same scoping
+            # as the remit-verbatim check below).
             check(f"baseline {rel}: HTML re-renders byte-identical from its JSON",
                   committed_html == read_bytes(r_html),
                   "committed HTML differs from a fresh render of the committed JSON")
             check(f"baseline {rel}: TXT re-renders byte-identical from its JSON",
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
+        elif post_relicense:
+            check(f"baseline {rel}: archival set ({set_name}) — byte re-render not gated against the current template (only {CURRENT_BASELINE} is)", True)
         else:
             check(f"baseline {rel}: pre-relicense template — byte re-render comparison skipped", True)
         # remit-quote invariant (praxen_version >= 0.6.0)
@@ -558,6 +604,8 @@ def main():
         remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
         if pv < (0, 6, 0):
             check(f"baseline {rel}: praxen_version < 0.6.0 — remit-quote check skipped", True)
+        elif set_name != CURRENT_BASELINE:
+            check(f"baseline {rel}: archival set ({set_name}) — remit-verbatim not re-checked against current remits (only {CURRENT_BASELINE} is gated)", True)
         elif not os.path.isfile(remit_path):
             check(f"baseline {rel}: has a matching tests/remits/{slug}.md", False)
         else:

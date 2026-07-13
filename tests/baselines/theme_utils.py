@@ -12,6 +12,22 @@ THEME_CSS = Path(__file__).resolve().parents[2] / "assets" / "praxen-theme.css"
 # further reading. Shared so the two coverage generators can't drift.
 DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide"
 
+# Brand assets (word-mark etc.), hosted at the project site root.
+BRAND_BASE = "https://open-agent-ai-security.github.io/praxen/graphics/brand"
+
+
+def masthead() -> str:
+    """A clean, minimal report masthead — just the Praxen word-mark, linking home.
+    Styling lives in the shared theme (assets/praxen-theme.css, `.pmast`). These
+    coverage pages are hosted web surfaces, so the word-mark is referenced by URL;
+    the per-agent scanner reports stay self-contained and do not use this."""
+    return (
+        '<header class="pmast">'
+        '<a class="pmast-brand" href="https://open-agent-ai-security.github.io/praxen/" aria-label="Praxen home">'
+        f'<img src="{BRAND_BASE}/praxen-wordmark-dark-background.svg" alt="Praxen" height="26">'
+        '</a></header>'
+    )
+
 
 def load_theme_css() -> str:
     """Return the shared design system (assets/praxen-theme.css) so a coverage
