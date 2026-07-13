@@ -11,7 +11,7 @@
 **agent behavior verifier**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/badge/release-v1.0.1-blue)](https://github.com/open-agent-ai-security/praxen/releases)
+[![Latest release](https://img.shields.io/badge/release-v1.1.0-blue)](https://github.com/open-agent-ai-security/praxen/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 

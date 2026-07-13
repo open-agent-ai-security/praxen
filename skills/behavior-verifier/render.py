@@ -373,8 +373,17 @@ def _tag_href(tag) -> str:
     return _DOCS_BASE  # unreachable: kinds are schema-constrained
 
 
-def _finding_tag_ctx(tag, _idx):
-    return {"TAG_CLASS": _TAG_CLASS[tag["kind"]], "TAG_LABEL": esc(tag["label"]),
+def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
+    """Render one finding tag chip. An OWASP chip whose code is NOT the finding's
+    primary (dominant) classification — i.e. a co-applicable secondary recorded in
+    tags[] — gets an extra ``tag-secondary`` class so it shows outlined rather than
+    solid, distinguishing the finding's main category from the ones it also touches."""
+    cls = _TAG_CLASS[tag["kind"]]
+    if tag["kind"] in ("owasp_llm", "owasp_agentic") and isinstance(tag.get("label"), str):
+        m = re.match(r"\s*([A-Za-z]+\d+)", tag["label"])
+        if m and m.group(1).upper() not in primary_codes:
+            cls += " tag-secondary"
+    return {"TAG_CLASS": cls, "TAG_LABEL": esc(tag["label"]),
             "TAG_HREF": esc(_tag_href(tag))}
 
 
@@ -391,7 +400,9 @@ def _expand_finding_inner(block, finding):
     `finding_tag` repeats once per tag. `finding_policy` is a 0-or-1 block: it
     survives for a finding that cites a remit rule and is dropped for one whose
     `policy_rule_ids` is null (a RAISE-category / detection-pattern finding)."""
-    block = expand_repeat(block, "finding_tag", finding["tags"], _finding_tag_ctx)
+    primary_codes = frozenset(c for c in (finding.get("owasp_llm"), finding.get("owasp_agentic")) if c)
+    block = expand_repeat(block, "finding_tag", finding["tags"],
+                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes))
     has_rule = finding["policy_rule_ids"] is not None
     block = expand_repeat(block, "finding_policy",
                           [finding] if has_rule else [], _policy_ctx)
@@ -832,6 +843,43 @@ def _scrub_secrets(data) -> None:
             ev["snippet"] = snippet
 
 
+# OWASP tag-label separator normalisation (#111). A finding's OWASP tag label is
+# semi-structured free text the model writes ("LLM01 — Prompt Injection"), so the
+# separator comes out model-dependent — em-dash on Claude, ASCII hyphen on Codex —
+# and identical inputs then produce stylistically different reports. Canonicalise
+# it here, in the deterministic layer, so the rendered HTML/TXT is identical
+# regardless of the authoring model. Conservative: only the separator between a
+# *recognised* OWASP code prefix and the name is rewritten; hyphens/dashes inside
+# the name are left alone, and any non-OWASP label passes through untouched.
+_OWASP_TAG_LABEL_RE = re.compile(r"^\s*((?:LLM|ASI)\d{2})\s*[-–—:]\s*(.+?)\s*$", re.IGNORECASE)
+
+
+def _canon_owasp_tag_label(label):
+    """Rewrite ``<CODE><sep><Name>`` to the canonical ``<CODE> — <Name>`` (em-dash,
+    single spaces) when ``<CODE>`` is a recognised OWASP code; otherwise return the
+    label unchanged."""
+    if not isinstance(label, str):
+        return label
+    m = _OWASP_TAG_LABEL_RE.match(label)
+    if not m:
+        return label
+    code = m.group(1).upper()
+    if code not in _OWASP_LLM_TITLES and code not in _OWASP_AGENTIC_TITLES:
+        return label
+    return f"{code} — {m.group(2)}"
+
+
+def _normalize_owasp_tag_labels(data) -> None:
+    """Canonicalise OWASP tag-label separators in-memory before rendering (#111).
+    Mutates only the render copy; the on-disk findings JSON is untouched.
+    Deterministic — a no-op on already-canonical (em-dash) input, so committed
+    goldens stay byte-stable."""
+    for f in data.get("findings", []):
+        for tag in (f.get("tags") or []):
+            if tag.get("kind") in ("owasp_llm", "owasp_agentic") and isinstance(tag.get("label"), str):
+                tag["label"] = _canon_owasp_tag_label(tag["label"])
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="render.py",
@@ -858,6 +906,7 @@ def main(argv=None) -> int:
         sys.exit(f"render.py: schema validation failed — {e}")
 
     _scrub_secrets(data)  # redact credential-shaped evidence + warn (Never-Reprint-Secrets backstop)
+    _normalize_owasp_tag_labels(data)  # canonicalise OWASP tag-label separators to `<CODE> — <Name>` (#111)
 
     # Schema validation passed — `schema.validate` raises on any failure, so
     # reaching this point means zero schema errors. The summary line below

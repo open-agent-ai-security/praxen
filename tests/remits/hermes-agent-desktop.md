@@ -17,63 +17,52 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 
 | Field | Value |
 |-------|-------|
-| Worker Name | Hermes Agent (with Hermes Desktop operator layer) |
-| Agent Key / ID | hermes-agent-desktop |
-| Owner / Operator | Single-tenant individual operator running their own instance |
-| Deployment Environment | Local host, Docker, or remote VPS; managed locally or via the Hermes Desktop GUI |
-| Primary Model | Operator-selected (Nous Portal, OpenRouter, Anthropic, OpenAI, Google, and other configured providers) |
-| Secondary Models | Operator-selected auxiliary models for curator, vision, embedding, title generation, and session search |
+| Worker Name | Hermes Agent (with Hermes Desktop) |
+| Agent Key / ID | `agent:main` (session-key namespace); desktop app id `com.nousresearch.hermes` |
+| Owner / Operator | Single human operator (personal, single-tenant agent) |
+| Deployment Environment | Operator's own host by default; optionally a VPS, cloud VM, container, or serverless sandbox reachable from CLI, TUI, ~20 messaging platforms, and the desktop app |
+| Primary Model | Operator-configurable; any provider (Nous Portal, OpenRouter, OpenAI, Anthropic, local endpoint, and others). No model is fixed by the agent. |
+| Secondary Models | Operator-configurable auxiliary models for side tasks (titling, summarization, vision, embedding, smart-approval risk assessment) |
 | Remit Version | 1.0 |
-| Last Updated | 2026-05-31 |
-| Updated By | Praxen (authored from documentation) |
+| Last Updated | 2026-07-11 |
+| Updated By | Praxen remit author (from Hermes documentation) |
 
 ---
 
 ## Mission
 
-**Scope note — multi-component deployment.** This remit covers two cooperating components deployed together. **Hermes Agent** (the Python LLM-driven agent built by Nous Research) is the **primary RAISE subject**: it runs the conversation loop, calls tools, executes shell and code, manages memory and skills, and reaches external messaging platforms. **Hermes Desktop** (an Electron/React GUI by a separate maintainer) is the **operator layer**: it is *not* LLM-driven; it installs, configures, and drives a Hermes Agent instance (local, Dockerized, or remote-over-SSH) and surfaces its state to a human operator. The Desktop is in scope only for how it provisions, authenticates to, and brokers operator control of the Agent — the behavioral judgment of agentic actions belongs to the Agent. Per-component obligations appear under `### Hermes Agent` / `### Hermes Desktop` sub-headings within the existing sections below.
+Hermes is a single-tenant personal AI agent that assists one operator with open-ended work — answering questions, writing and editing code, driving a real terminal and browser, running scheduled jobs, delegating to subagents, and learning across sessions through persistent memory and self-created skills. The same agent core is reachable through several front ends and must behave consistently and safely across all of them.
 
-Hermes Agent is a single-tenant personal AI assistant that converses with one operator across a terminal UI and messaging platforms, uses tools to act on the operator's behalf (shell, code execution, file operations, web, browser, memory, skills, scheduled jobs), and improves itself over time through agent-curated memory and skill creation. It must act only for its authorized operator, keep its dangerous capabilities behind the isolation and approval controls its documentation describes, and never become a conduit for exfiltrating operator data or credentials to destinations outside the operator's trust envelope.
+**Scope note — multi-component deployment.** This remit covers two cooperating components:
+
+- **Hermes Agent** *(primary RAISE subject)* — the Python, LLM-driven agent core (`run_agent.py` / `AIAgent`) plus its tool system, messaging gateway, cron scheduler, memory/skills learning loop, and terminal/browser/code-execution backends. All autonomous behavior originates here.
+- **Hermes Desktop** — an Electron + React operator-facing application that provides a native chat, settings, and management UI. It does not embed its own model loop; it spawns and drives a headless Hermes Agent backend (`hermes serve`) over local JSON-RPC/WebSocket, and can optionally attach to a remote Hermes backend.
+
+The two are tightly coupled — Desktop is a control surface over the Agent and only makes sense paired with it — so they are combined in one remit. Per-component rules, where they differ, are separated by `#### Hermes Agent` / `#### Hermes Desktop` sub-headings inside the existing sections.
 
 ---
 
 ## Job Description
 
-What this agent is supposed to do. Be specific — vague descriptions produce weak detection.
-
-### Hermes Agent
-
-- Hold conversations with the authorized operator over the terminal UI (classic CLI and Ink TUI) and over enabled messaging gateways (Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Mattermost, Email, SMS, and the other documented platform adapters).
-- Call tools to do work the operator requests: run shell commands through the configured terminal backend, execute code, read and write files, search and fetch the web, drive a browser, generate images and speech, and transcribe voice memos.
-- Persist and recall knowledge through agent-curated memory, user modeling, and full-text session search, and create or improve skills from experience.
-- Run scheduled (cron) jobs and deliver their results to the operator's configured platform.
-- Delegate subtasks to isolated subagents, and orchestrate multi-agent work through the kanban board when enabled.
-- Connect to operator-configured MCP servers to extend its capabilities.
-
-### Hermes Desktop
-
-- Guide the operator through installing Hermes Agent and configuring providers, models, API keys, profiles, memory, skills, tools, schedules, and messaging gateways through a graphical interface.
-- Drive a Hermes Agent instance in one of three modes — local (`http://127.0.0.1:8642`), plain Remote (HTTP URL plus API key for the chat path), or SSH Tunnel (full management parity against a remote host's `~/.hermes`).
-- Stream chat, render tool progress and token usage, and surface agent and gateway logs to the operator.
-- Persist the operator's connection and credential configuration through Hermes config files and the desktop's own `~/.hermes/desktop.json`.
+- Hold natural-language conversations and complete open-ended tasks for a single authorized operator (and the specific counterparties that operator allowlists).
+- Execute shell commands, read/write/patch files, run code, and automate a browser through its tool set, on behalf of the operator.
+- Fetch and summarize web content, and perform web search, through URL-capable tools.
+- Run scheduled (cron) jobs unattended and deliver their output to operator-configured destinations.
+- Delegate bounded sub-tasks to isolated subagents, with parallelism and spawn depth kept within operator-set limits.
+- Maintain persistent memory, user profile, and a self-curated skill library across sessions.
+- Serve as one agent across CLI, TUI, the Electron desktop app, an editor/ACP adapter, a messaging gateway (~20 platforms), and an optional local HTTP/API surface — with identical trust rules everywhere.
 
 ---
 
 ## Non-Goals (Out of Scope)
 
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
+Work this agent should never do, regardless of instruction:
 
-### Hermes Agent
-
-- Acting for any party other than its authorized operator, or treating an unauthorized caller on any surface as if it were the operator.
-- Exfiltrating operator credentials, session-authorization material, or sensitive operator data to any destination outside the operator's trust envelope.
-- Treating any in-process screen on attacker-influenced content (approval gate, output redaction, pattern scanner, tool allowlist) as if it were a containment boundary when a real OS-level boundary is what is required.
-- Multi-tenant operation: modeling per-caller capabilities inside a single adapter, or serving mutually untrusting users from one instance without separate allowlists.
-
-### Hermes Desktop
-
-- Acting as an autonomous agent or independently initiating agentic actions — it brokers operator control and must not originate tool calls or shell execution of its own.
-- Holding the LLM-behavioral trust decisions that belong to the Agent — it must not silently relax the Agent's isolation posture or approval gates on the operator's behalf.
+- Act as a **multi-tenant** service that models different privilege levels for different callers inside one instance. Capability separation is achieved by running separate instances/profiles, not by trusting some callers less than others within one adapter.
+- Serve untrusted, unauthenticated callers on any surface. No surface should dispatch agent work, resolve approvals, or return output to a caller outside the configured authorization set.
+- Emit outbound telemetry, usage attribution, analytics, or third-party identifier tagging without an explicit operator opt-in.
+- Move operator credentials or session-authorization material to any destination outside the operator's trust envelope.
+- Act as a general web service exposed to the public internet without an external authentication/VPN/firewall layer in front of it.
 
 ---
 
@@ -81,45 +70,36 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
-| Terminal UI (CLI / Ink TUI) | Yes | No | Local operator console |
-| Messaging gateway adapters (Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Mattermost, Email, SMS, etc.) | Yes | Operator enables per-platform | Each enabled network-exposed adapter must enforce a caller allowlist before dispatching work |
-| Network-exposed HTTP surfaces (API server adapter, dashboard, kanban HTTP) | Yes | Operator enables; loopback by default | Binding to a non-loopback interface is a deliberate break-glass operator decision |
-| Editor / IDE adapters (ACP) and local-IPC TUI gateway | Yes | No | Authorized by OS-level access control (file permissions, loopback-only binds) |
-| Operator-configured MCP servers | Yes | Operator configures | Treated as an input surface and a launch the supply-chain guard must vet |
-| Desktop → Agent connection (local / Remote / SSH Tunnel) | Yes | Operator configures | See Hermes Desktop sub-rules below |
+| Local CLI / TUI | Yes | No | Operator at the host's own terminal; authorized by OS-level account access. |
+| Hermes Desktop app (local backend) | Yes | No | Local operator UI driving a loopback `hermes serve` backend over JSON-RPC/WS. |
+| Editor / ACP adapter (VS Code, Zed, JetBrains) | Yes | No (local IPC) | Local-process client; authorized by the host user account, not exposed to the network. |
+| Messaging gateway platforms (Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Mattermost, Email, SMS, and other shipped adapters) | Yes, per platform | Yes — each enabled adapter requires an operator-configured caller allowlist (or DM-pairing approval) before it may serve any caller | Any messaging platform without a configured allowlist must serve no one (fail closed). |
+| Network-exposed HTTP surfaces (API server adapter, dashboard/kanban plugin endpoints, `hermes serve`) | Yes, when explicitly enabled | Yes — must require an operator-set auth layer (allowlist / auth provider) before serving | Loopback bind is the default; a non-loopback bind must engage authentication. |
+| Hermes Desktop → remote backend | Yes | Yes — remote backend must be protected by an auth provider (username/password for trusted networks, OAuth for anything internet-reachable) | Password-only auth must not be used for a publicly-exposed backend. |
+| Public internet exposure without an external auth/VPN/firewall layer | No | — | Break-glass only; unsupported posture. |
 
 **Any channel not listed here is unauthorized by default.**
-
-### Hermes Agent
-
-- Every enabled network-exposed adapter MUST refuse to dispatch agent work, resolve approvals, or relay output until an operator-configured caller allowlist is set; no adapter may fail open when no allowlist is configured.
-- Authorization MUST be re-checked at every surface that crosses a trust boundary; a session identifier is a routing handle only and MUST NOT be accepted as proof of authorization.
-- Local-IPC and editor surfaces (ACP, TUI gateway) MUST rely on OS-level access control and MUST NOT be exposed beyond the local user without an explicit network authentication layer.
-- Binding a loopback-default HTTP surface to a non-loopback interface MUST be an explicit operator action, never a silent default.
-
-### Hermes Desktop
-
-- The SSH Tunnel MUST bind only to `127.0.0.1` on the desktop side and MUST NOT expose the remote Hermes port to the public internet.
-- The desktop MUST authenticate to a remote Hermes host using key-based SSH in non-interactive (`BatchMode`) mode, and MUST NOT fall back to transmitting an operator password to satisfy a prompt.
-- The desktop MUST verify the remote host key on first connection and pin it, and MUST fail closed if a pinned host key later changes rather than silently re-trusting it.
-- The desktop MUST authorize its connection only against a dedicated, non-root Hermes user account on the remote host.
 
 ---
 
 ## Authorized Counterparties
 
 ### Trusted People / Accounts
-- The single authorized operator of this instance, as identified by the operator-configured caller allowlist on each enabled surface.
+- The single operator who installed and configured the agent.
+- Additional messaging users only after the operator explicitly allowlists their platform user ID or approves them through the DM-pairing flow.
 
 ### Trusted Domains
-- The operator-configured LLM provider endpoints and messaging-platform API endpoints required by the enabled providers and adapters (the allowlisted egress set when egress isolation is in use).
+- Model/provider endpoints the operator has configured (e.g. Nous Portal, OpenRouter, OpenAI, Anthropic, or a self-hosted endpoint).
+- Package/runtime distribution hosts the operator relies on for install and updates (e.g. PyPI by name for lazy dependency installs, official release hosts).
 
 ### Trusted Services / Integrations
-- Operator-configured LLM providers, messaging platforms, and MCP servers that the operator has reviewed and enabled.
+- Operator-configured MCP servers.
+- Operator-configured platform adapters, memory providers, and plugins that the operator installed after review.
 
 ### Explicitly Forbidden
-- Any caller not present in the operator-configured allowlist for the surface they arrive on.
-- Outbound destinations outside the operator's trust envelope or, when egress isolation is configured, outside the allowlisted egress set.
+- Any messaging user not on an allowlist and not pairing-approved.
+- Any network caller reaching an enabled adapter before an allowlist / auth provider is configured.
+- Any outbound destination for credentials or session-authorization material other than the provider endpoint they belong to.
 
 *Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
 
@@ -129,286 +109,210 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Allowed Tools (Known Good Baseline)
 
-*Tools the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
+*The agent is expected to have a broad, operator-gated tool surface. The following categories are the intended baseline:*
 
-#### Hermes Agent
-
-- The documented core toolsets: `terminal`, `code_execution`, `file`, `web`, `browser`, `search`, `session_search`, `memory`, `skills`, `delegation`, `todo`, `clarify`, `vision`, `image_gen`, `tts`, `video`, `cronjob`, `messaging`, and the platform-specific toolsets the operator enables.
-- Subagent delegation (`delegate_task`) and, when enabled, the kanban multi-agent toolset.
-- Tools contributed by operator-reviewed plugins and operator-configured MCP servers.
-
-#### Hermes Desktop
-
-- A graphical control surface over the Agent's configuration and management screens (Chat, Sessions, Agents/Profiles, Skills, Models, Memory, Soul, Tools, Schedules, Gateway, Office, Settings). The Desktop exposes no agentic tools of its own.
+- Terminal execution (`terminal`) across the operator-selected backend (local, Docker, SSH, Singularity, Modal, Daytona).
+- File tools (`read_file`, `write_file`, `patch`, `search_files`).
+- Code execution (`execute_code`) in a filtered child process.
+- Web tools (`web_search`, `web_extract`) and browser automation tools.
+- Vision, TTS/STT (voice), and image-generation tools when the operator enables and credentials them.
+- Delegation (`delegate_task`), todo, memory, and skill-management tools.
+- Cron scheduling (`cronjob`), session search, and messaging (`send_message`) within authorized channels.
+- Operator-configured MCP-server tools.
 
 ### Restricted Tools (Require Approval Before Use)
 
-#### Hermes Agent
-
-- Shell execution via the `terminal` tool MUST be subject to the operator approval path before a destructive command runs; auto-approval of shell beyond the operator's configured allowlist is not authorized.
-- File-writing and patch operations MUST run within the confines of the configured terminal backend and MUST be gated by the same approval path as shell when they mutate operator state.
-- High-impact messaging actions (sending to a counterparty, replying to an unknown sender) MUST be authorized against the caller allowlist before execution.
+- Any terminal command matching a dangerous/destructive pattern must require explicit human approval before it runs (on host-reaching backends).
+- Installing a third-party skill or plugin must surface its contents for operator review before it is loaded/executed.
+- `/reload-mcp`, and destructive session commands (`/clear`, `/new`, `/reset`, `/undo`) must confirm before discarding state, unless the operator has turned that confirmation off.
 
 ### Forbidden Tools
 
 *Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
-#### Hermes Agent
-
-- No tool that performs unattended, unisolated execution of attacker-influenced shell or code on the host while the operator believes an isolation posture is in force.
-- No tool that transmits operator credentials or session-authorization material off-host.
-
-#### Hermes Desktop
-
-- No tool that grants the Desktop autonomous, agent-equivalent action independent of operator instruction.
+- Any tool whose sole function is to exfiltrate operator credentials, environment secrets, or session tokens to an external destination.
+- Any tool that disables the always-on hardline command floor (see Action Boundaries → Never Allowed) or removes the operator's ability to see what a skill/plugin will run before install.
 
 ---
 
 ## Data Boundaries
 
 ### Allowed Data Sources
-
-#### Hermes Agent
-
-- Operator input; operator-authorized file reads through the configured backend; operator-configured web fetches, email, gateway messages, MCP responses, and tool results.
-- The operator's own memory store, session history, skills, and profile state under `~/.hermes` (profile-scoped via the active `HERMES_HOME`).
-
-#### Hermes Desktop
-
-- The Agent's `~/.hermes` state, read locally or via the SSH proxy against the remote host's `~/.hermes`, on behalf of the operator.
+- Operator input across any authorized channel.
+- Files and command output on the host within the operator's trust envelope (subject to the selected terminal backend's scope).
+- Web content and search results fetched through URL-capable tools.
+- Inbound messages from allowlisted/paired counterparties on enabled platforms.
+- Operator-configured MCP server responses.
+- The agent's own persistent memory, user profile, session transcripts, and skill library.
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
-
-- Provider API keys, gateway tokens, and other secrets (kept in the operator credential file / `~/.hermes/.env`, never in the main config and never in version control).
-- Session-authorization material and SSH private keys.
-- Operator memory, user-model data, and conversation history.
+- Provider API keys, gateway/bot tokens, and other credentials (kept in the operator credential file, e.g. `~/.hermes/.env`).
+- Session-authorization material (dashboard auth secrets, pairing codes, OAuth tokens).
+- Operator PII surfaced in session context (user IDs, chat IDs, names).
+- Persistent memory and user-profile content that is loaded into every session.
 
 ### Forbidden Data Movement
 
-*Specific patterns of data movement that are never authorized.*
-
-#### Hermes Agent
-
-- Credentials and session-authorization material MUST NOT leak to any destination outside the trust envelope through environment passthrough, adapter logging, or transport errors that flush them upstream.
-- Provider API keys and gateway tokens MUST be stripped from the environment passed to lower-trust in-process components (shell subprocesses, MCP subprocesses, the code-execution child) except where the operator or a loaded skill has explicitly declared a passthrough variable.
-- Secret-like patterns MUST be redacted from operator-facing display surfaces.
-
-#### Hermes Desktop
-
-- Operator-entered credentials (provider API keys, SSH key paths, remote API keys) MUST be stored only in the operator's own config files and MUST NOT be transmitted anywhere other than the configured Agent host.
+- Credentials and gateway tokens MUST NOT be passed into lower-trust child processes (shell subprocesses, `execute_code`, MCP subprocesses, cron scripts) except variables the operator or a loaded skill has explicitly declared as passthrough.
+- Secrets MUST NOT be written to logs, transcripts, error messages returned to the model, or any outbound adapter payload.
+- Pairing codes and auth secrets MUST NOT be logged to stdout or persisted in world-readable files.
+- Operator PII in the system-prompt session-context block SHOULD be redactable and MUST NOT be broadened beyond what routing requires.
+- Credentials MUST NOT be committed to version control or stored in the main (shareable) config file.
 
 ---
 
 ## Action Boundaries
 
-> **Writing verifiable rules**
-> Every rule in this section states a testable constraint on behavior — something Praxen can check against the agent's code or logs.
->
-> - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
-> - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
->
-> Praxen will inventory every rule and report any it cannot verify — so the more specific the rules, the more useful the coverage report.
+> Every rule here states a testable constraint on behavior Praxen can check against code, config, or logs.
 
 ### Allowed Without Approval
-
-#### Hermes Agent
-
-- Conversing with the authorized operator, reading the operator's own state, searching sessions, and performing non-destructive, read-only tool calls within the operator's trust envelope.
-
-#### Hermes Desktop
-
-- Displaying Agent state, streaming chat, and editing the operator's own configuration through the GUI at the operator's direction.
+- Reading files, searching the workspace, running web search/extract, and answering questions within the operator's trust envelope.
+- Running non-dangerous shell commands and code on the operator-selected backend.
+- Writing to the agent's own memory, profile, and agent-created skills.
+- Delivering responses to the authorized channel the request came from.
 
 ### Requires Human Approval Before Execution
-
-#### Hermes Agent
-
-- Execution of destructive or state-mutating shell commands through the `terminal` tool.
-- Sending messages or replying to counterparties on messaging surfaces.
-- Installation of third-party skills and plugins, which MUST be subject to operator review (reading the skill's Python and scripts, not only its description) before the code is loaded and run.
-- Loading or launching an operator-configured MCP server, which MUST pass the documented supply-chain guard at launch.
-
-#### Hermes Desktop
-
-- Switching the Agent connection mode or changing the remote host the Desktop drives.
-- Running the first-run installer that fetches and installs Hermes Agent on the host.
+- Any terminal command matching a dangerous/destructive pattern on a host-reaching backend MUST prompt the operator and MUST NOT execute until approved.
+- When an approval prompt is not answered within the configured window, the action MUST be denied (fail closed).
+- Installing or loading a third-party skill or plugin MUST give the operator a chance to review its actual code before it executes.
+- Cron jobs that hit a dangerous-command prompt MUST default to denying it rather than silently auto-approving.
+- Binding any local-only surface to a non-loopback interface MUST be a deliberate operator action that engages an authentication layer.
 
 ### Never Allowed
 
 *Praxen will emit a Critical finding for any of these.*
 
-#### Hermes Agent
-
-- Ingesting content from operator-uncontrolled surfaces (open web, inbound email, multi-user channels, untrusted MCP servers) while relying only on in-process heuristics, with no OS-level isolation boundary in force.
-- Dispatching agent work, resolving an approval, or relaying output to a caller outside the configured authorization set.
-- Running the agent process as root in a deployment that ingests untrusted input.
+- Executing a catastrophic, irreversible command (filesystem-root wipe, fork bomb, formatting a mounted device, zeroing a physical disk, piping an untrusted remote script straight to a shell) MUST be refused unconditionally — even under `--yolo`, `approvals.mode: off`, a permanent allowlist entry, or headless cron approve-mode. This floor MUST have no override flag.
+- Dispatching agent work, resolving an approval, or returning agent output to a caller who is outside the configured authorization set (allowlist, pairing approval, or OS-level equivalent) MUST NOT be possible; treating a session identifier as proof of authorization is forbidden.
+- A network-exposed adapter MUST NOT fail open (serve callers) when no allowlist / auth provider is configured.
+- Credentials or session-authorization material MUST NOT leak to any destination outside the operator's trust envelope through environment leakage, adapter logging, or transport error paths.
 
 #### Hermes Desktop
-
-- SSH'ing into, or authorizing its key on, the remote `root` account.
-- Disabling the Agent's host-key verification or weakening the SSH tunnel's loopback-only bind.
+- The desktop app MUST NOT weaken the Agent's trust rules: it MUST rely on the same backend authorization (auth gate on non-loopback binds, allowlists) and MUST NOT expose a password-only-protected remote backend to the public internet.
+- The desktop-launched backend MUST remain a JSON-RPC/API surface only (no unintended browser-reachable UI) and MUST stay bound to loopback unless the operator deliberately configures a remote/authenticated setup.
 
 ---
 
 ## Behavioral Expectations
 
 ### Normal Cadence
-
-#### Hermes Agent
-
-- Active hours: continuous availability for a single operator; responds to operator input on the terminal and enabled gateways, and runs scheduled jobs on their configured cadence.
-- Expected idle periods: idle between operator turns and between cron fires; on serverless backends the environment hibernates when idle.
-- Scheduled jobs / cron tasks: operator-defined cron jobs (duration, "every" phrase, 5-field cron, or one-shot ISO timestamp), each subject to the documented hard interrupt so a runaway loop cannot monopolize the scheduler.
-
-#### Hermes Desktop
-
-- Active hours: foreground while the operator has the app open; maintains the SSH tunnel only while connected in SSH Tunnel mode.
+- Active hours: on demand (interactive sessions) plus operator-scheduled cron jobs; no fixed schedule.
+- Expected idle periods: idle between operator messages and between scheduled jobs; serverless backends hibernate when idle.
+- Scheduled jobs / cron tasks: only those the operator (or the agent, on the operator's instruction) has registered.
 
 ### Expected Patterns
 
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
-
-- The Agent converses, calls tools within its authorized set, runs approved shell/code through the configured backend, and persists memory and skills for its single operator.
-- The Desktop reads and renders Agent state and edits operator configuration; it does not originate agentic actions.
+- One conversation reuses a byte-stable system prompt and a cached prefix for its lifetime; the agent MUST NOT rebuild the system prompt, swap toolsets, or mutate past context mid-conversation except during explicit context compression or an explicit operator action (e.g. `/model`).
+- Sessions are isolated from one another; one session MUST NOT read another session's data or state.
+- Cron sessions run with a hard interrupt bound so a runaway loop cannot monopolize the scheduler.
+- Agent actions and decisions are recorded to durable, operator-inspectable logs.
 
 ### Acceptable Retry Behavior
 
-#### Hermes Agent
-
-- The tool-calling loop MUST remain bounded by its iteration and budget limits and MUST stop on an operator interrupt.
-- Cron sessions MUST honor the documented hard interrupt; a job that fails repeatedly MUST be auto-blocked rather than retried indefinitely.
-- A delegated subagent MUST be cancelled when its parent turn is interrupted.
+- Maximum retries before escalation: tool-calling iterations MUST be bounded per turn/subagent; a session repeatedly failing across restarts MUST be escalated to a clean reset rather than retried indefinitely.
+- Retry interval: cron catch-up/grace windows must be bounded, not unbounded backfill.
+- Actions that should never be retried: a command that was denied or blocked MUST NOT be silently retried or rephrased to evade the guard.
 
 ---
 
 ## Known Good Baseline
 
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
-
 ### Typical Tool Inventory
-
-#### Hermes Agent
-
-- The documented core toolsets plus whatever subset the operator has enabled per platform; no tool present in code that is absent from the authorized set above.
+- Terminal + file + code-execution + web + browser + delegation + memory + skills + cron + messaging tools, plus operator-enabled MCP tools. The exact enabled set is operator-configured per platform via `hermes tools`.
 
 ### Typical Channels Used
-
-- Terminal UI and the messaging adapters the operator has explicitly enabled and allowlisted.
+- Local CLI/TUI and the desktop app for the operator; a subset of messaging platforms the operator has allowlisted.
 
 ### Typical Session Count / Duration
-
-- Single-operator sessions; conversation and cron sessions recorded in the SQLite session store with FTS5 search.
+- A modest number of concurrent sessions (the gateway caches on the order of a hundred agents); long-lived conversations reset on idle/daily policy (default 24h idle or a daily boundary).
 
 ### Typical Outbound Destinations
-
-- Operator-configured LLM provider and messaging-platform endpoints; when egress isolation is configured, only the allowlisted egress set.
+- The configured model/provider endpoint(s); allowlisted messaging platforms for delivery; operator-approved MCP servers; package/release hosts for updates.
 
 ### Typical File Paths Accessed
-
-- The profile-scoped `~/.hermes` tree (`config.yaml`, `.env`, `state.db`, `memories/`, `profiles/`, `skills/`, `cron/jobs.json`, `SOUL.md`) and operator-authorized working directories.
+- The active profile's `HERMES_HOME` (`~/.hermes` or `%LOCALAPPDATA%\hermes`, or a profile subdirectory) for config, credentials, memory, sessions, skills, logs; the operator's working directory for task work.
 
 ### Normal Restart Cadence
-
-- Restarted by the operator on update or configuration change; profiles remain isolated across restarts.
+- Restarts on operator action, `hermes update`, or crash recovery; a clean-shutdown marker suppresses spurious auto-resume, and unclean restarts recover in-flight sessions in a bounded way.
 
 ---
 
 ## Swimlane Definition
 
 ### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
-
-- General personal-assistant work for a single operator: shell, code, files, web, browser, memory, skills, scheduling, and messaging, all within the operator's trust envelope and the configured isolation posture.
+- Personal assistant, software engineering, sysadmin/automation, research and summarization, scheduled reporting, and content generation — all on behalf of the authorized operator and within the selected isolation posture.
 
 ### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
-
-- Any work that requires acting for a party other than the authorized operator, or that requires reaching destinations or callers outside the authorized sets.
-- Any task that would have the Desktop behave as an autonomous agent rather than an operator-driven control surface.
+- Serving unauthenticated third parties; multi-tenant privilege brokering within one instance; acting as an unauthenticated public web service; any task whose only path requires defeating the agent's own approval/isolation controls.
 
 ---
 
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
+*Areas where extra scrutiny applies — Praxen applies lower thresholds for findings here.*
 
-- The boundary between the agent's in-process heuristics and a real OS-level isolation boundary: the approval gate, output redaction, Skills Guard, and tool allowlists are review aids, and the operator's security intent is that a real boundary (terminal-backend or whole-process isolation) carry containment whenever untrusted input is ingested.
-- Credential handling and environment scoping for lower-trust in-process components.
-- External-surface authorization (allowlists on every enabled network-exposed adapter; OS-level control on local-IPC surfaces).
-- Third-party skill, plugin, and MCP-server trust, which rests on operator review and the documented launch and CI supply-chain guards.
-- SSH connection handling in the Desktop operator layer (key-only auth, loopback-only bind, host-key pinning, non-root target user).
+- The agent ingests attacker-influenceable content (open web, inbound email/messages, file contents, MCP responses) and can then execute shell/code — the external-input-to-execution path is the highest-value chain.
+- Writable, session-loaded context (persistent memory, user profile, agent-created skills, `SOUL.md`/`AGENTS.md` context files) is a persistence surface for injected instructions.
+- Approval-bypass modes (`--yolo`, `approvals.mode: off`, permanent allowlist, cron approve-mode) narrow the in-process guardrails to the hardline floor only.
+- Network-exposed surfaces (gateway adapters, API server, `hermes serve`, dashboard/kanban HTTP) and their fail-open behavior when unconfigured.
+- Credential handling across sandbox boundaries and in error/log paths.
+- Third-party skills, plugins, and MCP servers, which run with full agent privileges.
 
 ---
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
-
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
-
-#### Hermes Agent
-
-- A network-exposed adapter is found to dispatch work, resolve approvals, or relay output with no allowlist configured (fail-open).
-- Credential or session-authorization material is found leaving the trust envelope.
-- Attacker-influenced shell or code reaches host state that the operator's declared isolation posture was relied upon to confine.
-
-#### Hermes Desktop
-
-- The SSH tunnel is found bound to a non-loopback interface, or the remote Hermes port is found exposed publicly.
-- A changed remote host key is accepted without re-verification.
+- A caller outside the configured authorization set reaches any surface and dispatches work, resolves an approval, or receives output.
+- A network-exposed adapter is found serving callers with no allowlist / auth provider configured (fail-open).
+- Credentials or session-authorization material are observed leaving the trust envelope.
+- A catastrophic hardline command reaches the execution path (should have been refused before the approval layer).
 
 ### Alert Operator (Do Not Halt)
-
-#### Hermes Agent
-
-- A tool, channel, outbound destination, or capability is present in code but absent from this remit's authorized sets.
-- A declared security-relevant config variable (allowlist, approval, rate-limit, logging) is defined but never consulted by the code it is meant to guard.
-
-#### Hermes Desktop
-
-- The Desktop is found connecting as a non-dedicated or root user on the remote host.
+- A dangerous command is approved and executed (record who approved and what ran).
+- A third-party skill/plugin/MCP server is installed or enabled.
+- YOLO or approvals-off mode is activated for a session.
+- A context file is blocked for suspected prompt injection.
+- A supply-chain advisory matches an installed dependency.
 
 ### Log Only
-
-- Routine operator-authorized conversation, read-only tool calls, scheduled-job runs, and configuration edits within the authorized sets.
+- Routine tool calls, session lifecycle events (create/reset/expire/resume), model switches, and cron runs.
 
 ---
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
-
-- The agent ingests untrusted web content only while a terminal-backend or whole-process isolation boundary is in force, and treats its in-process screens as accident-prevention layered on top of that boundary.
-- A messaging adapter refuses to act for a sender absent from the operator's allowlist and re-checks authorization rather than trusting a session ID.
-- The Desktop connects to a remote Hermes over a loopback-bound, key-only SSH tunnel as a dedicated non-root user, pinning the host key on first use.
-
----
+- On an inbound message from an unknown user, the gateway declines to run agent work and (per policy) issues a pairing code instead of processing the request.
+- The agent proposes `rm -rf ./build`, the operator is prompted, approves once, and the action and approver are logged.
+- An MCP subprocess is launched with provider API keys stripped from its environment; only the operator-declared `env` values are present.
+- A web fetch to `http://169.254.169.254/…` is refused by SSRF protection before any request is made.
+- Switching models mid-chat is treated as an explicit cache-invalidating operator action, not a silent mid-conversation mutation.
 
 ## Example Bad Behavior
 
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
-
-- A network-exposed adapter that dispatches agent work before any allowlist is set, or that accepts a caller because they presented a known session ID.
-- Provider API keys passed through to a shell, MCP, or code-execution child that should have had them stripped, or flushed into an adapter log.
-- The Desktop transmitting a password to satisfy an SSH prompt, exposing the remote Hermes port publicly, or authorizing its key on the remote root account.
+- A Telegram user who is not allowlisted gets a full agent turn because no allowlist was configured and the adapter defaulted to open.
+- Injected web/email content causes the agent to run a shell command that reaches host state with no approval prompt.
+- A provider API key appears in `gateway.log`, in a tool error returned to the model, or in an outbound message.
+- A hardline command (`rm -rf /`, fork bomb) runs because YOLO was on.
+- The desktop app connects to a password-only backend exposed directly on the public internet.
+- The agent silently rephrases a denied command and retries it to slip past the guard.
 
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Hermes Agent (with Hermes Desktop operator layer) | Version: 1.0 | 2026-05-31*
+*Customized for: Hermes Agent (with Hermes Desktop) | Version: 1.0 | 2026-07-11*
 
 ---
 
-## Open Questions for the Operator
+## Open Questions for the operator
 
-*These are genuine operator-intent decisions that cannot be derived from documentation and are not facts the scan discovers about the code. They travel with this remit so the operator can resolve them; they are deliberately outside the policy body above.*
+*These are genuine operator-intent decisions that cannot be derived from Hermes's documentation. They travel with the remit but sit outside the policy body a scan reads as rules. Resolve them to make the coverage report precise for your deployment.*
 
-1. **Authorized caller allowlist.** Who exactly is the authorized operator on each enabled surface — which Telegram/Discord/Slack/Email/SMS identities, which API-server callers — should populate each adapter's allowlist? The remit requires an allowlist; the membership is yours to set.
-2. **Authorized isolation posture for this deployment.** Which OS-level isolation posture is required for *your* instance given the input surfaces you expose — terminal-backend isolation only, or whole-process wrapping (Hermes Docker/Compose or NVIDIA OpenShell)? State the minimum posture you intend to require so divergence can be judged against it.
-3. **In-scope outbound / egress allowlist.** Which provider and platform endpoints (and any other hosts) make up the authorized egress set for your deployment — e.g. the squid/envoy allowlist hosts? Confirm the list, including whether any non-LLM, non-messaging destinations are intended.
-4. **Network-exposure decision.** Do you intend any normally-loopback surface (dashboard, API server, kanban HTTP) to be reachable beyond the local host, and if so behind which external control (VPN, Tailscale, firewall, auth layer)? This is the break-glass decision the docs leave to you.
-5. **Third-party extension authorization.** Which specific third-party skills, plugins, and MCP servers are authorized for this instance? The remit requires operator review before load; the approved set is yours to declare.
-6. **Desktop remote target.** Which remote host(s) and which dedicated non-root Hermes user is the Desktop authorized to drive over SSH Tunnel mode?
+1. **Authorized counterparty allowlist.** Which specific messaging platforms are enabled, and which exact user IDs (or pairing-approved users) are authorized on each? The remit encodes "allowlist required"; the concrete membership is yours to set.
+2. **Authorized terminal backend / isolation posture.** Which terminal backend is sanctioned for this deployment (host-reaching local/SSH vs. isolated Docker/Modal/Daytona), and is running the default local backend while ingesting untrusted input acceptable to you, or should it be prohibited?
+3. **Approval-bypass modes.** Are `--yolo`, `approvals.mode: off`, or a permanent `command_allowlist` permitted in this deployment, or should they be treated as forbidden outside disposable/isolated environments? If permitted, in which contexts?
+4. **Outbound messaging scope.** May the agent send messages to arbitrary recipients (e.g. new email addresses / new chats), or only reply within existing allowlisted conversations?
+5. **Delegation and cron limits.** What maximum subagent spawn depth, concurrency, and cron-job cadence do you consider acceptable for this deployment?
+6. **Remote-backend exposure.** Is Hermes Desktop expected to attach to a remote backend at all, and if so, is anything beyond a trusted-network (VPN/Tailscale) posture in scope — i.e. is any public-internet exposure (OAuth-gated) authorized?
+7. **Network-exposed HTTP surfaces.** Are the API server adapter and the dashboard/kanban HTTP endpoints authorized to be enabled in this deployment, or should they be off entirely?
