@@ -212,6 +212,7 @@ def build_html(baseline_dir: Path, out_dir: Path):
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, follow">
 <title>Praxen — Baseline Agent Suite Health (Popularity &amp; Freshness)</title>
 <style>{theme_css}
 {SUITE_CSS}</style>
