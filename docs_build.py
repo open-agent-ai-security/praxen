@@ -15,11 +15,17 @@ generators. A left-nav lists every doc (the current one expanded into its
 section TOC); cross-doc `*.md` links are rewritten to `*.html`, and links to
 repo files (`../FOO.md`) are pointed at the GitHub blob view.
 
+Each page also gets an auto-derived meta description (from its first <p>), a
+canonical link, Open Graph / Twitter Card tags, and a TechArticle JSON-LD
+block, for search engines and AI/LLM answer engines (GEO). The same PAGES list
+also drives sitemap.xml, written to the repo root alongside guide/.
+
 Edit the docs in markdown; regenerate at release time:
 
     python3 docs_build.py
 """
 import html
+import json
 import re
 import sys
 from pathlib import Path
@@ -36,6 +42,8 @@ DOCS_DIR = ROOT / "docs"
 OUT_DIR = ROOT / "guide"
 THEME_CSS = ROOT / "assets" / "praxen-theme.css"
 REPO = "https://github.com/open-agent-ai-security/praxen"
+SITE_URL = "https://open-agent-ai-security.github.io/praxen/"
+SOCIAL_IMAGE = "graphics/praxen-social.png"
 
 # Ordered table of contents for the left-nav: (source file, nav label).
 PAGES = [
@@ -154,6 +162,22 @@ def onpage_toc(toc_tokens) -> str:
     return f'<ul class="docs-subnav">{lis}</ul>'
 
 
+TAG_RE = re.compile(r"<[^>]+>")
+WHITESPACE_RE = re.compile(r"\s+")
+
+
+def meta_description(body: str, fallback: str, limit: int = 155) -> str:
+    """Derive a meta/OG description from the page's first <p>, falling back to
+    `fallback` (the nav label) if the page has none. Plain text, collapsed
+    whitespace, truncated on a word boundary — never mid-word."""
+    m = re.search(r"<p[^>]*>(.*?)</p>", body, re.DOTALL)
+    text = html.unescape(TAG_RE.sub("", m.group(1))).strip() if m else ""
+    text = WHITESPACE_RE.sub(" ", text) or fallback
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(",;:.") + "…"
+
+
 def left_nav(active_file: str, active_toc: str) -> str:
     out = ['<nav class="docs-nav"><div class="docs-nav-title">Documentation</div><ul>']
     for src, label in PAGES:
@@ -168,14 +192,52 @@ def left_nav(active_file: str, active_toc: str) -> str:
     return "".join(out)
 
 
-def page_html(theme_css: str, title: str, nav: str, body: str, src: str, body_end: str = "") -> str:
+def page_html(theme_css: str, title: str, nav: str, body: str, src: str, description: str, body_end: str = "") -> str:
     edit_url = f"{REPO}/blob/main/docs/{src}"
+    out_rel = src[:-3] + ".html"
+    full_title = f"{html.escape(title)} · Praxen Docs"
+    canonical = f"{SITE_URL}guide/{out_rel}"
+    desc_attr = html.escape(description, quote=True)
+    image_url = f"{SITE_URL}{SOCIAL_IMAGE}"
+    # TechArticle: this is reference/how-to documentation, not editorial content,
+    # and has no reliable per-page date (a git-log-derived date would drift
+    # between a full local clone and CI's shallow checkout and make the
+    # docs-freshness gate flap on unrelated grounds). NB: script content is raw
+    # text per the HTML spec (entities are NOT decoded inside <script>), so JSON
+    # values here must go through json.dumps, never html.escape — an
+    # html-escaped quote would land in the DOM as the literal text `&quot;` and
+    # break JSON.parse.
+    json_ld = f"""<script type="application/ld+json">
+{{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": {json.dumps(title)},
+  "description": {json.dumps(description)},
+  "url": {json.dumps(canonical)},
+  "isPartOf": {{ "@type": "WebSite", "name": "Praxen", "url": {json.dumps(SITE_URL)} }},
+  "publisher": {{ "@type": "Organization", "name": "Exabeam", "url": "https://www.exabeam.com/" }}
+}}
+</script>"""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)} · Praxen Docs</title>
+<title>{full_title}</title>
+<meta name="description" content="{desc_attr}">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{canonical}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Praxen">
+<meta property="og:title" content="{full_title}">
+<meta property="og:description" content="{desc_attr}">
+<meta property="og:url" content="{canonical}">
+<meta property="og:image" content="{image_url}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{full_title}">
+<meta name="twitter:description" content="{desc_attr}">
+<meta name="twitter:image" content="{image_url}">
+{json_ld}
 <style>{theme_css}</style>
 <!-- Cookieless web analytics — docs/landing pages only, never the reports.
      Two tools run side by side (temporary A/B comparison):
@@ -230,6 +292,8 @@ def build():
         output_format="html5",
     )
 
+    sitemap_urls = ["", "news.html"]  # site root pages, relative to SITE_URL
+
     for src, label in PAGES:
         text = (DOCS_DIR / src).read_text(encoding="utf-8")
         text = LEADING_COMMENT.sub("", text, count=1)  # drop the license header comment
@@ -241,12 +305,40 @@ def build():
         m = re.search(r"<h1[^>]*>(.*?)</h1>", body, re.DOTALL)
         # The H1 is already HTML-escaped; unescape before page_html re-escapes it.
         title = html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else label
+        description = meta_description(body, label)
 
         nav = left_nav(src, onpage_toc(md.toc_tokens))
-        out_path = OUT_DIR / (src[:-3] + ".html")
+        out_rel = src[:-3] + ".html"
+        out_path = OUT_DIR / out_rel
         body_end = MERMAID_SCRIPT if has_mermaid else ""
-        out_path.write_text(page_html(theme_css, title, nav, body, src, body_end), encoding="utf-8")
+        out_path.write_text(page_html(theme_css, title, nav, body, src, description, body_end), encoding="utf-8")
         print(f"docs_build.py: wrote {out_path.relative_to(ROOT)}")
+        sitemap_urls.append(f"guide/{out_rel}")
+
+    # The two "📊 See it live" reports docs/index.md and docs/owasp.md and
+    # docs/RAISE.md link to prominently — static, checked-in HTML (not
+    # generated by this script) but genuinely public-facing, unlike the other
+    # tests/baselines/*.html health reports, which are CI-internal.
+    sitemap_urls.append("tests/baselines/owasp-coverage-report.html")
+    sitemap_urls.append("tests/baselines/raise-coverage-report.html")
+
+    write_sitemap(sitemap_urls)
+
+
+def write_sitemap(url_paths):
+    """Emit sitemap.xml at the repo root from the same PAGES list docs_build.py
+    already treats as the source of truth, so there is one place to update when
+    a page is added instead of a second list to keep in sync by hand."""
+    entries = "\n".join(f"  <url><loc>{html.escape(SITE_URL + p, quote=True)}</loc></url>" for p in url_paths)
+    sitemap = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}\n"
+        "</urlset>\n"
+    )
+    out_path = ROOT / "sitemap.xml"
+    out_path.write_text(sitemap, encoding="utf-8")
+    print(f"docs_build.py: wrote {out_path.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
