@@ -192,6 +192,17 @@ def left_nav(active_file: str, active_toc: str) -> str:
     return "".join(out)
 
 
+def _jsonld_str(value: str) -> str:
+    """JSON-encode a string for embedding inside an HTML <script> block.
+
+    json.dumps handles the JSON quoting, but does NOT escape `/`, so a value
+    containing `</script>` (or any `</…`) would prematurely close the script
+    element and could inject markup. Escaping `</` as `<\\/` is valid JSON and
+    parses identically, while being inert to the HTML parser.
+    """
+    return json.dumps(value).replace("</", "<\\/")
+
+
 def page_html(theme_css: str, title: str, nav: str, body: str, src: str, description: str, body_end: str = "") -> str:
     edit_url = f"{REPO}/blob/main/docs/{src}"
     out_rel = src[:-3] + ".html"
@@ -206,15 +217,16 @@ def page_html(theme_css: str, title: str, nav: str, body: str, src: str, descrip
     # text per the HTML spec (entities are NOT decoded inside <script>), so JSON
     # values here must go through json.dumps, never html.escape — an
     # html-escaped quote would land in the DOM as the literal text `&quot;` and
-    # break JSON.parse.
+    # break JSON.parse. `_jsonld_str` additionally escapes `</` so a value
+    # containing `</script>` can't break out of the <script> element.
     json_ld = f"""<script type="application/ld+json">
 {{
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": {json.dumps(title)},
-  "description": {json.dumps(description)},
-  "url": {json.dumps(canonical)},
-  "isPartOf": {{ "@type": "WebSite", "name": "Praxen", "url": {json.dumps(SITE_URL)} }},
+  "headline": {_jsonld_str(title)},
+  "description": {_jsonld_str(description)},
+  "url": {_jsonld_str(canonical)},
+  "isPartOf": {{ "@type": "WebSite", "name": "Praxen", "url": {_jsonld_str(SITE_URL)} }},
   "publisher": {{ "@type": "Organization", "name": "Exabeam", "url": "https://www.exabeam.com/" }}
 }}
 </script>"""
