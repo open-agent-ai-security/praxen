@@ -122,15 +122,19 @@ Ordered by the clean run's evidence — severity anchoring first:
 - **Directional-lean check (carried from 1.1, now with an anchor).** The
   non-gating check: does the Zero-Trust / Limit-Your-Domain category-mean
   drift the same direction again vs. v1.0.2? Measuring *bias* (vs. scatter)
-  needs a human-anchored reference: **Steve hand-scores 2–3 calibration
-  targets** (suggest deepagents, salesforce, openai-cs) and those become the
-  fixed reference points the rubric is validated against. If the lean is
+  needs a human-anchored reference: **Steve hand-scores 2–3 targets as the
+  lean anchor set** (suggest deepagents, salesforce, openai-cs) and those
+  become the fixed reference points the rubric's *center* is validated
+  against. (Distinct from the stage gate's *flip-check set* below — the four
+  targets whose Critical↔High reproducibility is measured; the two sets
+  overlap on deepagents/salesforce but serve different measurements.) If the lean is
   structural, correct it here; if unclear, document and carry to 1.3.
 
 **Stage gate (median-of-3 on both sides, graded vs `v1.1-claude48`):**
-zero Critical↔High flips across 3× runs on the four calibration targets
-(deepagents, salesforce, uAgents, craftbot); median-of-3 |weighted drift|
-≤ 0.2 on those targets; posture bucket stable everywhere. Same
+zero Critical↔High flips across 3× runs on the four **flip-check targets**
+(deepagents, salesforce, uAgents, craftbot — the two worst severity-drift
+offenders from the clean run plus the two widest-band targets); median-of-3
+|weighted drift| ≤ 0.2 on those targets; posture bucket stable everywhere. Same
 over-steer/contamination discipline the 1.1 tagging work hard-won — scoring is
 even more seductive to steer than tagging; validate on the calibration
 targets *before* touching the rest of the suite.

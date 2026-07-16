@@ -54,7 +54,7 @@ A baseline freeze should not rest on a single run — parts of the analysis are 
 - **Freeze the median run** per target as the committed exemplar (one real, unedited run — keeps the byte-render gate honest).
 - **Set each band from the 3-run mean ± observed spread**, not from any single run. Distinguish *stable-but-offset* targets (low std, mean outside the old band → **move** the band) from *noisy-but-centred* ones (mean in-band, high std → **widen** the band).
 - **Diff by theme and rule text, not by `R-NN` id** — rule IDs are re-derived each run and are not stable across runs/models.
-- Name the new set `baselines/vX.Y-<variant>/` (e.g. `v0.7.7-claude48` for the Opus 4.8 re-freeze), retire the previous set in place, and update the pointer + bands here. The current set's [`BASELINE.md`](baselines/v1.0.2-claude48/BASELINE.md) is the worked example.
+- Name the new set `baselines/vX.Y-<variant>/` (e.g. `v0.7.7-claude48` for the Opus 4.8 re-freeze), retire the previous set in place, and update the pointer + bands here. The [`v1.0.2-claude48` BASELINE.md](baselines/v1.0.2-claude48/BASELINE.md) is the worked example of a median-of-3 characterization (the current `v1.1-claude48` set carries that freeze over unchanged via re-tag — see its own `BASELINE.md` for the re-tag method).
 
 ## Pre-release checklist
 

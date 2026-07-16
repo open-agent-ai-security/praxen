@@ -31,7 +31,7 @@ baselines/
     GATE-NOTES.md            ← the A/B record and the "drop the parallel path" verdict
 ```
 
-When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.1-claude48/`** set is the reference — see its [`BASELINE.md`](v1.1-claude48/BASELINE.md).
+When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.1-claude48/`** set is the reference — see its [`BASELINE.md`](v1.1-claude48/BASELINE.md). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
 
 ## Re-tag transforms — validity domain
 
@@ -53,7 +53,7 @@ Case study: the 1.1 re-tag could not apply the sharpened LLM08 guidance to
 craftbot's agent-writable vector store, because the frozen record never captured
 the ChromaDB evidence — the LLM08 column reads zero in `v1.1-claude48/` for that
 reason, and the fix lands via the v1.2 re-scan freeze. See
-[#169](https://github.com/open-agent-ai-security/praxen/issues/169). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is now retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
+[#169](https://github.com/open-agent-ai-security/praxen/issues/169).
 
 `v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 
