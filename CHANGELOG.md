@@ -11,7 +11,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ## [Unreleased]
 
-_Nothing yet — staging the next change set._
+**Post-1.1 cleanup (docs/process batch — no version bump, no analysis change).** Paper-trail reconciliation from the 1.1 retrospective (`RELEASE_1.1_REVIEW.md`): the #48 descope recorded in `RELEASE_1.1_PLAN.md`; the tagging-checkpoint report marked superseded; the LLM08 anchor gap documented (#169 — fix lands via the v1.2 re-scan freeze); the 1.1/1.2/1.3 plan set committed. Process: `guide/` docs-freshness now checked on every PR (#178); theme-coverage formalized as the regression gate with the weighted RAISE score advisory (#48 item 4); re-tag transforms scoped to prose-decidable corrections (`tests/baselines/README.md`); published tags are never re-pointed; the interim per-PR review convention codified (#120). The frozen `v1.1-claude48` baseline is byte-untouched.
 
 ## [1.1.0] — 2026-07-12
 

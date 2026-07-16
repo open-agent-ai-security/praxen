@@ -3,129 +3,208 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen 1.2 — Engine reliability, schema evolution, output quality & coverage
+# Praxen 1.2 — Harness Reliability & Scoring Stability
+
+> **Revised 2026-07-15** — supersedes the 2026-07-12 draft (see git history and
+> `RELEASE_1.2_PLAN_REVIEW.md` for what changed and why). Re-scoped around the
+> operator priority statement (Steve, 2026-07-15): *"our big problems are
+> harness reliability, and scoring stability (Critical vs. High, etc., and
+> RAISE)."* Everything else moved to `RELEASE_1.3_PLAN.md` or the 1.1.1 patch
+> (`RELEASE_1.1.1_PLAN.md`).
 
 ## Objective
 
-The **broad functional line** that 1.1 deliberately left out. Where 1.1 tightens the
-scoring/tagging *judgment* metadata against a stable engine, 1.2 is the larger, higher-blast-
-radius work: schema evolution (which forces a re-baseline), the render/output-quality
-overhaul, engine reliability, and new detection surface. Sequenced **after** 1.1 is frozen, so
-each of these lands against a metadata layer that's already been made consistent.
+1.2 attacks the two problems that matter most in production, and nothing else:
+
+1. **Harness reliability** — scans must not stall or die. The 2026-07-12
+   clean run had zero watchdog deaths but several scans at 13–14 min, right at
+   the watchdog edge; historical full-suite mortality has hit ~30%. The stall
+   mechanism is known (the Step-9.9 synthesis burst) and so is the fix shape
+   (interleaved emission + decomposition primer + recovery checkpoints).
+2. **Scoring stability** — the same target with the same remit must score the
+   same way twice. The clean run pinpointed the lever: RAISE drift was
+   **entirely severity calibration on borderline findings** (5/12 exact, mean
+   |drift| 0.17, max 0.55; deepagents +0.55 and salesforce +0.45 were each a
+   **Critical scored as High**). This is also the project's most-cited external
+   criticism (July Deep Research assessment, quoted on #48).
+
+The schema work (#7/#5) stays in 1.2 **as the enabler, not a co-headline**:
+stable, joinable rule IDs are what make scoring stability *measurable
+mechanically* (the clean run needed hand-matching to compare scans), and since
+#7 forces the re-baseline anyway, it shares the one freeze this release pays
+for.
+
+**Scope rule:** in 1.2, everything that serves reliability or scoring
+stability, plus the schema enabler; **out**, everything that doesn't —
+detection additions, coverage backfill, output polish, harness reach, and docs
+are 1.3 (`RELEASE_1.3_PLAN.md`).
 
 ## Prerequisite
-Fold **1.1** in first. 1.2 branches from `1.1`. Because #7 (schema arrays) forces a
-re-baseline, 1.2 re-freezes `v1.2-claude48` at release.
 
-## Buckets (re-triaged out of the old #168)
+**The post-1.1 cleanup batch folds in first** (`RELEASE_1.1.1_PLAN.md` —
+shipped as a **docs/process batch, no version bump**, per Steve 2026-07-16):
+paper-trail reconciliation and process items only — **no re-tag, no
+re-freeze** (the LLM08 fix was diagnosed as unfixable by re-tagging and moved
+into this release: authoring invariant in stage 1, re-scan acceptance in
+stage 4). `v1.1-claude48` therefore remains the anchor, and it is still the
+pristine, scoring-unchanged "before" this release is graded against. 1.2
+branches from `main` after the cleanup batch lands.
 
-### A · Schema evolution *(forces a re-baseline)*
-- **#7** — structure `policy_rule_text` / `policy_rule_ids` as arrays; fold into the render-
-  pipeline refactor. **Largest single change** — moves the byte-render gate, `schema_version`
-  bump, full re-baseline. The reason 1.1 was kept schema-neutral.
-- **#5** — `schema.py` validator round 2: `policy_rule_ids` ↔ remit-rule cross-check.
+## Staged scope — order is load-bearing
 
-### B · Skill-flow & output quality
-- **#33** interleave finding emission with analysis (kill the Step-9.9 synthesis burst / stream-stall)
-- **#29** Step-8.5 finding-themes outline first (decomposition primer)
-- **#113** wrap technical tokens in `<code>` consistently across prose fields
-- **#27** report finding default-state (collapsed/expanded) + expand/collapse-all
-- **#25** split output-authoring conventions out of `SKILL.md` (rendering/MVC split)
-- **#6** `render.py` polish (confidence, Medium/Low badge)
+The release ends in one expensive re-freeze (median-of-3 × 12). Every stage
+that changes scan output must land **before** it; the freeze comes last, once.
 
-### C · Engine reliability
-- **#65** — framework scanning, manifest resilience, discovery gaps (from the uAgents scan).
-  Distinct from the scoring/tagging *judgment* work — this is about scans not stalling/dying
-  and handling framework targets robustly.
+### Stage 1 · Harness reliability *(the #1 problem)*
 
-### D · Detection additions *(may add findings — intended)*
-- **#104** entropy-based secret detection in `render.py`'s redaction backstop
-- **#41** new named detection pattern: external API response → filesystem write (path-traversal class)
-- **Full OWASP category coverage (LLM01–10 + ASI01–10).** Goal: every category exercised by at
-  least one baseline target. 1.1's tagging work (#169) is the *first* remedy — it recovers the
-  categories that zeroed as **tagging artifacts** (ASI08/ASI10 — behaviors are still found, just
-  mis-/under-tagged). What tagging **cannot** recover is a category lost to **target retirement**:
-  **LLM05 (Improper Output Handling)** zeroed because we retired the output-handling specialist
-  targets. **Contingency (owner of finding #3):** if the 1.1 scoring/tagging tweaks don't restore
-  a category, **add new baseline app(s)** here in 1.2 to cover it — LLM05/output-handling is the
-  known one to backfill. Measured against the `owasp_coverage.py` matrix (no zero columns).
+- **#33** — interleave finding emission with analysis; kill the Step-9.9
+  synthesis burst at its mechanism.
+- **#29** — Step-8.5 finding-themes outline before drafting (decomposition
+  primer). Also expected to shrink the finding-count scatter the clean run saw
+  (hermes 11-vs-5, aider 11-vs-6 at equal substance), which currently muddies
+  every scan-to-scan comparison.
+- **#65 items 1–2** — Step-4 evidence checkpoint written to disk (survives
+  compaction on large codebases); `--validate-manifest` flag on
+  `manifest_to_findings.py` (manifest format errors caught early, not at
+  parse time).
+- **Evidence-completeness authoring invariant** *(added 2026-07-16 from the
+  LLM08 diagnosis — see #169 and `RELEASE_1.1.1_PLAN.md`)* — SKILL.md evidence
+  step: **evidence must cite every mechanism in the finding's causal chain** —
+  if the chain runs through a store, queue, scheduler, or subsystem, that
+  surface gets an evidence line even when another frame dominates the summary.
+  Test: the record must be **closed under classification** — a competent
+  reader reaches the right taxonomy from the record alone (craftbot-005 is
+  the failing case study: its frozen record dropped the ChromaDB link, so no
+  prose pass could ever tag LLM08). Lands here because it shares #29's
+  carving/emission surface and it changes finding content → must precede the
+  freeze.
 
-### G · Scoring rigour (#48) — *explicitly deferred from 1.1*
-- **#48** — RAISE scoring-guidance rigour. **Pushed out of 1.1 into 1.2 on purpose:** 1.1 held
-  scoring constant (tagging-only) precisely so `v1.1-claude48` is the clean, scoring-unchanged
-  *"before"* this work is graded against. 1.2 owns tightening the RAISE rubric — **severity
-  anchoring** (decidable Critical-vs-High / Medium-vs-Low criteria) and category-score guidance —
-  to shrink run-to-run score variance. Pairs with the **directional-lean** correction in
-  "Carried-forward watch-items" below (both need a **human-anchored reference**). Measure
-  **median-of-3 on both sides**, graded vs `v1.1-claude48`. Same over-steer/contamination
-  discipline the 1.1 tagging work hard-won applies here, amplified — scoring is even more
-  seductive to steer than tagging.
+**Stage gate (measured, 3× single-target shakedown then one full-suite run):**
+zero watchdog deaths; no scan within 20% of the watchdog limit; finding-count
+spread on 3× same-target runs ≤ ±2.
 
-### E · Harness support
-- **#151** — Google Antigravity (`agy` CLI) as a supported harness.
+### Stage 2 · Schema enabler — mechanical comparability
 
-### F · Docs / low / defer
-- **#117** — `challenging-findings.md`: *damage-model-wrong* resolution path + category-score
-  *independence* guidance. **Moved here from 1.1** (human-challenge-workflow axis, not automated
-  run-to-run variance) and **gated on #118**: if we adopt curated outputs, #117 is the docs half
-  of that work; if not, it collapses to a ~1-paragraph note ("challenges resolve by re-analysis;
-  category scores are independent") that lands opportunistically.
-- **#135** docs simplicity pass (Tier 3) · **#4** SKILL authoring aids · **#118** operator
-  override + finding-revision records (provenance; schema-contract change) · **#90** shared org
-  brand/design system · **#2** durable version-independent standing config *(explicitly deferred)*.
+- **#7** — `policy_rule_text` / `policy_rule_ids` as arrays; `schema_version`
+  bump; render-pipeline migration. The largest mechanical change — the reason
+  this release re-baselines.
+- **#5** — validator round 2: `policy_rule_ids` ↔ remit-rule cross-check, so
+  rule references are verifiably real.
+- **Named deliverable: a scan-vs-scan diff tool** (promote
+  `compare_checkpoint.py` or successor into `tests/`): joins two runs of the
+  same target on remit-anchored rule references + finding content. The clean
+  run proved the need — regression detection currently requires hand-matching.
 
-## Carried-forward watch-items (from 1.1)
-- **Scoring directional *lean* (RAISE credit bias).** 1.1 tightens scoring *scatter* (σ) but
-  deliberately does **not** gate on directional *bias* — the old→new lean (Zero Trust up,
-  Limit-Your-Domain stricter) — because measuring bias needs a **human-anchored reference** we
-  don't have. 1.1 only carries a lightweight non-gating check (does the ZT / Limit-Your-Domain
-  category-mean drift the *same* direction again vs v1.0.2?). If that check shows the lean is
-  structural, **1.2 owns the correction**: pair it with #48's rubric work + a human-anchored
-  reference so the scoring center — not just its spread — can be validated.
+**Stage gate:** two independent runs of the same target join ≥90% of findings
+mechanically; `test_render.py` migrated and green on the new shape.
 
-## Not in 1.2 — pull independently
-- **#120** — replace the retired Gemini review gate. **Time-sensitive: Gemini Code Assist
-  sunsets 2026-07-17.** Pull **now / independently** of both 1.1 and 1.2; it belongs to no
-  theme and cannot wait for either release train.
-- **#127** — gate `examples/` in `test_render.py` — **planned for 1.0.2** (PR #160 open, targets
-  `dev`; not yet merged). Tracking moves #168 Bucket F → #167 on merge.
+> **Mid-release checkpoint (after Stage 2).** If the schedule is stressed
+> here, 1.2 ships as reliability+schema and Stage 3 moves to 1.3 **by plan
+> amendment, in this doc, the day the call is made** — not by silent descope.
+> (1.1's lesson.)
 
-## Regression discipline
-1.2 also intentionally moves numbers (#7 schema shape, #104/#41 add findings) → re-freeze
-`v1.2-claude48`, graded vs `v1.1-claude48`. Because #7 changes the schema contract, plan the
-re-baseline + render-pipeline refactor as one coherent migration.
+### Stage 3 · Scoring stability (#48 items 1–3)
 
-## Clean-run validation (2026-07-12) — empirical inputs for the buckets above
-Before prod, all **12 baseline targets were re-scanned by fresh independent agents** (new
-agents, source + remit only, no baseline peek) against `v1.1-claude48`. All 12 completed
-schema-valid with **zero watchdog deaths**, and **detection reproduced** — the major vulns were
-re-found on every target (verified by finding *content*; no genuine misses). The *divergences*
-map onto this plan and should inform the work:
+Ordered by the clean run's evidence — severity anchoring first:
 
-- **→ A (#5 / #7 stable rule IDs) — highest-value prod item.** `policy_rule_ids` (`R-NN`) are
-  assigned **per-scan** and not tied to the remit, so baseline `R-15` ≠ fresh `R-15`; a
-  scan-to-scan diff **can't join on them** (it took hand-matching finding content to confirm
-  detection held). With more users you need *mechanical* scan-vs-scan regression detection — #5's
-  remit cross-check + #7's arrays are exactly what makes that possible. The clean run is a live
-  demonstration of the need.
-- **→ B (#29 themes primer / #33 interleaved emission).** Finding *counts* varied widely at equal
-  substance (hermes 11 vs 5, aider 11 vs 6) — a decomposition/splitting inconsistency #29/#33
-  would stabilise; it also inflates apparent divergence and muddies score comparison.
-- **→ C (#65 / #33 reliability).** 0 deaths this run, but several scans ran **13–14 min, right at
-  the watchdog edge**; at prod scale (historical ~30% mortality) that's fragile — #65 resilience +
-  #33 killing the Step-9.9 synthesis burst address it directly.
-- **→ D (coverage) — UPDATE / likely strike.** **LLM05 is no longer a zero column:** 1.1's
-  LLM05/LLM06 orthogonality fix recovered it to **4P / 6S** on the code-exec findings. Verify
-  against the `owasp_coverage.py` matrix, then the "backfill output-handling targets for LLM05"
-  contingency here can likely be **removed**.
-- **→ G (#48 scoring) — empirical baseline.** RAISE-score reproducibility: **5/12 exact, mean
-  |drift| 0.17 / 5.0, max 0.55**, and it is **entirely severity-calibration on borderline
-  findings** (deepagents +0.55 and salesforce +0.45 lean *lenient* — a Critical scored as High).
-  This pinpoints **severity anchoring** as #48's lever and names the two worst-offender targets to
-  calibrate against. Caveat: single-pass fresh vs a median-of-3 baseline overstates true variance
-  slightly — #48 must measure median-of-3 on both sides.
+- **Severity anchoring (Critical vs. High, High vs. Medium)** — decidable
+  criteria + 1–2 concrete evidence→severity→because anchors per boundary,
+  calibrated against the two named lenient flips (deepagents, salesforce).
+  This is the single largest measured drift source; it moves the weighted
+  score through the severity weights, so it is *the* Critical-vs-High fix.
+- **Control-ledger (per RAISE category, authored before the score)** —
+  enumerate controls → on the default path? → off-by-default/bypassable? →
+  therefore score N. Anchors the 1-vs-2 credit call to stated control-facts
+  instead of gestalt.
+- **0↔1 / 2↔3 boundary decision rules** — the operative-but-imperfect-control
+  case (Partial = executes on the default path unmodified; Ad hoc = exists but
+  off-by-default/bypassed/not on the agent's path; Absent = never invoked).
+- **Directional-lean check (carried from 1.1, now with an anchor).** The
+  non-gating check: does the Zero-Trust / Limit-Your-Domain category-mean
+  drift the same direction again vs. v1.0.2? Measuring *bias* (vs. scatter)
+  needs a human-anchored reference: **Steve hand-scores 2–3 calibration
+  targets** (suggest deepagents, salesforce, openai-cs) and those become the
+  fixed reference points the rubric is validated against. If the lean is
+  structural, correct it here; if unclear, document and carry to 1.3.
 
-Bottom line for prod sequencing: the reliability wins here are **A (stable IDs, so regressions
-are detectable at all)** and **C (engine resilience, so scans don't die at scale)** — ahead of
-the output-polish items. 1.1 fixed the *visible* problem (tagging); this run says the
-*prod-reliability* problem is schema-stable-IDs + engine-resilience, which is what 1.2 carries.
+**Stage gate (median-of-3 on both sides, graded vs `v1.1-claude48`):**
+zero Critical↔High flips across 3× runs on the four calibration targets
+(deepagents, salesforce, uAgents, craftbot); median-of-3 |weighted drift|
+≤ 0.2 on those targets; posture bucket stable everywhere. Same
+over-steer/contamination discipline the 1.1 tagging work hard-won — scoring is
+even more seductive to steer than tagging; validate on the calibration
+targets *before* touching the rest of the suite.
+
+### Stage 4 · Re-freeze `v1.2-claude48` — once, last
+
+- Median-of-3 × 12 targets on the final stack (new emission flow, new schema,
+  new scoring guidance). **Reference model pinned: Opus 4.8** — a model change
+  is its own future re-baseline, never folded into this one.
+- **Tagging pass riding the freeze** *(added 2026-07-16 — dispositions from
+  the LLM08 diagnosis)*:
+  - **#169 acceptance:** the craftbot vector-store finding carries LLM08 in
+    the **majority of the median-of-3 runs** — these are fresh code-reading
+    scans under the LLM08-aware KB + the stage-1 authoring invariant, which is
+    the only method that can fix it (re-tagging was proven unable to; see
+    #169's diagnosis comment). #169 closes here or the KB/authoring guidance
+    gets another look.
+  - **Secondary chips anchored majority-of-3**, same spirit as median-of-3
+    scores — single-pass secondaries are demonstrably churn-prone (the
+    hermes/salesforce LLM08 flips across the three 1.1 passes). A secondary
+    appears in the frozen exemplar iff ≥2 of 3 runs emit it.
+  - **#173 / #174** — make the two KB clauses decidable (LLM06
+    phantom-control; ASI10 default-off vs structurally-absent), then let this
+    pass classify under them. Close both here.
+  - **KB validity-domain sentence** — state in the LLM08 entry (and any other
+    code-dependent guidance) that detect-then-audit steps assume source
+    access; prose-only contexts must not guess them.
+- Batch here (their issues say "next re-baseline"): **#176** (suite_health
+  full RAISE scale + baseline-dir consistency); coverage pages regenerated;
+  **LLM06 discrimination check** — LLM06 is now ~25% of the tagged corpus
+  (23P+6S), the most steerable rule in the KB, and structurally positioned to
+  become the new dumping ground the way `untagged` was pre-1.1: sample its
+  findings and confirm a non-LLM06 counterfactual exists for each.
+- Coverage gate carried from 1.1, restated so it's passable: **no zero columns
+  counting primary+secondary**, with the documented structural exception for
+  outcome categories (ASI08 may not attach at finding level; ASI10 rides
+  secondary) — LLM08 becomes non-zero at this freeze (the #169 acceptance
+  above), not before.
+
+## Explicit non-goals (→ 1.3 or later)
+
+Detection additions **#104 / #41 / #65-item-4 (IaC discovery)** — real, wanted,
+and deliberately *not* here: each adds findings, and findings added after the
+freeze cost a second freeze. They headline 1.3, whose re-freeze they justify.
+Also out: `scan_type: framework` (#65 item 5 — needs the O5 framing decision),
+the DB/NL-to-SQL roster replacement (#70), LLM05 specialist target, output
+quality (#27/#25/#6/#113), harness reach (#151), docs (#117/#118/#135/#4/#90/#2).
+
+## Regression discipline & success metric
+
+1.2 intentionally moves numbers (#7 shape, #48 scoring) → re-freeze
+`v1.2-claude48`, graded vs `v1.1-claude48`. Success is **measured, per stage
+gate above** — in one line each:
+
+- **Reliability:** two consecutive full-suite runs, zero deaths, nothing at
+  the watchdog edge.
+- **Comparability:** mechanical scan-vs-scan join ≥90%, no hand-matching.
+- **Scoring:** zero Critical↔High flips and |drift| ≤ 0.2 median-of-3 on the
+  calibration targets; **theme-coverage is the gate, weighted score advisory**
+  (per #48 item 4, landed in 1.1.1).
+- Version bump 1.2.0 (6 guarded locations + `PRAXEN_SPEC` §sync + CHANGELOG);
+  `test_render.py` + `build.sh` green; CI 3.9/3.12/3.13; docs-freshness now
+  checked per-PR (#178, landed in 1.1.1).
+
+## Deliverables checklist
+
+- [ ] Stage 1: #33 + #29 + #65(1,2) landed; reliability gate passed and
+      recorded (shakedown + full-suite run committed under `tests/runs/`)
+- [ ] Stage 2: #7 arrays + `schema_version` bump; #5 cross-check; scan-diff
+      tool in `tests/`; comparability gate passed
+- [ ] Stage 3: #48 severity anchors + control-ledger + boundary rules in
+      SKILL/KB; human-anchored calibration recorded; scoring gate passed;
+      lean check run and dispositioned
+- [ ] Stage 4: `v1.2-claude48` frozen median-of-3; `CURRENT` updated; #176
+      batched; coverage + LLM06 checks recorded
+- [ ] Closes: #5, #7, #29, #33, #48, #169, #173, #174, #176; #65 partially
+      (items 1–2; comment scoping the remainder to 1.3)

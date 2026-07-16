@@ -5,6 +5,15 @@
 
 # Praxen 1.1 — Scoring & Tagging Rigour
 
+> **Descoped 2026-07-12, recorded 2026-07-16** *(the record lagged the decision —
+> see `RELEASE_1.1_REVIEW.md`)*: **#48 (bucket A, RAISE scoring rigour) was moved
+> out of 1.1 mid-release** and is owned by **1.2 stage 3** (`RELEASE_1.2_PLAN.md`).
+> Shipping 1.1 tagging-only keeps `v1.1-claude48` scoring-byte-identical to the
+> 1.0.2 median-of-3 — the clean "before" #48 is graded against. What `v1.1.0`
+> actually shipped: **#169** (OWASP distillation sharpening + primary/secondary
+> layer) and **#111** (tag-label normalization). The scope and checklist below are
+> preserved as written pre-descope; strikethroughs mark what moved.
+
 ## Objective
 
 **Tightly scoped.** 1.1 fixes the *metadata layer* that sits on top of Praxen's detection —
@@ -63,10 +72,12 @@ Detection is strong; the noise is in the classification/scoring **metadata**:
 
 ## Scope — three items, one theme
 
-### A · Scoring rigour (RAISE weighted)
-- **#48** — RAISE scoring rigour: a structured **control-ledger** + **boundary decision rules**
+### A · Scoring rigour (RAISE weighted) — ~~descoped → 1.2 stage 3~~
+- ~~**#48** — RAISE scoring rigour: a structured **control-ledger** + **boundary decision rules**
   so the mid-maturity credit call is reproducible. *(The eval's headline critique.)* **Moves
-  numbers — intended.** 1.1's scoring half is now **#48 only**.
+  numbers — intended.** 1.1's scoring half is now **#48 only**.~~ *(Moved out
+  2026-07-12 — see the descope note at top. Item 4 of #48 — theme-gate /
+  advisory-score — landed early via the post-1.1 cleanup batch.)*
 
 > **#117 moved to 1.2.** The *human-challenge-workflow* docs item (`challenging-findings.md`
 > damage-model path + category-score *independence*, not "cascade") is a different axis from
@@ -115,14 +126,14 @@ stable tagging**, measured, not just "it ran":
   (`SKILL.md` analysis logic, `manifest_to_findings.py`, KBs' *detection* content) unchanged
   except the scoring/tagging *guidance* edits.
 
-## Deliverables checklist
-- [ ] #48 control-ledger + boundary rules authored in `SKILL.md`/KB; scoring reproducibility validated
-- [ ] #169 (reframed) OWASP + RAISE distillations sharpened (LLM08 first, boundaries disambiguated); untagged-rate down + excessive-agency test passes
-- [ ] #111 tag-label normalization in the deterministic layer
-- [ ] Re-freeze `v1.1-claude48` (median-of-3), graded vs `v1.0.2-claude48`; variance/untagged metrics reported
-- [ ] `schema_version` still `2.0`; `test_render.py` + `build.sh` green; CI 3.9/3.12/3.13
-- [ ] Version bump 1.1.0 (manifests + `PRAXEN_SPEC` + CHANGELOG); coverage pages regenerated
-- [ ] Closes: #48, #111, #169
+## Deliverables checklist *(reconciled 2026-07-16 to what v1.1.0 shipped)*
+- [ ] ~~#48 control-ledger + boundary rules authored in `SKILL.md`/KB; scoring reproducibility validated~~ *(descoped → 1.2 stage 3)*
+- [x] #169 OWASP distillations sharpened (boundaries disambiguated; primary/secondary layer surfaced). *Caveats: the untagged-rate goal was retired as miscalibrated (~22% is the honest floor under the corrected taxonomy — logging/observability are RAISE-only); the LLM08 proof case did **not** land in the anchor (frozen record lacks the vector-store evidence; re-tag can't add it) — #169 stays open, fix lands via the v1.2 re-scan freeze.*
+- [x] #111 tag-label normalization in the deterministic layer
+- [x] Re-freeze `v1.1-claude48` — by **re-tag of `v1.0.2-claude48`** (scoring byte-identical), not a re-scan; the median-of-3 carries over
+- [x] `schema_version` still `2.0`; `test_render.py` + `build.sh` green; CI 3.9/3.12/3.13
+- [x] Version bump 1.1.0 (manifests + `PRAXEN_SPEC` + CHANGELOG); coverage pages regenerated
+- [ ] ~~Closes: #48, #111, #169~~ *(#111 closed via the post-1.1 cleanup sweep; #48 → 1.2; #169 open until the v1.2 freeze)*
 
 ## Fold-down
 `1.0.2 → 1.1` first (baseline), then 1.1 work on `1.1`. 1.2 branches from 1.1 once 1.1 is frozen.
