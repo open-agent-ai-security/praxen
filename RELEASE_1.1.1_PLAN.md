@@ -65,12 +65,12 @@ diagnosis, the deferral, and the process rule are on the record.
   pre-recalibration over-steer corrected by `26f1cde`/`a158032`; **its LLM08
   0→4 came from fresh code-reading scans, which the prose re-tag that built
   the anchor could not reproduce** (see B5); point to
-  `v1.1-claude48/BASELINE.md` for the shipped policy.
+  `tests/baselines/v1.1-claude48/BASELINE.md` for the shipped policy.
 - **B3** — 1.1 CHANGELOG entry (or `BASELINE.md`): one added line — *the
   plan's "untagged toward ~7%" success metric was retired as miscalibrated;
   under the corrected taxonomy (logging/observability → RAISE-only), ~22%
   untagged is the honest floor.* Metrics may be retired; never silently.
-- **B4** — `v1.1-claude48/BASELINE.md`: fix the duplicated "What changed"
+- **B4** — `tests/baselines/v1.1-claude48/BASELINE.md`: fix the duplicated "What changed"
   table header; add one honest line to the LLM08 row — *zero in this anchor
   because the frozen records predate the LLM08-aware KB and re-tagging cannot
   add evidence; lands via the v1.2 re-scan (#169).*
