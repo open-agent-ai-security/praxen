@@ -98,12 +98,58 @@ spread on 3× same-target runs ≤ ±2.
 **Stage gate:** two independent runs of the same target join ≥90% of findings
 mechanically; `test_render.py` migrated and green on the new shape.
 
-> **Mid-release checkpoint (after Stage 2).** If the schedule is stressed
-> here, 1.2 ships as reliability+schema and Stage 3 moves to 1.3 **by plan
-> amendment, in this doc, the day the call is made** — not by silent descope.
-> (1.1's lesson.)
+### Stage 2.5 · STOP · LOOK AROUND · TEST — the Stage-3 go/no-go gate
+*(Formalized 2026-07-16 at Steve's direction — replaces the informal
+"mid-release checkpoint". This is a real stage with work products, not a
+schedule vibe-check, because its TEST output is instrumentation Stage 3
+needs regardless of the decision.)*
 
-### Stage 3 · Scoring stability (#48 items 1–3)
+**STOP.** No Stage-3 (#48) work begins — not "started in parallel," not
+"just drafting the rubric" — until this gate's review is written down.
+Rubric text drafted before the TEST data exists is how over-steer happens.
+
+**LOOK AROUND.**
+- Re-read the Stage-1 and Stage-2 gate results as written: watchdog margins,
+  finding-count spread, diff-tool join rate. Any gate passed on a waiver
+  counts as not-passed for this review.
+- Survey the world: reference model still Opus 4.8; upstream targets not
+  drifted in ways that would contaminate a re-characterization (the Hermes
+  O8 lesson); no new external findings/issues that re-rank the remaining
+  work; Steve's hand-scored lean-anchor set delivered (it is a Stage-3
+  entry dependency — schedule it during Stages 1–2, not now).
+- Schedule and appetite check, honestly stated.
+
+**TEST.** Characterize the four flip-check targets (deepagents, salesforce,
+uAgents, craftbot) **median-of-3 on the Stage-2 stack** (new emission flow,
+new schema, authoring invariant — scoring guidance untouched), plus
+HelperBot as the stability control. Commit the results under
+`tests/runs/v1.2-stage2.5/`. This one run yields three things:
+1. **Verification** that Stages 1–2 didn't destabilize scoring (they touch
+   flow and shape, not judgment — confirm it).
+2. **The clean intra-release "before" for #48.** Stage 1 legitimately moves
+   decomposition, so v1.1-claude48 is no longer the right before for the
+   rubric work — these runs are. Without this, #48's effect can't be
+   isolated from the flow changes.
+3. **A fresh variance measurement** to sanity-check whether the Stage-3
+   gate's numbers (zero Critical↔High flips, |drift| ≤ 0.2) are realistic
+   or need honest revision *before* the rubric work starts chasing them.
+
+**DECIDE — with these pre-agreed criteria, recorded here by dated amendment:**
+- **GO (Stage 3 stays in 1.2):** Stage-1/2 gates passed clean; TEST shows
+  scores stable or movement explained-and-accepted; lean-anchor hand-scores
+  in hand; schedule healthy.
+- **PUSH (Stage 3 → 1.3):** any gate failed and consumed its contingency;
+  TEST shows large unexplained score movement (a rubric must never be
+  calibrated on an engine that just destabilized); or the anchor set isn't
+  ready. **A push is cheap by design:** 1.3 already pays for a re-freeze, so
+  #48 rides it at zero extra freeze cost — with one hard constraint carried
+  along: inside 1.3, #48 lands **before** the detection additions, so its
+  grading window isn't contaminated by new findings.
+- Either way, 1.2 still ships and **Stage 4's freeze still happens** —
+  Stages 1–2 change bytes and flow, so `v1.2-claude48` is required
+  regardless of where #48 lives.
+
+### Stage 3 · Scoring stability (#48 items 1–3) — *entered only via a Stage-2.5 GO*
 
 Ordered by the clean run's evidence — severity anchoring first:
 
@@ -130,7 +176,9 @@ Ordered by the clean run's evidence — severity anchoring first:
   overlap on deepagents/salesforce but serve different measurements.) If the lean is
   structural, correct it here; if unclear, document and carry to 1.3.
 
-**Stage gate (median-of-3 on both sides, graded vs `v1.1-claude48`):**
+**Stage gate (median-of-3 on both sides — the "before" side is the
+Stage-2.5 TEST runs, so #48's effect is isolated from the Stage-1 flow
+changes; `v1.1-claude48` remains the outer, release-level reference):**
 zero Critical↔High flips across 3× runs on the four **flip-check targets**
 (deepagents, salesforce, uAgents, craftbot — the two worst severity-drift
 offenders from the clean run plus the two widest-band targets); median-of-3
@@ -205,6 +253,9 @@ gate above** — in one line each:
       recorded (shakedown + full-suite run committed under `tests/runs/`)
 - [ ] Stage 2: #7 arrays + `schema_version` bump; #5 cross-check; scan-diff
       tool in `tests/`; comparability gate passed
+- [ ] Stage 2.5: STOP·LOOK·TEST review written; flip-check median-of-3 on the
+      Stage-2 stack committed (`tests/runs/v1.2-stage2.5/`); GO/PUSH decision
+      recorded by dated amendment here (and in `RELEASE_1.3_PLAN.md` if PUSH)
 - [ ] Stage 3: #48 severity anchors + control-ledger + boundary rules in
       SKILL/KB; human-anchored calibration recorded; scoring gate passed;
       lean check run and dispositioned

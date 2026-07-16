@@ -18,6 +18,15 @@ polish what it *emits*. Detection additions move numbers → 1.3 re-freezes
 `v1.3-claude48`, graded vs `v1.2-claude48`. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
+## Contingent arrival from 1.2 — #48 (Stage-2.5 PUSH case)
+
+If 1.2's **Stage 2.5 STOP·LOOK·TEST gate** decides to push the scoring work,
+**#48 lands here — sequenced before bucket A's detection additions**, so its
+before/after grading window isn't contaminated by new findings (the "before"
+is the committed `tests/runs/v1.2-stage2.5/` characterization). It rides this
+release's existing re-freeze at no extra freeze cost. If 1.2 keeps it (the
+default), strike this section at re-triage.
+
 ## Buckets
 
 ### A · Detection additions *(the re-baseline justification — land all before the freeze)*
