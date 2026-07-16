@@ -31,7 +31,29 @@ baselines/
     GATE-NOTES.md            ← the A/B record and the "drop the parallel path" verdict
 ```
 
-When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.0.2-claude48/`** set (12 targets, Praxen 1.0.x on Opus 4.8, median-of-3) is the reference — see its [`BASELINE.md`](v1.0.2-claude48/BASELINE.md). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is now retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
+When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.1-claude48/`** set is the reference — see its [`BASELINE.md`](v1.1-claude48/BASELINE.md). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
+
+## Re-tag transforms — validity domain
+
+A frozen set may be derived from its predecessor by a **re-tag transform** instead
+of a re-scan (the way `v1.1-claude48/` was derived from `v1.0.2-claude48/`): a
+classifier pass rewrites *classification fields only*, and a round-trip check
+proves every other byte identical — preserving the median-of-3 freeze without
+re-introducing detection variance. That method has a hard limit:
+
+> **Re-tag transforms are valid only for prose-decidable corrections.** The
+> classifier sees the frozen finding record — nothing else. Any classification
+> that depends on **code inspection** (e.g. guidance of the form "first detect X
+> in the source, then tag Y") cannot be executed by a re-tag and **requires a
+> re-scan**. Frozen findings are complete only with respect to the guidance that
+> produced them; when new guidance needs evidence the original scan was never
+> told to record, re-tagging cannot add it.
+
+Case study: the 1.1 re-tag could not apply the sharpened LLM08 guidance to
+craftbot's agent-writable vector store, because the frozen record never captured
+the ChromaDB evidence — the LLM08 column reads zero in `v1.1-claude48/` for that
+reason, and the fix lands via the v1.2 re-scan freeze. See
+[#169](https://github.com/open-agent-ai-security/praxen/issues/169).
 
 `v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 

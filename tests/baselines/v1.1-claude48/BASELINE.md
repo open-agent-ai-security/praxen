@@ -36,19 +36,17 @@ scoring pipeline moved, so copying the tables here would only risk them drifting
 
 ## What changed — OWASP tagging only (114 findings, unchanged count)
 
-| Measure | v1.0.2 | v1.1 | Note |
-|---|--:|--:|---|
 Counts are from a clean, un-hinted classifier pass (identical harness across all 12 targets); primary = the `owasp_llm`/`owasp_agentic` scalar, secondary = co-applicable codes in `tags[]`.
 
 | Measure | v1.0.2 | v1.1 | Note |
 |---|--:|--:|---|
 | Findings | 114 | 114 | detection frozen |
-| No-OWASP (null/null) | 24 (21%) | 25 (22%) | honest taxonomy reach; logging/observability/config → RAISE-only |
+| No-OWASP (null/null) | 24 (21%) | 25 (22%) | honest taxonomy reach; logging/observability/config → RAISE-only. *The 1.1 plan's "untagged toward ~7%" goal was retired as miscalibrated — under the corrected taxonomy these findings are correctly OWASP-untagged, so ~22% is the honest floor (recorded 2026-07-16).* |
 | Secondary (co-applicable) chips | 3 | 28 | the primary/secondary layer, now surfaced |
 | LLM06 — Excessive Agency | 19P / 1S | 23P / 6S | the largest LLM primary; co-applies with LLM05 on ungated raw-exec |
 | LLM05 — Improper Output Handling | 0P / 0S | 4P / 6S | raw model-output-to-sink (esp. code exec) now tagged — orthogonal to LLM06, co-occurs with ASI05 |
 | LLM01 / LLM02 primary | 12 / 15 | 13 / 16 | injection + credential-disclosure (LLM02×ASI03) each up one |
-| LLM04 / LLM08 primary | 1 / 0 | 1 / 0 | unchanged — LLM08 is not exercised as a primary in this corpus |
+| LLM04 / LLM08 primary | 1 / 0 | 1 / 0 | **LLM08 is zero in this anchor — primary *and* secondary** — a known limitation, not a taxonomy verdict: the frozen records predate the LLM08-aware KB, so the vector-store evidence (e.g. craftbot's agent-writable ChromaDB) was never captured, and a prose re-tag cannot add evidence the original scan didn't record. Fix lands via the v1.2 re-scan freeze — see #169 (recorded 2026-07-16). |
 | ASI01 / ASI09 primary | 10 / 1 | 9 / 0 | mechanism kept primary; ASI09 → secondary |
 | ASI10 (Rogue) / ASI08 (Cascading) | 0 / 0 | 0P + **5S** / 0 | outcomes — ASI10 rides secondary on the 5 findings whose deviation *outlives the action*; ASI08 doesn't attach at the finding level (cascade is system-level) |
 

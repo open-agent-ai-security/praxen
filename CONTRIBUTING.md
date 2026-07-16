@@ -134,6 +134,24 @@ A scheduled CI check (`.github/workflows/branch-drift.yml`) asserts `main` is an
 ancestor of `dev` and fails the day the histories diverge — catching a missed
 fast-forward (or an accidental squash promotion) before it accumulates.
 
+## Automated review on every PR (interim convention)
+
+*(Maintainers. Codified 2026-07-16 as the interim replacement for the retired
+Gemini Code Assist review gate — sunset 2026-07-17; the longer-term CI-triggered
+replacement is tracked in
+[#120](https://github.com/open-agent-ai-security/praxen/issues/120).)*
+
+Every PR gets an automated second set of eyes before human review:
+
+1. When a PR is opened, run a **background code-review agent** over the diff
+   (non-blocking — do not hold the PR open waiting on it; typical runtime is
+   ~1–2 minutes).
+2. **Post the findings as a PR comment** — including "no findings" — so the
+   review is on the record and trackable.
+3. The merge convention is unchanged and this review is **advisory, never a
+   hard gate**: merge requires **CI green + explicit maintainer approval**.
+   Agents never self-merge.
+
 ## Releasing and rolling back
 
 *(Maintainers.)* Releases are tag-driven: pushing a `v*` tag runs `release.yml`,
@@ -196,6 +214,14 @@ a tag.
 **Never force-push `main` or `dev` to "undo" a release.** Once a tag is public, a
 forward revert plus a hotfix tag is the only safe path — rewriting history breaks
 every clone and the `main`-ancestor-of-`dev` invariant.
+
+**Never re-point a published tag.** The same rule at tag granularity: once a
+`v*` tag has been pushed, it is immutable — anyone who fetched in the meantime
+holds a divergent tag, and the published zip no longer matches the ref. If the
+tagged artifact is broken, fix forward and ship the next PATCH version (a broken
+release is the exception to the no-thrash-bumps cadence rule, not a license to
+move the tag). *(Rule adopted 2026-07-16 after the v1.1.0 docs-freshness failure
+forced a one-time tag re-point — the incident #178's per-PR check now prevents.)*
 
 ## Before you open a PR
 

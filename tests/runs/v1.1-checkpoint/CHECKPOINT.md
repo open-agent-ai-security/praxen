@@ -5,6 +5,18 @@
 
 # Praxen 1.1 — Phase 1 Tagging Checkpoint
 
+> **⚠️ Superseded (2026-07-16 note).** This checkpoint reflects the **pre-recalibration**
+> tagging policy — its headline numbers (untagged 5%, ASI10 = 27, LLM06 = 50, coverage
+> 20/20) came from a pass that was later judged **over-steered** and corrected by
+> `26f1cde` / `a158032` before the freeze. The shipped policy and counts are in
+> [`../../baselines/v1.1-claude48/BASELINE.md`](../../baselines/v1.1-claude48/BASELINE.md)
+> (untagged ~22% — the honest floor once logging/observability route to RAISE-only;
+> ASI10 = 5 secondary). One methodological caveat discovered later (#169): the LLM08
+> 0→4 recovery here came from **fresh code-reading scans**; the prose-only re-tag that
+> built the shipped anchor could not reproduce it, because the frozen records lack the
+> vector-store evidence. Read this file as the experiment log it is, not as the release's
+> results.
+
 **Branch:** `1.1` · **Commits:** `0ff901c` + `7298ebd` (KB sharpening) · **Compares against:** the frozen `v1.0.2-claude48` baseline.
 
 ## Objective
