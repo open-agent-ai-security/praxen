@@ -175,10 +175,13 @@ Ordered by the clean run's evidence — severity anchoring first:
   non-gating check: does the Zero-Trust / Limit-Your-Domain category-mean
   drift the same direction again vs. v1.0.2? Measuring *bias* (vs. scatter)
   needs a human-anchored reference — produced by the **hand-score
-  questionnaire protocol** below. **Anchor set: deepagents, uagents,
-  salesforce** *(updated 2026-07-16 from the Stage-0 baseline: uagents
-  replaced openai-cs because it now carries the largest anchor dispute —
-  3 Criticals in every fresh run vs the frozen 1)*. The recorded inclinations
+  questionnaire protocol** below. **Anchor set: deepagents, uAgents,
+  salesforce** *(updated 2026-07-16 from the **Stage-0 baseline** — a
+  dry-run of the Stage-2.5 mechanics on the current v1.1 stack executed
+  before any 1.2 work, flip-check four + HelperBot control × 3 runs each,
+  committed as [`tests/runs/v1.2-stage0-baseline/`](tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
+  uAgents replaced openai-cs because it now carries the largest anchor
+  dispute — 3 Criticals in every fresh run vs the frozen 1)*. The recorded inclinations
   become the fixed reference points the rubric's *center* is validated
   against. (Distinct from the stage gate's *flip-check set* below — the four
   targets whose Critical↔High reproducibility is measured; the sets overlap
@@ -198,7 +201,13 @@ Ordered by the clean run's evidence — severity anchoring first:
      **Inclination** field.
   2. **Session (Steve + Claude):** walk the entries together, decide the
      inclination on each, Claude marks it with a one-line rationale. Undecided
-     entries are marked *deferred*, not guessed.
+     entries are marked *deferred*, not guessed. **Intra-gate order:** LOOK
+     (session may be merely scheduled) → TEST → finalize the questionnaire
+     with anything TEST surfaced → session → DECIDE — the session sits
+     between TEST and DECIDE. **Deferred entries** are re-examined at the
+     Stage-4 freeze review against the fresh median-of-3 evidence; any still
+     undecided carry to 1.3 alongside the lean disposition (and #48's anchor
+     text simply doesn't anchor those boundaries yet — no guessed anchors).
   3. **Record:** the marked questionnaire is committed under
      `tests/runs/v1.2-stage2.5/HANDSCORE.md` and serves three roles —
      (a) the human-anchored reference for the lean check, (b) the seed text
@@ -207,8 +216,8 @@ Ordered by the clean run's evidence — severity anchoring first:
   - **Seed corner cases (from the 2026-07-16 Stage-0 baseline — the
     questionnaire starts from these five and adds whatever the Stage-2.5
     TEST surfaces):** deepagents MCP-TLS-scheme gap (frozen Critical vs
-    3-of-3 fresh High — bounded-blast-radius argument); uagents plaintext
-    private-key persistence (High vs Critical); uagents spoofable-loopback
+    3-of-3 fresh High — bounded-blast-radius argument); uAgents plaintext
+    private-key persistence (High vs Critical); uAgents spoofable-loopback
     admin exposure (High vs Critical); salesforce Knowledge-injection
     compound (flipped C/H/C across its own three runs); craftbot
     ungated-shell/approval cluster (Critical-count churn 4/3/4 at constant
