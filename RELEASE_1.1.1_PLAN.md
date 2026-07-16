@@ -129,13 +129,14 @@ belong here.**
 - Issue tracker reflects reality: shipped work closed, deferred work
   annotated with its owning release.
 
-## Deliverables checklist
+## Deliverables checklist *(executed 2026-07-16, PR #187)*
 
-- [ ] B1–B4 doc reconciliation committed
-- [ ] B5 diagnosis filed on #169 (acceptance criterion recorded)
-- [ ] C1 issue sweep done (#70 retitled; #169/#173/#174 annotated, held open)
-- [ ] C2 #178 CI check live · C3 theme-gate docs landed · C4 #120 interim
-      gate codified · C5 tag rule in runbook · C6 baseline-method rule in
-      baselines README
-- [ ] Closes: #137, #178 (+ #111/#167/#168/#64/#116/#69 via the C1 sweep)
-- [ ] Steve's call recorded: docs batch vs tagged v1.1.1
+- [x] B1–B4 doc reconciliation committed
+- [x] B5 diagnosis filed on #169 (acceptance criterion recorded)
+- [x] C1 issue sweep done (#70 retitled; #169/#173/#174 annotated, held open)
+- [x] C2 #178 CI check live (passed on its own PR) · C3 theme-gate docs
+      landed · C4 #120 interim gate codified · C5 tag rule in runbook ·
+      C6 baseline-method rule in baselines README
+- [x] Closed via the C1 sweep: #111/#137/#167/#168/#64/#116/#69; #178 closes
+      on promotion to `main`
+- [x] Steve's call recorded: docs/process batch, no version bump (2026-07-16)
