@@ -137,11 +137,15 @@ HelperBot as the stability control. Commit the results under
 **DECIDE — with these pre-agreed criteria, recorded here by dated amendment:**
 - **GO (Stage 3 stays in 1.2):** Stage-1/2 gates passed clean; TEST shows
   scores stable or movement explained-and-accepted; lean-anchor hand-scores
-  in hand; schedule healthy.
-- **PUSH (Stage 3 → 1.3):** any gate failed and consumed its contingency;
-  TEST shows large unexplained score movement (a rubric must never be
-  calibrated on an engine that just destabilized); or the anchor set isn't
-  ready. **A push is cheap by design:** 1.3 already pays for a re-freeze, so
+  in hand; schedule healthy. **All four must hold — failing any GO criterion
+  is itself a PUSH** (no undecidable middle: a clean-gates-but-stressed-
+  schedule outcome pushes).
+- **PUSH (Stage 3 → 1.3):** any GO criterion failed — typically: a stage
+  gate failed; TEST shows score movement that is large (outside the Stage-3
+  gate numbers — a Critical↔High flip or |drift| > 0.2 on a flip-check
+  target) and unexplained (a rubric must never be calibrated on an engine
+  that just destabilized); the anchor set isn't ready; or the schedule/
+  appetite check fails. **A push is cheap by design:** 1.3 already pays for a re-freeze, so
   #48 rides it at zero extra freeze cost — with one hard constraint carried
   along: inside 1.3, #48 lands **before** the detection additions, so its
   grading window isn't contaminated by new findings.
@@ -233,14 +237,15 @@ quality (#27/#25/#6/#113), harness reach (#151), docs (#117/#118/#135/#4/#90/#2)
 
 ## Regression discipline & success metric
 
-1.2 intentionally moves numbers (#7 shape, #48 scoring) → re-freeze
+1.2 intentionally moves numbers (#7 shape; #48 scoring, contingent on the
+Stage-2.5 GO) → re-freeze
 `v1.2-claude48`, graded vs `v1.1-claude48`. Success is **measured, per stage
 gate above** — in one line each:
 
 - **Reliability:** two consecutive full-suite runs, zero deaths, nothing at
   the watchdog edge.
 - **Comparability:** mechanical scan-vs-scan join ≥90%, no hand-matching.
-- **Scoring:** zero Critical↔High flips and |drift| ≤ 0.2 median-of-3 on the
+- **Scoring** *(contingent on the Stage-2.5 GO)*: zero Critical↔High flips and |drift| ≤ 0.2 median-of-3 on the
   calibration targets; **theme-coverage is the gate, weighted score advisory**
   (per #48 item 4, landed in 1.1.1).
 - Version bump 1.2.0 (6 guarded locations + `PRAXEN_SPEC` §sync + CHANGELOG);
@@ -253,13 +258,15 @@ gate above** — in one line each:
       recorded (shakedown + full-suite run committed under `tests/runs/`)
 - [ ] Stage 2: #7 arrays + `schema_version` bump; #5 cross-check; scan-diff
       tool in `tests/`; comparability gate passed
-- [ ] Stage 2.5: STOP·LOOK·TEST review written; flip-check median-of-3 on the
-      Stage-2 stack committed (`tests/runs/v1.2-stage2.5/`); GO/PUSH decision
-      recorded by dated amendment here (and in `RELEASE_1.3_PLAN.md` if PUSH)
+- [ ] Stage 2.5: STOP·LOOK·TEST review written; flip-check + HelperBot-control
+      median-of-3 on the Stage-2 stack committed (`tests/runs/v1.2-stage2.5/`);
+      GO/PUSH decision recorded by dated amendment here (and in
+      `RELEASE_1.3_PLAN.md` if PUSH)
 - [ ] Stage 3: #48 severity anchors + control-ledger + boundary rules in
       SKILL/KB; human-anchored calibration recorded; scoring gate passed;
       lean check run and dispositioned
 - [ ] Stage 4: `v1.2-claude48` frozen median-of-3; `CURRENT` updated; #176
       batched; coverage + LLM06 checks recorded
-- [ ] Closes: #5, #7, #29, #33, #48, #169, #173, #174, #176; #65 partially
+- [ ] Closes: #5, #7, #29, #33, #169, #173, #174, #176; #48 *(contingent on
+      the Stage-2.5 GO — moves to 1.3's list on a PUSH)*; #65 partially
       (items 1–2; comment scoping the remainder to 1.3)
