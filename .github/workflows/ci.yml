@@ -29,3 +29,30 @@ jobs:
         run: python3 tests/render/test_plugin_manifests.py
       - name: Package the distributable (sanity)
         run: bash build.sh
+
+  # guide/ freshness on every PR (#178) — catches docs/*.md or shared-theme edits
+  # whose regenerated guide/*.html wasn't committed. Previously this only ran
+  # inside release.yml (tag push), so drift surfaced *after* the tag was cut
+  # (v1.1.0). The release-time backstop in build.sh/docs_build.py stays as
+  # defense-in-depth.
+  docs-freshness:
+    runs-on: ubuntu-latest
+    name: docs-freshness (guide/)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install build-only docs dependency
+        run: pip install -r requirements-dev.txt
+      - name: Rebuild guide/ and fail on drift
+        # git status --porcelain (not git diff) so NEW, untracked guide pages
+        # count as drift too — matches build.sh's release-time backstop.
+        run: |
+          python3 docs_build.py
+          drift=$(git status --porcelain -- guide/)
+          if [ -n "$drift" ]; then
+            echo "$drift"
+            echo "::error::guide/ is out of date with docs/*.md (or the shared theme). Run 'python3 docs_build.py' and commit the updated guide/*.html."
+            exit 1
+          fi
