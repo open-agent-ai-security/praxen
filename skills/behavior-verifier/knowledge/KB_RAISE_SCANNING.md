@@ -56,7 +56,7 @@ labels leave ambiguous.
 |-------|-------|-----------------------------------|
 | 0 | Absent | **No operative control.** For a runtime category (Limit Domain, Balance KB, Zero Trust, Monitor), a *documented-but-unenforced* policy is **0** — a `SECURITY.md` that says "we validate input" with no code behind it is not a control. Incidental architecture is **0** too (see the incidental-architecture principle). *(Process categories — Build an AI Red Team — differ: the practice is evidenced by artifacts, so a doc/report can earn ≥1. See that category's ladder.)* |
 | 1 | Ad hoc | **Any operative control, however weak, floors here.** It exists and runs but is trivially bypassable, off-default, or narrow. "It's factually not nonexistent — it just sucks" is exactly a 1. Reserve 0 for genuinely *no* control. |
-| 2 | Partial | **A real control with incomplete coverage.** On-by-default is **not** required — a real control **documented as a required install/deploy config step** earns Partial; do not dump it to 1 for being off-by-default. |
+| 2 | Partial | **A real control with incomplete coverage.** On-by-default is **not** required — a real control **documented as a required install/deploy config step** earns a **reasonable mid-grade (2, or 3 if it comprehensively covers the category's primary risk)**; do not dump it to 1 for being off-by-default. |
 | 3 | Established | **A real control that comprehensively covers the category's primary risk**, code-enforced, with no *un-mitigated* open MUST-NOT gap in that category. |
 | 4 | Strong | **Correct + always-on + gap-free**: on-by-default, code-enforced, no open MUST-NOT gap in the category. Off-by-default caps you *below* 4 — this is the one place off-by-default actually costs a point. |
 | 5 | Exemplary | **A 4 that is ALSO proven and layered** — defense-in-depth (a second control behind the first), *or* adversarial validation (tests that specifically attack the control), *or* a regression-guard (a gate that stops it silently regressing). Not just correct — *proven*. Kept rare on purpose. |
@@ -284,7 +284,7 @@ When escalating, populate `related_findings` to link the injection finding, the 
 **What to do with it:**
 - Extract the specific behavioral rules (the "MUST NEVER", "MUST ALWAYS" statements)
 - Cross-reference each rule against code and config to check for policy-implementation divergence
-- Absence of a specific rule for a high-risk capability is itself a finding
+- Where the agent **has** a high-risk capability (observed) that the policy states **no rule to govern**, that ungoverned-capability gap is a finding — it hangs on the *observed* capability, not on a bare absence (consistent with the finding-anchoring rule above: you observe the capability; its governance is missing). A capability the agent does *not* have needs no rule — its unmentioned absence is not a finding.
 
 **Red flags:**
 - Policy exists but code doesn't implement it → Critical (policy-implementation divergence)
@@ -509,6 +509,8 @@ the same as an adversarial testing *program*; it caps at 1–2, not 3.)*
 | Testing only at launch, not ongoing | Threat landscape evolves; model behavior shifts | High |
 | Red team findings not incorporated into controls | Testing theater; no feedback loop | High |
 | No testing of indirect injection via RAG or external content | Most dangerous vector often untested | High |
+
+*(Severity column = the severity **if** the signal rises to a finding. Whether it does is decided by the finding-anchoring rule, not by this table: a **remit-silent** absence of adversarial testing lowers the **category score** and is not filed as a finding; the High severities here apply only when the remit required the testing or you observe a specific tested-and-failed gap.)*
 
 **Positive signals:**
 - Real adversarial exercise documented (not just a pen test)
