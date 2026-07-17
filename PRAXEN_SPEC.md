@@ -54,6 +54,8 @@ Every claim is tagged:
 - **Inferred** — reasonable conclusion from indirect evidence
 - **Unknown** — no evidence available (absence of a control in a production system is itself a finding)
 
+A finding's evidence must cite **every mechanism in its causal chain**, not only the entry point and the outcome — the record is **closed under classification**, meaning a reader with the finding's evidence alone (not the codebase) can reach the correct taxonomy. A chain that runs through a store, scheduler, index, or subprocess cites that surface even when a different frame dominates the summary; otherwise the record silently loses any classification that depends on the omitted mechanism.
+
 ### 2.3 Never reprint secrets
 
 Reports must never contain the literal value of a secret, credential, token, password, or private key — even when the source is already public, even when the value looks like a placeholder. Secrets are referred to by location and pattern only. See `skills/behavior-verifier/SKILL.md` for the full redaction rule.
@@ -436,7 +438,8 @@ Praxen does not ship a scheduler. If recurring scans are desired, wrap the agent
 
 An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the coding agent's session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
 
-- At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived.
+- At the end of Step 4, Praxen writes a flat **evidence checkpoint** at `./reports/<agent-slug>-evidence-<timestamp>.txt` — the files read and the first-pass signals (credential patterns by location, binding addresses, dependency pins, stub controls, MCP configs, log files) — so a compaction during the long read-and-analyze span (Steps 4–8, dozens of reads before any manifest exists) can be resumed without re-discovering the workspace from scratch.
+- At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived. Its `--validate-manifest` mode structure-checks the manifest (reporting every problem, recovering at section boundaries) and is safe to run against a mid-composition skeleton.
 - The same Step 9.9 prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout — before any file is written — so the operator sees the synthesis even if the session later truncates.
 - Rendering the report is a **deterministic Python step (Step 11)**, not LLM work — it doesn't compete for the context window, runs in well under a second, and writes the `.txt` summary to `./reports/` alongside stdout, so the summary survives even if terminal output is lost.
 

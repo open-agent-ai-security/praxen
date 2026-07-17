@@ -68,6 +68,8 @@ Tag every claim before you make it. Never skip this.
 
 Absence of a control in a production system is not a gap in documentation — it is a finding. Score accordingly.
 
+**Evidence must cite every mechanism in the finding's causal chain.** When a finding is a chain — untrusted input reaches a store, a scheduler re-invokes a tool, a memory file feeds back into the prompt — cite *each* mechanism the chain runs through, not just the entry point and the outcome. If the chain passes through a vector store, a queue, a scheduler, an embedding index, a subprocess, or any named subsystem, that surface gets its own evidence line **even when a different frame dominates the finding's summary**. The test: **the finding record must be closed under classification** — a reader (or a re-classification pass) who has only the finding's evidence, not the codebase, must be able to reach the correct taxonomy from the record alone. A finding whose summary leads with "persistence via writable identity file" but whose chain actually runs through an agent-writable vector store must cite that store, or the record silently loses the classification that depends on it (this is exactly how an LLM08 vector-store finding came to be recorded with no vector-store evidence — see the 1.1 → 1.2 LLM08 lesson). Dropping a mid-chain mechanism because another frame reads as "the point" is the failure mode; carry them all.
+
 ---
 
 ## Never Reprint Secrets
@@ -261,6 +263,16 @@ Sweep the workspace for files that appear to be logs. Identify them by:
 For each discovered log file, record: full path, apparent source, content type, apparent purpose, and last modified timestamp. You will serialize this list in Step 9.8.
 
 **Source-only scan — inferring log files from code.** If no log files are found on disk but logging infrastructure is present in source (e.g. Python's `setup_logging()` / `RotatingFileHandler` / `FileHandler`, Node.js `winston` / `pino` file transports, Go `log.SetOutput` or `zap` file sinks, or language-equivalent log-routing configuration), infer the runtime log file locations from the code. Record each inferred log file with `mtime: "unknown"` and `status: "inferred"`. These entries give the operator an accurate picture of where runtime logs will appear on a deployed instance and directly support Monitor Continuously scoring — omitting them because the scan is source-only leaves the report silent on a topic the code clearly addresses.
+
+**Evidence checkpoint — write it to disk before leaving Step 4.**
+
+Steps 1–8 can involve dozens of file reads on a large codebase with no artifact on disk until the Step 9.9 manifest — so a context compaction mid-analysis forces a full re-read from scratch. Before continuing to Step 4b, write a flat text checkpoint to `./reports/<slug>-evidence-<TIMESTAMP>.txt` (same `<TIMESTAMP>` you will use for the report files). It does not need to be machine-parseable; its only job is to let a resumed session skip re-discovery. Include, as terse one-liners:
+
+- every file you read (path + the read strategy used if sampled: `[first 100 + last 50]`)
+- first-pass signals worth keeping: credential patterns seen (location + pattern only — the Never Reprint Secrets rule applies to this file too), binding addresses, dependency pins or their absence, empty/stub control files, MCP configs found, log files discovered or inferred
+- open threads you intend to chase in Steps 5–8
+
+Append to this file as later steps surface more evidence if you wish, but the Step-4 write is the mandatory one — it is the recovery point. The file is a working artifact like the draft manifest: it stays in `./reports/` and is not part of the report deliverables.
 
 **Before continuing to Step 4b: if any MCP server configuration was found in this step**, return to Step 3 and read `knowledge/KB_MCP_SECURITY.md` now. You need that calibration before Step 6's MCP Server Evaluation runs.
 
