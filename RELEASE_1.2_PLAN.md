@@ -114,7 +114,9 @@ Rubric text drafted before the TEST data exists is how over-steer happens.
   counts as not-passed for this review.
 - Survey the world: reference model still Opus 4.8; upstream targets not
   drifted in ways that would contaminate a re-characterization (the Hermes
-  O8 lesson); no new external findings/issues that re-rank the remaining
+  O8 lesson — `PHASE1_OPEN_ISSUES.md` §O8, the Hermes remit/upstream-drift
+  investigation, not an OWASP code); no new external findings/issues that
+  re-rank the remaining
   work; the hand-score questionnaire prepped and the joint scoring session
   done or scheduled (see the Stage-3 protocol — it is a Stage-3
   entry dependency — schedule it during Stages 1–2, not now).
@@ -213,15 +215,15 @@ Ordered by the clean run's evidence — severity anchoring first:
      (a) the human-anchored reference for the lean check, (b) the seed text
      for #48's severity/credit anchors, (c) the replay cases the Stage-3
      gate re-tests (post-rubric runs must land on the marked side).
-  - **Seed corner cases (from the 2026-07-16 Stage-0 baseline — the
-    questionnaire starts from these five and adds whatever the Stage-2.5
-    TEST surfaces):** deepagents MCP-TLS-scheme gap (frozen Critical vs
-    3-of-3 fresh High — bounded-blast-radius argument); uAgents plaintext
-    private-key persistence (High vs Critical); uAgents spoofable-loopback
-    admin exposure (High vs Critical); salesforce Knowledge-injection
-    compound (flipped C/H/C across its own three runs); craftbot
-    ungated-shell/approval cluster (Critical-count churn 4/3/4 at constant
-    weighted score).
+  **Seed corner cases** (from the 2026-07-16 Stage-0 baseline — the
+  questionnaire starts from these five and adds whatever the Stage-2.5
+  TEST surfaces): deepagents MCP-TLS-scheme gap (frozen Critical vs
+  3-of-3 fresh High — bounded-blast-radius argument); uAgents plaintext
+  private-key persistence (High vs Critical); uAgents spoofable-loopback
+  admin exposure (High vs Critical); salesforce Knowledge-article-injection
+  compound (flipped C/H/C across its own three runs); craftbot
+  ungated-shell/approval cluster (Critical-count churn 4/3/4 at constant
+  weighted score).
 
 **Stage gate (median-of-3 on both sides — the "before" side is the
 Stage-2.5 TEST runs, so #48's effect is isolated from the Stage-1 flow

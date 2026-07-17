@@ -11,7 +11,11 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ## [Unreleased]
 
-**Post-1.1 cleanup (docs/process batch — no version bump, no analysis change).** Paper-trail reconciliation from the 1.1 retrospective (`RELEASE_1.1_REVIEW.md`): the #48 descope recorded in `RELEASE_1.1_PLAN.md`; the tagging-checkpoint report marked superseded; the LLM08 anchor gap documented (#169 — fix lands via the v1.2 re-scan freeze); the 1.1/1.2/1.3 plan set committed. Process: `guide/` docs-freshness now checked on every PR (#178); theme-coverage formalized as the regression gate with the weighted RAISE score advisory (#48 item 4); re-tag transforms scoped to prose-decidable corrections (`tests/baselines/README.md`); published tags are never re-pointed; the interim per-PR review convention codified (#120). The frozen `v1.1-claude48` baseline is byte-untouched.
+**Post-1.1 cleanup (docs/process batch — no version bump, no analysis change).** The frozen `v1.1-claude48` baseline is byte-untouched.
+
+- **Paper trail** (from the 1.1 retrospective, `RELEASE_1.1_REVIEW.md`): the #48 descope recorded in `RELEASE_1.1_PLAN.md`; the tagging-checkpoint report marked superseded; the LLM08 anchor gap documented (#169 — fix lands via the v1.2 re-scan freeze); the 1.1/1.2/1.3 plan set committed.
+- **Process**: `guide/` docs-freshness now checked on every PR (#178); theme-coverage formalized as the regression gate with the weighted RAISE score advisory (#48 item 4); re-tag transforms scoped to prose-decidable corrections (`tests/baselines/README.md`); published tags are never re-pointed; the interim per-PR review convention codified (#120).
+- **1.2 planning**: the Stage 2.5 STOP·LOOK·TEST go/no-go gate; the hand-score questionnaire protocol (the human-anchor instrument for #48); the Stage-0 baseline run record (`tests/runs/v1.2-stage0-baseline/` — 15 scans on the v1.1 stack establishing the pre-1.2 severity-stability baseline).
 
 ## [1.1.0] — 2026-07-12
 
