@@ -512,6 +512,8 @@ When a compound pattern matches:
 
 **The compound finding IS the deliverable — write it as one finding spanning the chain, not as N independent findings with cross-references.** Splitting a compound into independent halves defeats the escalation: each half on its own typically doesn't trigger the escalation row, so the chain lands at the contributing-signal severity rather than at Critical. The chain's evidence array can exceed the Step 10 prose-discipline two-span soft cap when the chain genuinely spans more sites — name every site in the chain that's load-bearing to the escalation, not a truncated subset.
 
+**A contributing link becomes its own standalone finding only if it passes the fold/break-out test** (defined in Step 8.5): *would it still be a finding after the other links are fixed?* A link exploitable on its own → standalone (and still noted as a contributor in the compound's chain). A link exploitable only as part of the chain → folded, no standalone finding. **Never emit the same mechanism both as a standalone finding and as a broken-out link of the compound** — that double-counts and is the single largest source of run-to-run finding-count variance. Decide fold/break-out per contributor in the Step 8.5 outline, not here.
+
 ---
 
 ## Step 8 — Positive Posture Recognition
@@ -541,16 +543,26 @@ THEMES (N findings)
 - [Critical] ungated host shell exec — run_shell inherits full env, no approval — ZT — evidence: executor.py, action/config
 - [High]     unauthenticated control plane — localhost WS no-origin + 0.0.0.0 sidecar — ZT — evidence: app/server.py, sidecar config
 - [Medium]   plaintext credential storage — tokens in cleartext JSON — Balance KB — evidence: credentials_store.py
-- [compound of the above two] external-input → exec chain — auto_reply + no sender check + run_shell — Critical
+- [compound of the shell-exec + control-plane links] external-input → exec chain — auto_reply + no sender check + run_shell — Critical
+    contributors: run_shell [standalone: RCE surface even if the auto-reply path were removed] · auto_reply-no-sender-check [folded: only exploitable as the chain's entry] · missing-approval-gate [folded]
 ...
 ```
 
 Each line carries: intended **severity**, a **one-line theme** (what the finding is about), the **RAISE category**, and the **evidence sites** it will cite (from your Step-4 checkpoint — this is where the closed-under-classification rule gets enforced: if a theme's chain runs through a store/scheduler/index, name it here so it can't be dropped later). Mark compound findings (Step 7) explicitly and list their contributing themes.
 
-**Decomposition rules — apply them here, once:**
+**Decomposition rules — apply them here, once. These are the count-determining decisions; making them by explicit rule instead of gestalt is what keeps two scans of the same agent at the same finding count.**
+
 - **One finding per distinct control gap**, not per file and not per symptom. Two symptoms of the same missing control are one finding with two evidence sites; one control gap that surfaces in two unrelated subsystems is two findings.
-- **A compound chain (Step 7) is one finding**, not the sum of its links — list it once, with its contributing themes noted, and do not also emit the links as standalone findings unless a link is independently material.
+
+- **Compound chains (Step 7) and their contributors — the decidable fold/break-out test.** A compound chain is **one** finding (list it once, with its contributing mechanisms noted inline). A contributing mechanism gets its **own** standalone finding *in addition* to the compound **only if it passes this test: would it still be a finding after the other links in the chain are fixed?** — i.e. it is exploitable on its own, not solely as a step in the chain.
+  - Passes → standalone (and it also appears as a contributor in the compound's chain note). *Example: a `0.0.0.0` public bind with no auth is a finding even if every downstream admin endpoint were removed → standalone.*
+  - Fails → **folded** into the compound, no standalone finding. *Example: `forwarded_allow_ips="*"` (spoofable-loopback guard) or an inspector that is on-by-default are only exploitable **because** the endpoints are remotely reachable; fix the bind/exposure and they are no longer findings → fold them.*
+  - Mark every contributor in the outline `[folded]` or `[standalone: independently exploitable because …]`. Never emit a mechanism **both** as a standalone finding and as a broken-out link of the compound — that double-counts (the exact carve that made one scan report 13 findings where two others reported 9).
+
+- **Absent-control gaps — standalone finding vs. category-score-only.** The absence of a whole control class (no adversarial testing, no audit logging, no monitoring) lowers its RAISE **category score** and is explained in that category's *rationale* — it becomes a **standalone finding** only when it is *specific and actionable* (a named surface that should log but doesn't; a specific untested attack path). A blanket "no red-team evidence" is a category-score matter, not its own finding. Decide once here; don't let it float run to run.
+
 - **Don't tier-compress** (Step 6's rule): if the workspace has Medium-grade gaps, they get their own theme lines — most real agents land 2–5 Medium findings.
+
 - The count you write in `THEMES (N findings)` is your committed target. Step 9 drafts exactly these; if drafting surfaces a genuinely new finding, add a theme line here first (and note why), rather than letting the set drift silently.
 
 The outline is working scaffolding, not a deliverable — it lives in the evidence checkpoint, not the report. Its payoff is threefold: it stabilizes the finding count across runs, it front-loads the decomposition decision so Step 9's per-finding drafting is mechanical (which is what makes interleaved emission safe — see Step 9.9), and it gives a compaction-resume an explicit map of what findings the run intended to write.
