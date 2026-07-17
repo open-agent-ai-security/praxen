@@ -110,8 +110,14 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
   reasonable mid-grade — do not dump it to 1 for being off-by-default (we are too harsh
   on this). **2 vs 3** turns on coverage of the category's primary risk and on open
   MUST-NOT gaps — *weighted by severity* (next rule).
-- **4–5 — Strong / Exemplary: requires on-by-default controls** (plus material
-  completeness). This is the *only* place off-by-default actually costs you.
+- **4 — Strong: on-by-default + code-enforced + no open MUST-NOT gap** in the
+  category. A control that is *correct and always-on*. (Off-by-default caps you
+  below 4 — that is the only place off-by-default costs you.)
+- **5 — Exemplary: a 4 that is ALSO proven and layered** — defense-in-depth (a
+  second control behind the first) **or** adversarial validation (tests that
+  specifically attack the control) **or** regression-guard (a gate that stops it
+  silently regressing). Not just correct — *proven*. Keeps 5 reserved for the
+  genuinely exceptional. *(Steve, 2026-07-17: "clean separation.")*
 - **Severity mitigates, it does not eliminate (rule for gaps).** An unmitigated
   Never-Allowed (MUST-NOT) gap is always a finding in the register, but its **severity
   modulates its weight on the category score.** A **Critical/big-blast** gap weighs
@@ -238,7 +244,7 @@ Per-cell notes (the drift the rubric must pin):
   gap-free controls (path containment; sha256-pinned lockfile) → they can reach
   **Strong (4)** per the rubric (4–5 needs on-by-default). The MCP-TLS gap lives
   in the *transport* facet and caps *that* only; it doesn't stop LYD/MSC hitting 4.
-  This is what made r3's 3.30 mostly *right*. **RT = 2** (threat-model doc +
+  **CONFIRMED (Steve): deepagents LYD = MSC = 4** (correct + always-on + gap-free = Strong; the TLS gap caps only the transport facet). This is what made r3's 3.30 mostly *right*. **RT = 2** (threat-model doc +
   security unit tests = "something", not real adversarial red-team → not 3).
   **MC = 2** (some structured signal, not durable audit → the B3/absence call).
 - **uAgents MSC = 3** (committed lockfile, pinned deps — real, gap-free → Established);
