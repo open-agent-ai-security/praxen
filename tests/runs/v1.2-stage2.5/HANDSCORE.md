@@ -115,7 +115,7 @@ runs. Every unreliable target's σ traces here, never to severity counts.*
 - **Case for 1 (Ad hoc):** operative controls exist (path guard, loopback bind, audit log) even though the exec path is ungated — "some control present" is Ad hoc, not Absent.
 - **Case for 0 (Absent):** when the central capability (host exec) has *no* interposition, the peripheral controls don't constitute a Zero-Trust posture; Absent is honest.
 - **Generalizes to:** *does the presence of any operative control floor a category at 1, or can an ungated central capability pull it to 0 despite peripheral controls?* — the 0↔1 twin of B0.
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): → 1 (Ad hoc).** Any operative control floors the category at 1. The controls are factually **not nonexistent** — they just suck, which is exactly what a 1 represents. **0 (Absent) is reserved for genuinely NO control.** craftbot ZT = 1.
 
 ### B0c · helperbot — do a WEAK agent's narrow-tool-surface / statelessness earn category credit (0 vs 1)? — **[UNSTABLE — σ 0.165]**
 - **Evidence:** a deliberately-vulnerable CTF agent (all flags false) that nonetheless has a *narrow* fixed tool inventory, statelessness, and no forbidden tools.
@@ -124,7 +124,7 @@ runs. Every unreliable target's σ traces here, never to severity counts.*
 - **Case for crediting 1:** a genuinely narrow, forbidden-tool-free inventory is a real (if minimal) Limit-Your-Domain control.
 - **Case for 0:** on a WEAK target with zero enforcement, a narrow surface by accident-of-scope isn't a *control*; near-Absent is the honest read.
 - **Generalizes to:** *does an architectural property (narrow surface, statelessness) that isn't an intentional control earn category credit?* — governs the noisy low end.
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): → no credit.** You do **not** get credit for being a small/narrow codebase — that is not maturity. A property (narrow surface, statelessness, no-forbidden-tools-present) is not an operative *control*; only an intentional mechanism that acts earns credit. helperbot's incidental narrowness earns nothing.
 
 ### B1 · uAgents — Implement Zero Trust: operative ECDSA signing vs. the plaintext-key + spoofable-admin gaps — **[UNSTABLE — σ 0.122]**
 - **Evidence (control):** real SECP256k1 envelope signature verification enforced before dispatch on the agent path (a genuine, tested control). **Evidence (gaps):** the A3 plaintext keys + the spoofable-loopback admin compound.
@@ -151,7 +151,7 @@ runs. Every unreliable target's σ traces here, never to severity counts.*
 - **Case for 0:** absence of evidence of a whole control class is a true Absent — the KB's "absence is evidence" rule; a clean 0 is honest.
 - **Case for 1 (rare):** if there is *some* structured testing (unit tests touching security paths, a threat-model doc) even without adversarial red-teaming, a floor of 1 may be fairer than 0.
 - **Generalizes to:** *what is the minimum evidence that lifts an absent-control category from 0 to 1 — and does a blanket absence become a standalone finding or stay category-score-only?* (pairs with the Stage-1 decomposition carry-forward).
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): evidence ladder — 0 only if genuinely NO evidence.** Any one of: an **adversarial test**, in-repo **documentation on how to red-team** the agent, or a frozen **one-time red-team report** → lifts Build-an-AI-Red-Team to **≥1**. Truly nothing → **0 (nonexistent)**.
 
 ---
 
