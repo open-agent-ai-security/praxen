@@ -346,6 +346,64 @@ check("top-level keys are in canonical order", keys == expected_keys,
       f"got {keys}")
 
 
+# ── 8. --validate-manifest mode (#65 item 2) ────────────────────────────────
+print("\n8. --validate-manifest mode")
+
+
+def run_validate(manifest_path):
+    return subprocess.run(
+        [sys.executable, CONVERTER, "--manifest", manifest_path,
+         "--validate-manifest"],
+        capture_output=True, text=True)
+
+
+with tempfile.TemporaryDirectory() as td:
+    # 8a. Complete, clean manifest → exit 0, "complete and valid", no JSON out.
+    res = run_validate(MANIFEST)
+    check("validate: clean manifest exits 0", res.returncode == 0,
+          res.stdout + res.stderr)
+    check("validate: clean manifest reported complete",
+          "complete and valid" in res.stdout, res.stdout)
+
+    # 8b. Mid-composition skeleton (sections missing, present ones clean)
+    # → exit 0 with a non-fatal note; this is the run-after-skeleton use case.
+    skel = os.path.join(td, "skeleton.md")
+    Path(skel).write_text(
+        "\n".join(manifest_text.splitlines()[:30]) + "\n", encoding="utf-8")
+    res = run_validate(skel)
+    check("validate: skeleton exits 0", res.returncode == 0,
+          res.stdout + res.stderr)
+    check("validate: skeleton notes missing sections",
+          "not yet present" in res.stdout, res.stdout)
+
+    # 8c. Two errors in two different sections → BOTH reported (the fail-fast
+    # parser would stop at the first), exit 1.
+    broken = os.path.join(td, "broken.md")
+    b = manifest_text.replace(
+        "## intro_band", "bogus_field: broken\n\n## intro_band", 1)
+    b = b.replace("severity: Critical", "severity: Catastrophic", 1)
+    Path(broken).write_text(b, encoding="utf-8")
+    res = run_validate(broken)
+    check("validate: broken manifest exits 1", res.returncode == 1,
+          res.stdout + res.stderr)
+    check("validate: reports the first section's error",
+          "bogus_field" in res.stdout, res.stdout)
+    check("validate: ALSO reports the later section's error (recovery)",
+          "Catastrophic" in res.stdout, res.stdout)
+    check("validate: error count is 2", "2 error(s)" in res.stdout, res.stdout)
+
+    # 8d. Validate mode writes nothing.
+    check("validate: no JSON emitted",
+          not [f for f in os.listdir(td) if f.endswith(".json")])
+
+    # 8e. --out still required in convert mode.
+    res = subprocess.run(
+        [sys.executable, CONVERTER, "--manifest", MANIFEST],
+        capture_output=True, text=True)
+    check("convert mode without --out errors", res.returncode != 0,
+          str(res.returncode))
+
+
 print(f"\n{_passed} passed, {_failed} failed")
 # Guard the exit so `pytest <this-file>` doesn't fail collection with
 # `INTERNALERROR: SystemExit`. The test is a standalone script (see header);
