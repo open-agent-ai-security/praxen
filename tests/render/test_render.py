@@ -501,6 +501,14 @@ def main():
           f"stderr: {rc.stderr!r}")
 
     # 5. negative cases — each must exit non-zero with a useful message
+    def _first_ruled(d):
+        """Index of the first finding that cites remit rules (policy_rule_ids
+        non-null) — the mutation target for the policy_rule array checks."""
+        for i, f in enumerate(d["findings"]):
+            if f.get("policy_rule_ids"):
+                return i
+        raise AssertionError("fixture has no finding with policy_rule_ids")
+
     def negative(name, mutate):
         bad = json.loads(json.dumps(data))
         path = os.path.join(tmp, "bad.json")
@@ -536,8 +544,16 @@ def main():
              lambda d: d["findings"][0].__setitem__("related_findings", [d["findings"][0]["id"]]))
     negative("rejects policy_rule_ids null while policy_rule_text is set",
              lambda d: d["findings"][0].__setitem__("policy_rule_ids", None))
-    negative("rejects an empty-string policy_rule_ids",
-             lambda d: d["findings"][0].__setitem__("policy_rule_ids", "  "))
+    negative("rejects a scalar-string policy_rule_ids (must be an array in 3.0)",
+             lambda d: d["findings"][0].__setitem__("policy_rule_ids", "R-01"))
+    negative("rejects policy_rule_ids / policy_rule_text of unequal length",
+             lambda d: d["findings"][_first_ruled(d)].__setitem__(
+                 "policy_rule_text",
+                 d["findings"][_first_ruled(d)]["policy_rule_text"] + ["extra"]))
+    negative("rejects policy_rule_ids referencing a nonexistent remit rule (#5)",
+             lambda d: d["findings"][_first_ruled(d)].__setitem__(
+                 "policy_rule_ids",
+                 d["findings"][_first_ruled(d)]["policy_rule_ids"][:-1] + ["R-9999"]))
 
     # 6. committed regression baselines under tests/baselines/. The canonical
     #    JSON is the source of truth; the committed HTML/TXT are derived. For the

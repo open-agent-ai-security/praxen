@@ -429,6 +429,17 @@ def _validate_consistency(data, findings, finding_ids):
                 _err(f"$.findings ({f['id']}).related_findings",
                      f"references finding {r!r} which does not exist in findings[]")
 
+    # 3c. every finding's policy_rule_ids[] resolves to a real remit rule (#5 —
+    # the reverse of check 3). Closes the gap where a finding could cite an
+    # R-NN id that no rule in remit_coverage.rules[] defines; the array shape
+    # (schema 3.0) makes this a clean per-id membership test.
+    rule_ids = {r["rule_id"] for r in rules}
+    for f in findings:
+        for rid in (f.get("policy_rule_ids") or []):
+            if rid not in rule_ids:
+                _err(f"$.findings ({f['id']}).policy_rule_ids",
+                     f"references rule {rid!r} which does not exist in remit_coverage.rules[]")
+
     # 4. weighted overall matches Σ(score × weight).
     # Scores are integers and weights are exact (0.25 / 0.15), so the true sum
     # has no floating-point error; the only slack we allow is the rounding in
