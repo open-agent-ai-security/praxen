@@ -71,7 +71,7 @@ reliability fix.*
 - **Case for Critical:** it is a Never-Allowed remit clause ("remote MCP URLs MUST use TLS"); a plaintext MCP channel exposes tool traffic / credentials to a network attacker; a flat Never-Allowed violation is conventionally Critical regardless of exploit distance.
 - **Case for High:** the CLI is a *deploy-only bundler* — it never opens the MCP connection itself, so the blast radius is a mis-configured artifact, not a live exploited channel; the risk requires the deployed runtime to then use the bad URL; "bounded because no live sink" is the fresh runs' consistent reasoning.
 - **Generalizes to:** *does a Never-Allowed remit violation with no live sink in the scanned component score Critical (violation-severity governs) or High (blast-radius governs)?* — one of the most load-bearing anchors in the rubric.
-- **Inclination:** _______________________________________________
+- **Inclination (ratified, stable 6/6 fresh): High.** Blast-radius governs when there is no live sink in-scope — the bundler never opens the connection. Consistent with the severity-mitigation rule that makes deepagents' category reach Established (the gap is High/small-blast, not Critical).
 
 ### A2 · salesforce — indirect prompt injection via Knowledge-article content, undefended in code — **[STABLE]**
 - **Evidence:** `force-app/main/default/aiAuthoringBundles/haaHelpAgent/haaHelpAgent.agent:10` — retrieved Knowledge content enters agent context unlabeled; the sole injection guard addresses user input only; no code-side detection/halt.
@@ -80,7 +80,7 @@ reliability fix.*
 - **Case for Critical:** it defeats the agent's #1 declared defense, is undetectable (no logging), and injection→off-script behavior is the agent's core threat; policy-exists-but-no-enforcement-and-no-monitoring is the rubric's canonical Critical compound.
 - **Case for High:** the agent is a *constrained, single-tool* Q&A bot — no DML/shell/exfil sink, so the realized blast radius of a successful injection is off-script text / misinformation, not action; a bounded-capability agent caps the downside.
 - **Generalizes to:** *does agent capability (blast radius) cap the severity of an injection finding, or does defeating the primary declared control set it regardless of downstream capability?*
-- **Inclination:** _______________________________________________
+- **Inclination (ratified, stable 3/3 fresh): High.** Bounded-capability (read-only, single-tool) caps realized blast radius to off-script text / misinformation, not action → High, not Critical. The prompt-only injection defense is doc-only for that control (→ low there), but the managed platform guardrails are real operative controls → target ~Partial (2), matching salesforce's reliable 2.15 median.
 
 ### A3 · uAgents — identity + wallet private keys persisted to plaintext `private_keys.json`
 - **Evidence:** `storage/__init__.py:113` + `agent.py` name-based key path — `save_private_keys()` writes identity and wallet private keys in cleartext on the default named-agent path.
@@ -89,7 +89,7 @@ reliability fix.*
 - **Case for Critical:** private signing keys at rest in cleartext is a forbidden-data-movement / key-management failure; key compromise = full agent + wallet impersonation; conventionally Critical.
 - **Case for High:** it is the *default local* path for a framework (operator can supply a seed / external keystore); no remote exposure by itself; "framework default the operator is expected to harden" is a High-not-Critical argument (the `scan_type: framework` question, #65 item 5).
 - **Generalizes to:** *is a framework's insecure-by-default key-at-rest scored at the severity of the exposure it creates (Critical) or discounted one tier as an operator-overridable default?* — ties directly to the framework-vs-deployed-agent framing (O5).
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): the FINDING stays Critical in the register (honest severity — key compromise is full impersonation); the CATEGORY SCORE is mitigated to ~Partial (2) because the secure path (seed / external keystore) is documented-required config.** Rule #2 governs the score, rule #3 keeps the finding severity honest. **This is the decidable answer to the framework-framing / O5 / #65 question:** a framework's insecure default is judged at its exposure in the *finding*, but the *category score* is not crushed when the secure configuration is documented as required.
 
 ---
 
@@ -160,7 +160,7 @@ runs. Every unreliable target's σ traces here, never to severity counts.*
 - **Case for Partial (2):** the signature-verification control is real, on the default path, and not bypassable — the calibration rule credits an operative control Partial even with findings about its gaps.
 - **Case for Ad hoc (1):** the surrounding defaults (cleartext keys, spoofable admin, no replay) are so permissive that the one good control doesn't constitute a Zero-Trust *posture*; the gaps dominate.
 - **Generalizes to:** *does one genuinely-operative control floor its category at Partial(2), or can a cluster of Critical gaps in the same category pull it back to Ad hoc(1) despite that control?* — the single biggest 2↔3-region weighted-variance lever.
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): ZT = Partial (2).** Operative ECDSA verification on the default path + documented-required secure key config → Partial. The Critical key/replay gaps stay in the register as Critical findings (rule #3) but the documented-config mitigation (rule #2 + A3) keeps ZT at ~2, not lower. Target weighted ~2.0 (matches the reliable median).
 
 ### B2 · aider — Implement Zero Trust / Limit Your Domain: the bypassable human-in-the-loop confirm model
 - **Evidence:** aider's confirm-prompt / developer-in-the-loop gating on edits and commands — a real control, but bypassable (`--yes`, `# ai!` auto-exec in `--watch-files`, `--no-verify`).
