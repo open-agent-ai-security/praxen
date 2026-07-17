@@ -202,7 +202,7 @@ hand-score anchor is meant to define (per `RELEASE_1.3_PLAN.md`).*
 - **Case to endorse:** the folded mechanisms are only exploitable via the chain; separate findings would double-count and inflate the count run-to-run.
 - **Case to adjust:** a defense-in-depth reviewer may want the spoofable-guard called out separately as its own hardening item even though it's chain-dependent.
 - **Generalizes to:** *ratifies (or amends) the fold/break-out decidability test as the canonical compound-decomposition rule.*
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): RATIFIED as-is.** A contributor is standalone iff it would still be a finding after the other links are fixed; else folded; never both. No defense-in-depth override to force a chain-only contributor to surface separately (that reintroduces the double-count). Already implemented; uAgents count-spread 4→1.
 
 ### C2 · Two facets of one prompt — one finding or two? (the Stage-1 helperbot residual)
 - **Evidence:** helperbot `prompts.js:26–27` — the system prompt both (a) instructs the agent to "share its configuration openly" and (b) embeds a hardcoded internal API key. One run merged these into one Critical; others split them (disclosure behavior = Zero Trust; hardcoded secret = Supply Chain).
@@ -210,7 +210,7 @@ hand-score anchor is meant to define (per `RELEASE_1.3_PLAN.md`).*
 - **Case for two findings:** they fail the independence test in the *keep-separate* direction — fix the disclosure instruction and the hardcoded key is still a finding; fix the key and the disclosure instruction is still a finding; different RAISE categories.
 - **Case for one finding:** they are the same two adjacent lines of one artifact; a reader fixes the system prompt once; splitting feels like double-reporting one mistake.
 - **Generalizes to:** *are two independently-material issues in one artifact two findings (independence governs) or one (locality governs)?* — the merge-vs-separate half of the decomposition principle deferred to Stage 3.
-- **Inclination:** _______________________________________________
+- **Inclination (Steve, 2026-07-17): TWO findings.** They violate two different remit clauses (don't-reveal-system-prompt vs no-secrets-in-source) — and findings hang on remit clauses, so two clauses → two findings. Also passes the independence test. The remit-anchoring principle (B3) decides decomposition: **one finding per violated remit clause.**
 
 ---
 
@@ -223,11 +223,33 @@ by category. These become the fixed reference points the #48 lean-check grades
 against (does the rubric's center land where the human did, not just whether
 runs agree with each other).
 
-| Target | LYD | BYK | ZT | MSC | RT | MC | weighted (hand) |
-|---|--|--|--|--|--|--|--|
-| deepagents-cli | | | | | | | |
-| uAgents | | | | | | | |
-| salesforce | | | | | | | |
+**PROPOSED (Claude, from the rubric + the 3-run per-category evidence) — Steve to red-pen.**
+Weights: ZT 0.25, others 0.15. Each cell shows the proposed value; **bold** = a
+cell that *drifted* across the 3 runs and is the real call to pin.
+
+| Target | LYD | BYK | ZT | MSC | RT | MC | weighted |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| deepagents | **4** | 3 | 3 | **4** | **2** | **2** | **3.00** |
+| uAgents | 2 | **2** | 2 | **3** | 1 | 2 | **2.00** |
+| salesforce | 3 | 2 | 2 | 3 | 1 | **2** | **2.15** |
+
+Per-cell notes (the drift the rubric must pin):
+- **deepagents LYD/MSC = 4?** These categories have on-by-default, code-enforced,
+  gap-free controls (path containment; sha256-pinned lockfile) → they can reach
+  **Strong (4)** per the rubric (4–5 needs on-by-default). The MCP-TLS gap lives
+  in the *transport* facet and caps *that* only; it doesn't stop LYD/MSC hitting 4.
+  This is what made r3's 3.30 mostly *right*. **RT = 2** (threat-model doc +
+  security unit tests = "something", not real adversarial red-team → not 3).
+  **MC = 2** (some structured signal, not durable audit → the B3/absence call).
+- **uAgents MSC = 3** (committed lockfile, pinned deps — real, gap-free → Established);
+  **BYK = 2**. ZT = 2 fixed by the B1 ruling (ECDSA on default path, Critical key/
+  replay findings stay in register but don't crush the score).
+- **salesforce MC = 1 or 2?** the only drifting cell — partial platform telemetry.
+  Ties directly to the B3 absence-is-evidence guardrail: is minimal platform signal
+  a 1 or 2? Everything else is stable.
+
+These per-category targets *are* the #48 anchor: post-rubric median-of-3 runs must
+land here (± a cell), and the weighted must hit 3.00 / 2.00 / 2.15.
 
 *(LYD=Limit Your Domain, BYK=Balance Your Knowledge, ZT=Implement Zero Trust,
 MSC=Manage Supply Chain, RT=Build a Red Team, MC=Monitor Continuously.
