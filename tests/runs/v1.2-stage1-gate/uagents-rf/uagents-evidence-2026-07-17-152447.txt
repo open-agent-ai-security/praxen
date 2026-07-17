@@ -1,0 +1,63 @@
+Praxen evidence checkpoint — uAgents Framework Runtime
+Scan date 2026-07-17 / TS 2026-07-17-152447
+Workspace: /Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/uagents
+Scope: framework runtime — python `uagents` + `uagents-core` (identity/signing, wallet/ledger, ASGI inbound, Almanac reg/resolver, typed dispatch, KV storage). Evaluates default posture handed to deployed agents.
+
+FILES READ (workspace-relative under python/)
+- src/uagents/asgi.py (full) — inbound ASGI server
+- src/uagents/config.py (full) — constants, endpoint parsing
+- src/uagents/dispatch.py (full) — Dispatcher
+- src/uagents/storage/__init__.py (full) — KeyValueStore + private-key persistence
+- src/uagents/crypto/__init__.py (full) — sign_registration, sign_arbitrary
+- src/uagents/agent.py (init 356-535, wallet/identity 571-598, inspector rest, grep)
+- src/uagents/context.py (send 490-555, history, grep)
+- src/uagents/mailbox.py (250-337 + grep) — mailbox inbound
+- src/uagents/utils.py (grep) — logging.basicConfig console
+- src/uagents/network.py, registration.py, resolver.py, communication.py (grep)
+- src/uagents/experimental/quota/__init__.py (head) — opt-in rate limit + ACL
+- uagents-core/uagents_core/identity.py (full) — Identity, sign/verify_digest
+- uagents-core/uagents_core/envelope.py (full) — Envelope sign/verify/_digest (nonce+expires in digest)
+- uagents-core/uagents_core/storage.py (full) — ExternalStorage attestation
+- uagents-core/uagents_core/logger.py (grep) — optional FileHandler
+- pyproject.toml (uagents 0.25.3) + uagents-core/pyproject.toml (0.4.8)
+- SECURITY.md, tests/ listing
+
+FIRST-PASS SIGNALS
+- asgi.py:23,181 HOST="0.0.0.0" hardcoded; Agent exposes NO host param -> always binds all interfaces, no loopback option, no approval/opt-out.
+- asgi.py:184 forwarded_allow_ips="*" -> uvicorn trusts X-Forwarded-For from ANY client, rewrites scope["client"]. asgi.py:304-307 reserved-endpoint guard = `"127.0.0.1" not in scope["client"]` -> SPOOFABLE by remote sending X-Forwarded-For: 127.0.0.1. (remit "spoofed loopback source address" bad-behavior)
+- asgi.py:186-189 CORS Access-Control-Allow-Origin:* on all responses; Allow-Credentials:false (limits impact).
+- asgi.py:363-365 `if not is_user_address(env.sender): env.verify()` -> user-prefixed sender skips signature verify entirely; is_user_address only checks "user" prefix. Agent senders ARE verified (positive). User senders trusted on assertion.
+- asgi.py:373-385 dispatch after verify with NO check of env.expires vs now and NO nonce/replay tracking. envelope.py nonce+expires exist and are in signed _digest but never enforced inbound. mailbox.py:268-287 same. -> replay/expiry gap.
+- asgi.py:366-371 failed verify logs warning + returns 400; agent does NOT halt/alert (remit escalation says halt+alert).
+- agent.py:305 enable_agent_inspector=True DEFAULT -> registers /agent_info,/messages,/connect,/disconnect REST. /messages (488-494) returns full cached message history payloads. /connect,/disconnect re-register/unregister in Agentverse.
+- storage/__init__.py:113-150 save_private_keys writes {identity_key, wallet_key} PLAINTEXT to private_keys.json in cwd; get_or_create_private_keys is the seed-less named path (agent.py:590). BUG: line 149 saves PrivateKey().private_key (fresh) not wallet_key var. Remit Non-Goal + Forbidden Data Movement violation.
+- agent.py:594-598 seed path derives identity+wallet deterministically (Identity.from_seed / derive_key_from_seed) -> env-only seed, no disk write (positive, recommended path); stable identity across restarts.
+- context.py:509-519 outbound Envelope signed with agent identity + expires set (positive).
+- asgi.py:239,348 inbound payload pydantic model_validate before dispatch (positive schema validation).
+- Supply chain: uagents 0.25.3 / uagents-core 0.4.8 declared; deps floor-pinned `>=x,<y` EXCEPT cosmpy `>=0.12.1` (no upper bound, pyproject:19); no committed lockfile observed (hatchling build).
+- Red team: tests/ has test_msg_verify.py test_server.py test_registration.py etc (functional); grep replay|spoof|inject|malicious|attack|forge|tamper over tests -> ZERO hits. No adversarial suite.
+- Monitor: utils.py logging.basicConfig(INFO) console; uagents-core logger.py optional FileHandler only if log_file passed; failed-verify logged at warning. No structured/durable action-level audit by default.
+- No MCP server config present anywhere (no mcpServers/servers-map) -> KB_MCP_SECURITY not loaded.
+- No credentials/secrets literals in framework source (contract addrs are public chain constants).
+
+RAISE (weighted 1.70, floor 1 = Ad hoc)
+LD 2 / BK 2 / ZT 2 (w.25) / SC 2 / RT 1 / MC 1
+= .30+.30+.50+.30+.15+.15 = 1.70
+
+THEMES (8 findings)
+- [Critical] remote unauth admin/message-history access (COMPOUND) — 0.0.0.0 bind + spoofable X-Forwarded-For loopback guard + inspector-on-by-default exposing /messages,/connect,/disconnect — ZT/ASI03/LLM02 — evidence: asgi.py:181/184/304-307, agent.py:305/488-494 — rules R-03,R-05,R-09
+    contributors: 0.0.0.0-public-bind [standalone: exposes /submit to public internet even if admin endpoints removed -> finding 003] · forwarded_allow_ips="*" spoofable-loopback-guard [folded: only exploitable because endpoints remotely reachable] · inspector-default-on [folded: only exploitable because remotely reachable]
+- [High]     plaintext identity+wallet key persistence — save_private_keys cleartext private_keys.json on seed-less named path — ZT/LLM02/ASI03 — evidence: storage/__init__.py:113-150, agent.py:590 — rules R-02,R-06
+- [High]     default public bind, no loopback option / no approval / no alert — HOST hardcoded 0.0.0.0, no host param — ZT — evidence: asgi.py:23/181, agent.py init — rules R-08,R-14  (standalone contributor of the compound)
+- [High]     no replay/expiry protection on inbound signed envelopes — nonce+expires in signed digest but never enforced on receipt — ZT/ASI07 — evidence: asgi.py:363-385, mailbox.py:268-287, envelope.py:93-111 — rules R-11,R-16
+- [Medium]   unauthenticated user-sender identity trusted on assertion — is_user_address prefix check skips verify — ZT/ASI03 — evidence: asgi.py:363, identity.py:33-34 — rules R-04,R-12
+- [Medium]   signature-verify failure does not halt/alert per remit escalation — logs warning, returns 400, continues — Monitor — evidence: asgi.py:366-371 — rule R-13
+- [Medium]   wide-open CORS on all responses — Allow-Origin:* (creds false) — ZT — evidence: asgi.py:186-189 — no rule (null)
+- [Medium]   supply chain: cosmpy unbounded upper + no committed lockfile — floor-pinned deps — SupplyChain/LLM03 — evidence: pyproject.toml:19 — no rule (null)
+
+POSITIVES
+- ecdsa SECP256k1 envelope signing + verify on agent-sender inbound path (envelope.py:64-91, identity.py:145-164, asgi.py:363-365)
+- outbound envelopes signed + carry expires (context.py:509-519)
+- deterministic pydantic schema validation before dispatch (asgi.py:239,348)
+- seed-derived deterministic identity/wallet, env-only seed, stable across restarts (agent.py:594-598)
+- opt-in QuotaProtocol rate-limit + ACL primitive (experimental/quota) — off by default

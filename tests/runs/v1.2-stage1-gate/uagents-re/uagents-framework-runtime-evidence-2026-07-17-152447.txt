@@ -1,0 +1,49 @@
+Praxen evidence checkpoint — uAgents Framework Runtime
+Scan: 2026-07-17  TS: 2026-07-17-152447
+Workspace: /Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/uagents (python/)
+Version: uagents 0.25.3 (git v0.25.3)
+
+FILES READ
+- WORKER_REMIT.md (policy baseline)
+- uagents-core/uagents_core/identity.py [full] — Identity, sign/verify, seed derivation, is_user_address (prefix check "user")
+- uagents-core/uagents_core/envelope.py [full] — Envelope model; expires/nonce OPTIONAL (None default); _digest covers sender/target/session/schema/payload/(+expires/nonce if set); verify() checks signature only
+- uagents-core/uagents_core/storage.py [full] — ExternalStorage attestation: nonce(32) + validity window (replay-resistant) — contrast w/ envelope path
+- src/uagents/asgi.py [full] — HOST="0.0.0.0" (:23 hardcoded const); forwarded_allow_ips="*" (:184); reserved-endpoint guard checks "127.0.0.1" in scope["client"] (:304-311) but /agent_info EXEMPT; CORS ACAO "*" credentials false (:186-189); user-sender skips verify (:363); dispatch after verify, NO expiry/nonce/replay check (:379-385)
+- src/uagents/agent.py [full] — enable_agent_inspector default True (:305); inspector registers /agent_info /messages /connect /disconnect REST (:474-531); _initialize_wallet_and_identity name-path calls get_or_create_private_keys (:590); signed handlers reject user senders (:1459-1469); no replay dedup in _process_single_message
+- src/uagents/storage/__init__.py [full] — save_private_keys writes identity_key+wallet_key CLEARTEXT to private_keys.json in cwd (:113-127); KeyValueStore -> <name>_data.json plaintext (:94-96). (bug: :149 saves fresh PrivateKey not wallet_key)
+- src/uagents/config.py [full] — timeouts/intervals; DEFAULT_ENVELOPE_TIMEOUT_SECONDS=30; no rate-limit / no auth constants
+- src/uagents/dispatch.py [full] — dispatch_msg routes to sinks, no freshness/replay logic
+- src/uagents/utils.py + uagents-core/logger.py — Python logging StreamHandler(stdout); CORE logger ALSO FileHandler default "uagents_core.log" in cwd
+- pyproject.toml (src + core) — deps floor-pinned ranges; cosmpy(>=0.12.1) NO upper bound; uv.lock + poetry.lock COMMITTED
+- tests/ dir — unit tests incl test_msg_verify.py (sign/verify tested); NO redteam/fuzz/adversarial/injection files
+- SECURITY.md present (vuln disclosure policy, not red-teaming)
+
+KEY SIGNALS
+- CRED-AT-REST: private_keys.json cleartext identity+wallet keys (storage:113-127) — remit forbidden
+- BIND: 0.0.0.0 hardcoded module const, not configurable, no approval gate (asgi:23)
+- SPOOF: forwarded_allow_ips="*" => uvicorn rewrites scope["client"] from X-Forwarded-For => loopback guard bypass via "X-Forwarded-For: 127.0.0.1" (asgi:184 + 304-311)
+- INSPECTOR: default-on; /agent_info exempt from guard => remote recon; /messages => history disclosure; /connect,/disconnect => re-registration control
+- REPLAY: expires only read for sync-response timeout (asgi:390), never to reject; nonce never consulted inbound; no session-replay dedup => captured signed envelope re-runs handler
+- SENDER-AUTH: user-prefixed sender skips verify; is_user_address = string prefix only => spoofable sender identity on unsigned path
+- RATE-LIMIT: none on /submit (public)
+- SUPPLY: lockfiles committed (mitigates); cosmpy unbounded range on wallet/crypto dep
+- LOGGING: free-form stdout logs; core writes uagents_core.log file (inferred durable sink); sig-fail = warning log only, no halt/alert (remit escalation says Halt+Alert)
+- NO MCP config present (no mcpServers/servers-map files) => KB_MCP not loaded
+
+POSITIVES
+- Envelope ECDSA signature verify implemented + unit-tested (envelope:76-91, tests/test_msg_verify.py)
+- Seed-derived deterministic identity/wallet (restart-stable) (identity:90-99, agent:593-602)
+- Signed handlers reject unverified user senders (agent:1459-1469)
+- Inbound payloads pydantic schema-validated before dispatch (asgi:347-355, agent:1442)
+- Attestation tokens use nonce+validity window (storage:12-30)
+
+THEMES (8 findings)
+- [Critical] PRAX-...-001 plaintext identity+wallet key storage — private_keys.json cleartext — ZT/Supply — ASI03 prim / LLM02 — evidence: storage/__init__.py:113-127, agent.py:590
+- [Critical] PRAX-...-002 COMPOUND: unauthenticated remote access to inspector/admin endpoints — 0.0.0.0 bind + forwarded_allow_ips="*" spoofable loopback guard + inspector default-on + /agent_info guard-exempt — ZT — ASI03 prim / LLM02 (msg-history disclosure) — evidence: asgi.py:184,304-311, agent.py:305,488
+    contributors: 0.0.0.0-bind [standalone: public exposure of /submit is a finding even if all admin endpoints were removed -> PRAX-...-004] · forwarded_allow_ips="*"-spoof [folded: only exploitable because endpoints are remotely reachable] · inspector-default-on [folded: local operator access is remit-allowed; dangerous only via the bind+spoof] · /agent_info-guard-exempt [folded: remote reach comes from the bind]
+- [Critical] PRAX-...-003 no replay/expiry enforcement on inbound signed envelopes — dispatch runs handler regardless of expires/nonce/session reuse — ZT — ASI07 — evidence: asgi.py:379-390, envelope.py:39-40,105-110
+- [High] PRAX-...-004 public network bind not approval-gated and not configurable — HOST hardcoded 0.0.0.0 — ZT — ASI03 prim / LLM06 — evidence: asgi.py:23,177-198 [standalone contributor to 002]
+- [Medium] PRAX-...-005 unsigned/user-sender path trusts spoofable sender-asserted identity — is_user_address prefix check, no auth for user senders — ZT — ASI03 — evidence: asgi.py:363, identity.py:33-38
+- [Medium] PRAX-...-006 no rate limiting / connection or size caps on public /submit — LLM10 — evidence: asgi.py:281-337
+- [Medium] PRAX-...-007 unbounded cosmpy dependency range on crypto/wallet dep — LLM03 — evidence: uagents-core pyproject cosmpy>=0.12.1 (src pyproject deps)
+- [Medium] PRAX-...-008 no operator alert / structured security-event record on signature-verification failure — Monitor/escalation gap (RAISE only) — evidence: asgi.py:366-371 (warning log only)
