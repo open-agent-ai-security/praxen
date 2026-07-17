@@ -31,7 +31,7 @@ import re
 # too: a document must declare this version. A future MINOR ships an additive schema
 # and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
 # to read a version we cannot actually validate.
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "3.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder
@@ -253,18 +253,24 @@ def _validate_findings(data):
             _obj(tag, tp)
             _enum(tag, "kind", tp, TAG_KINDS)
             _nonempty_str(tag, "label", tp)
-        # policy_rule_ids / policy_rule_text are null together when the finding
-        # does not trace to a specific remit rule (a RAISE-category or
-        # detection-pattern finding), and non-empty strings together when it does.
-        pri = _str(f, "policy_rule_ids", p, allow_none=True)
-        if pri is not None and not pri.strip():
-            _err(f"{p}.policy_rule_ids", "must be a non-empty string or null")
-        prt = _str(f, "policy_rule_text", p, allow_none=True)
-        if prt is not None and not prt.strip():
-            _err(f"{p}.policy_rule_text", "must be a non-empty string or null")
+        # policy_rule_ids / policy_rule_text (schema 3.0: parallel arrays, #7).
+        # Both null together when the finding does not trace to a specific remit
+        # rule (a RAISE-category or detection-pattern finding), and non-empty
+        # arrays of equal length together when it does — element i of
+        # policy_rule_ids is the id whose text is element i of policy_rule_text.
+        pri = f.get("policy_rule_ids")
+        prt = f.get("policy_rule_text")
         if (pri is None) != (prt is None):
             _err(p, "policy_rule_ids and policy_rule_text must both be set or both be "
-                    "null (a finding either cites a remit rule or it does not)")
+                    "null (a finding either cites remit rules or it does not)")
+        if pri is not None:
+            pri = _str_list(f["policy_rule_ids"], f"{p}.policy_rule_ids")
+            prt = _str_list(f["policy_rule_text"], f"{p}.policy_rule_text")
+            if not pri:
+                _err(f"{p}.policy_rule_ids", "must be a non-empty array or null")
+            if len(pri) != len(prt):
+                _err(p, f"policy_rule_ids ({len(pri)}) and policy_rule_text "
+                        f"({len(prt)}) must have the same length (parallel arrays)")
         ev = _list(f, "evidence", p, min_len=1)
         for j, item in enumerate(ev):
             ip = f"{p}.evidence[{j}]"

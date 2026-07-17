@@ -388,9 +388,12 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
 
 
 def _policy_ctx(finding, _idx):
+    # schema 3.0: policy_rule_ids / policy_rule_text are parallel arrays (#7).
+    # Join for display with the historical separators (", " for ids, " / " for
+    # the quoted texts) so the rendered card is unchanged by the shape change.
     return {
-        "RULE_IDS": esc(finding["policy_rule_ids"]),
-        "QUOTED_RULE_TEXT": esc(finding["policy_rule_text"]),
+        "RULE_IDS": esc(", ".join(finding["policy_rule_ids"])),
+        "QUOTED_RULE_TEXT": esc(" / ".join(finding["policy_rule_text"])),
     }
 
 

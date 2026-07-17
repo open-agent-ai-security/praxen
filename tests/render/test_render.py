@@ -558,8 +558,12 @@ def main():
         rel = os.path.relpath(bj, REPO_ROOT)
         bdata = load_json(bj)
         sv = str(bdata.get("schema_version", ""))
-        if not sv.startswith("2."):
-            check(f"baseline {rel}: schema_version {sv!r} — frozen pre-2.0 artifact, schema/render checks skipped", True)
+        # Only the CURRENT schema version is schema/render-checked. Older frozen
+        # sets (e.g. 2.0 before the #7 array migration) are kept for diff-history
+        # but exempt — they are re-frozen under the current schema at the next
+        # re-baseline (Stage 4 → v1.2-claude48 at 3.0).
+        if sv != schema.SCHEMA_VERSION:
+            check(f"baseline {rel}: schema_version {sv!r} != current {schema.SCHEMA_VERSION!r} — frozen legacy artifact, schema/render checks skipped", True)
             continue
         try:
             schema.validate(bdata)
@@ -636,8 +640,8 @@ def main():
         rel = os.path.relpath(ej, REPO_ROOT)
         edata = load_json(ej)
         sv = str(edata.get("schema_version", ""))
-        if not sv.startswith("2."):
-            check(f"example {rel}: schema_version {sv!r} — pre-2.0 artifact, checks skipped", True)
+        if sv != schema.SCHEMA_VERSION:
+            check(f"example {rel}: schema_version {sv!r} != current {schema.SCHEMA_VERSION!r} — legacy artifact, checks skipped", True)
             continue
         try:
             schema.validate(edata)

@@ -904,9 +904,10 @@ def _populate_derived(data):
         Trust, 0.15 for the other five)
       * ``findings[].escalation`` from ``severity`` (Critical/High → alert,
         else → log_only)
-      * ``findings[].policy_rule_text`` from ``findings[].policy_rule_ids``
-        by looking up the rule_id(s) in ``remit_coverage.rules[].rule_text``;
-        multi-rule joined with `" / "` (the renderer's display separator)
+      * ``findings[].policy_rule_ids`` split from the manifest's comma-separated
+        string into an array, and ``findings[].policy_rule_text`` looked up per
+        id in ``remit_coverage.rules[].rule_text`` into a parallel array
+        (schema 3.0, #7 — element i of one aligns with element i of the other)
     """
     rules = data.get("remit_coverage", {}).get("rules", [])
     findings = data.get("findings", [])
@@ -977,6 +978,9 @@ def _populate_derived(data):
         if pri is None:
             f["policy_rule_text"] = None
         else:
+            # Manifest authors write policy_rule_ids as a human-friendly
+            # comma-separated string ("R-03, R-04"); schema 3.0 emits it — and
+            # the looked-up texts — as parallel arrays (#7), element-aligned.
             ids = [s.strip() for s in pri.split(",") if s.strip()]
             texts = []
             missing_ids = []
@@ -989,7 +993,8 @@ def _populate_derived(data):
                 raise ManifestError(
                     f"finding {f.get('id', '?')!r}: policy_rule_ids references "
                     f"rule(s) {missing_ids} not present in remit_coverage.rules[]")
-            f["policy_rule_text"] = " / ".join(texts)
+            f["policy_rule_ids"] = ids
+            f["policy_rule_text"] = texts
 
     # Reorder each finding dict to canonical schema field order so that fields
     # the LLM didn't write (escalation, policy_rule_text) appear in the right
