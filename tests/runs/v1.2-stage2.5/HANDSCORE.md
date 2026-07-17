@@ -125,6 +125,12 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
   gap does **not alone crush** the score. This is the discriminator between deepagents
   (High-bounded TLS gap → still Established ~3) and uAgents (Critical key/replay gaps →
   capped ~Partial 2).
+- **Monitor Continuously 1↔2 (Steve, 2026-07-17):** logging that exists but has **no
+  durable audit trail of the security-relevant actions** (you could not reconstruct an
+  incident from it) = **1 (Ad hoc)**, not 2. **2 (Partial)** requires a *durable,
+  security-relevant action log on the default path*; **3** adds structured-for-detection.
+  Console-only / ephemeral / partial telemetry that can't reconstruct actions → 1.
+  Applies suite-wide: deepagents, salesforce, and uAgents MC all resolve to **1**.
 
 ## Section B — RAISE category-credit calls (0↔1 and 2↔3) — **[UNSTABLE] — #48's real target, score this first**
 
@@ -235,9 +241,14 @@ cell that *drifted* across the 3 runs and is the real call to pin.
 
 | Target | LYD | BYK | ZT | MSC | RT | MC | weighted |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| deepagents | **4** | 3 | 3 | **4** | **2** | **2** | **3.00** |
-| uAgents | 2 | **2** | 2 | **3** | 1 | 2 | **2.00** |
-| salesforce | 3 | 2 | 2 | 3 | 1 | **2** | **2.15** |
+| deepagents | 4 | 3 | 3 | 4 | **2?** | 1 | **2.85** |
+| uAgents | 2 | 2 | 2 | 3 | 1 | 1 | **1.85** |
+| salesforce | 3 | 2 | 2 | 3 | 1 | 1 | **2.00** |
+
+*(Updated for the locked rulings: LYD/MSC=4 where always-on+gap-free; MC=1
+suite-wide per the durable-audit rule; ZT per B1. Anchors: deepagents 2.85,
+uAgents 1.85, salesforce 2.00 — these are what post-rubric runs must converge to.
+Only open cell: deepagents **RT 2 vs 3**.)*
 
 Per-cell notes (the drift the rubric must pin):
 - **deepagents LYD/MSC = 4?** These categories have on-by-default, code-enforced,
