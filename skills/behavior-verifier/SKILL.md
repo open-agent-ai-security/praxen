@@ -26,7 +26,7 @@ allowed-tools: Read Grep Glob Bash Write
 
 Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 — the manifest that lets a long scan recover from mid-analysis context compaction. **Do not skip Step 9.9.**
 
-**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; Step 9 writes the prose; **Step 9.9 checkpoints the synthesis to disk** (mandatory gate); Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
+**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
 
 **Contents — jump table (useful after a context compaction).** A long scan can exceed the coding agent's context window; if your session resumed mid-procedure, this jump table is the fastest way to relocate the step you were on.
 
@@ -42,7 +42,8 @@ Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 �
 - [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; configuration gaps; MCP server evaluation; remit-delta
 - [Step 7 — Compound Signal Reasoning](#step-7--compound-signal-reasoning) — combination escalations to Critical
 - [Step 8 — Positive Posture Recognition](#step-8--positive-posture-recognition) — confirmed positives
-- [Step 9 — Synthesize the Report Prose](#step-9--synthesize-the-report-prose) — 9.1 remit summary · 9.2 structure summary · 9.3 behavior summary · 9.4 RAISE rationales · 9.5 weighted rationale · 9.6 remit coverage · 9.7 positives · 9.8 log files · **9.9 draft manifest + interim overview (gate)**
+- [Step 8.5 — Finding-Themes Outline](#step-85--finding-themes-outline-decomposition-primer) — commit the decomposition (one line per intended finding) before drafting; stabilises finding count across runs
+- [Step 9 — Synthesize the Report Prose](#step-9--synthesize-the-report-prose) — 9.1 remit summary · 9.2 structure summary · 9.3 behavior summary · 9.4 RAISE rationales · 9.5 weighted rationale · 9.6 remit coverage · 9.7 positives (drafted + **appended to the manifest one at a time**) · 9.8 log files · **9.9 completeness gate: manifest on disk + interim overview**
 - [Step 10 — Write the Canonical Findings JSON](#step-10--write-the-canonical-findings-json) — manifest-exists pre-check, JSON shape, common validation errors
 - [Step 11 — Render the Report](#step-11--render-the-report) — invoke `render.py`
 - [Step 12 — Final Summary (stdout)](#step-12--final-summary-stdout) — print the .txt summary + the file pointers
@@ -529,13 +530,42 @@ For each of the following, check whether the evidence supports it. Include confi
 
 ---
 
+## Step 8.5 — Finding-Themes Outline (decomposition primer)
+
+Before you draft any finding prose, commit the **decomposition** — how the raw signals from Steps 5–8 carve into discrete findings — as a short outline. This is a thinking step with one small on-disk artifact; it exists because the carve is where run-to-run variance is born: the same evidence, split one way, is 8 findings; split another, 13. Deciding the split *once, up front* is what keeps two scans of the same agent comparable.
+
+**Write the outline into the evidence checkpoint** (`./reports/<agent-slug>-evidence-<TIMESTAMP>.txt`, from Step 4) — append a `THEMES` section. One line per intended finding:
+
+```
+THEMES (N findings)
+- [Critical] ungated host shell exec — run_shell inherits full env, no approval — ZT — evidence: executor.py, action/config
+- [High]     unauthenticated control plane — localhost WS no-origin + 0.0.0.0 sidecar — ZT — evidence: app/server.py, sidecar config
+- [Medium]   plaintext credential storage — tokens in cleartext JSON — Balance KB — evidence: credentials_store.py
+- [compound of the above two] external-input → exec chain — auto_reply + no sender check + run_shell — Critical
+...
+```
+
+Each line carries: intended **severity**, a **one-line theme** (what the finding is about), the **RAISE category**, and the **evidence sites** it will cite (from your Step-4 checkpoint — this is where the closed-under-classification rule gets enforced: if a theme's chain runs through a store/scheduler/index, name it here so it can't be dropped later). Mark compound findings (Step 7) explicitly and list their contributing themes.
+
+**Decomposition rules — apply them here, once:**
+- **One finding per distinct control gap**, not per file and not per symptom. Two symptoms of the same missing control are one finding with two evidence sites; one control gap that surfaces in two unrelated subsystems is two findings.
+- **A compound chain (Step 7) is one finding**, not the sum of its links — list it once, with its contributing themes noted, and do not also emit the links as standalone findings unless a link is independently material.
+- **Don't tier-compress** (Step 6's rule): if the workspace has Medium-grade gaps, they get their own theme lines — most real agents land 2–5 Medium findings.
+- The count you write in `THEMES (N findings)` is your committed target. Step 9 drafts exactly these; if drafting surfaces a genuinely new finding, add a theme line here first (and note why), rather than letting the set drift silently.
+
+The outline is working scaffolding, not a deliverable — it lives in the evidence checkpoint, not the report. Its payoff is threefold: it stabilizes the finding count across runs, it front-loads the decomposition decision so Step 9's per-finding drafting is mechanical (which is what makes interleaved emission safe — see Step 9.9), and it gives a compaction-resume an explicit map of what findings the run intended to write.
+
+---
+
 ## Step 9 — Synthesize the Report Prose
 
 Praxen produces three artifacts per analysis: a canonical findings JSON (Step 10), and — rendered deterministically from that JSON by `render.py` (Step 11) — an HTML report and a plain-text summary. **The renderer does no synthesis and fills no gaps.** Every piece of prose the report displays must be written here. Anything you skip will be missing from both the HTML and the JSON.
 
 **Write prose with literal characters, not HTML entities.** Use `—`, `&`, `<`, `>`, `'` directly — *not* `&mdash;`, `&amp;`, `&lt;`, `&gt;`, `&#39;`. Literal is cleaner and matches the examples; the renderer will normalise an entity you write by mistake (it un-escapes prose before re-escaping for HTML, so `&mdash;` still renders as `—`), but don't rely on that. The only markup allowed in prose fields is the inline-tag allowlist noted per field below (`<code>`, and for `behavior_summary` also `<p>`/`<strong>`/`<em>`) — everything else, including a stray `<` inside e.g. a version range like `langsmith<1.0.0`, is fine as a literal character and is escaped safely.
 
-Synthesize 9.1–9.8 now, in order, and hold them in working memory. Then **9.9 is a mandatory action, not a held item** — you write the draft manifest to disk and print the interim overview before you write anything in Step 10. The draft manifest is what lets the analysis survive a context-window compaction during a long scan; do not skip it.
+**Emit as you synthesize — do not hold the whole report in working memory.** The failure mode this step is built to avoid is the *synthesis burst*: composing every finding internally and then writing them all in one pass. That burst is where long scans stall (the model goes silent for minutes composing N findings between tool calls, and the background watchdog kills the run) and where the context window is most likely to compact with nothing durable on disk. The fix is to **interleave writing with composing**: write the manifest skeleton early (right after 9.1–9.6 prose is set), then append each finding to it the moment you finish drafting that one finding's prose — following the decomposition you already committed in the Step 8.5 outline. By the time you reach 9.9 the findings are already on disk; 9.9 becomes a *gate that confirms completeness and prints the overview*, not a compose-and-dump.
+
+Concretely: synthesize 9.1–9.8 in order, but treat 9.7 (findings) as a **loop over your Step 8.5 theme lines** — draft one finding's prose, Edit-append it to the manifest, heartbeat, move to the next. The skeleton write and the per-finding appends are detailed in 9.9's emission discipline; the shift here is *when* you write them — continuously, not in a terminal burst. **9.9 remains a mandatory gate** — the draft manifest must be complete on disk and the interim overview printed before Step 10 — but if you have been appending as you go, reaching it is a matter of writing the last finding and the overview, not composing the report.
 
 **Across all three summaries below: cite files and functions, never line numbers.** A summary names *what* and *where* at the file/function level (`src/index.js`, `process_invoice()`) — the precise `file:line` coordinates (`index.js:374-457`) belong in each finding's evidence block, not these overviews. Repeating them here is noise the reader already gets below; keep the summaries pattern-level.
 
@@ -738,7 +768,7 @@ For each log file (empty exactly when `present=false` — in that case write a s
 
 **Format conventions the parser enforces.** Sections appear in any order (the parser re-orders the JSON to canonical key order on emission); fields within a section may appear in any order; values are single-line (prose blocks under `### intro_band` subsections, `## behavior_summary`, and `### weighted_rationale` may wrap, joined by single spaces on parse). Indentation is meaningful: flat fields at depth 0, nested array items at depth 2 (with `- ` bullet), continuation fields at depth 4 (no bullet). The parser refuses tabs, unknown fields, malformed bullets, and any structural surprise.
 
-**Manifest emission discipline — background subagents.** Don't write the whole manifest in one big `Write` — compose it across many small tool calls so the watchdog never sees a >600 s gap:
+**Manifest emission discipline — interleaved, not a terminal burst.** Don't write the whole manifest in one big `Write`, and don't compose all findings internally before writing any — spread both the writing *and the composing* across many small tool calls so the watchdog never sees a >600 s gap and so a compaction always finds most of the work already on disk. The skeleton write happens **early** (as soon as the 9.1–9.6 prose is set, before you finish drafting findings); the rule and finding appends happen **as you finalize each one**, driven by the Step 8.5 theme lines. Optionally run `manifest_to_findings.py --validate-manifest ./reports/<slug>-draft-<TIMESTAMP>.md` after the skeleton and again partway through the appends — it structure-checks what you've written so far and is designed to pass on an incomplete skeleton, so format mistakes surface early instead of at the Step 10 conversion.
 
 1. **Write the skeleton first.** `Write` the manifest file with every authored `## section` heading present, the small sections fully populated:
 
