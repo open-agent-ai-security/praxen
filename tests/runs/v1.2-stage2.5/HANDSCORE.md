@@ -106,6 +106,24 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
 > below is written as a verifiable property, so any implementation that exhibits the
 > property scores the same.
 
+> **Evidence conditions the score — defaults matter ONLY under source-only evidence
+> (Steve, 2026-07-17).** Praxen grades **the version of the system in the evidence, not
+> an abstract ideal.** Two regimes:
+> - **Source / repo only:** you cannot see what's actually running, so the **default is
+>   your best proxy for "what runs"** — an off-by-default control is graded off-by-default
+>   (discounted; can't assume the operator enabled it). *This is the ONLY place the
+>   "off-by-default caps you below 4–5" rule applies.*
+> - **Live system, or evidence derived from real operation (deployment state, logs,
+>   telemetry):** you are observing **truth** — grade what is **actually present and
+>   operative**, regardless of the source default. A control off-by-default *in source*
+>   but observably *on in the running system* scores as **on**.
+>
+> So "on-by-default" was never the real criterion — it is a **stand-in for *operative*,
+> used only when source can't show operative directly.** When the evidence shows
+> operative, use the truth, not the stand-in. (The Stage-2.5 anchors were scored on
+> **source-only** evidence, so the defaults-matter regime applies to them — e.g. a
+> source-only scan can't credit a monitoring pipeline it can't see running → MC 1.)
+
 - **0 — nonexistent.** No operative control. For a **runtime** category (Zero Trust,
   Limit-Domain, Balance-KB), a *documented-but-unenforced* policy (e.g. `SECURITY.md`
   says "we validate input" with no code) is **0** — documentation of intent is not a
@@ -149,8 +167,9 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
     flagging of anomalous/risky events in the stream.
   - **4 Strong** — a 3 that is **operative by default**: monitoring is on in the
     deployment (shipped-initialized in code, *or* deployment-state evidence it is
-    running), not a remember-to-wire-it option. *(This is how "on-by-default" applies to
-    a monitoring category — "operative in the deployment," verifiable by observation.)*
+    running), not a remember-to-wire-it option. *("on-by-default" here = **operative in
+    the evidence**: shipped-on under source evidence, or observed-running under live/
+    deployment/log evidence. Defaults are moot once you can see the real thing.)*
   - **5 Exemplary** — a 4 with an **independent, active detection layer** consuming the
     stream (behavioral-anomaly / analytics on a separate system): defense-in-depth +
     continuous assurance.
