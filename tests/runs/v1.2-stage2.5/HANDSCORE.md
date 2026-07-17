@@ -5,14 +5,12 @@
 
 # Hand-score questionnaire — the human anchor for #48
 
-> **Status: DRAFT — inclinations blank, pending the joint Steve+Claude session**
-> (per `RELEASE_1.2_PLAN.md` Stage-3 hand-score protocol). Claude drafts the
-> corner cases with honest pros/cons for each side; we decide each inclination
-> together and Claude marks it with a one-line rationale. Undecided entries are
-> marked **deferred**, never guessed. Once marked, this file is the (a) human
-> reference for the directional-lean check, (b) seed text for #48's severity /
-> credit anchors, (c) replay set the Stage-3 gate re-tests (post-rubric runs
-> must land on the marked side of every decided entry).
+> **Status: COMPLETE (joint Steve+Claude session, 2026-07-17).** Every case decided;
+> no deferrals. This file is now the human anchor for #48: (a) the directional-lean
+> reference (lean-anchor table below — deepagents 2.85 / uAgents 1.85 / salesforce 2.00),
+> (b) the seed text for #48's severity + category-credit rubric (the RUBRIC block
+> below), (c) the replay set the Stage-3 gate re-tests (post-rubric median-of-3 runs
+> must land on the decided side / anchor of every entry, ± a cell).
 
 > **Framing (Steve, 2026-07-17) — read before scoring, this is critical:**
 > The `v1.1-claude48` **frozen baseline is not ground truth.** It is 3 runs of
@@ -289,14 +287,16 @@ cell that *drifted* across the 3 runs and is the real call to pin.
 
 | Target | LYD | BYK | ZT | MSC | RT | MC | weighted |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| deepagents | 4 | 3 | 3 | 4 | **2?** | 1 | **2.85** |
+| deepagents | 4 | 3 | 3 | 4 | 2 | 1 | **2.85** |
 | uAgents | 2 | 2 | 2 | 3 | 1 | 1 | **1.85** |
 | salesforce | 3 | 2 | 2 | 3 | 1 | 1 | **2.00** |
 
 *(Updated for the locked rulings: LYD/MSC=4 where always-on+gap-free; MC=1
 suite-wide per the durable-audit rule; ZT per B1. Anchors: deepagents 2.85,
 uAgents 1.85, salesforce 2.00 — these are what post-rubric runs must converge to.
-Only open cell: deepagents **RT 2 vs 3**.)*
+**All cells decided (Steve, 2026-07-17): deepagents RT = 2** — CI security tests that
+verify own controls are operative (Partial), not comprehensive adversarial red-teaming
+(Established).)*
 
 Per-cell notes (the drift the rubric must pin):
 - **deepagents LYD/MSC = 4?** These categories have on-by-default, code-enforced,
