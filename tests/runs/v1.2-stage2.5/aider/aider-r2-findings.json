@@ -1,0 +1,630 @@
+{
+  "schema_version": "3.0",
+  "praxen_version": "1.1.0",
+  "scan": {
+    "agent": "Aider",
+    "agent_slug": "aider",
+    "scan_date": "2026-07-17",
+    "scan_timestamp": "2026-07-17T17:34:28Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/aider",
+    "artifact_count": 22
+  },
+  "intro_band": {
+    "agent_remit_summary": "Aider is an interactive AI pair-programming agent that runs in the developer's terminal on their own account and credentials, scoped to a single local git repository. It reads files the developer shares into the chat, proposes edits to satisfy natural-language requests, applies approved edits to the working tree, auto-commits them with a descriptive message, and can lint, run developer-authorized tests and shell commands (`/run`, `/test`, `/lint`), scrape developer-supplied URLs (`/web`), and read images or voice input. The remit leaves the developer in control: shell execution, commits, pushes, package installs, and edits to security-sensitive files require explicit human approval, and Aider must never push autonomously, write outside the repository root, exfiltrate code or secrets, or follow instructions embedded in untrusted file content.",
+    "agent_structure_summary": "A Python CLI application under `aider/`, organized around a `Coder` class hierarchy in `aider/coders/` (a `base_coder.py` orchestrator plus per-edit-format coders) driving developer-configured LLMs. The human-in-the-loop gate is `IO.confirm_ask()` in `io.py`; shell execution flows through `run_cmd()` (`subprocess.Popen(shell=True)` on an interactive shell) invoked by `commands.py` (`/run`, `/test`, `/lint`, `/git`) and by `base_coder.handle_shell_commands()` for model-suggested commands. Edits are applied via `apply_updates()`/`allowed_to_edit()` and committed by `repo.py`; untrusted content enters LLM context from file bodies, the repo map (`repomap.py`), git history, scraped web pages (`scrape.py`), and watched `AI!`/`AI?` comments (`watch.py`). Notably, file-write path resolution (`abs_root_path` → `utils.safe_abs_path`) applies no repository-root boundary, `is_important()` (`special.py`) lists security-sensitive files but is consulted only for repo-map ranking, and analytics (`analytics.py`) initializes PostHog with exception autocapture enabled."
+  },
+  "behavior_summary": "<p>The dominant pattern is a genuine developer-in-the-loop confirmation architecture with real teeth on the highest-impact path but soft edges everywhere else. The strongest control is verifiable and holds: model-suggested shell commands are gated by <code>confirm_ask(..., explicit_yes_required=True)</code>, which even <code>--yes-always</code> cannot auto-approve and for which a group \"all\" answer cannot be selected — so the classic external-content-to-shell-execution chain is blocked in one hop, and no autonomous <code>git push</code> capability exists anywhere in the code.</p><p>The gaps cluster in what the confirm gate does not deterministically enforce: there is no code-level repository-root confinement on file writes (path resolution is a bare <code>Path.resolve()</code>, and the one <code>/add</code> guard is a weak <code>startswith</code> prefix check coupled to <code>auto_commits</code>), <code>--yes-always</code> silently auto-approves package installs and edits to not-yet-added files, security-sensitive files are edited through the ordinary path despite an unused <code>is_important()</code> inventory, and no secret scanning or untrusted-content labeling exists before file bodies, diffs, or scraped pages reach the LLM and git history. These are the surfaces to review first.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 4,
+      "gap": 4,
+      "partial": 6,
+      "vague": 0,
+      "enp": 0,
+      "total": 14
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Mission",
+        "rule_text": "Act as an interactive AI pair programmer in the developer's terminal: read source code the developer shares into the chat, propose edits to accomplish the developer's natural-language requests, apply approved edits to the local working tree, and commit them to git with a message describing the change — always leaving the developer in control and able to review or undo any change.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Non-Goals (Out of Scope)",
+        "rule_text": "Running as a background service, daemon, scheduled job, or cron task — Aider is interactive and developer-driven.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Approved Communication Channels",
+        "rule_text": "Aider must never push autonomously.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Approved Communication Channels",
+        "rule_text": "Anonymous, aggregate usage metrics only; must never carry code, prompts, keys, or PII.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-006"
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Restricted Tools (Require Approval Before Use)",
+        "rule_text": "Arbitrary shell / `/run` execution of any command the developer did not author or that the LLM proposed — the exact command must be shown to and confirmed by the developer.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Including secret-like strings from the repository or `.env` in LLM context, proposed edits, or commit messages.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-003"
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Committing, staging, or writing any secret-like string into git history.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-003"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Editing security-sensitive files: container build files (Dockerfiles), CI/CD workflow definitions, dependency manifests and lockfiles, code-ownership files (CODEOWNERS), and security-policy files.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-005"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Installing any package, or running any command that fetches code from the network (including self-upgrade and Playwright install).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-007"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Committing to git (the developer must be able to review the diff before it is committed).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-008"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Writing to or creating files outside the current repository root — via absolute path, escaping symlink, or parent-directory traversal.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-001"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Following instructions embedded in file content, code comments, commit messages, or dependency metadata that attempt to expand Aider's capabilities, exfiltrate content, execute arbitrary shell commands, or override its confirmation gates.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-004"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Risk Sensitivities",
+        "rule_text": "Confirmation-bypass modes: `--yes` / `--yes-always` and non-interactive `--message` / scripted runs must not silently auto-approve pushes, package installs, or out-of-repo writes.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-002"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Escalation Rules — Alert Operator (Do Not Halt)",
+        "rule_text": "Scraped web content, a watched `AI` comment, or other untrusted input containing directive-like language that tries to steer Aider beyond the developer's request.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-004"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-07-17-001",
+      "severity": "High",
+      "summary": "File writes have no deterministic repository-root confinement; the boundary is only a bypassable confirm prompt and a weak prefix check.",
+      "description": "`abs_root_path()` joins the model-supplied path to the repo root and passes it through `utils.safe_abs_path()`, which is a bare `Path.resolve()` — an absolute path or `../` traversal resolves outside the root with no boundary check. `allowed_to_edit()` gates such writes only with a non-`explicit_yes` confirm prompt (auto-approved under `--yes-always`), and the one `/add` guard in `cmd_add` is a `startswith` prefix match coupled to `auto_commits` being enabled. The remit lists out-of-repo writes as never allowed, but the control is present-and-bypassable rather than a real confinement.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-11"
+      ],
+      "policy_rule_text": [
+        "Writing to or creating files outside the current repository root — via absolute path, escaping symlink, or parent-directory traversal."
+      ],
+      "evidence": [
+        {
+          "file": "aider/utils.py",
+          "line": 96,
+          "snippet": "safe_abs_path() returns Path(res).resolve() with no repository-root boundary check"
+        },
+        {
+          "file": "aider/commands.py",
+          "line": 849,
+          "snippet": "cmd_add out-of-repo guard uses abs_file_path.startswith(self.coder.root) (no separator boundary) and is gated on self.coder.auto_commits, so --no-auto-commits skips it"
+        }
+      ],
+      "recommended_actions": [
+        "Add a deterministic repo-root confinement check in `allowed_to_edit()` (base_coder.py) that rejects any resolved edit target not contained within `self.root`, using a proper path-prefix test (`os.path.commonpath` or `Path.is_relative_to`), independent of `auto_commits` and not satisfiable by the confirm prompt.",
+        "Apply the same boundary in `cmd_add` and replace the `startswith` prefix match, which passes sibling directories like `<root>-secrets`."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-002"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-002",
+      "severity": "High",
+      "summary": "`--yes-always` silently auto-approves package installs and edits to not-yet-added files, which the remit forbids bypass modes from doing.",
+      "description": "Setting `io.yes = True` makes `confirm_ask()` return \"yes\" for every non-`explicit_yes` gate, so `check_pip_install_extra()`'s \"Run pip install?\" and `allowed_to_edit()`'s \"Allow edits to file not added to the chat?\" are auto-approved. Model-suggested shell commands are protected (they use `explicit_yes_required=True`, which returns \"no\" under `--yes-always`), so the asymmetry is real but incomplete. The remit explicitly requires that `--yes` / `--yes-always` never silently auto-approve package installs or out-of-repo writes.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-13"
+      ],
+      "policy_rule_text": [
+        "Confirmation-bypass modes: `--yes` / `--yes-always` and non-interactive `--message` / scripted runs must not silently auto-approve pushes, package installs, or out-of-repo writes."
+      ],
+      "evidence": [
+        {
+          "file": "aider/io.py",
+          "line": 866,
+          "snippet": "\"if self.yes is True: res = 'n' if explicit_yes_required else 'y' — non-explicit gates auto-yes under --yes-always\""
+        },
+        {
+          "file": "aider/utils.py",
+          "line": 317,
+          "snippet": "check_pip_install_extra confirms with confirm_ask(\"Run pip install?\") — no explicit_yes_required, so --yes-always auto-approves the install"
+        }
+      ],
+      "recommended_actions": [
+        "Mark package-install and not-yet-added-file / out-of-repo edit confirmations with `explicit_yes_required=True` (or a dedicated bypass-exempt flag) so `--yes-always` cannot silently approve them, matching the shell-command gate.",
+        "Document precisely which gates `--yes-always` may and may not bypass, and add a test asserting installs and out-of-repo writes are never auto-approved."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-003",
+      "severity": "Medium",
+      "summary": "No secret scanning or redaction runs before file content enters LLM context or before diffs are committed to git history.",
+      "description": "File bodies the developer adds, repo-map content, and full diffs flow to the LLM verbatim; `get_commit_message()` sends the entire diff to the weak model and the returned message is committed, with no detection of secret-like strings at any point. The `.env` default-ignore and `scrub_sensitive_info()` help only narrowly (scrub covers CLI args at settings display, not file content), so a secret hardcoded in an edited source file can enter context, a proposed edit, and git history. The remit forbids secrets in context, edits, commit messages, or history.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-06",
+        "R-07"
+      ],
+      "policy_rule_text": [
+        "Including secret-like strings from the repository or `.env` in LLM context, proposed edits, or commit messages.",
+        "Committing, staging, or writing any secret-like string into git history."
+      ],
+      "evidence": [
+        {
+          "file": "aider/repo.py",
+          "line": 326,
+          "snippet": "get_commit_message() sends the full diff to the model and commits the returned message with no secret scanning"
+        },
+        {
+          "file": "aider/main.py",
+          "line": 750,
+          "snippet": "scrub_sensitive_info is applied only to the CLI arg line at settings display, not to file content, diffs, or LLM context"
+        }
+      ],
+      "recommended_actions": [
+        "Add an opt-out secret-scanning pass (e.g. a detect-secrets-style regex/entropy check) over proposed edits and diffs before they are sent to the commit-message model or committed, warning or redacting on a hit.",
+        "Screen file content added to the chat for high-confidence credential patterns and prompt the developer before it enters LLM context."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-004",
+      "severity": "Medium",
+      "summary": "Untrusted content enters LLM context unlabeled and unneutralized across multiple ingress paths, with no directive-detection or alerting.",
+      "description": "File bodies, the repo map, git history, git commit messages, `/web`-scraped pages (added directly to `cur_messages`), and the code surrounding watched `AI!`/`AI?` comments all reach the model with no origin labeling, injection neutralization, or alert on directive-like language. An injected instruction can steer the model to propose edits that are auto-applied to in-chat files and auto-committed (see PRAX-2026-07-17-008); the shell and push escalations are blocked by the shell gate and the absence of push, so the chain stays reversible and in-repo rather than reaching execution. The developer reviewing diffs and confirming actions is the only mitigation.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Agent Goal Hijack"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-12",
+        "R-14"
+      ],
+      "policy_rule_text": [
+        "Following instructions embedded in file content, code comments, commit messages, or dependency metadata that attempt to expand Aider's capabilities, exfiltrate content, execute arbitrary shell commands, or override its confirmation gates.",
+        "Scraped web content, a watched `AI` comment, or other untrusted input containing directive-like language that tries to steer Aider beyond the developer's request."
+      ],
+      "evidence": [
+        {
+          "file": "aider/commands.py",
+          "line": 243,
+          "snippet": "cmd_web scrapes a URL and appends the raw content to cur_messages as a user message, unlabeled as untrusted"
+        },
+        {
+          "file": "aider/watch.py",
+          "line": 218,
+          "snippet": "process_changes injects the code surrounding AI comments (TreeContext) into the prompt; surrounding file content is untrusted but unmarked"
+        }
+      ],
+      "recommended_actions": [
+        "Wrap externally-sourced content (scraped pages, watched-file surroundings, git history) in explicit untrusted-content delimiters in the prompt and instruct the model to treat it as data, not instructions.",
+        "Add a lightweight directive-language detector that alerts the developer when scraped or watched content contains instruction-like text attempting to expand capabilities or override gates (remit escalation rule)."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-07-17-008"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-005",
+      "severity": "Medium",
+      "summary": "Security-sensitive files are edited through the ordinary path with no elevated approval, despite an unused inventory that names exactly those files.",
+      "description": "`special.py` defines `is_important()` / `ROOT_IMPORTANT_FILES` covering Dockerfiles, CI/CD workflows, dependency manifests and lockfiles, CODEOWNERS, and security-policy files — but it is consulted only by `repomap.py` for context ranking, never by `allowed_to_edit()`. Editing a Dockerfile or `.github/workflows/*.yml` in the chat is therefore applied and auto-committed like any other file, with no elevated confirmation. The remit requires human approval before editing these files; the declared inventory exists but is never wired to the gate that would enforce it.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-08"
+      ],
+      "policy_rule_text": [
+        "Editing security-sensitive files: container build files (Dockerfiles), CI/CD workflow definitions, dependency manifests and lockfiles, code-ownership files (CODEOWNERS), and security-policy files."
+      ],
+      "evidence": [
+        {
+          "file": "aider/special.py",
+          "line": 184,
+          "snippet": "is_important() classifies Dockerfiles/CI/lockfiles/CODEOWNERS/SECURITY but the only consumer is repomap.py filter_important_files ranking"
+        },
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 2191,
+          "snippet": "allowed_to_edit() applies no is_important() check, so sensitive files take the ordinary auto-apply/auto-commit path"
+        }
+      ],
+      "recommended_actions": [
+        "In `allowed_to_edit()`, call `special.is_important()` on the target and require an `explicit_yes_required` confirmation before editing a security-sensitive file, so the existing inventory actually gates edits."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-006",
+      "severity": "Medium",
+      "summary": "Analytics initializes PostHog with exception autocapture enabled, which can transmit file paths and code fragments beyond anonymous metrics.",
+      "description": "`enable_exception_autocapture=True` sends automatic exception reports whose stack traces can include local file paths, source-line fragments, and variable context — data outside the remit's \"anonymous, aggregate usage metrics only; must never carry code, prompts, keys, or PII.\" Analytics is opt-in and model names are redacted (both positive), but exception autocapture is a distinct data-movement surface not scoped to anonymous metrics. The hardcoded PostHog/Mixpanel keys are public ingestion tokens, not user credentials, so they are noted by location only and are not a credential-exposure finding.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-04"
+      ],
+      "policy_rule_text": [
+        "Anonymous, aggregate usage metrics only; must never carry code, prompts, keys, or PII."
+      ],
+      "evidence": [
+        {
+          "file": "aider/analytics.py",
+          "line": 102,
+          "snippet": "Posthog(..., enable_exception_autocapture=True) — auto-sent tracebacks can carry local paths and code, exceeding anonymous-metrics scope"
+        },
+        {
+          "file": "aider/analytics.py",
+          "line": 56,
+          "snippet": "hardcoded posthog_project_api_key literal (public ingestion key, redacted here by pattern/location; not a user secret)"
+        }
+      ],
+      "recommended_actions": [
+        "Disable `enable_exception_autocapture`, or route exception reporting through a scrubbing layer that strips file paths, code fragments, and local variables before send, so telemetry stays anonymous and code-free."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-007",
+      "severity": "Medium",
+      "summary": "`/web` scraping silently downloads and installs a pandoc binary with no confirmation or integrity check, and can disable SSL verification.",
+      "description": "When converting scraped HTML, `try_pandoc()` calls `pypandoc.download_pandoc()` to fetch and install a pandoc binary from the network with no developer confirmation and no hash/signature check — while the adjacent Playwright install path IS confirm-gated. Separately, the scraper honors a `verify_ssl=False` mode that disables certificate verification for outbound fetches. The remit requires approval for any command that fetches code from the network, making the unconfirmed binary download a divergence.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Supply Chain"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-09"
+      ],
+      "policy_rule_text": [
+        "Installing any package, or running any command that fetches code from the network (including self-upgrade and Playwright install)."
+      ],
+      "evidence": [
+        {
+          "file": "aider/scrape.py",
+          "line": 223,
+          "snippet": "try_pandoc() calls pypandoc.download_pandoc(delete_installer=True) with no confirm_ask and no integrity verification"
+        },
+        {
+          "file": "aider/scrape.py",
+          "line": 158,
+          "snippet": "browser.new_context(ignore_https_errors=not self.verify_ssl) — SSL cert verification can be disabled for scrapes"
+        }
+      ],
+      "recommended_actions": [
+        "Gate the pandoc download behind a `confirm_ask` like the Playwright install, and verify the downloaded binary against a known hash before use.",
+        "Default `verify_ssl` to true and require an explicit developer flag (surfaced in output) to disable certificate verification."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-008",
+      "severity": "Medium",
+      "summary": "Auto-commit (default on) commits LLM edits to git with no explicit pre-commit approval, only post-hoc review.",
+      "description": "With `auto_commits` defaulting to true, `apply_updates()` applies model edits and `auto_commit()` commits them with an LLM-generated message and no explicit pre-commit confirmation — the remit requires the developer be able to review the diff before it is committed. The gap is materially mitigated: pre-existing dirty changes are committed separately first, commits are attributed, and `/undo` reverts the last Aider commit, so every change is reversible and reviewable after the fact rather than silently persisted.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-10"
+      ],
+      "policy_rule_text": [
+        "Committing to git (the developer must be able to review the diff before it is committed)."
+      ],
+      "evidence": [
+        {
+          "file": "aider/coders/base_coder.py",
+          "line": 2375,
+          "snippet": "auto_commit() runs after apply_updates with no explicit pre-commit confirm_ask when self.auto_commits is set"
+        },
+        {
+          "file": "aider/args.py",
+          "line": 440,
+          "snippet": "--auto-commits defaults to True, so LLM edits are committed automatically unless the developer disables it"
+        }
+      ],
+      "recommended_actions": [
+        "Offer (or default to) a pre-commit diff-review confirmation for Aider-authored commits, or document that auto-commit trades the pre-commit gate for guaranteed reversibility via `/undo` so operators can choose per the remit."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-004"
+      ],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Human-in-the-loop shell gate that resists the bypass mode",
+      "description": "Model-suggested shell commands are gated by `confirm_ask(explicit_yes_required=True)`, which returns \"no\" under `--yes-always` and for which a group \"all\" answer cannot be selected, so each model-proposed command needs a fresh explicit \"y\" — blocking the external-content-to-shell chain.",
+      "evidence_path": "aider/io.py:866; aider/coders/base_coder.py:2456"
+    },
+    {
+      "title": "No autonomous git push capability",
+      "description": "The codebase contains no push call anywhere; pushing happens only via a developer-typed `/git push` or a developer-confirmed shell command, matching the remit's \"Aider must never push autonomously.\"",
+      "evidence_path": "aider/repo.py (no push); aider/commands.py cmd_git:967"
+    },
+    {
+      "title": "Default-deny of sensitive artifacts from watch/context",
+      "description": "`.env`, `.aider*` history/state files, logs, and caches are hardcoded into the file-watcher ignore list, and `.aider*` is added to `.gitignore` by default, keeping credential and transcript files out of the watched context surface.",
+      "evidence_path": "aider/watch.py:20-56"
+    },
+    {
+      "title": "Analytics opt-in with model-name redaction",
+      "description": "Telemetry is disabled until the user is asked to opt in (`need_to_ask`) and model names are redacted to provider/REDACTED unless in a known list, so routine analytics do not carry raw model identifiers.",
+      "evidence_path": "aider/analytics.py:119-135; aider/analytics.py:195-204"
+    },
+    {
+      "title": "Reversible, attributed edits",
+      "description": "Aider commits any pre-existing dirty changes separately before applying its own edits, attributes AI commits (co-authored-by / \"(aider)\"), and supports `/undo`, so any auto-committed change is reviewable and reversible.",
+      "evidence_path": "aider/repo.py commit:131; aider/coders/base_coder.py check_for_dirty_commit:2175"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": ".aider.input.history",
+        "source": "aider/io.py IO input-history handling",
+        "content_type": "plaintext input history",
+        "purpose": "Records the developer's typed inputs and slash commands across sessions",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": ".aider.chat.history.md",
+        "source": "aider/io.py IO chat-history handling",
+        "content_type": "markdown transcript",
+        "purpose": "Human-readable running transcript of the chat, including assistant output",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": ".aider.llm.history",
+        "source": "aider/io.py IO llm-history handling",
+        "content_type": "plaintext LLM request/response log",
+        "purpose": "Raw record of LLM requests and responses when enabled",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "analytics jsonl logfile (--analytics-log)",
+        "source": "aider/analytics.py Analytics.event",
+        "content_type": "structured JSON lines",
+        "purpose": "Appends one JSON record per analytics event when a logfile is configured",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": "~/.aider/analytics.json",
+        "source": "aider/analytics.py Analytics.save_data",
+        "content_type": "JSON state",
+        "purpose": "Stores the analytics UUID and opt-in/disable state",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 1.85,
+    "weighted_rationale": "Ad hoc. Aider pairs a real, operative human-in-the-loop confirmation model — strongest on shell execution, which resists even the `--yes-always` bypass — with an absence of deterministic, code-level enforcement around it: no repository-root confinement, no secret redaction, no untrusted-content labeling, and confirmation gates that a bypass mode can silently defeat for installs and edits. The agent is well-scoped to a single repository and single interactive session with no autonomous push or daemon behavior, but its Zero Trust posture rests on a bypassable prompt rather than a boundary, and there is no verifiable adversarial-testing or security-grade monitoring evidence in the scanned source. The result is a coherent, developer-controlled tool whose safety depends on the human at the keyboard, not on controls that hold when that human clicks through.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Aider is structurally scoped to a single git repository and a single interactive, developer-driven session with a well-defined command palette and no daemon/cron mode, but its editing/shell action surface is inherently broad and the \"single repository / no out-of-repo\" boundary is enforced only by a weak `startswith` prefix check (`commands.py` `cmd_add`) rather than a real confinement."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Some real hygiene exists — `.env`, `.aider*`, logs and caches are hardcoded into the watch/gitignore default-deny list (`watch.py`) — but untrusted content from file bodies, the repo map, git history, `/web` scrapes (`commands.py` `cmd_web`), and `AI!` comments enters LLM context unlabeled and unneutralized, and no secret redaction removes credentials from context or diffs."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.25,
+        "rationale": "A genuine, operative confirm-gate sits on the agent's path and is strong on shell execution (`explicit_yes_required=True`, unbypassable by `--yes-always`), earning real credit — but there is no code-level path confinement on writes (`utils.safe_abs_path` is a bare resolve), no input validation or output/secret filtering, and `--yes-always` silently auto-approves package installs and not-yet-added-file edits."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 2,
+        "confidence": "Low",
+        "weight": 0.15,
+        "rationale": "Self-upgrade from PyPI/main and Playwright install are confirm-gated (positive), but `/web` scraping silently downloads and installs a pandoc binary with no confirmation or integrity check (`scrape.py` `try_pandoc`); dependency pinning and any ML-BOM live outside the scanned scope (top-level `aider/*.py` + `aider/coders/`), limiting confidence."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Low",
+        "weight": 0.15,
+        "rationale": "The scanned source (top-level `aider/*.py` and `aider/coders/`) contains no verifiable adversarial-testing artifacts, red-team notes, or evidence that injection/confinement testing drove design; the confirm-gate architecture suggests threat awareness but no testing feedback loop is observable in scope."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Durable records exist — chat/LLM/input history files and an optional structured analytics event stream (`io.py`, `analytics.py`) — but these are UX transcripts and opt-in telemetry, not security-grade action logs, and there is no alerting on high-impact actions or directive-like untrusted input."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 0,
+      "high": 2,
+      "medium": 6,
+      "low": 0,
+      "info": 0
+    }
+  }
+}
