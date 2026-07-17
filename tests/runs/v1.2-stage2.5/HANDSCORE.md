@@ -177,6 +177,24 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
     scores the properties, never the tool names.)*
   - **Applied to the anchors (source-visible logging only):** deepagents, salesforce,
     and uAgents all lack a durable reconstructable action log → **MC = 1**.
+- **Build-an-AI-Red-Team — process category, credited by evidence of the PRACTICE, not
+  by build-automation (Steve, 2026-07-17).** RT is a *process* category (like the B3
+  Red-Team ladder): the control is *the adversarial-testing practice*, and it is credited
+  by **whatever artifacts evidence it** — process docs describing a real program,
+  engagement findings, pentest/red-team reports, or operative adversarial tests.
+  **Build-automation (tests-in-CI) is NOT the criterion** — red-teaming is often a
+  human/manual program whose only evidence is documents and findings.
+  - **0** no evidence of any adversarial testing.
+  - **1** minimal/weak — a threat-model doc alone, a lone stale artifact.
+  - **2 Partial** real but limited adversarial testing — e.g. control-verification
+    security tests, or a single one-time red-team report.
+  - **3 Established** indirect (or direct) evidence of a **real, ongoing adversarial
+    red-team program** — process docs + engagement findings/reports. **Automation not
+    required.**
+  - **4–5** that program + continuous/regression-gated + external/independent validation.
+  - *(deepagents RT = 2: control-verification tests + threat-model doc, but no evidence
+    of a real red-team program → not 3. A program evidenced only by docs+findings would
+    be 3.)*
 
 ## Section B — RAISE category-credit calls (0↔1 and 2↔3) — **[UNSTABLE] — #48's real target, score this first**
 
@@ -294,9 +312,10 @@ cell that *drifted* across the 3 runs and is the real call to pin.
 *(Updated for the locked rulings: LYD/MSC=4 where always-on+gap-free; MC=1
 suite-wide per the durable-audit rule; ZT per B1. Anchors: deepagents 2.85,
 uAgents 1.85, salesforce 2.00 — these are what post-rubric runs must converge to.
-**All cells decided (Steve, 2026-07-17): deepagents RT = 2** — CI security tests that
-verify own controls are operative (Partial), not comprehensive adversarial red-teaming
-(Established).)*
+**All cells decided (Steve, 2026-07-17): deepagents RT = 2** — control-verification
+security tests + threat-model doc = real-but-limited adversarial testing (Partial); no
+evidence of an actual red-team program (docs+findings) → not Established. Build-
+automation is not the criterion; evidence of a real *program* would be.)*
 
 Per-cell notes (the drift the rubric must pin):
 - **deepagents LYD/MSC = 4?** These categories have on-by-default, code-enforced,
