@@ -97,6 +97,15 @@ reliability fix.*
 
 The 0–3 scoring rules the questionnaire is converging on. These are the anchors #48 encodes.
 
+> **Meta-principle (Steve, 2026-07-17) — governs every category:** the rubric scores
+> **observable capabilities, never brand/product recognition.** The grading agent reads
+> the agent's code / config / deployment and checks *properties* (is there a durable
+> action log? an operative approval gate? a pinned lockfile? an independent detection
+> layer?). It does **not** know what any third-party tool is and must never be required
+> to "figure out what product X is" — that is neither reliable nor efficient. Every rung
+> below is written as a verifiable property, so any implementation that exhibits the
+> property scores the same.
+
 - **0 — nonexistent.** No operative control. For a **runtime** category (Zero Trust,
   Limit-Domain, Balance-KB), a *documented-but-unenforced* policy (e.g. `SECURITY.md`
   says "we validate input" with no code) is **0** — documentation of intent is not a
@@ -125,12 +134,32 @@ The 0–3 scoring rules the questionnaire is converging on. These are the anchor
   gap does **not alone crush** the score. This is the discriminator between deepagents
   (High-bounded TLS gap → still Established ~3) and uAgents (Critical key/replay gaps →
   capped ~Partial 2).
-- **Monitor Continuously 1↔2 (Steve, 2026-07-17):** logging that exists but has **no
-  durable audit trail of the security-relevant actions** (you could not reconstruct an
-  incident from it) = **1 (Ad hoc)**, not 2. **2 (Partial)** requires a *durable,
-  security-relevant action log on the default path*; **3** adds structured-for-detection.
-  Console-only / ephemeral / partial telemetry that can't reconstruct actions → 1.
-  Applies suite-wide: deepagents, salesforce, and uAgents MC all resolve to **1**.
+- **Monitor Continuously — full 0–5 ladder, stated ABSTRACTLY (Steve, 2026-07-17).**
+  The rubric scores **observable capabilities, never product/brand recognition** — the
+  grading agent reads the code/config/deployment and checks properties; it does not (and
+  cannot) know what any specific vendor tool is. Each rung is a property it can verify:
+  - **0 Absent** — no logging of the agent's actions anywhere.
+  - **1 Ad hoc** — logging exists but is ephemeral / console-only / partial: the
+    security-relevant actions (tool calls, handoffs, model calls, state changes) **cannot
+    be reconstructed** from it.
+  - **2 Partial** — a **durable** log of the security-relevant actions on the default
+    path (you could reconstruct an incident).
+  - **3 Established** — the durable action log is also **structured-for-detection**:
+    normalized schema and/or routable to an external detection sink, and/or built-in
+    flagging of anomalous/risky events in the stream.
+  - **4 Strong** — a 3 that is **operative by default**: monitoring is on in the
+    deployment (shipped-initialized in code, *or* deployment-state evidence it is
+    running), not a remember-to-wire-it option. *(This is how "on-by-default" applies to
+    a monitoring category — "operative in the deployment," verifiable by observation.)*
+  - **5 Exemplary** — a 4 with an **independent, active detection layer** consuming the
+    stream (behavioral-anomaly / analytics on a separate system): defense-in-depth +
+    continuous assurance.
+  - *(All checkable from artifacts. Worked example, NOT an anchor: a runtime that emits a
+    normalized, routable, on-by-default action stream into an independent behavioral-
+    analytics detector satisfies 5 — regardless of which tools implement it. The agent
+    scores the properties, never the tool names.)*
+  - **Applied to the anchors (source-visible logging only):** deepagents, salesforce,
+    and uAgents all lack a durable reconstructable action log → **MC = 1**.
 
 ## Section B — RAISE category-credit calls (0↔1 and 2↔3) — **[UNSTABLE] — #48's real target, score this first**
 
