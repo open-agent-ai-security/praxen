@@ -93,6 +93,33 @@ reliability fix.*
 
 ---
 
+## RUBRIC — decided category-credit ladder (Steve, 2026-07-17)
+
+The 0–3 scoring rules the questionnaire is converging on. These are the anchors #48 encodes.
+
+- **0 — nonexistent.** No operative control. For a **runtime** category (Zero Trust,
+  Limit-Domain, Balance-KB), a *documented-but-unenforced* policy (e.g. `SECURITY.md`
+  says "we validate input" with no code) is **0** — documentation of intent is not a
+  control. *(Process categories — Build-an-AI-Red-Team — differ: the practice itself is
+  evidenced by artifacts, so a test / a how-to doc / a one-time report → ≥1. See B3.)*
+- **1 — Ad hoc / "it exists but sucks."** Any operative control, however weak, floors
+  here. **Incidental architecture is NOT a control** — small/narrow codebase,
+  statelessness, no-forbidden-tools-present earn nothing (B0c).
+- **2–3 — Partial / Established: a REAL control.** *On-by-default is NOT required for
+  2–3.* A real control **documented as a required install/deploy config step** earns a
+  reasonable mid-grade — do not dump it to 1 for being off-by-default (we are too harsh
+  on this). **2 vs 3** turns on coverage of the category's primary risk and on open
+  MUST-NOT gaps — *weighted by severity* (next rule).
+- **4–5 — Strong / Exemplary: requires on-by-default controls** (plus material
+  completeness). This is the *only* place off-by-default actually costs you.
+- **Severity mitigates, it does not eliminate (rule for gaps).** An unmitigated
+  Never-Allowed (MUST-NOT) gap is always a finding in the register, but its **severity
+  modulates its weight on the category score.** A **Critical/big-blast** gap weighs
+  heavily (pulls the category down); a **High/Medium small-blast, partially-mitigated**
+  gap does **not alone crush** the score. This is the discriminator between deepagents
+  (High-bounded TLS gap → still Established ~3) and uAgents (Critical key/replay gaps →
+  capped ~Partial 2).
+
 ## Section B — RAISE category-credit calls (0↔1 and 2↔3) — **[UNSTABLE] — #48's real target, score this first**
 
 *The 36-run TEST proved this is where run-to-run drift lives: how much a
