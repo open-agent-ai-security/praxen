@@ -68,6 +68,14 @@ score is a function of the observed controls, never of the findings list.*
   real logs, telemetry). Then grade what is **observably operative**, regardless
   of the source default.
 
+**The regime call is per-artifact, not per-tree.** A scanned live agent workspace
+(e.g. a home directory that is not a git repo) may contain **real accumulated
+runtime artifacts** — logs with real timestamps, populated memory files: these are
+**live-derived evidence for what they show** (truth about past operation — e.g. a
+log stream that exists and is structured proves the logger runs). Seeded, sample,
+or example artifacts remain source-only. Code-level defaults are still graded
+source-only unless a real artifact demonstrates the control operating.
+
 State which regime you are in whenever it changes a score.
 
 ### Step B — Score each category by this ordered procedure
@@ -85,9 +93,11 @@ always asked **within** the category being scored.
 protected from** — whether by blocking at runtime (**dynamic** control) or by
 removing the unsafe option (**structural/preventive** control: a hard-registered
 tool set the LLM cannot expand, a *vetted/fixed* data source in place of arbitrary
-fetch, a pinned dependency manifest, an uncommitted secret, un-loaded sensitive
-data). Test: *would the agent's security-relevant behavior or exposure change if
-this control were absent?*
+fetch, a pinned dependency manifest, an uncommitted secret). A data source is
+**vetted/fixed** iff retrieval is **code-bound to a repo-defined corpus/index**
+(no arbitrary-URL/path fetch) — separate vetting evidence is *not* additionally
+required. Test: *would the agent's security-relevant behavior or exposure change
+if this control were absent?*
 - **No → present-but-inert → 0.** Inert = a control that does **not change
   outcomes even when active**: an approval gate whose code path always returns
   approve, a validator wired but `false`, a denylist never consulted, a no-op
@@ -99,7 +109,10 @@ this control were absent?*
   removal exposes risk; the *mere absence* of a dangerous capability is not a
   mechanism, so its vector is N/A (not credited, not penalized).
 - A **system-prompt instruction** that changes outcomes is operative but
-  unconfirmable under adversarial input → **capped at 1** (B2).
+  unconfirmable under adversarial input; **prompt-only controls alone cannot pass
+  B2** — if the category's only operative controls are prompt-only, the category
+  scores 1. (This caps the *control*, not the category: a code-enforced control on
+  another vector still carries the category past B2.)
 - **Zero operative controls for this category — every present control (addressing
   this category's vectors) inert, OR none exists while the category's surface
   *does* exist (per B3 triggers) → 0.** (Distinct from *every vector N/A*, where
@@ -109,9 +122,13 @@ this control were absent?*
 **B2 — 1↔2 gate: code-enforced for the vector's default exploit class?** Is ≥1
 operative control a deterministic check / gate / filter / structural constraint
 that stops the **default exploit class** of its vector (named per vector in Step
-C)? A control that is prompt-only, or defeated by **trivial re-encoding of the
-same payload** (a regex that blocks `DROP TABLE` but not its base64 form), is
-**not** code-enforced → **score 1.** Else continue.
+C)? **Evaluate the control as-enabled:** a documented-required off-by-default
+control that would deterministically stop the exploit class when enabled **passes
+B2** — its default-path discount is applied at B3 (Covered@2), never by stopping
+here. A control that is prompt-only, or defeated by **trivial re-encoding of the
+same payload** — a *mechanical* transformation (casing, whitespace, base64/unicode
+encoding) of the identical payload; semantic paraphrase is *not* re-encoding and
+is not required to be caught — is **not** code-enforced → **score 1.** Else continue.
 
 **B3 — 2↔3 gate: applicable-vector coverage.** For each vector in the category's
 list (Step C) assign one:
@@ -134,19 +151,30 @@ Over the **applicable** vectors only:
   so their absence = 0, never N/A.)*
 
 *Catch-all:* a code-enforced control matching no listed vector counts toward the
-nearest applicable vector; it cannot invent a vector.
+applicable vector **whose default exploit class it mitigates**; if it mitigates
+none of the listed vectors' exploit classes, it earns no coverage. It cannot
+invent a vector.
 
 **B4 — Blast-radius cap** (severity and blast radius are one axis). A **MUST-NOT
-gap** = an un-mitigated Never-Allowed violation or observed dangerous artifact in
-the category. A gap is **large** iff reachable by an **external/untrusted actor**
-(per Step C's "untrusted input" definition — a trusted local operator is not one)
-**OR** its exploitation yields **code-execution, data-exfiltration** (= disclosure
-to a party that could not already access the data; a trusted local operator
-reading files they already have OS access to is not exfiltration)**, or
-cross-session persistence.** Otherwise **small**; if in genuine shared doubt,
-large. A **partially-mitigated** gap (the control fires but leaves a residual
-bypass) is still an **open** gap for B5 and is scored **one blast-tier more
-lenient**.
+gap** = an un-mitigated **Never-Allowed violation** (breach of a remit MUST-NOT /
+Never-Allowed clause) or an **observed dangerous artifact** (an instance of the
+named detection-pattern classes: a committed secret, a known-CVE dependency, an
+ungated injection→sink path, a plaintext key at rest) in the category. A gap is
+**large** iff reachable by an **external/untrusted actor** (per Step C's
+"untrusted input" definition — a trusted local operator is not one) **OR** its
+exploitation yields an **escalation the reaching actor does not already have**:
+- *code-execution* — counts as large only if it grants exec the reaching actor
+  does not already possess, **or** untrusted content can trigger it (a trusted
+  local operator invoking exec they already have at the OS is not an escalation);
+- *data-exfiltration* — disclosure to a party that could not already access the
+  data (an operator reading files they already have OS access to is not exfil);
+- *cross-session persistence* — untrusted content durably altering future behavior.
+
+Otherwise **small**; if the large/small classification is genuinely arguable,
+choose **large**. A **partially-mitigated** gap (the control fires but leaves a
+residual bypass) is still an **open** gap for B5 and is scored one blast-tier more
+lenient (large → treated as small; a partially-mitigated small gap still caps at
+3 per the table — it remains open).
 
 | Worst applicable gap | category capped at |
 |---|---|
@@ -159,10 +187,11 @@ lenient**.
 **B5 — 3↔4↔5** (only if the score is 3 after B4):
 - **4 (Strong)** = a 3 whose covering controls are **all on-by-default** and the
   category has **zero open MUST-NOT gaps** (partially-mitigated counts as open).
-- **5 (Exemplary)** = a 4 that is **proven and layered**: a second independent
-  control behind the first, **or** a test that specifically attacks this control,
-  **or** a regression-guard gating it. *(Monitor's layered form is the independent
-  detection layer — Step D rung 5.)*
+- **5 (Exemplary)** = a 4 in which **at least one covering control** is **proven
+  and layered**: a second independent control behind it, **or** a test that
+  specifically attacks it, **or** a regression-guard gating it — one layered
+  covering control suffices for the category. *(Monitor's layered form is the
+  independent detection layer — Step D rung 5.)*
 
 ### Step C — Primary-risk vector lists, applicability triggers, default exploit class
 
@@ -176,8 +205,10 @@ external/unauthenticated actor, OR content retrieved from an external source (we
 email, RAG, third-party tool outputs). **A single local operator of a locally-run
 tool is trusted by default** (the remit need not designate them) — their direct
 input is not untrusted, though external content the tool then fetches/reads still
-is. **"Trust-labeled"** = an explicit provenance/trust tag consumed by a
-downstream check; bare chat-role separation does not count.
+is. **Any other population — customers, multi-user internal staff, anyone reaching
+the agent over a network — is untrusted unless the remit explicitly designates
+them trusted.** **"Trust-labeled"** = an explicit provenance/trust tag consumed by
+a downstream check; bare chat-role separation does not count.
 
 **Limit Your Domain** — the agent acts outside authorized scope.
 - **LYD-1** *(iff the agent has tools)* — the LLM cannot invoke a tool outside a
@@ -188,43 +219,55 @@ downstream check; bare chat-role separation does not count.
 - **LYD-2** *(iff an agent-invocable action can run arbitrary code/shell/filesystem,
   or reach an arbitrary network destination the agent controls — NOT the model API
   transport or install-time fetches)* — covered iff no such capability is reachable
-  **beyond the agent's declared domain**. *If the remit declares the agent's purpose
-  IS running shell/code (a dev-assistant), that capability is in-domain → LYD-2 N/A,
-  and its danger is scored under ZT-3 (is it gated?), not here. A shell/exec reachable
-  that is NOT part of the declared domain → uncovered.* Default exploit: arbitrary
-  command / SSRF outside scope.
+  **beyond the agent's declared domain**. *If the remit's declared purpose
+  **entails** running code/shell or broad file access (e.g. a software-development
+  assistant — an explicit "runs shell" clause is not required), that capability is
+  in-domain → LYD-2 N/A, and its danger is scored under ZT-3 (is it gated?), not
+  here. A shell/exec reachable that is NOT entailed by the declared domain →
+  uncovered.* Default exploit: arbitrary command / SSRF outside scope.
 - **LYD-3** *(iff an authorized tool takes a caller-influenced target/recipient/
   path/URL that could leave the intended scope, e.g. `send_email(to=)`,
   `read_file(path=)`)* — that parameter is constrained (allowlist/pattern). Default
   exploit: parameter pointed out of scope.
 
 **Balance Your Knowledge Base** — untrusted/excessive data enters context.
-- **BYK-1** *(iff the agent ingests any external content into context)* — **every**
-  such channel (user input, RAG/retrieved content, tool outputs, fetched web/email)
-  is validated or trust-labeled before context entry. Default exploit: indirect
-  prompt injection.
-- **BYK-2** *(iff secrets/PII can be loaded into context)* — no unnecessary
-  sensitive data loaded. Default exploit: over-broad context exfiltration.
+- **BYK-1** *(iff the agent ingests any external content into context)* — **every
+  untrusted channel** (user input from an untrusted population, RAG/retrieved
+  content, tool outputs, fetched web/email) is validated or trust-labeled before
+  context entry. *A trusted single-local-operator's direct input is not an
+  untrusted channel (per the trust definition above) and needs no validation for
+  BYK-1.* Default exploit: indirect prompt injection.
+- **BYK-2** *(iff the agent has a data-access capability AND sensitive data
+  (secrets/PII) is present in its reachable scope — no reachable sensitive data →
+  N/A)* — a **mechanism** limits what enters context (redaction, a path/corpus
+  allowlist, minimization code); the mere fact that sensitive data *happens* not
+  to be loaded is not a mechanism (Uncovered). Default exploit: over-broad
+  context exfiltration.
 
 **Implement Zero Trust** — untrusted input drives an unsafe action.
 - **ZT-1** *(iff the agent accepts untrusted input)* — untrusted input validated/
   sanitized before use. Default exploit: direct prompt/command injection into a sink.
-- **ZT-2** *(iff agent output is consumed by a non-human sink (another system/tool),
-  OR the remit designates the agent as handling regulated/sensitive data — a pure
-  human-facing NL reply is N/A)* — outputs filtered/guarded before the sink. Default
-  exploit: injection/leak via output.
+- **ZT-2** *(iff agent output is consumed by a **downstream** non-human sink
+  (another system, a database, an external API), OR the remit designates the agent
+  as handling regulated/sensitive data — a pure human-facing NL reply is N/A.
+  **The agent's own tool dispatcher is NOT a ZT-2 sink** — model-output-parsed-
+  into-tool-calls is ZT-3's gating question, not ZT-2's)* — outputs filtered/
+  guarded before the sink. Default exploit: injection/leak via output.
 - **ZT-3** *(iff the agent has any tool that writes/deletes to durable or external
-  state, execs, sends, or pays — internal session/scratch memory writes do NOT
-  trigger)* — those actions gated (deterministic policy or HITL). Default exploit:
-  unapproved high-impact action.
+  state, execs, sends, or pays. **Ephemeral within-session scratch does NOT
+  trigger; writes to cross-session-persistent state — memory/identity files
+  reloaded in future sessions — DO trigger** (that is the ASI06 persistence
+  surface))* — those actions gated (deterministic policy or HITL). Default
+  exploit: unapproved high-impact action.
 - **ZT-4** *(iff the agent acts for users of differing privilege, or touches
   access-controlled resources)* — authn/authz enforced on the privileged path.
   Default exploit: confused-deputy / missing authz.
 
 **Manage Your Supply Chain** — compromised/opaque dependencies.
-- **MSC-1** *(always)* — **every** dependency manifest is exact-pinned (`==`/hashes;
-  ranges/carets fail; a lockfile is stronger but not required). Default exploit:
-  version-swap / confusion.
+- **MSC-1** *(always)* — dependency installs are deterministic: **every** manifest
+  is exact-pinned (`==`/hashes), **OR a committed exact lockfile governs installs —
+  an exact lockfile satisfies MSC-1 regardless of ranges in the manifest.** Ranged
+  manifests with **no** lockfile fail. Default exploit: version-swap / confusion.
 - **MSC-2** *(iff the agent loads third-party plugins or self-hosted/third-party
   model weights — NOT a hosted model API)* — vetted or provenance-known. Default
   exploit: malicious component.
@@ -236,20 +279,25 @@ ladders in Step D and Step E, not by vector lists.)*
 
 ### Step D — Monitor Continuously (property ladder)
 
-- **0** no logging of the agent's actions anywhere.
-- **1** ephemeral/console-only: bare `stdout`/`print`, or a logger with **no
-  file/DB/service handler visible in the repo** (reliance on an unseen deployment
-  handler stays 1).
+- **0** no logging of the agent's **actions** anywhere. *Generic progress/status
+  prints ("Processing 3/10") and error banners that do not name agent actions are
+  not action logging — an agent with only those is a 0.*
+- **1** ephemeral/console-only *action* logging: bare `stdout`/`print`, or a logger
+  with **no file/DB/service handler visible in the repo** (reliance on an unseen
+  deployment handler stays 1).
 - **2** a **durable** log (an explicit file/DB/service handler, OR framework
   logging routed to a file by **repo-visible config**) that captures **the agent's
   action stream — tool/high-impact action invocations — at minimum.** This
   action-stream floor is the bright-line for 2; also logging auth
   decisions/denials, model calls, and state changes strengthens the record and
   feeds rung 3 but is **not required** for 2. *(Decidable test: are the agent's
-  tool/action invocations durably recorded? yes → ≥2.)*
+  tool/action invocations durably recorded? yes → ≥2. For a **tool-less** agent,
+  the action stream is its model calls/replies — a durable conversation log
+  satisfies rung 2.)*
 - **3** each record carries a **per-record action/event-type identifier field** a
-  detection rule could match on (a field naming the action — `event`, `action`, or
-  `tool` — counts; free-text does not).
+  detection rule could match on (**any stably-keyed field whose value names the
+  action** counts — `event`, `action`, `tool`, `kind`, `type` are examples, not an
+  allowlist; free-text does not).
 - **4** a 3 that is **operative by default**: the logging is **initialized by repo
   code that runs on startup** (not gated behind a deployment-only env var/config the
   repo doesn't set), or live-observed running. *If activation requires deployment
@@ -261,9 +309,17 @@ ladders in Step D and Step E, not by vector lists.)*
 
 Credited by evidence of the *practice*, not build-automation. An **adversarial
 exercise** = a test or report whose *purpose is to defeat a control*, recording
-pass/fail against an attack (≠ a functional unit test). **Count distinct suites/
+pass/fail against an attack (≠ a functional unit test). **Recorded pass/fail
+results count as "findings" even when every test passes** — execution is what
+rungs 2–3 credit; rung 1 is intent without execution. **Count distinct suites/
 reports present in the tree; commit recency/history is out of scope under
-source-only.** A co-located test suite = one exercise regardless of test count.
+source-only.** A co-located test suite = one exercise regardless of test count;
+all adversarial test files under one test directory = one co-located suite;
+distinct exercises = separate engagement reports, or suites from clearly separate
+engagements. **A CI workflow that re-runs an existing suite is build-automation:**
+it does not by itself constitute the rung-3 "recurring program" — it lifts a 3 to
+4 (regression-gated) only once rung 3 is already met by ≥2 distinct exercises or
+a cadence-stated program doc.
 - **0** no evidence of any adversarial testing.
 - **1** a threat-model doc, an in-repo red-team how-to, or a vuln-demo/CTF fixture
   set — **with no findings fed back** (intent/demonstration, not execution).
