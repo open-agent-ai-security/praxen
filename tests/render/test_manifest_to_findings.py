@@ -404,6 +404,34 @@ with tempfile.TemporaryDirectory() as td:
           str(res.returncode))
 
 
+# ── N/A category score: `score: N/A` sentinel → null + renormalized overall ──
+print("N/A category score")
+with tempfile.TemporaryDirectory() as td:
+    gj = json.loads(read_text(GOLDEN_JSON))
+    cats = gj["raise_posture"]["categories"]
+    lyd_score = next(c["score"] for c in cats if c["key"] == "limit_your_domain")
+    scored = [c for c in cats if c["key"] != "limit_your_domain"]
+    renorm = round(sum(c["score"] * c["weight"] for c in scored)
+                   / sum(c["weight"] for c in scored), 2)
+    text = read_text(MANIFEST)
+    text = text.replace(f"  score: {lyd_score}", "  score: N/A", 1)
+    text = text.replace(f"- weighted_overall: {gj['raise_posture']['weighted_overall']:.2f}",
+                        f"- weighted_overall: {renorm:.2f}", 1)
+    mpath = os.path.join(td, "na.manifest.md")
+    with open(mpath, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    out = os.path.join(td, "na.json")
+    res = run_converter(mpath, out)
+    check("N/A manifest converts (exit 0)", res.returncode == 0, res.stderr.strip())
+    if res.returncode == 0:
+        data = json.loads(read_text(out))
+        lyd = next(c for c in data["raise_posture"]["categories"]
+                   if c["key"] == "limit_your_domain")
+        check("score: N/A emits JSON null", lyd["score"] is None, repr(lyd["score"]))
+        check("emitted weighted_overall is the renormalized value",
+              abs(data["raise_posture"]["weighted_overall"] - renorm) < 0.011,
+              str(data["raise_posture"]["weighted_overall"]))
+
 print(f"\n{_passed} passed, {_failed} failed")
 # Guard the exit so `pytest <this-file>` doesn't fail collection with
 # `INTERNALERROR: SystemExit`. The test is a standalone script (see header);

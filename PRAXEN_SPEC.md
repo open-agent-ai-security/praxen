@@ -332,13 +332,13 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     ]
   },
   "raise_posture": {
-    "weighted_overall": "<float 0.0–5.0 = Σ(score × weight)>",
+    "weighted_overall": "<float 0.0–5.0 = Σ(score × weight) over scored categories ÷ Σ(their weights)>",
     "weighted_rationale": "<2–4 sentences>",
     "categories": [
-      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": "<0–5>", "confidence": "High|Medium|Low", "weight": 0.15, "rationale": "<1–2 sentences>" },
-      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
-      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": "<0–5>", "confidence": "...",            "weight": 0.25, "rationale": "..." },
-      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": "<0–5|null>", "confidence": "High|Medium|Low", "weight": 0.15, "rationale": "<1–2 sentences>" },
+      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": "<0–5|null>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": "<0–5|null>", "confidence": "...",            "weight": 0.25, "rationale": "..." },
+      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": "<0–5|null>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
       { "key": "build_an_ai_red_team",        "name": "Build an AI Red Team",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
       { "key": "monitor_continuously",        "name": "Monitor Continuously",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." }
     ]
@@ -353,7 +353,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 - `footer.severity_counts` matches the actual severities in `findings[]`; `remit_coverage.stat_counts` matches the actual statuses in `rules[]`, and `total` equals the number of rules.
 - Every non-null `rule.finding_id` exists in the `findings[]` id set; finding ids are unique.
-- `raise_posture.categories` is exactly the six RAISE keys, each with its standard weight (Zero Trust 0.25, the other five 0.15); `weighted_overall` equals Σ(score × weight) within rounding.
+- `raise_posture.categories` is exactly the six RAISE keys, each with its standard weight (Zero Trust 0.25, the other five 0.15); `weighted_overall` equals Σ(score × weight) over the scored categories, divided by the sum of their weights, within rounding. A `null` score marks an N/A category (no applicable risk surface — permitted only for the four vector-scored categories, never Build an AI Red Team or Monitor Continuously): it is excluded from the weighted overall rather than counted as 0.
 - Severity, confidence, status, tag-kind, and log-status values are from their fixed enumerations.
 
 **Notes:**

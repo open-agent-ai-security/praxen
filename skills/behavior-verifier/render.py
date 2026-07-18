@@ -471,6 +471,19 @@ def _log_row_ctx(row, _idx):
 
 def _raise_card_ctx(cat, _idx):
     score, weight = cat["score"], cat["weight"]
+    if score is None:
+        # N/A category (KB Step B3 all-N/A): excluded from the weighted overall.
+        # Reuses the mid-tone score class so no template change is needed.
+        return {
+            "SCORE_CLASS": _SCORE_CLASS[2],
+            "CATEGORY_NAME": esc(cat["name"]),
+            "SCORE": "N/A",
+            "SCORE_PCT": "0",
+            "CONFIDENCE": esc(cat["confidence"]),
+            "WEIGHT_PCT": str(round(weight * 100)),
+            "WEIGHTED_CONTRIBUTION": "excluded",
+            "RATIONALE": render_rich(cat["rationale"], allow=_RICH_FIELDS["raise_rationale"]),
+        }
     return {
         "SCORE_CLASS": _SCORE_CLASS[score],
         "CATEGORY_NAME": esc(cat["name"]),
@@ -704,7 +717,8 @@ def render_txt(data: dict) -> str:
     out.append(f"  Weighted overall:  {posture['weighted_overall']:.2f} / 5.0"
                f"   ({maturity_label(posture['weighted_overall'])})")
     for c in sorted(posture["categories"], key=lambda c: RAISE_KEYS.index(c["key"])):
-        out.append(f"  {c['name']:<30} {c['score']}/5"
+        score_txt = "N/A" if c["score"] is None else f"{c['score']}/5"
+        out.append(f"  {c['name']:<30} {score_txt}"
                    f"   (confidence: {c['confidence']}, weight: {round(c['weight'] * 100)}%)")
     out.append("")
 

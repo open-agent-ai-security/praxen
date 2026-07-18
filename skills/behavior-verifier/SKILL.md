@@ -617,7 +617,7 @@ Before you commit the numbers: re-check them against the Scoring Model procedure
 
 ### 9.5 Weighted-overall rationale → `raise_posture.weighted_overall` + `raise_posture.weighted_rationale`
 
-Compute the weighted overall: Σ(score × weight) across the six categories, where **Implement Zero Trust has weight 0.25** and the other five have **weight 0.15** each. Round to two decimals. Then write a 2–4 sentence rationale that explains what the number means in posture terms (not the arithmetic) — what the agent does and doesn't have across the framework. Open with the maturity label for `floor(weighted_overall)`:
+Compute the weighted overall: Σ(score × weight) across the **scored** categories, where **Implement Zero Trust has weight 0.25** and the other five have **weight 0.15** each — then, **if any category is N/A (all vectors inapplicable, KB Step B3), divide by the sum of the scored categories' weights** so the N/A category is excluded rather than counted as 0 (with no N/A category the divisor is 1.0 and this is the plain fixed-weight sum). Round to two decimals. Then write a 2–4 sentence rationale that explains what the number means in posture terms (not the arithmetic) — what the agent does and doesn't have across the framework. Open with the maturity label for `floor(weighted_overall)`:
 
 | `floor(weighted_overall)` | Maturity label |
 |---|---|
@@ -693,7 +693,7 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 <9.3 dominant-pattern narrative, 2–4 sentences, single paragraph>
 
 ## raise_posture
-- weighted_overall: <float, 2 decimals — Σ(score × weight)>
+- weighted_overall: <float, 2 decimals — Σ(score × weight) over scored categories, ÷ Σ(their weights) if any category is N/A>
 
 ### weighted_rationale
 <9.5 prose, 2–4 sentences, single paragraph>
@@ -702,12 +702,12 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 For each of the six RAISE categories — in this fixed order: limit_your_domain, balance_your_knowledge_base, implement_zero_trust, manage_your_supply_chain, build_an_ai_red_team, monitor_continuously — record one block. Item starts with `- key:` at depth 0; the remaining fields continue at depth 2 (no bullet). Write `name` and `weight` alongside the score even though the Step 10 script also derives them — writing the weight forces you to rehearse the relative-importance scale (Zero Trust counts double) right next to the score you're assigning, which is an anchor for consistent per-category calibration:
 - key: <one of the six keys>
   name: <display name — Limit Your Domain | Balance Your Knowledge Base | Implement Zero Trust | Manage Your Supply Chain | Build an AI Red Team | Monitor Continuously>
-  score: <0–5>
+  score: <0–5, or N/A — only when every vector's applicability trigger failed (KB Step B3); only the four vector-scored categories may be N/A, never Red Team or Monitor>
   confidence: <High | Medium | Low>
   weight: <0.25 for implement_zero_trust; 0.15 for the other five>
   rationale: <9.4 prose, 1–2 sentences, single line>
 
-(The script overwrites `name` and `weight` from `key` on emit, so a typo in either does not break the JSON — but the LLM rehearsing them out loud per category is the point. Compute `weighted_overall` above as Σ(score × weight) — do not round any per-category product until the final sum, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
+(The script overwrites `name` and `weight` from `key` on emit, so a typo in either does not break the JSON — but the LLM rehearsing them out loud per category is the point. Compute `weighted_overall` above as Σ(score × weight) over the scored categories — divided by Σ(their weights) when any category is N/A — do not round any per-category product until the final result, then round once to two decimals. The Step 11 renderer re-checks this against the per-category scores; a mismatch is a validation failure.)
 
 ## remit_coverage
 ### rules
@@ -897,7 +897,7 @@ Rules for the finding manifest and the JSON it produces:
 
 **Common validation errors — check these before you run the script.** The validator (run by the Step 10 script and again by Step 11) is strict about a few cross-field invariants the script does NOT derive for you:
 
-- **`weighted_overall` doesn't match Σ(score × weight).** The script applies the per-key weight, but you write `weighted_overall` yourself — and it must equal Σ(score × weight) to two decimals. Compute it explicitly from the per-category scores; do not eyeball.
+- **`weighted_overall` doesn't match the weighted formula.** The script applies the per-key weight, but you write `weighted_overall` yourself — and it must equal Σ(score × weight) over the scored categories, divided by Σ(their weights) if any category is N/A, to two decimals. Compute it explicitly from the per-category scores; do not eyeball.
 - **A `finding_id` / `related_findings` / `policy_rule_ids` id that doesn't exist.** Every non-null `rule.finding_id`, every entry in any `related_findings` array, and every id in any `policy_rule_ids` field must be the `id` of a finding (or rule, respectively) actually present in the manifest. No self-references in `related_findings`. The script catches dangling `policy_rule_ids` at parse time; the schema validator catches the rest.
 - **A finding violates a rule whose status says it isn't violated.** Walk every `findings[].policy_rule_ids` and look it up in `remit_coverage.rules[]`: the matching rule's `status` must be `gap` or `partial` — never `verified`, and rarely `vague` (a vague rule is too imprecise to violate by construction) or `enp` (enforcement-not-possible findings shouldn't usually trace to a remit rule). A finding citing a `verified` rule is a logical contradiction and almost always means the rule's status was assessed under one understanding of the code and the finding written under another — re-read the cited line and either downgrade the rule to `partial` (control exists but is bypassable in the case the finding describes) or drop the rule link from the finding (set `policy_rule_ids` to `null` and explain the connection in the finding's `description`).
 - **A `partial` rule linked to an unrelated finding.** Every `partial` rule's `finding_id` must point at the finding describing the *specific gap that makes this rule incomplete* — not just any finding in the vicinity. A `partial` rule linked to an unrelated finding (e.g. a logging-gap finding bolted onto a trust-rule's `partial` slot because both happened to land in the same scan) produces a misleading coverage picture: the audit table claims the rule is partially audited when it isn't audited at all. Walk every `partial` rule and confirm the linked finding's content actually describes the rule's gap; if it doesn't, either set the rule to the correct status (`gap` if no finding exists, `verified` if the gap was a misread) or correct the link to the finding that does describe the gap.

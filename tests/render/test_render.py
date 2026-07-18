@@ -677,6 +677,59 @@ def main():
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
 
+    # 8. N/A (null-score) categories — KB Step B3 all-N/A exclusion.
+    #    A vector-scored category may be null (excluded, weights renormalized);
+    #    presence-scored categories (Red Team, Monitor) may not; the declared
+    #    weighted_overall must use the renormalized formula.
+    na_doc = load_json(FIXTURE)
+    for c in na_doc["raise_posture"]["categories"]:
+        if c["key"] == "limit_your_domain":
+            c["score"] = None
+    scored = [c for c in na_doc["raise_posture"]["categories"] if c["score"] is not None]
+    renorm = sum(c["score"] * c["weight"] for c in scored) / sum(c["weight"] for c in scored)
+    na_doc["raise_posture"]["weighted_overall"] = round(renorm, 2)
+    try:
+        schema.validate(na_doc)
+        check("N/A: null score on a vector-scored category + renormalized weighted_overall validates", True)
+    except schema.SchemaError as e:
+        check("N/A: null score on a vector-scored category + renormalized weighted_overall validates", False, str(e))
+    na_path = os.path.join(tmp, "na.json")
+    with open(na_path, "w", encoding="utf-8") as fh:
+        json.dump(na_doc, fh)
+    r = run_render(["--findings", na_path, "--template", TEMPLATE,
+                    "--out-html", os.path.join(tmp, "na.html"),
+                    "--out-txt", os.path.join(tmp, "na.txt")])
+    check("N/A: render exits 0 on an N/A-category document", r.returncode == 0, r.stderr.strip())
+    if r.returncode == 0:
+        na_txt = read_bytes(os.path.join(tmp, "na.txt")).decode("utf-8")
+        check("N/A: TXT shows N/A for the excluded category",
+              any("Limit Your Domain" in ln and "N/A" in ln for ln in na_txt.splitlines()))
+        na_html = read_bytes(os.path.join(tmp, "na.html")).decode("utf-8")
+        check("N/A: HTML shows N/A and the excluded contribution", "N/A" in na_html and "excluded" in na_html)
+
+    bad_mc = load_json(FIXTURE)
+    for c in bad_mc["raise_posture"]["categories"]:
+        if c["key"] == "monitor_continuously":
+            c["score"] = None
+    try:
+        schema.validate(bad_mc)
+        check("N/A: null score on monitor_continuously (presence-scored) is rejected", False,
+              "validated but should have failed")
+    except schema.SchemaError:
+        check("N/A: null score on monitor_continuously (presence-scored) is rejected", True)
+
+    bad_wo = load_json(FIXTURE)
+    for c in bad_wo["raise_posture"]["categories"]:
+        if c["key"] == "limit_your_domain":
+            c["score"] = None
+    bad_wo["raise_posture"]["weighted_overall"] = round(min(5.0, renorm + 0.3), 2)
+    try:
+        schema.validate(bad_wo)
+        check("N/A: non-renormalized weighted_overall with an N/A category is rejected", False,
+              "validated but should have failed")
+    except schema.SchemaError:
+        check("N/A: non-renormalized weighted_overall with an N/A category is rejected", True)
+
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0
 

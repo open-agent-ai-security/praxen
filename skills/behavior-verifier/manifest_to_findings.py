@@ -66,14 +66,15 @@ class ManifestError(ValueError):
 
 def _is_null_sentinel(v):
     """True if `v` is an LLM-written sentinel for "no value" — an empty
-    string, or the strings "null"/"none" in any case. The parser already
+    string, or the strings "null"/"none"/"n/a" in any case. The parser already
     converts the literal `null` (unquoted) to Python None at coercion time;
     this helper handles the cases where the LLM wrote the string `"null"`,
-    `"none"`, or left the value empty when a real id/list was expected."""
+    `"none"`, `"N/A"` (the KB's spelling for an excluded category score), or
+    left the value empty when a real id/list was expected."""
     if not isinstance(v, str):
         return False
     s = v.strip()
-    return s == "" or s.lower() in ("null", "none")
+    return s == "" or s.lower() in ("null", "none", "n/a")
 
 
 def _load_praxen_version():
@@ -132,8 +133,8 @@ _RAISE_POSTURE_FIELD_TYPES = {
 _RAISE_CATEGORY_FIELD_TYPES = {
     "key": "str",
     "name": "str",
-    "score": "int",
-    "confidence": "str",
+    "score": "int_or_none",   # null/N/A = category excluded (KB Step B3 all-N/A);
+    "confidence": "str",       # schema.py enforces which keys may be N/A
     "weight": "float",
     "rationale": "str",
 }
