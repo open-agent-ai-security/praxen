@@ -954,7 +954,7 @@ That is the end of the analysis.
 
 **Do not summarize — analyze.** The operator already knows the agent exists. Your job is to evaluate it against its remit and the RAISE framework and produce findings specific enough to act on.
 
-**Score conservatively.** If you cannot verify a control, do not give credit for it. A system with no evidence of adversarial testing scores 0 in "Build an AI Red Team" regardless of what the policy document says will happen.
+**Score conservatively.** If you cannot verify a control, do not give credit for it. A system with no adversarial-testing evidence of any kind scores 0 in "Build an AI Red Team" — but the score always comes from the KB's Step E ladder (a threat-model doc or red-team how-to alone is rung 1, not 0), never from what a policy document merely promises will happen.
 
 **Every finding needs evidence.** If you cannot cite a specific file path, line, pattern, or observed absence, the finding should not exist. Inferred findings are allowed — label them `[Inferred]` and lower the confidence.
 
