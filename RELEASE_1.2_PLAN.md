@@ -241,6 +241,16 @@ targets *before* touching the rest of the suite.
 - Median-of-3 × 12 targets on the final stack (new emission flow, new schema,
   new scoring guidance). **Reference model pinned: Opus 4.8** — a model change
   is its own future re-baseline, never folded into this one.
+- **Certification mode decided (Steve, 2026-07-18, from the v4 gate-run data):
+  MEDIAN-OF-3 is Praxen's score-certification protocol.** The stage-4-r2 gate
+  run showed single scans wobble ±1 cell on a handful of judgment rungs while
+  median-of-3 medians are stable and land on the hand-score anchors (deepagents
+  3.00/2.85, uagents 2.00/1.85, salesforce 1.85/2.00, all ± a cell). So: a
+  *certified* Praxen score = the median of 3 independent scans (the baseline is
+  already median-of-3 by construction); a single scan is the fast dev-loop mode
+  and is labeled as such. The stability gate for the v5 boundary fixes is
+  therefore **median stability + σ improvement on the re-run targets**, not a
+  single-run-σ bar alone.
 - **Tagging pass riding the freeze** *(added 2026-07-16 — dispositions from
   the LLM08 diagnosis)*:
   - **#169 acceptance:** the craftbot vector-store finding carries LLM08 in
