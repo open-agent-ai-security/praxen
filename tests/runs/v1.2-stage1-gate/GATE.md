@@ -5,7 +5,7 @@
 
 # Stage-1 gate — Praxen 1.2 (reliability + decomposition), 2026-07-17
 
-Validates the Stage-1 changes (`RELEASE_1.2_PLAN.md` Stage 1): Step-4 evidence
+Validates the Stage-1 changes (`plans/RELEASE_1.2_PLAN.md` Stage 1): Step-4 evidence
 checkpoint (#65), evidence-completeness invariant, Step-8.5 themes outline (#29),
 interleaved emission (#33), `--validate-manifest` (#65), and the follow-up
 compound-contributor decidability rule. Gate criteria: **zero watchdog deaths; no
