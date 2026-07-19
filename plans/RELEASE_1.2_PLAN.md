@@ -227,7 +227,7 @@ Ordered by the clean run's evidence — severity anchoring first:
   salesforce** *(updated 2026-07-16 from the **Stage-0 baseline** — a
   dry-run of the Stage-2.5 mechanics on the current v1.1 stack executed
   before any 1.2 work, flip-check four + HelperBot control × 3 runs each,
-  committed as [`tests/runs/v1.2-stage0-baseline/`](tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
+  committed as [`tests/runs/v1.2-stage0-baseline/`](../tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
   uAgents replaced openai-cs because it now carries the largest anchor
   dispute — 3 Criticals in every fresh run vs the frozen 1)*. The recorded inclinations
   become the fixed reference points the rubric's *center* is validated
