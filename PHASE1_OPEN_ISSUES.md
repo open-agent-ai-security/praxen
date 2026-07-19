@@ -5,7 +5,7 @@
 
 # Phase 1 — Open Issues (needs human input, not blocking)
 
-> Companion to `RELEASE_1.0.2_BASELINE_REFRESH.md`. Tracks decisions/confirmations that require a human but do **not** block getting the expanded baseline in front of you to review. Phase 1 = **add the new targets (CraftBot, uAgents, Agentforce), run them clean, freeze provisional exemplars**.
+> Companion to `plans/RELEASE_1.0.2_BASELINE_REFRESH.md`. Tracks decisions/confirmations that require a human but do **not** block getting the expanded baseline in front of you to review. Phase 1 = **add the new targets (CraftBot, uAgents, Agentforce), run them clean, freeze provisional exemplars**.
 
 ## Status — Phase 1 scans complete ✅
 All three targets scanned on the 1.0.x skill (Opus 4.8), frozen into `tests/baselines/v1.0.2-claude48/`, and **passing every gate** (`python3 tests/render/test_render.py` → **352 passed, 0 failed** — schema-valid, HTML/TXT byte-render clean, every rule quoted verbatim from its remit).

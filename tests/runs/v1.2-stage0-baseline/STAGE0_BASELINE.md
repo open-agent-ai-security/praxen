@@ -63,7 +63,7 @@ Consistent disagreement with the FROZEN anchor (runs agree with each other, not 
 (a) genuine run-to-run churn on nameable boundary findings (salesforce, craftbot),
 which #48's anchors fix; (b) frozen-anchor calibration disputes (deepagents, uAgents),
 which only the human-anchored reference resolves. The anchor was not hand-edited;
-(b) routes into the hand-score questionnaire (RELEASE_1.2_PLAN.md, Stage 3).
+(b) routes into the hand-score questionnaire (plans/RELEASE_1.2_PLAN.md, Stage 3).
 
 ## Gate realism verdict (the numbers 1.2 commits to)
 - **|drift| ≤ 0.2 median-of-3: realistic** — already met pre-#48 (max 0.15).
