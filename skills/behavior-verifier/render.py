@@ -40,6 +40,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 import textwrap
 from datetime import datetime
 
@@ -771,8 +772,20 @@ def render_txt(data: dict) -> str:
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
 def _write(path: str, content: str) -> None:
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(content)
+    out_dir = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".praxen-render-", suffix=".tmp", dir=out_dir, text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _load_json(path: str):
@@ -920,11 +933,17 @@ def main(argv=None) -> int:
             html_out = render_html(_read_template(args.template), data)
         except RenderError as e:
             sys.exit(f"render.py: HTML render error — {e}")
-        _write(args.out_html, html_out)
+        try:
+            _write(args.out_html, html_out)
+        except OSError as e:
+            sys.exit(f"render.py: cannot write HTML report {args.out_html}: {e}")
         print(f"render.py: wrote {args.out_html} ({summary})")
 
     if args.out_txt:
-        _write(args.out_txt, render_txt(data))
+        try:
+            _write(args.out_txt, render_txt(data))
+        except OSError as e:
+            sys.exit(f"render.py: cannot write TXT report {args.out_txt}: {e}")
         print(f"render.py: wrote {args.out_txt} ({summary})")
 
     return 0

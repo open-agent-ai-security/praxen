@@ -273,6 +273,13 @@ def main():
     out_txt_only = os.path.join(tmp, "only.txt")
     r = run_render(["--findings", FIXTURE, "--out-txt", out_txt_only])
     check("--out-txt without --out-html works", r.returncode == 0 and os.path.exists(out_txt_only))
+    atomic_path = os.path.join(tmp, "atomic.txt")
+    render._write(atomic_path, "first\n")
+    render._write(atomic_path, "second\n")
+    leftovers = [name for name in os.listdir(tmp) if name.startswith(".praxen-render-")]
+    check("report writes replace atomically and clean temporary files",
+          read_text(atomic_path) == "second\n" and not leftovers,
+          f"leftover temp files: {leftovers}")
 
     # 4b. cited code that *looks* like a template placeholder must not corrupt the
     #     render or trip the "unsubstituted placeholder" check.
@@ -516,6 +523,12 @@ def main():
     negative("rejects a legacy bare-list findings file", None)
     negative("rejects a missing required field (behavior_summary)",
              lambda d: d.pop("behavior_summary"))
+    negative("rejects an impossible scan_date even when it matches YYYY-MM-DD",
+             lambda d: d["scan"].__setitem__("scan_date", "2026-02-31"))
+    negative("rejects scan_timestamp without an explicit timezone",
+             lambda d: d["scan"].__setitem__("scan_timestamp", "2026-05-03T04:39:06"))
+    negative("rejects an impossible scan_timestamp even when it matches the ISO shape",
+             lambda d: d["scan"].__setitem__("scan_timestamp", "2026-02-31T04:39:06Z"))
     negative("rejects a footer/severity count mismatch",
              lambda d: d["footer"]["severity_counts"].__setitem__("critical", 99))
     negative("rejects a bad severity enum",

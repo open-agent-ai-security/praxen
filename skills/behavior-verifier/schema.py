@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import datetime
 
 # ── version ──────────────────────────────────────────────────────────────────
 # The exact schema version this validator (and the bundled renderer) understands.
@@ -65,6 +66,10 @@ LOG_STATUSES = ["active", "inferred"]
 ESCALATIONS = ["alert", "log_only"]
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIMESTAMP_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
+    r"(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
 # Finding IDs are PRAX-YYYY-MM-DD-NNN — a three-digit sequence, so the
 # implicit ceiling is 999 findings in a single scan. No real target has come
 # close; if one ever does, widen the sequence here and in findings.schema.json.
@@ -198,7 +203,20 @@ def _validate_scan(data):
     sd = _nonempty_str(scan, "scan_date", "$.scan")
     if not _DATE_RE.match(sd):
         _err("$.scan.scan_date", f"must be YYYY-MM-DD; got {sd!r}")
-    _nonempty_str(scan, "scan_timestamp", "$.scan")
+    try:
+        datetime.strptime(sd, "%Y-%m-%d")
+    except ValueError as e:
+        _err("$.scan.scan_date", f"must be a real calendar date; got {sd!r} ({e})")
+    ts = _nonempty_str(scan, "scan_timestamp", "$.scan")
+    if not _TIMESTAMP_RE.match(ts):
+        _err("$.scan.scan_timestamp",
+             f"must be an ISO-8601 timestamp with explicit timezone; got {ts!r}")
+    norm = ts[:-1] + "+00:00" if ts.endswith("Z") else ts
+    try:
+        datetime.fromisoformat(norm)
+    except ValueError as e:
+        _err("$.scan.scan_timestamp",
+             f"must be a real ISO-8601 timestamp with explicit timezone; got {ts!r} ({e})")
     _nonempty_str(scan, "workspace", "$.scan")
     _int(scan, "artifact_count", "$.scan", minimum=0)
 
