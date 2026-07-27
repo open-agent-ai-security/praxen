@@ -23,6 +23,19 @@
 > deepagents ×3 subject-declaration check, then productization. The v6.x
 > corpus remains parked research (see the parked record below).
 >
+> **Reference-model note (Steve, 2026-07-28):** Opus 5 has shipped; *"we may
+> need to eval updating that baseline"*. Verified the `opus` subagent alias
+> still resolves to `claude-opus-4-8` (probe, 2026-07-28) — the RC regression
+> run is uncontaminated. Standing rule holds: a reference-model change is its
+> own re-baseline, never folded into another. Default sequence: (a) infra
+> regression on 4.8, (b) OWASP-2026 KB refresh + freeze on 4.8, (c) separate
+> Opus-5 lean characterization (method: the 4.8-vs-4.7 comparison — suite on
+> the new model vs frozen exemplars, measure systematic lean, then decide
+> adoption/bands). Fold-into-one-freeze is Steve's call to make explicitly if
+> the two-freeze cost is unacceptable. Operational risk to watch: the alias
+> will eventually flip and the subagent API offers no version-pinned Opus;
+> re-verify the alias before every future suite run.
+>
 > ## ⏸ prior parked record (2026-07-18) — kept for context
 >
 > **Where we are.** The scoring-stability arc ran four corpus generations in
