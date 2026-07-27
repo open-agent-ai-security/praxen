@@ -5,7 +5,25 @@
 
 # Praxen 1.2 — Harness Reliability & Scoring Stability
 
-> ## ⏸ STATUS: PARKED (2026-07-18, Steve) — resume-from-here record
+> ## ▶ STATUS: RESUMED (2026-07-28, Steve) — active plan
+>
+> Steve's direction (2026-07-28, quoted): core-3 infra is *"solid, but not
+> sufficient for a 1.2 release. It requires it for compatibility statements,
+> but is uninspired for marketing."* Approved sequence: **revert scoring to
+> shipped-state (regression-gated) → validate subject-declaration on that
+> stack (3 scans) → productize it (scan-instructions guidance, template
+> capability-clarity pass, docs paragraph, known-limits section)** — *"Yes to
+> this. But stop short of 'shipping'. I still want a headline. The 2026 OWASP
+> LLM list is about to ship. Once we get the infra stable again, we'll do a
+> pass over the OWASP KB and update it as the headline for 1.2."*
+>
+> Progress: scoring reverted to pre-#48 state (`9ebbe66` text) in `7b53ccb`,
+> N/A plumbing retained (inert, forward-compat); smoke suites 237/0 green.
+> Next: Full Suite Run vs `v1.1-claude48` (theme-coverage gate), then the
+> deepagents ×3 subject-declaration check, then productization. The v6.x
+> corpus remains parked research (see the parked record below).
+>
+> ## ⏸ prior parked record (2026-07-18) — kept for context
 >
 > **Where we are.** The scoring-stability arc ran four corpus generations in
 > one day (v4 decidable procedure → v5 default-directions → **v6 fresh-cloth
