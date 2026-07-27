@@ -64,6 +64,19 @@ To be clear about the guarantees:
 - **The schema is fixed** — every report has the same sections, the same six RAISE categories, the same OWASP tag vocabulary.
 - **Real findings reproduce** — a genuine Critical does not vanish on the next run. Disappearing material findings or dropped Critical themes are *not* normal variance; treat them as something to investigate.
 
+### One extra source of variance: an ambiguous subject
+
+If the workspace holds more than one agent's worth of code — a monorepo, an
+example inside a framework, a two-repository agent — and you *don't* declare
+which part is the subject, two runs can legitimately disagree about **what they
+scanned** (one grades the whole tree, another just your package), and that moves
+the score far more than the per-category judgment wobble above. This is
+avoidable, not inherent: declare the subject with a `SCAN_INSTRUCTIONS.md`
+(see [Writing Remits → Declaring what to scan](writing-remits.md#declaring-what-to-scan-monorepos-and-multi-agent-trees)).
+With the subject declared, the *scope* is stable run-to-run; the residual is
+just the ordinary category variance. Declaring the subject fixes *which agent
+gets scanned* — it does not make the score itself deterministic.
+
 ## Next steps
 
 - [Interpreting Reports](interpreting-reports.md) — what each section means and how to read the maturity score

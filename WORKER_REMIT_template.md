@@ -12,6 +12,17 @@ Customize this template for the specific agent before running an analysis.
 
 **The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
 
+**State capabilities the agent does NOT have as plainly as the ones it does.** A
+declarative non-capability line — "performs no LLM inference; assembles no model
+context", "runs no shell/exec", "reads no external network content" — is
+load-bearing evidence: it lets the scan mark the corresponding risk vectors
+*inapplicable* rather than *unprotected*, which is the correct reading for a
+worker that genuinely lacks the surface. Bury it, and the scan may score a
+missing control against an agent that never had the exposure. (This is *what the
+agent is* — a job-description fact. It is distinct from *what to scan for this
+run*, which belongs in a scan-time `SCAN_INSTRUCTIONS.md`, not here — see
+`docs/writing-remits.md`.)
+
 ---
 
 ## Identity
@@ -22,7 +33,7 @@ Customize this template for the specific agent before running an analysis.
 | Agent Key / ID | |
 | Owner / Operator | |
 | Deployment Environment | |
-| Primary Model | |
+| Primary Model | *(state "None — performs no LLM inference" if the worker runs no model itself)* |
 | Secondary Models | |
 | Remit Version | |
 | Last Updated | |

@@ -151,6 +151,8 @@ If they want to create one, read `WORKER_REMIT_template.md` from the Praxen pack
 
 If Praxen was invoked non-interactively (e.g., `claude -p`) and (1) does not apply, halt with a clear error rather than stalling on a prompt that will never be answered.
 
+**Scan instructions (optional — scan-time scope).** Search for a `SCAN_INSTRUCTIONS.md` in the current directory (same search precedence as the remit: exact name first, then `SCAN_INSTRUCTIONS*.md`). This file is **operator input declaring *what* to scan for this invocation** — it is distinct from the Worker Remit, which declares what the subject is expected to *do*. It typically names: the subject's paths within a larger tree, bundled-but-not-subject code to exclude, and whether tree-wide hygiene sweeps still cover the whole workspace. If present, read it and carry its scope into Step 4; if absent, scan the whole resolved workspace as the subject (no scope narrowing). A `SCAN_INSTRUCTIONS.md` never changes *how* controls are scored — only *which* code is evaluated as the subject.
+
 **Agent name.** Same priority: invocation message > infer from workspace directory name > ask. If the name contains spaces or capitals, compute a slug: lowercase, replace whitespace and punctuation with hyphens, strip anything not `[a-z0-9-]`. This slug is used in output filenames and in the `scan.agent_slug` field of the findings JSON.
 
 **Output directory.** Use `./reports/` relative to the current working directory. Create it if it doesn't exist:
@@ -203,6 +205,8 @@ After completing Step 4, if any MCP server configuration was found in the worksp
 ## Step 4 — Discover and Read the Workspace
 
 Using the workspace path from Step 1, discover all artifacts in the agent's workspace. Cast a wide net — you are looking for everything the agent uses to operate.
+
+**Apply the scan-scope from Step 1's `SCAN_INSTRUCTIONS.md`, if one was found.** When scope is declared, the **subject** is the code the instructions name; bundled-but-not-subject code (other packages in a monorepo, a framework the subject only *tools for*, unrelated example agents) is read for context but its capabilities, controls, and tests are **not** evaluated as the subject's — so it neither raises findings against the subject nor earns the subject credit. Two carve-outs the instructions will usually state, and which hold even when they don't: (a) **tree-wide hygiene sweeps** — committed secrets and dependency pinning — still cover the entire workspace, because a leaked key anywhere is a real exposure; (b) code the subject actually imports or invokes at runtime **is** the subject, wherever it lives. If the subject spans **multiple source roots** declared together (e.g., a paired agent + desktop client), treat all named roots as one combined subject. With no `SCAN_INSTRUCTIONS.md`, the whole resolved workspace is the subject.
 
 **Artifact types to seek:**
 

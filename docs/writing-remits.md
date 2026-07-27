@@ -115,6 +115,47 @@ See [Challenging and Revising Findings](challenging-findings.md) for guidance on
 - **Forgetting forbidden domains of work.** Most remits do well at saying what the agent should do, less well at what it must never do. Both are necessary — a wide-open scope produces large compound findings.
 - **Writing restrictions for under-documented capabilities.** If documentation names a feature without scoping it — *"supports SSH tunnel mode"*, *"executes shell commands"* — don't write a fabricated MUST NOT based on an assumed scope (a prohibition that contradicts the implementation produces a Critical finding that is a remit error, not a code vulnerability). The skill instead states the *conservative security intent* the feature implies — e.g. *"an SSH tunnel MUST bind loopback and MUST NOT expose a service publicly"* — and lets the scan check it; whether the feature should be authorized *at all* goes in the Open Questions list, not as a guessed clause.
 
+## Declaring what to scan (monorepos and multi-agent trees)
+
+The remit says what the agent *does*. It does **not** say *which files* Praxen
+should treat as that agent — that is a separate, scan-time question, and it
+matters whenever the workspace holds more than one agent's worth of code:
+
+- a **monorepo** where your agent is one package among many (the others are
+  libraries it uses, or unrelated tools);
+- an **example agent shipped inside a framework** (the framework is context,
+  not your agent);
+- an agent that **spans two repositories** (e.g. a service plus its desktop
+  client) that must be analyzed together.
+
+Point Praxen at the wrong scope and it will either blame your agent for a
+sibling package's flaws or credit it for a framework's controls. To make the
+subject explicit, put a **`SCAN_INSTRUCTIONS.md`** in the scan's working
+directory (alongside `WORKER_REMIT.md`). Praxen reads it in Step 1 and honors it
+in Step 4. A minimal one:
+
+```markdown
+# SCAN INSTRUCTIONS
+
+| Field | Value |
+|-------|-------|
+| Subject | `libs/my-agent/**` — the agent this remit describes |
+| Not the subject | Other packages in this repo (libraries it tools for) |
+```
+
+Two things always hold, whether or not you state them: **hygiene sweeps**
+(committed secrets, dependency pinning) still cover the *entire* tree — a leaked
+key anywhere is a real exposure — and code your agent actually imports or runs
+**is** part of the subject wherever it lives. For a subject that spans multiple
+source roots, name all of them and supply all of them to the scan; Praxen treats
+them as one combined agent. With no `SCAN_INSTRUCTIONS.md`, the whole workspace
+is the subject. (The regression suite carries one per multi-scope target under
+`tests/scan_instructions/` — those double as worked examples.)
+
+**Keep it out of the remit.** Scope is about *this scan run*, not about what the
+agent is; mixing the two is what makes a policy document drift. The remit
+describes the agent; `SCAN_INSTRUCTIONS.md` points at it.
+
 ## Self-authored remits
 
 If the agent is asked to write or update its own remit, treat that with caution. Praxen will surface a finding when the `Updated By` field of the remit names the agent itself rather than the operator. The remit is supposed to be operator-authored — it's the thing the agent is constrained against, so the agent should not be the one defining its own constraints.
