@@ -49,11 +49,17 @@ re-introducing detection variance. That method has a hard limit:
 > produced them; when new guidance needs evidence the original scan was never
 > told to record, re-tagging cannot add it.
 
-Case study: the 1.1 re-tag could not apply the sharpened LLM08 guidance to
+Case study: the 1.1 re-tag could not apply the sharpened vector-and-embedding
+guidance (LLM08 in the 2025 numbering these baselines use; LLM09 in 2026) to
 craftbot's agent-writable vector store, because the frozen record never captured
-the ChromaDB evidence — the LLM08 column reads zero in `v1.1-claude48/` for that
+the ChromaDB evidence — that LLM08 column reads zero in `v1.1-claude48/` for that
 reason, and the fix lands via the v1.2 re-scan freeze. See
 [#169](https://github.com/open-agent-ai-security/praxen/issues/169).
+
+**Numbering note:** baselines frozen before v1.2 tag findings with OWASP LLM
+Top 10 **2025** numbering; v1.2 and later use **2026** numbering, which reordered
+the list and renamed one entry. Diff across that boundary by category **name**,
+never by code — the map is in [docs/owasp.md](../../docs/owasp.md#2025--2026-what-changed).
 
 `v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 

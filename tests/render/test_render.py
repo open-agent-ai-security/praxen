@@ -202,7 +202,7 @@ def main():
     check("#111 padded em-dash collapses to single spaces",
           _canon("ASI05  —  Unexpected Code Execution (RCE)") == "ASI05 — Unexpected Code Execution (RCE)")
     check("#111 already-canonical label is unchanged (goldens stay byte-stable)",
-          _canon("LLM06 — Excessive Agency") == "LLM06 — Excessive Agency")
+          _canon("LLM03 — Excessive Agency") == "LLM03 — Excessive Agency")
     check("#111 lowercase code canonicalises (case-insensitive) and uppercases the code",
           _canon("llm01 - Prompt Injection") == "LLM01 — Prompt Injection")
     check("#111 name-internal hyphen preserved (only the separator is rewritten)",

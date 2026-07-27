@@ -69,7 +69,7 @@ The methodology adapts. Categories the input doesn't cover are scored at lower c
 
 Every finding Praxen produces is classified against four industry-standard frameworks simultaneously:
 
-- **OWASP Top 10 for LLM Applications 2025** — `LLM01`–`LLM10` tags
+- **OWASP Top 10 for LLM Applications 2026** — `LLM01`–`LLM10` tags
 - **OWASP Top 10 for Agentic AI Applications 2026** — `ASI01`–`ASI10` tags
 - OWASP's **A Practical Guide for Secure MCP Server Development 2026** — applied when MCP configuration is found
 - **RAISE Framework** — six-category 0–5 maturity score; see [RAISE](RAISE.md)

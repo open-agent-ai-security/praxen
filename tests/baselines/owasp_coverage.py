@@ -91,17 +91,20 @@ TARGETS = [
      "Salesforce Agentforce customer-service agent (Knowledge-article RAG)"),
 ]
 
+# OWASP LLM Top 10 2026 numbering. Baseline JSONs frozen before v1.2 carry the
+# 2025 numbering — when reading those, compare categories by NAME, never by code
+# (see docs/owasp.md "2025 → 2026: what changed" for the map).
 LLM_TITLES = [
     ("LLM01", "Prompt Injection"),
     ("LLM02", "Sensitive Information Disclosure"),
-    ("LLM03", "Supply Chain"),
-    ("LLM04", "Data and Model Poisoning"),
-    ("LLM05", "Improper Output Handling"),
-    ("LLM06", "Excessive Agency"),
-    ("LLM07", "System Prompt Leakage"),
-    ("LLM08", "Vector and Embedding Weaknesses"),
-    ("LLM09", "Misinformation"),
-    ("LLM10", "Unbounded Consumption"),
+    ("LLM03", "Excessive Agency"),
+    ("LLM04", "Supply Chain"),
+    ("LLM05", "Data and Model Poisoning"),
+    ("LLM06", "Unbounded Consumption"),
+    ("LLM07", "Misinformation"),
+    ("LLM08", "Hidden Context Exposure"),
+    ("LLM09", "Vector and Embedding Weaknesses"),
+    ("LLM10", "Improper Output Handling"),
 ]
 ASI_TITLES = [
     ("ASI01", "Agent Goal Hijack"),

@@ -69,7 +69,7 @@ Tag every claim before you make it. Never skip this.
 
 Absence of a control in a production system is not a gap in documentation — it is a finding. Score accordingly.
 
-**Evidence must cite every mechanism in the finding's causal chain.** When a finding is a chain — untrusted input reaches a store, a scheduler re-invokes a tool, a memory file feeds back into the prompt — cite *each* mechanism the chain runs through, not just the entry point and the outcome. If the chain passes through a vector store, a queue, a scheduler, an embedding index, a subprocess, or any named subsystem, that surface gets its own evidence line **even when a different frame dominates the finding's summary**. The test: **the finding record must be closed under classification** — a reader (or a re-classification pass) who has only the finding's evidence, not the codebase, must be able to reach the correct taxonomy from the record alone. A finding whose summary leads with "persistence via writable identity file" but whose chain actually runs through an agent-writable vector store must cite that store, or the record silently loses the classification that depends on it (this is exactly how an LLM08 vector-store finding came to be recorded with no vector-store evidence — see the 1.1 → 1.2 LLM08 lesson). Dropping a mid-chain mechanism because another frame reads as "the point" is the failure mode; carry them all.
+**Evidence must cite every mechanism in the finding's causal chain.** When a finding is a chain — untrusted input reaches a store, a scheduler re-invokes a tool, a memory file feeds back into the prompt — cite *each* mechanism the chain runs through, not just the entry point and the outcome. If the chain passes through a vector store, a queue, a scheduler, an embedding index, a subprocess, or any named subsystem, that surface gets its own evidence line **even when a different frame dominates the finding's summary**. The test: **the finding record must be closed under classification** — a reader (or a re-classification pass) who has only the finding's evidence, not the codebase, must be able to reach the correct taxonomy from the record alone. A finding whose summary leads with "persistence via writable identity file" but whose chain actually runs through an agent-writable vector store must cite that store, or the record silently loses the classification that depends on it (this is exactly how a vector-and-embedding finding came to be recorded with no vector-store evidence — see the 1.1 → 1.2 vector-store re-tag lesson). Dropping a mid-chain mechanism because another frame reads as "the point" is the failure mode; carry them all.
 
 ---
 
@@ -875,7 +875,7 @@ Rules for the finding manifest and the JSON it produces:
   - **`evidence`** — at most two cited spans per finding. If you genuinely need three, you have two findings, not one.
   - **`recommended_actions`** — at most two items, each ≤ two sentences. A long fix-list is a redesign discussion, not a recommendation.
   Long prose isn't more rigorous — it's just harder for the operator to triage.
-- **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Unexpected Code Execution (RCE)`, not `ASI05`. The exact format is `<CODE> — <Name>`: the code (`LLM01`, `ASI05`), a space, an **em dash** (`—`, not a hyphen `-`, not an en dash `–`), a space, then the canonical name exactly as written in the KB. For an **MCP-checklist finding** — one produced by Step 6's MCP Server Evaluation against `knowledge/KB_MCP_SECURITY.md`'s minimum-bar checklist — add `{ "kind": "mcp", "label": "<the MCP checklist item the finding violates>" }`. **A finding whose primary classification is a different pattern but happens to involve MCP-shaped evidence does NOT carry the `mcp` tag** — e.g. an `LLM03 — Supply Chain` finding about an `npx -y @some/mcp-server` install lacking a version pin is a supply-chain finding; an `LLM06 — Excessive Agency` finding about a write-without-approval tool that happens to be exposed through MCP is an agency finding. Their evidence makes the MCP context clear, and their OWASP / RAISE tags carry the primary classification. Attach `kind=mcp` *only* when the finding is itself the violation of a specific MCP-checklist item from the KB.
+- **`tags`** always includes the RAISE category as `{ "kind": "raise", "label": "<display name>" }`. Add `{ "kind": "owasp_llm", "label": "..." }` whenever `owasp_llm` is non-null and `{ "kind": "owasp_agentic", "label": "..." }` whenever `owasp_agentic` is non-null. Tag labels carry the **full** name, never just the code — `LLM01 — Prompt Injection`, not `LLM01`; `ASI05 — Unexpected Code Execution (RCE)`, not `ASI05`. The exact format is `<CODE> — <Name>`: the code (`LLM01`, `ASI05`), a space, an **em dash** (`—`, not a hyphen `-`, not an en dash `–`), a space, then the canonical name exactly as written in the KB. For an **MCP-checklist finding** — one produced by Step 6's MCP Server Evaluation against `knowledge/KB_MCP_SECURITY.md`'s minimum-bar checklist — add `{ "kind": "mcp", "label": "<the MCP checklist item the finding violates>" }`. **A finding whose primary classification is a different pattern but happens to involve MCP-shaped evidence does NOT carry the `mcp` tag** — e.g. an `LLM04 — Supply Chain` finding about an `npx -y @some/mcp-server` install lacking a version pin is a supply-chain finding; an `LLM03 — Excessive Agency` finding about a write-without-approval tool that happens to be exposed through MCP is an agency finding. Their evidence makes the MCP context clear, and their OWASP / RAISE tags carry the primary classification. Attach `kind=mcp` *only* when the finding is itself the violation of a specific MCP-checklist item from the KB.
 
   **Quick-reference labels (copy-paste verbatim).** The KB files (`knowledge/KB_LLM_TOP10.md`, `knowledge/KB_AGENTIC_TOP10.md`) remain authoritative; this table is a copy-paste aid so the labels don't drift across findings.
 
@@ -883,14 +883,14 @@ Rules for the finding manifest and the JSON it produces:
   |---|---|
   | LLM01 | `LLM01 — Prompt Injection` |
   | LLM02 | `LLM02 — Sensitive Information Disclosure` |
-  | LLM03 | `LLM03 — Supply Chain` |
-  | LLM04 | `LLM04 — Data and Model Poisoning` |
-  | LLM05 | `LLM05 — Improper Output Handling` |
-  | LLM06 | `LLM06 — Excessive Agency` |
-  | LLM07 | `LLM07 — System Prompt Leakage` |
-  | LLM08 | `LLM08 — Vector and Embedding Weaknesses` |
-  | LLM09 | `LLM09 — Misinformation` |
-  | LLM10 | `LLM10 — Unbounded Consumption` |
+  | LLM03 | `LLM03 — Excessive Agency` |
+  | LLM04 | `LLM04 — Supply Chain` |
+  | LLM05 | `LLM05 — Data and Model Poisoning` |
+  | LLM06 | `LLM06 — Unbounded Consumption` |
+  | LLM07 | `LLM07 — Misinformation` |
+  | LLM08 | `LLM08 — Hidden Context Exposure` |
+  | LLM09 | `LLM09 — Vector and Embedding Weaknesses` |
+  | LLM10 | `LLM10 — Improper Output Handling` |
   | ASI01 | `ASI01 — Agent Goal Hijack` |
   | ASI02 | `ASI02 — Tool Misuse and Exploitation` |
   | ASI03 | `ASI03 — Identity and Privilege Abuse` |

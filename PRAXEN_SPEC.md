@@ -5,7 +5,7 @@
 
 # Praxen — Specification
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** Public release (1.0 GA)
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -395,7 +395,7 @@ Each analysis produces a self-contained HTML report from a canonical template (`
 6. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags (each a link to that entry in the framework docs), quoted policy rule, evidence block, and recommended action
 7. **What's Working Well** — verified positive controls
 8. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
-9. **OWASP LLM Top 10 (2025) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
+9. **OWASP LLM Top 10 (2026) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
 10. **OWASP Agentic Top 10 (2026) Coverage** — mirror of #9, driven by `owasp_agentic` (ASI01–ASI10).
 11. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
 12. **Footer** — navy band mirroring the masthead: brand lockup, repository link, project sponsor (Exabeam), and a legal line (Praxen version, license, copyright)
@@ -454,7 +454,7 @@ Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. T
 | File | Contents |
 |------|----------|
 | `KB_RAISE_SCANNING.md` | RAISE framework scanning methodology — scoring model, artifact intake patterns, signal-to-risk heuristics, inference rules, compound patterns, positive posture signals. Primary calibration file. |
-| `KB_LLM_TOP10.md` | OWASP Top 10 for LLM Applications 2025 — distilled to code patterns, behavioral indicators, and cross-category compound risks. |
+| `KB_LLM_TOP10.md` | OWASP Top 10 for LLM Applications 2026 — distilled to code patterns, behavioral indicators, and cross-category compound risks, with a centralized primary-arbitration section. |
 | `KB_AGENTIC_TOP10.md` | OWASP Top 10 for Agentic Applications 2026 — agentic-specific attack patterns and the ASI taxonomy for classifying findings. |
 | `KB_MCP_SECURITY.md` | OWASP's *A Practical Guide for Secure MCP Server Development 2026* — MCP-specific vulnerability landscape and minimum-bar checklist. Loaded only when MCP configuration is discovered in the workspace. |
 
