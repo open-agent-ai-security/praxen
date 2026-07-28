@@ -18,9 +18,9 @@
 | Deployment Environment | Local developer command-line tool (single Go binary); runs on the developer's workstation. Two runtime modes: a config generator (`yaah generate`) and a built-in MCP server / hook runtime (`yaah serve`) that runs alongside the configured coding agent. |
 | Primary Model | None — yaah performs no LLM inference itself. It generates configuration for, and runs protective hooks around, the developer's chosen coding agent (Claude Code, OpenCode, Codex CLI, GitHub Copilot CLI), which uses that agent's own configured provider for inference. |
 | Secondary Models | The workflow subagents yaah generates declare models (`planner` → opus; `researcher`, `doc-writer`, `verifier` → sonnet). These are configuration yaah emits, not models yaah invokes. |
-| Remit Version | 2.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 2.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -272,4 +272,4 @@ Generate coding-agent configuration for four coding agents — Claude Code, Open
 ---
 
 *Worker Remit — Praxen*
-*Customized for: yaah (Yet Another Agent Harness) | Version: 2.1 | 2026-07-27*
+*Customized for: yaah (Yet Another Agent Harness) | Version: 2.2 | 2026-07-28*

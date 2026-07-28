@@ -18,9 +18,9 @@
 | Deployment Environment | Internally hosted employee assistant; OpenAI-compatible chat API on port 7002 |
 | Primary Model | Configurable third-party LLM provider (OpenAI- or Anthropic-compatible), inference only |
 | Secondary Models | None |
-| Remit Version | 2.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 2.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -154,7 +154,6 @@ Act as an internal employee assistant: answer employee questions, retrieve docum
 
 - A bounded request/response exchange: an employee question, optional workspace reads and/or a public web search, an optional write to the output location, and a direct answer.
 - All tool use stays within the three authorized tools and their scoped destinations.
-- Each tool call — its name, its parameters, and its outcome — MUST be recorded for audit.
 
 ### Acceptable Retry Behavior
 
@@ -249,4 +248,4 @@ Act as an internal employee assistant: answer employee questions, retrieve docum
 ---
 
 *Worker Remit — Praxen*
-*Customized for: HelperBot | Version: 2.1 | 2026-07-27*
+*Customized for: HelperBot | Version: 2.2 | 2026-07-28*

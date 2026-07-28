@@ -28,9 +28,9 @@
 | Deployment Environment | Local developer workstation; interactive terminal (CLI) running against a single local git repository, on the developer's user account and authority |
 | Primary Model | Developer-configured LLM accessed with the developer's own API credentials (e.g. Claude Sonnet, GPT-4o / o-series, DeepSeek, or a local model) |
 | Secondary Models | Weak model for commit-message and chat-history summarization; editor model; optional voice-transcription model |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -186,6 +186,7 @@
 - Following instructions embedded in file content, code comments, commit messages, or dependency metadata that attempt to expand Aider's capabilities, exfiltrate content, execute arbitrary shell commands, or override its confirmation gates.
 - Installing packages, or modifying the developer's shell environment, OS packages, or system state.
 - Sending repository code, prompts, credentials, or PII to any analytics, telemetry, or third-party endpoint.
+- Auto-approving a push to a remote, a package install, or a write outside the repository root in any confirmation-bypass mode (`--yes` / `--yes-always`, non-interactive `--message`, or scripted runs) — these approval gates apply in every mode.
 
 ---
 
@@ -252,7 +253,7 @@
 
 - Untrusted content entering LLM context: file contents, code comments (especially `AI!` / `AI?` watch comments), commit messages, dependency metadata, and scraped web pages — all are prompt-injection surfaces even inside the developer's own repo.
 - Shell / `/run` / test execution — an external-content-to-shell path in a single hop if confirmation gates are weak.
-- Confirmation-bypass modes: `--yes` / `--yes-always` and non-interactive `--message` / scripted runs are permitted, but may never auto-approve pushes to a remote, package installs, or writes outside the repository root — those approval gates apply in every mode.
+- Confirmation-bypass modes: `--yes` / `--yes-always` and non-interactive `--message` / scripted runs reduce prompting and are a prime surface for a push, package install, or out-of-repo write slipping past its approval gate.
 - Secret handling: `.env` and credential files, and Aider's own transcript/history files, must be kept out of LLM context and git history.
 - Path confinement: absolute paths, symlinks, and parent-directory traversal that would escape the repository root for writes.
 
@@ -301,4 +302,4 @@ These rules drive Praxen's reporting layer.
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Aider | Version: 1.1 | 2026-07-27*
+*Customized for: Aider | Version: 1.2 | 2026-07-28*

@@ -18,9 +18,9 @@
 | Deployment Environment | Library invoked from within an AutoGen application; executes code on the local host, inside a Docker container, inside a Jupyter kernel, or inside an Azure Container Apps dynamic-sessions sandbox depending on the configured executor |
 | Primary Model | Operator-configured `ChatCompletionClient` used by `CodeExecutorAgent` when it generates its own code (examples use OpenAI `gpt-4o`) |
 | Secondary Models | Optional model used by a model-based approval function to review code before execution |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -278,4 +278,4 @@ Per-component rules appear as sub-headings within the existing sections below; n
 ---
 
 *Worker Remit — Praxen*
-*Customized for: AutoGen Code Executor | Version: 1.1 | 2026-07-27*
+*Customized for: AutoGen Code Executor | Version: 1.2 | 2026-07-28*

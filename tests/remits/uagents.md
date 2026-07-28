@@ -18,9 +18,9 @@
 | Deployment Environment | Self-hosted Python process; registers on the Fetch.ai Almanac smart contract; optional Agentverse mailbox/proxy |
 | Primary Model | N/A — the framework is model-agnostic plumbing; LLM use is left to the agent developer |
 | Secondary Models | N/A |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (placement + deepen, v1.2) |
 
 ---
 
@@ -46,8 +46,10 @@ Work this framework runtime should never do, regardless of instruction.
 
 - Executing operating-system shell commands or arbitrary code on behalf of a remote message sender.
 - Writing agent private keys, wallet keys, or seed phrases to disk in plaintext form.
+- Disclosing agent identity or wallet private key material outside the agent process, whether over the network, inside a message payload, or in an Almanac record.
 - Exposing administrative, introspection, or message-history interfaces to unauthenticated remote callers.
 - Acting on the claimed identity of a message sender without cryptographic proof of that identity.
+- Advertising on the Almanac, or resolving to counterparties, an endpoint or public identity the agent does not itself control and serve.
 
 ---
 
@@ -72,9 +74,12 @@ Work this framework runtime should never do, regardless of instruction.
 
 ### Trusted Services / Integrations
 - Other uAgents whose message envelopes carry a valid cryptographic signature matching the claimed sender address.
+- An inbound agent counterparty is authorized only after its envelope signature verifies against the claimed sender address and the envelope is confirmed fresh, neither previously delivered nor expired.
 
 ### Explicitly Forbidden
 - Any remote counterparty whose asserted identity has not been cryptographically verified.
+- A sender whose envelope signature is missing, malformed, or does not match the claimed sender address.
+- A message relayed through the Agentverse mailbox or proxy that cannot be attributed to a signature-verified origin agent; the mailbox and proxy are transport only and MUST NOT be treated as authenticating the sender.
 
 ---
 
@@ -113,7 +118,9 @@ Work this framework runtime should never do, regardless of instruction.
 ### Forbidden Data Movement
 
 - Private keys, wallet keys, or seeds MUST NOT be written to disk in plaintext or emitted to logs.
-- Agent identity and wallet keys at rest are protected by an env-only seed: the seed is supplied via environment variable, derived private keys exist only in process memory, and neither the seed nor any derived key is persisted to disk.
+- Agent identity and wallet private keys MUST be derived in process memory from an operator seed supplied via environment variable and MUST NOT be persisted to disk, in plaintext or any other form.
+- Agent identity or wallet private keys and seed material MUST NOT be transmitted in any outbound message, Almanac registration record, or network response; only the agent's public address and verification key may be published or shared with counterparties.
+- Private key or seed material MUST NOT be made available to a message handler, REST handler, scheduled handler, or any developer-supplied callback.
 - Sensitive configuration secrets MUST NOT be embedded as literals in framework or agent source.
 
 ---
@@ -130,12 +137,16 @@ Work this framework runtime should never do, regardless of instruction.
 ### Requires Human Approval Before Execution
 - Binding the agent's HTTP server to a non-loopback (public) network interface.
 - Enabling remote reachability of the inspector / administrative endpoints.
+- Operating an agent without a configured seed such that its private key is written to local storage rather than derived in memory from an environment-supplied seed.
 
 ### Never Allowed
 
 - Dispatching an inbound message from a non-user agent sender whose envelope signature has not been verified.
 - Accepting and re-processing a previously delivered (replayed) or expired signed envelope as if it were fresh.
 - Treating an unauthenticated, sender-asserted identity as trusted for any security decision.
+- Sending an outbound message that is not cryptographically signed with the agent's own identity.
+- Replacing, regenerating, or re-deriving to a different value the identity or wallet address of an agent configured with a fixed seed, whether on restart or during operation.
+- Registering on the Almanac, or resolving to counterparties, an endpoint or public key the operator did not configure for this agent.
 
 ---
 
@@ -177,7 +188,7 @@ Work this framework runtime should never do, regardless of instruction.
 - Agent key-value store file and, when persisted, message-history storage in the working directory.
 
 ### Normal Restart Cadence
-- Restarts must not change a seeded agent's identity or wallet address.
+- Restarts are infrequent operational events; under normal operation a seeded agent resumes with its prior address while an unseeded agent presents a freshly generated address.
 
 ---
 
@@ -203,13 +214,20 @@ Work this framework runtime should never do, regardless of instruction.
 
 ### Halt Agent and Alert Operator
 - An inbound signed envelope fails signature verification.
+- The agent's Almanac record resolves to an endpoint or public key the agent did not publish.
+- Agent identity or wallet private key material is detected leaving the process in a log line, message payload, or Almanac record.
 
 ### Alert Operator (Do Not Halt)
 - An inbound message arrives from a sender address not previously seen for a security-relevant handler.
 - The agent server is bound to a public interface.
+- A previously delivered or expired envelope is re-presented for processing.
+- Registration or message-delivery retries reach their finite bound without success.
+- An agent private key is loaded from on-disk storage rather than derived from an environment-supplied seed.
+- A mailbox- or proxy-relayed message arrives that cannot be attributed to a signature-verified origin agent.
 
 ### Log Only
 - Receipt of a message with an unrecognized schema digest.
+- An inbound message is rejected for failing schema validation.
 
 ---
 
@@ -229,4 +247,4 @@ Work this framework runtime should never do, regardless of instruction.
 ---
 
 *Worker Remit — Praxen*
-*Customized for: uAgents Framework Runtime | Version: 1.1 | 2026-07-27*
+*Customized for: uAgents Framework Runtime | Version: 1.2 | 2026-07-28*

@@ -18,9 +18,9 @@
 | Deployment Environment | Local developer command-line tool, run one-shot under direct supervision. Talks to the LangSmith Managed Deep Agents platform (`/v1/deepagents/*`) and the LangChain Hub (`/v1/platform/hub`) over HTTPS using the developer's own `LANGSMITH_API_KEY` / `LANGCHAIN_API_KEY`. |
 | Primary Model | Not applicable — the CLI performs no LLM inference. Model identifiers it handles (e.g. the scaffold default `openai:gpt-5.5`) are declared configuration carried into the bundle for the *deployed* agent to consume; the CLI itself never calls a model. |
 | Secondary Models | None |
-| Remit Version | 1.2 |
+| Remit Version | 1.3 |
 | Last Updated | 2026-07-28 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -278,4 +278,4 @@
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.2 | 2026-07-28*
+*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.3 | 2026-07-28*

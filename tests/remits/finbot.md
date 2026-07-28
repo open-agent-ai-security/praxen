@@ -25,9 +25,9 @@
 | Deployment Environment | Web application (Flask / gunicorn) backed by a relational invoice and vendor database, using an external LLM provider for inference |
 | Primary Model | External LLM provider (specific model not named in documentation) |
 | Secondary Models | None documented |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -254,4 +254,4 @@ FinBot processes vendor invoices autonomously for CineFlow Productions. For each
 ---
 
 *Worker Remit — Praxen*
-*Customized for: FinBot | Version: 1.1 | 2026-07-27*
+*Customized for: FinBot | Version: 1.2 | 2026-07-28*

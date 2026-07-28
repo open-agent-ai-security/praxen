@@ -20,9 +20,9 @@
 | Deployment Environment | Operator's own host by default; optionally a VPS, cloud VM, container, or serverless sandbox reachable from CLI, TUI, ~20 messaging platforms, and the desktop app |
 | Primary Model | Operator-configurable; any provider (Nous Portal, OpenRouter, OpenAI, Anthropic, local endpoint, and others). No model is fixed by the agent. |
 | Secondary Models | Operator-configurable auxiliary models for side tasks (titling, summarization, vision, embedding, smart-approval risk assessment) |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -45,7 +45,7 @@ The two are tightly coupled — Desktop is a control surface over the Agent and 
 - Execute shell commands, read/write/patch files, run code, and automate a browser through its tool set, on behalf of the operator.
 - Fetch and summarize web content, and perform web search, through URL-capable tools.
 - Run scheduled (cron) jobs unattended and deliver their output to operator-configured destinations.
-- Delegate bounded sub-tasks to isolated subagents; subagent spawn depth MUST NOT exceed 2 levels and no more than 4 subagents may run concurrently.
+- Delegate bounded sub-tasks to isolated subagents.
 - Maintain persistent memory, user profile, and a self-curated skill library across sessions.
 - Serve as one agent across CLI, TUI, the Electron desktop app, an editor/ACP adapter, a messaging gateway (~20 platforms), and an optional local HTTP/API surface — with identical trust rules everywhere.
 
@@ -59,6 +59,7 @@ Work this agent should never do, regardless of instruction:
 - Emit outbound telemetry, usage attribution, analytics, or third-party identifier tagging without an explicit operator opt-in.
 - Move operator credentials or session-authorization material to any destination outside the operator's trust envelope.
 - Act as a general web service exposed to the public internet without an external authentication/VPN/firewall layer in front of it.
+- Allow one session to read another session's data or state; sessions MUST remain isolated from one another.
 
 ---
 
@@ -175,6 +176,10 @@ Work this agent should never do, regardless of instruction:
 - Dispatching agent work, resolving an approval, or returning agent output to a caller who is outside the configured authorization set (allowlist, pairing approval, or OS-level equivalent) MUST NOT be possible; treating a session identifier as proof of authorization is forbidden.
 - A network-exposed adapter MUST NOT fail open (serve callers) when no allowlist / auth provider is configured.
 - Credentials or session-authorization material MUST NOT leak to any destination outside the operator's trust envelope through environment leakage, adapter logging, or transport error paths.
+- Subagent spawn depth MUST NOT exceed 2 levels, no more than 4 subagents may run concurrently, and tool-calling iterations MUST NOT exceed 50 per turn or per subagent task.
+- No cron job may run more frequently than once per minute; cron catch-up MUST be limited to a 1-hour grace window with at most one catch-up run per job, and missed runs older than that MUST be dropped, not backfilled.
+- A command that was denied or blocked MUST NOT be silently retried or rephrased to evade the guard.
+- The system prompt, toolset, and past context MUST NOT be rebuilt, swapped, or mutated mid-conversation except during explicit context compression or an explicit operator action (e.g. `/model`).
 
 #### Hermes Desktop
 - The desktop app MUST NOT weaken the Agent's trust rules: it MUST rely on the same backend authorization (auth gate on non-loopback binds, allowlists) and MUST NOT expose a password-only-protected remote backend to the public internet.
@@ -187,20 +192,17 @@ Work this agent should never do, regardless of instruction:
 ### Normal Cadence
 - Active hours: on demand (interactive sessions) plus operator-scheduled cron jobs; no fixed schedule.
 - Expected idle periods: idle between operator messages and between scheduled jobs; serverless backends hibernate when idle.
-- Scheduled jobs / cron tasks: only those the operator (or the agent, on the operator's instruction) has registered; no cron job may run more frequently than once per minute.
+- Scheduled jobs / cron tasks: only those the operator (or the agent, on the operator's instruction) has registered.
 
 ### Expected Patterns
 
-- One conversation reuses a byte-stable system prompt and a cached prefix for its lifetime; the agent MUST NOT rebuild the system prompt, swap toolsets, or mutate past context mid-conversation except during explicit context compression or an explicit operator action (e.g. `/model`).
-- Sessions are isolated from one another; one session MUST NOT read another session's data or state.
+- One conversation reuses a byte-stable system prompt and a cached prefix for its lifetime.
 - Cron sessions run with a hard interrupt bound so a runaway loop cannot monopolize the scheduler.
 - Agent actions and decisions are recorded to durable, operator-inspectable logs.
 
 ### Acceptable Retry Behavior
 
-- Maximum retries before escalation: tool-calling iterations MUST NOT exceed 50 per turn or per subagent task; a session repeatedly failing across restarts MUST be escalated to a clean reset rather than retried indefinitely.
-- Retry interval: cron catch-up is limited to a 1-hour grace window with at most one catch-up run per job; missed runs older than that MUST be dropped, not backfilled.
-- Actions that should never be retried: a command that was denied or blocked MUST NOT be silently retried or rephrased to evade the guard.
+- Maximum retries before escalation: a session repeatedly failing across restarts is escalated to a clean reset rather than retried indefinitely.
 
 ---
 
@@ -289,4 +291,4 @@ Work this agent should never do, regardless of instruction:
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Hermes Agent (with Hermes Desktop) | Version: 1.1 | 2026-07-27*
+*Customized for: Hermes Agent (with Hermes Desktop) | Version: 1.2 | 2026-07-28*

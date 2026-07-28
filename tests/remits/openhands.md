@@ -18,9 +18,9 @@
 | Deployment Environment | FastAPI application server (`openhands/app_server/`) backed by the pinned OpenHands Software Agent SDK; agent actions execute inside a per-conversation sandboxed runtime (Docker / Remote / Local / Kubernetes) |
 | Primary Model | Operator-configured LLM (bring-your-own-model, via LiteLLM); no fixed default in the open-source distribution |
 | Secondary Models | Optional condenser / model-routing LLMs (e.g. summarizing condenser, multimodal router), operator-configured |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -306,4 +306,4 @@ OpenHands is an autonomous software-engineering agent that accepts natural-langu
 ---
 
 *Worker Remit — Praxen*
-*Customized for: OpenHands (Autonomous Software-Engineering Agent) | Version: 1.1 | 2026-07-27*
+*Customized for: OpenHands (Autonomous Software-Engineering Agent) | Version: 1.2 | 2026-07-28*

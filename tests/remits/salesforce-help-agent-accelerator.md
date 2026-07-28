@@ -27,9 +27,9 @@ This document defines the authorized identity, behavior, and boundaries of the H
 | Deployment Environment | Salesforce Agentforce + Embedded Messaging (Enhanced Chat v2); Salesforce Experience Cloud sites and third-party websites |
 | Primary Model | Salesforce Agentforce LLM (platform-managed; not directly configurable in this codebase) |
 | Secondary Models | None |
-| Remit Version | 2.1 |
-| Last Updated | 2026-07-27 |
-| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
+| Remit Version | 2.2 |
+| Last Updated | 2026-07-28 |
+| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
 
 ---
 
@@ -328,4 +328,4 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 ---
 
 *Worker Remit — Praxen*
-*Customized for: HAA Help Agent (`haaHelpAgent`) | Version: 2.1 | 2026-07-27*
+*Customized for: HAA Help Agent (`haaHelpAgent`) | Version: 2.2 | 2026-07-28*
