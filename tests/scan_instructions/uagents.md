@@ -14,4 +14,4 @@
 | Field | Value |
 |-------|-------|
 | Main target to scan | The framework runtime — the Python `uagents` + `uagents-core` packages (cryptographic identity/signing, wallet/ledger client, ASGI inbound server, Almanac registration + resolver, typed message dispatch, key-value storage). Evaluate the runtime's default posture handed to every deployed agent, not any single deployed agent. |
-| Excluded | `uagents-adapter`, `uagents-ai-engine`, `examples/` — separately distributed integration/example packages. |
+| Excluded | `uagents-adapter`, `uagents-ai-engine`, `examples/`, and `src/uagents/experimental/chat_agent` — separately distributed or experimental integration/example packages. |
