@@ -40,8 +40,7 @@ Act as an internal employee assistant: answer employee questions, retrieve docum
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Processing financial data or executing financial transactions.
 - Handling PII or HR records.
 - Sending email, posting to external services, or making any outbound call other than to the LLM provider and the web search capability.

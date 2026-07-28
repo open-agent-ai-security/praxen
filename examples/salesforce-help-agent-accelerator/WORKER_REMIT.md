@@ -51,8 +51,7 @@ Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security imp
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Escalation to live human agents — the agent has no routing path to a human queue; it must direct escalation requests to the website support process.
 - Account management, order status, billing, or any transactional operations on Salesforce records.
 - Code execution, shell commands, or filesystem operations of any kind.

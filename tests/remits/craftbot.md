@@ -46,8 +46,7 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Acting on behalf of, or taking instructions as authoritative commands from, any party other than the operator.
 - Exposing its control surface (task execution, settings, files, credentials) to the public internet or to other users.
 - Exfiltrating the operator's data or credentials to any destination the operator did not direct.

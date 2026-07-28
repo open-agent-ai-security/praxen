@@ -55,8 +55,7 @@
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Deploying code, publishing packages, or running CI/CD pipelines.
 - Operating on more than one repository at a time, or carrying editing authority across repositories.
 - Running as a background service, daemon, scheduled job, or cron task — Aider is interactive and developer-driven.

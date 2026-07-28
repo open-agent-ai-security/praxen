@@ -43,8 +43,7 @@ Generate coding-agent configuration for four coding agents — Claude Code, Open
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Operating as a hosted, networked, or multi-tenant service — yaah is a local single-developer CLI.
 - Performing LLM inference of its own, or acting as an autonomous agent without a supervising developer at the terminal.
 - Sending email, posting to external services, or making outbound network calls beyond: the configured coding agent's LLM provider, the configured MCP servers, the package registries used to fetch third-party MCP servers, the git remotes for remote skills/agents, and the coding-agent plugin marketplace.

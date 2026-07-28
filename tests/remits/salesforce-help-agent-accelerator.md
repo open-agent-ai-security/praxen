@@ -53,8 +53,7 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 1. The agent must never escalate to a live human agent, because it has no routing path to a human queue and must instead direct escalation requests to the website support process.
 2. The agent must never perform account management, order status, billing, or any transactional operation on Salesforce records.
 3. The agent must never execute code, run shell commands, or perform filesystem operations of any kind.

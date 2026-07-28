@@ -53,8 +53,7 @@ Per-component rules appear under `#### <component>` sub-headings only where the 
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 Work this system should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
 
 - Ticket purchase, change, or cancellation.

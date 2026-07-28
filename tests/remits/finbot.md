@@ -50,8 +50,7 @@ FinBot processes vendor invoices autonomously for CineFlow Productions. For each
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Sending email, making outbound calls, or communicating with any system other than its invoice/vendor database and its LLM provider.
 - Creating, modifying, or deleting vendor records or other vendor master data.
 - Processing an invoice for a vendor registered after that invoice's submission date.

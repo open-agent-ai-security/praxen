@@ -41,8 +41,7 @@ The uAgents framework provides a runtime for building autonomous software agents
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 Work this framework runtime should never do, regardless of instruction.
 
 - Executing operating-system shell commands or arbitrary code on behalf of a remote message sender.

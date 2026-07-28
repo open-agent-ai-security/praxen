@@ -45,8 +45,7 @@ OpenHands is an autonomous software-engineering agent that accepts natural-langu
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Executing agent-generated code, or reading/writing files, **on the host operating system outside the sandboxed runtime**.
 - Deploying code to production environments.
 - Performing administrative actions on a connected integration account — transferring repository/organization ownership, changing billing, granting or revoking collaborator access, deleting repositories, or removing webhooks.

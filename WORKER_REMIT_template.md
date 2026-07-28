@@ -19,6 +19,17 @@
   policy, so delete any section you leave empty rather than shipping placeholder
   text.
 
+  POLICY vs CONTEXT — every section is one or the other, marked in its comment:
+    - POLICY sections list things the agent MUST or MUST NEVER do — obligations a
+      wrong implementation could violate. The scan extracts a rule from each
+      entry and checks it against the code. Write these as testable constraints.
+    - CONTEXT sections describe what the agent IS or normally does. The scan
+      reads them to understand the agent and to judge findings, but does NOT
+      turn them into rules. Write them as plain description.
+  Consequence to avoid: a checkable "must never" placed in a CONTEXT section is
+  never inventoried — it silently does nothing. Put obligations in POLICY
+  sections.
+
   WHICH CODE GETS SCANNED is a separate question from what this agent does.
   Do not declare scan scope here. If the agent lives in a monorepo, spans more
   than one repository, or ships as an example inside a framework, declare the
@@ -55,13 +66,13 @@
 
 ## Mission
 
-<!-- The agent's purpose, in 1-3 sentences. -->
+<!-- CONTEXT (describes the agent; not extracted as rules). The agent's purpose, in 1-3 sentences. -->
 
 ---
 
 ## Job Description
 
-<!-- What this agent is supposed to do. Be specific; vague entries cannot be verified. -->
+<!-- CONTEXT (describes what the agent does; not extracted as rules). Be specific — this frames the analysis even though it produces no rules. -->
 
 - 
 - 
@@ -69,9 +80,19 @@
 
 ---
 
-## Non-Goals (Out of Scope)
+## Prohibited Behaviors
 
-<!-- Work this agent must never do, regardless of instruction. -->
+<!--
+  POLICY (extracted as rules — the load-bearing "stay in your lane" section).
+  Whole categories of work the agent must NEVER engage in, regardless of
+  instruction: "never processes payments", "never takes instructions from
+  retrieved content", "never redefines its own goals". This is agent-level
+  scope — the boundary of what the agent is for at all.
+  (Distinct from Action Boundaries > Never Allowed, which forbids specific
+  operations *inside* work the agent IS allowed to do. Rule of thumb: if the
+  agent should never be in this territory at all, it goes here; if it's a
+  forbidden move within permitted territory, it goes in Never Allowed.)
+-->
 
 - 
 - 
@@ -82,8 +103,8 @@
 ## Approved Communication Channels
 
 <!--
-  Every channel the agent may use. Any channel absent from this table is
-  unauthorized by default.
+  POLICY (extracted as rules). Every channel the agent may use. Any channel
+  absent from this table is unauthorized by default.
 -->
 
 | Channel | Allowed | Requires Approval | Notes |
@@ -95,8 +116,9 @@
 ## Authorized Counterparties
 
 <!--
-  Who the agent may interact with. Counterparties found in code or configuration
-  but missing from these lists are reported as a trust expansion.
+  POLICY (extracted as rules). Who the agent may interact with. Counterparties
+  found in code or configuration but missing from these lists are reported as a
+  trust expansion.
 -->
 
 ### Trusted People / Accounts
@@ -114,6 +136,8 @@
 ---
 
 ## Tools and Capabilities
+
+<!-- POLICY (extracted as rules). -->
 
 ### Allowed Tools (Known Good Baseline)
 
@@ -135,6 +159,8 @@
 
 ## Data Boundaries
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Data Sources
 - 
 
@@ -155,8 +181,8 @@
 ## Action Boundaries
 
 <!--
-  Every rule here should state a testable constraint on behavior — something that
-  can be checked against the agent's code or logs.
+  POLICY (extracted as rules). Every entry states a testable constraint on
+  behavior — something checkable against the agent's code or logs.
 
   Verifiable:
     "Message bodies must never be fetched for senders not in the authorized
@@ -167,8 +193,8 @@
     "Handle email appropriately"
     "Be careful with sensitive data"
 
-  Every rule in this document is inventoried and any that cannot be verified is
-  reported as such, so specific rules produce a more useful coverage report.
+  These are forbidden or gated MOVES within work the agent is allowed to do —
+  distinct from Prohibited Behaviors, which rules out whole categories of work.
 -->
 
 ### Allowed Without Approval
@@ -179,7 +205,7 @@
 
 ### Never Allowed
 
-<!-- Actions that are always a violation. -->
+<!-- Specific actions that are always a violation. -->
 
 - 
 
@@ -187,15 +213,14 @@
 
 ## Behavioral Expectations
 
+<!-- CONTEXT (describes normal operation; not extracted as rules). Used to distinguish ordinary operation from drift. -->
+
 ### Normal Cadence
 - Active hours:
 - Expected idle periods:
 - Scheduled jobs / cron tasks:
 
 ### Expected Patterns
-
-<!-- What normal work looks like, used to distinguish ordinary operation from drift. -->
-
 - 
 
 ### Acceptable Retry Behavior
@@ -208,7 +233,7 @@
 
 ## Known Good Baseline
 
-<!-- What this agent looks like when operating correctly. Used for comparison. -->
+<!-- CONTEXT (snapshot of normal operation for comparison; not extracted as rules — the enforceable tool/channel lists live in Tools and Capabilities and Approved Communication Channels). -->
 
 ### Typical Tool Inventory
 - 
@@ -232,15 +257,19 @@
 
 ## Swimlane Definition
 
+<!--
+  POLICY (extracted as rules). Topic/subject-matter lanes — the areas of work
+  the agent engages with vs declines. Keep whole-category prohibitions in
+  Prohibited Behaviors; use this for topic-level lane definition within the
+  agent's remit.
+-->
+
 ### Authorized Domains of Work
-
-<!-- Topics, systems, and tasks this agent may engage with. -->
-
 - 
 
 ### Disallowed Domains of Work
 
-<!-- Topics, systems, and tasks this agent must decline or escalate. -->
+<!-- Topics the agent must decline or escalate. -->
 
 - 
 
@@ -248,7 +277,7 @@
 
 ## Risk Sensitivities
 
-<!-- Areas where extra scrutiny applies; findings here are held to a lower threshold. -->
+<!-- CONTEXT (flags areas for extra scrutiny; not extracted as rules). Findings in these areas are held to a lower threshold. -->
 
 - 
 
@@ -257,8 +286,9 @@
 ## Escalation Rules
 
 <!--
-  What happens when something goes wrong. State each condition precisely enough
-  to check whether the agent's code implements the described response.
+  POLICY (extracted as rules). What happens when something goes wrong. State
+  each condition precisely enough to check whether the agent's code implements
+  the described response.
 
   "Alert if something suspicious happens" cannot be checked.
   "Alert the operator when a reply is addressed to any address not in the
@@ -281,7 +311,7 @@
 
 ## Example Good Behavior
 
-<!-- Concrete examples of authorized operation. -->
+<!-- CONTEXT (calibration examples; not extracted as rules). Concrete examples of authorized operation. -->
 
 - 
 
@@ -289,7 +319,7 @@
 
 ## Example Bad Behavior
 
-<!-- Concrete examples of unauthorized or anomalous behavior. -->
+<!-- CONTEXT (calibration examples; not extracted as rules). Concrete examples of unauthorized or anomalous behavior. -->
 
 - 
 

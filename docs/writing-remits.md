@@ -36,7 +36,7 @@ The template is a complete reference, but the load-bearing sections are:
 - **Identity** — what the agent is, who owns it, what version of the remit this is
 - **Mission** — one paragraph describing the agent's primary purpose
 - **Job Description** — what the agent is supposed to do (specific, listable)
-- **Non-Goals** — what the agent must never do, regardless of instruction
+- **Prohibited Behaviors** — the whole categories of work the agent must never engage in, regardless of instruction (the load-bearing "stay in your lane" section)
 - **Approved Communication Channels** — every channel the agent may use, with notes on whether approval is required
 - **Authorized Counterparties** — trusted people, domains, services, integrations; explicitly forbidden ones
 - **Tools and Capabilities** — allowed (the known-good baseline), restricted (require approval), forbidden
@@ -46,6 +46,15 @@ The template is a complete reference, but the load-bearing sections are:
 - **Escalation Rules** — what triggers halt, alert, log-only
 
 If a section doesn't apply to your agent, leave it minimal but explain why — Praxen will note vague or missing rules.
+
+### Policy sections vs context sections
+
+Every section is one of two kinds, and the template marks which in each section's HTML comment:
+
+- **Policy sections** state what the agent **must** or **must never** do — obligations a wrong implementation could violate. Praxen extracts a rule from each entry and checks it against the code. These are **Prohibited Behaviors, Approved Communication Channels, Authorized Counterparties, Tools and Capabilities, Data Boundaries, Action Boundaries, Swimlane Definition, Escalation Rules**. Write every entry as a testable constraint (see [the specificity test](#the-specificity-test)).
+- **Context sections** describe what the agent **is** or **normally does**. Praxen reads them to understand the agent and to judge findings, but does not turn them into rules. These are **Mission, Job Description, Behavioral Expectations, Known Good Baseline, Risk Sensitivities, Example Good/Bad Behavior**. Write them as plain description — don't force them into "must" language.
+
+Two consequences worth knowing. A checkable "must never" written into a *context* section is silently never checked — if you have a real prohibition, it belongs in **Prohibited Behaviors** (a whole category the agent must never touch) or **Action Boundaries → Never Allowed** (a specific forbidden move). And a *context* line that merely narrates a capability ("scaffolds a project folder") is not a rule even though the code does it — it describes function, not a security boundary, so it stays context.
 
 **Multi-component deployments** (e.g., an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: give each component its own sub-headings *within* the existing sections rather than adding new top-level sections. Don't declare which component is "the subject" here — that is scan scope, and it belongs in [`SCAN_INSTRUCTIONS.md`](#declaring-what-to-scan-monorepos-and-multi-agent-trees).
 

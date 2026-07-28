@@ -49,8 +49,7 @@ Per-component rules appear as sub-headings within the existing sections below; n
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Evaluating the semantic safety of the code — that is the responsibility of the calling agent's prompting, an approval function, or a separate review step, not the executor's core loop.
 - Sending email, SMS, webhooks, or any outbound message on its own behalf.
 - Persisting execution results to long-term storage or maintaining memory across application restarts.

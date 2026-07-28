@@ -51,8 +51,7 @@ The two are tightly coupled — Desktop is a control surface over the Agent and 
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 Work this agent should never do, regardless of instruction:
 
 - Act as a **multi-tenant** service that models different privilege levels for different callers inside one instance. Capability separation is achieved by running separate instances/profiles, not by trusting some callers less than others within one adapter.

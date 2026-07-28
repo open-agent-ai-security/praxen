@@ -18,8 +18,8 @@
 | Deployment Environment | Local developer command-line tool, run one-shot under direct supervision. Talks to the LangSmith Managed Deep Agents platform (`/v1/deepagents/*`) and the LangChain Hub (`/v1/platform/hub`) over HTTPS using the developer's own `LANGSMITH_API_KEY` / `LANGCHAIN_API_KEY`. |
 | Primary Model | Not applicable — the CLI performs no LLM inference. Model identifiers it handles (e.g. the scaffold default `openai:gpt-5.5`) are declared configuration carried into the bundle for the *deployed* agent to consume; the CLI itself never calls a model. |
 | Secondary Models | None |
-| Remit Version | 1.1 |
-| Last Updated | 2026-07-27 |
+| Remit Version | 1.2 |
+| Last Updated | 2026-07-28 |
 | Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
@@ -43,8 +43,7 @@
 
 ---
 
-## Non-Goals (Out of Scope)
-
+## Prohibited Behaviors
 - Running the deployed agent itself, or performing any LLM inference — the CLI produces the artifact and hands it to the platform; it never invokes a model.
 - Acting as an interactive coding assistant or REPL — that surface moved to the separate `deepagents-code` (`dcode`) package; a bare `deepagents` invocation only redirects the user there.
 - Operating as a hosted, multi-tenant, or long-running background service — it is a one-shot local developer tool run under direct supervision.
@@ -58,7 +57,7 @@
 
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
-| HTTPS to the Managed Deep Agents API (`/v1/deepagents/*`) | Yes | No | Default endpoint `https://api.smith.langchain.com`; scheme forced to HTTPS, userinfo rejected, proxy env ignored (`trust_env=False`). Auth via `X-Api-Key`. |
+| HTTPS to the Managed Deep Agents API (`/v1/deepagents/*`) | Yes | No | Default endpoint `https://api.smith.langchain.com`. The connection MUST use HTTPS, MUST reject a URL carrying userinfo credentials, and MUST ignore proxy environment variables. Auth via `X-Api-Key`. |
 | HTTPS to the LangChain Hub (`/v1/platform/hub/*`) | Yes | No | Managed-directory commits that sync the deployed agent's files. Same client, same endpoint host. |
 | Local terminal (stdin/stdout) with the operating developer | Yes | No | Prompts, summaries, confirmations, and errors. |
 | Local filesystem — the project directory (read) | Yes | No | Reads only declared sources within the resolved project root; symlinks and path-escapes rejected. |
@@ -104,9 +103,9 @@
 
 ### Restricted Tools (Require Approval Before Use)
 
-- Overwriting an existing project folder during `init` — gated behind `--force`.
-- Deploying to an `agent_id` declared in `agent.json` that local state has not seen before — gated behind an interactive confirmation (or `--yes`).
-- Deleting a workspace agent or MCP server — gated behind an interactive confirmation (or `--yes`).
+- Overwriting an existing project folder during `init` — MUST require an explicit opt-in flag; it MUST NOT proceed on the default invocation.
+- Deploying to an `agent_id` declared in `agent.json` that local state has not seen before — MUST require an interactive confirmation before the request is sent.
+- Deleting a workspace agent or MCP server — MUST require an interactive confirmation before the deletion is issued.
 
 ### Forbidden Tools
 
@@ -132,10 +131,10 @@
 
 ### Forbidden Data Movement
 
-- Writing, committing to version control, logging, or printing platform / provider / Hub / tracing credentials or MCP auth-header values. (MCP header values are redacted to `***` on `mcp-servers get`.)
+- Writing, committing to version control, logging, or printing platform / provider / Hub / tracing credentials or MCP auth-header values. Any command that displays a stored MCP server MUST redact its auth-header values.
 - Folding secret material (e.g. `.env` contents) into the seeded bundle payload — environment stays environment; it is never merged into the skills, subagent, or managed-directory payload.
 - Pulling any file into the bundle from outside the resolved project root, via symlink, path traversal, or an undeclared source.
-- Letting repository-local deploy state steer authenticated requests (auth resolution ignores repo-local state).
+- Letting repository-local deploy state steer authenticated requests — credential and endpoint resolution MUST NOT read repository-local state.
 
 ---
 
@@ -279,4 +278,4 @@
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.1 | 2026-07-27*
+*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.2 | 2026-07-28*
