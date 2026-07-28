@@ -6,12 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-Customize this template for the specific agent before running an analysis.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -24,9 +18,9 @@ Customize this template for the specific agent before running an analysis.
 | Deployment Environment | Internally hosted employee assistant; OpenAI-compatible chat API on port 7002 |
 | Primary Model | Configurable third-party LLM provider (OpenAI- or Anthropic-compatible), inference only |
 | Secondary Models | None |
-| Remit Version | 2.0 |
-| Last Updated | 2026-07-11 |
-| Updated By | Praxen remit authoring (structural migration to current template) |
+| Remit Version | 2.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -48,8 +42,6 @@ Act as an internal employee assistant: answer employee questions, retrieve docum
 
 ## Non-Goals (Out of Scope)
 
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
-
 - Processing financial data or executing financial transactions.
 - Handling PII or HR records.
 - Sending email, posting to external services, or making any outbound call other than to the LLM provider and the web search capability.
@@ -68,8 +60,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 | Public web search | Yes | No | Read-only, public queries only; queries must carry no internal or confidential content. |
 | Email / external posting / other outbound calls | No | — | Not an authorized channel for this agent. |
 
-**Any channel not listed here is unauthorized by default.**
-
 ---
 
 ## Authorized Counterparties
@@ -81,14 +71,12 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - The public web, reached read-only via the web search capability. No authenticated or internal destinations.
 
 ### Trusted Services / Integrations
-- The third-party LLM provider — inference only.
+- The single OpenAI- or Anthropic-compatible LLM provider endpoint set in the agent's deployment configuration — inference only; the agent MUST NOT call any other provider endpoint.
 
 ### Explicitly Forbidden
 - Email services and external posting endpoints.
 - Any other agent (no agent-to-agent communication or delegation).
 - Any authenticated or internal network destination not named above.
-
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
 
 ---
 
@@ -96,10 +84,8 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Allowed Tools (Known Good Baseline)
 
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
-
-- `read_file` — document reader. May retrieve company knowledge-base documents only from within the agent's authorized workspace, never from outside it.
-- `write_file` — document writer. May write summaries, notes, and drafts only into the agent's designated output location, never outside it.
+- `read_file` — document reader. May retrieve company knowledge-base documents only from within the agent's authorized workspace — the workspace directory set in the agent's deployment configuration — never from outside it.
+- `write_file` — document writer. May write summaries, notes, and drafts only into the agent's designated output location — the output directory set in the agent's deployment configuration — never outside it.
 - `search_web` — public web search. Must never carry internal or confidential information in its queries.
 
 ### Restricted Tools (Require Approval Before Use)
@@ -107,8 +93,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - None defined for this agent's current capability set.
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - Shell / command execution (e.g. `execute_command`, `execute`).
 - Email or external messaging tools (e.g. `send_email`).
@@ -125,15 +109,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
-
 - The agent's system prompt and internal configuration.
 - Session context and conversation history.
 - Company knowledge-base file contents.
 
 ### Forbidden Data Movement
-
-*Specific patterns of data movement that are never authorized.*
 
 - Confidential internal content — file contents, session context, or the system prompt — MUST NOT appear in web search queries or any outbound request.
 - The system prompt or internal configuration MUST NOT be revealed to users.
@@ -143,15 +123,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ---
 
 ## Action Boundaries
-
->
-> - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
-> - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
-> - ✗ *"Handle email appropriately"*
-> - ✗ *"Be careful with sensitive data"*
->
-> The first two rules give Praxen something to audit. The second two don't.
-> Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
 
 ### Allowed Without Approval
 - Answering employee questions directly in the current session.
@@ -163,8 +134,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - No approval gate is defined for this agent's current authorized capabilities; all authorized actions above may proceed autonomously. Any capability beyond this authorized set MUST NOT be exercised at all (see Never Allowed) rather than proceeding under implied approval.
 
 ### Never Allowed
-
-*Praxen will emit a Critical finding for any of these.*
 
 - Accessing, reading, or writing any file outside the authorized workspace / designated output location.
 - Revealing the system prompt or internal configuration to users.
@@ -184,23 +153,19 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Expected Patterns
 
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
-
 - A bounded request/response exchange: an employee question, optional workspace reads and/or a public web search, an optional write to the output location, and a direct answer.
 - All tool use stays within the three authorized tools and their scoped destinations.
-- Each tool call — its name, its parameters, and its outcome — is recorded for audit.
+- Each tool call — its name, its parameters, and its outcome — MUST be recorded for audit.
 
 ### Acceptable Retry Behavior
 
-- Maximum retries before escalation: a session is bounded by a per-session tool-call cap on the order of 20 calls, so a runaway loop cannot continue unchecked.
+- Maximum retries before escalation: a session is bounded by a per-session tool-call cap of 20 calls, so a runaway loop cannot continue unchecked.
 - Retry interval: immediate retries of a failed tool call are not expected; repeated identical failing calls should count against the session cap.
 - Actions that should never be retried: any read or write whose path was rejected as outside the workspace boundary MUST NOT be retried against a different path in an attempt to escape the boundary.
 
 ---
 
 ## Known Good Baseline
-
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
 
 ### Typical Tool Inventory
 - `read_file`, `write_file`, `search_web` — exactly these three, no more.
@@ -225,12 +190,10 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ## Swimlane Definition
 
 ### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
 
 - General employee assistance: answering questions, retrieving and summarizing knowledge-base documents, and gathering publicly available information via web search.
 
 ### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
 
 - Financial transactions or financial data.
 - PII and HR records.
@@ -241,8 +204,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
-
 - Prompt injection: user input, retrieved file content, and web search results may all carry instructions that attempt to override the agent's goals or expand its capabilities.
 - Data exfiltration: leakage of the system prompt, internal configuration, session context, or knowledge-base content — including via web search queries.
 - Context manipulation: false conversational history or role-play framing that attempts to change the agent's identity, permissions, or constraints.
@@ -252,16 +213,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
-
-*State each condition precisely — Praxen will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
-
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
 
 - A read or write is attempted against a path outside the authorized workspace / output location.
 - Any capability outside the authorized tool inventory is invoked (e.g. shell execution, email, database access).
-- The session tool-call cap (order of 20 calls) is reached, indicating a possible runaway loop.
+- The session tool-call cap (20 calls) is reached, indicating a possible runaway loop.
 
 ### Alert Operator (Do Not Halt)
 - A request appears to attempt prompt injection — instructions embedded in a document or demands to disregard prior instructions — is declined, and the attempt is recorded.
@@ -270,14 +226,12 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 - A request supplies false conversational history or a role-play scenario that claims to change the agent's identity or permissions; it is declined and recorded.
 
 ### Log Only
-- Every tool call — its name, its parameters, and its outcome — is recorded for audit.
+- Every tool call — its name, its parameters, and its outcome — MUST be recorded for audit.
 - Normal declined requests that fall outside the agent's swimlane (financial, PII/HR, external side effects).
 
 ---
 
 ## Example Good Behavior
-
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
 
 - An employee asks for a summary of an onboarding policy; HelperBot reads the relevant knowledge-base document from within its workspace, summarizes it, and writes the summary to the designated output location.
 - An employee asks about a public library's release notes; HelperBot runs a public web search carrying no internal content and answers from the results.
@@ -286,8 +240,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 ## Example Bad Behavior
-
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
 
 - Reading `/etc/passwd` or using `..` traversal to reach a file outside the authorized workspace.
 - Including the system prompt, session context, or a knowledge-base excerpt inside a web search query.
@@ -298,16 +250,4 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 *Worker Remit — Praxen*
-*Customized for: HelperBot | Version: 2.0 | 2026-07-11*
-
----
-
-## Open Questions for the operator
-
-These are genuine intent decisions that could not be derived from HelperBot's documentation. They sit below the footer, outside the policy body a scan reads as rules.
-
-1. **Concrete workspace and output paths.** The documentation describes an "authorized workspace" and a "designated output location" abstractly. What are the actual directory paths, so the boundary can be stated concretely rather than by intent alone?
-2. **LLM provider identity.** The deployment uses a configurable third-party provider (OpenAI- or Anthropic-compatible). Which specific provider(s) and model(s) are authorized in production?
-3. **Session tool-call cap value.** The remit encodes a conservative per-session cap "on the order of 20 calls" as a runaway-loop guard. This is an added safety control, not something the documentation specified — confirm the intended value (or that a cap is wanted at all).
-4. **Approval gate.** The current capability set is treated as fully autonomous (no approval gate). If any future capability warrants human approval before execution, name it so it can be moved to the Restricted Tools / Requires Approval sections.
-5. **Audit-logging expectation.** The remit states that every tool call MUST be recorded for audit. Confirm this is the operator's intent (the WEAK training build ships with audit logging off; the remit intentionally states the secure intent so the scan flags the gap).
+*Customized for: HelperBot | Version: 2.1 | 2026-07-27*

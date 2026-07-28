@@ -3,14 +3,37 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
+<!--
+  HOW TO USE THIS TEMPLATE
+
+  Copy this file, rename it WORKER_REMIT.md, and fill it in for one agent.
+
+  This document states POLICY — what the agent is allowed and forbidden to do.
+  It does not describe implementation: no file paths, tool internals, or library
+  versions. The scan reads the code; this file declares the intent to compare it
+  against.
+
+  Every guidance note in this template is an HTML comment like this one, so it is
+  never mistaken for a policy clause. Delete the comments or leave them — either
+  way they are not read as rules. Everything OUTSIDE a comment is treated as
+  policy, so delete any section you leave empty rather than shipping placeholder
+  text.
+
+  WHICH CODE GETS SCANNED is a separate question from what this agent does.
+  Do not declare scan scope here. If the agent lives in a monorepo, spans more
+  than one repository, or ships as an example inside a framework, declare the
+  main target to scan in a SCAN_INSTRUCTIONS.md file alongside this remit.
+  See docs/writing-remits.md.
+
+  MULTI-COMPONENT DEPLOYMENTS (e.g. an agent plus an operator console) belong in
+  one remit, not several. Keep the section structure below exactly as it is and
+  separate per-component rules with sub-headings INSIDE the existing sections
+  (use H4 where H3 sub-headings already exist). Do not add new top-level
+  sections — rules placed outside the standard headings can be missed.
+-->
+
 # Worker Remit
 *Praxen — Agent Policy*
-
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-Customize this template for the specific agent before running an analysis.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
 
 ---
 
@@ -32,13 +55,13 @@ Customize this template for the specific agent before running an analysis.
 
 ## Mission
 
-*Describe the agent's primary purpose in 1–3 sentences. This is the north star for all behavioral evaluation. For multi-component deployments, open with a scope note naming each component, designating the primary RAISE subject (the LLM-driven component), and describing how the components relate. Use sub-headings within existing sections (H4 where H3 sub-headings already exist) to separate per-component rules — do not add new top-level sections.*
+<!-- The agent's purpose, in 1-3 sentences. -->
 
 ---
 
 ## Job Description
 
-What this agent is supposed to do. Be specific — vague descriptions produce weak detection.
+<!-- What this agent is supposed to do. Be specific; vague entries cannot be verified. -->
 
 - 
 - 
@@ -48,7 +71,7 @@ What this agent is supposed to do. Be specific — vague descriptions produce we
 
 ## Non-Goals (Out of Scope)
 
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
+<!-- Work this agent must never do, regardless of instruction. -->
 
 - 
 - 
@@ -58,15 +81,23 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Approved Communication Channels
 
+<!--
+  Every channel the agent may use. Any channel absent from this table is
+  unauthorized by default.
+-->
+
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
 | | | | |
 
-**Any channel not listed here is unauthorized by default.**
-
 ---
 
 ## Authorized Counterparties
+
+<!--
+  Who the agent may interact with. Counterparties found in code or configuration
+  but missing from these lists are reported as a trust expansion.
+-->
 
 ### Trusted People / Accounts
 - 
@@ -80,15 +111,13 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ### Explicitly Forbidden
 - 
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
 
 ### Allowed Tools (Known Good Baseline)
 
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
+<!-- Every tool the agent is expected to have at runtime. -->
 
 - 
 
@@ -98,7 +127,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Forbidden Tools
 
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
+<!-- Tools that must never appear in the agent's inventory or code. -->
 
 - 
 
@@ -111,13 +140,13 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
+<!-- Data requiring special handling; unexpected access or movement is reported. -->
 
 - 
 
 ### Forbidden Data Movement
 
-*Specific patterns of data movement that are never authorized.*
+<!-- Specific movements of data that are never authorized. -->
 
 - 
 
@@ -125,16 +154,22 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Action Boundaries
 
-> **Writing verifiable rules**
-> Every rule in this section should state a testable constraint on behavior — something Praxen can check against the agent's code or logs. Vague intent produces weak detection.
->
-> - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
-> - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
-> - ✗ *"Handle email appropriately"*
-> - ✗ *"Be careful with sensitive data"*
->
-> The first two rules give Praxen something to audit. The second two don't.
-> Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
+<!--
+  Every rule here should state a testable constraint on behavior — something that
+  can be checked against the agent's code or logs.
+
+  Verifiable:
+    "Message bodies must never be fetched for senders not in the authorized
+     counterparty list"
+    "Responding to unknown senders requires human approval — no automated reply"
+
+  Not verifiable:
+    "Handle email appropriately"
+    "Be careful with sensitive data"
+
+  Every rule in this document is inventoried and any that cannot be verified is
+  reported as such, so specific rules produce a more useful coverage report.
+-->
 
 ### Allowed Without Approval
 - 
@@ -144,7 +179,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Never Allowed
 
-*Praxen will emit a Critical finding for any of these.*
+<!-- Actions that are always a violation. -->
 
 - 
 
@@ -159,7 +194,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Expected Patterns
 
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
+<!-- What normal work looks like, used to distinguish ordinary operation from drift. -->
 
 - 
 
@@ -173,7 +208,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Known Good Baseline
 
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
+<!-- What this agent looks like when operating correctly. Used for comparison. -->
 
 ### Typical Tool Inventory
 - 
@@ -198,12 +233,14 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ## Swimlane Definition
 
 ### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
+
+<!-- Topics, systems, and tasks this agent may engage with. -->
 
 - 
 
 ### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
+
+<!-- Topics, systems, and tasks this agent must decline or escalate. -->
 
 - 
 
@@ -211,7 +248,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
+<!-- Areas where extra scrutiny applies; findings here are held to a lower threshold. -->
 
 - 
 
@@ -219,12 +256,18 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
+<!--
+  What happens when something goes wrong. State each condition precisely enough
+  to check whether the agent's code implements the described response.
 
-*State each condition precisely — Praxen will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
+  "Alert if something suspicious happens" cannot be checked.
+  "Alert the operator when a reply is addressed to any address not in the
+   Rolodex" can.
+-->
 
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
+
+<!-- Conditions serious enough to warrant stopping the agent. -->
 
 - 
 
@@ -238,7 +281,7 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
+<!-- Concrete examples of authorized operation. -->
 
 - 
 
@@ -246,7 +289,7 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Bad Behavior
 
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
+<!-- Concrete examples of unauthorized or anomalous behavior. -->
 
 - 
 
@@ -254,3 +297,10 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 *Worker Remit — Praxen*
 *Customized for: [Worker Name] | Version: [X.X] | [Date]*
+
+<!--
+  Anything the operator still needs to decide goes AFTER this footer, under a
+  "## Open Questions for the operator" heading — outside the policy body, so it
+  is never read as a rule. Resolve each one into a real clause, or delete it,
+  before relying on this remit.
+-->

@@ -6,11 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -23,9 +18,9 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 | Deployment Environment | Self-hosted Python process; registers on the Fetch.ai Almanac smart contract; optional Agentverse mailbox/proxy |
 | Primary Model | N/A — the framework is model-agnostic plumbing; LLM use is left to the agent developer |
 | Secondary Models | N/A |
-| Remit Version | 1.0 |
-| Last Updated | 2026-07-10 |
-| Updated By | Praxen operator (Exabeam) |
+| Remit Version | 1.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -66,8 +61,6 @@ Work this framework runtime should never do, regardless of instruction.
 | Fetch.ai Almanac / ledger (Cosmos RPC + Almanac API) | Yes | No | Registration and address resolution |
 | Local agent inspector / admin endpoints (`/messages`, `/connect`, `/disconnect`, `/agent_info`) | Restricted | Yes — local operator only | Must not be reachable by unauthenticated remote callers |
 
-**Any channel not listed here is unauthorized by default.**
-
 ---
 
 ## Authorized Counterparties
@@ -83,8 +76,6 @@ Work this framework runtime should never do, regardless of instruction.
 
 ### Explicitly Forbidden
 - Any remote counterparty whose asserted identity has not been cryptographically verified.
-
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
 
 ---
 
@@ -123,6 +114,7 @@ Work this framework runtime should never do, regardless of instruction.
 ### Forbidden Data Movement
 
 - Private keys, wallet keys, or seeds MUST NOT be written to disk in plaintext or emitted to logs.
+- Agent identity and wallet keys at rest are protected by an env-only seed: the seed is supplied via environment variable, derived private keys exist only in process memory, and neither the seed nor any derived key is persisted to disk.
 - Sensitive configuration secrets MUST NOT be embedded as literals in framework or agent source.
 
 ---
@@ -238,14 +230,4 @@ Work this framework runtime should never do, regardless of instruction.
 ---
 
 *Worker Remit — Praxen*
-*Customized for: uAgents Framework Runtime | Version: 1.0 | 2026-07-10*
-
----
-
-## Open Questions for the operator
-
-*These require an operator decision and are not derivable from the framework's documentation. Resolve each before relying on this remit.*
-
-1. **Default bind interface.** Should the agent HTTP server bind to loopback (`127.0.0.1`) by default and require explicit operator opt-in to expose a public interface, or is binding to all interfaces (`0.0.0.0`) the intended default for this deployment?
-2. **Inspector default.** Should the agent inspector and its reserved administrative endpoints be enabled by default, or disabled unless the operator explicitly turns them on?
-3. **Key-at-rest mechanism.** What is the approved mechanism for protecting agent identity and wallet keys at rest for this deployment (OS keychain, encrypted file, secret manager, env-only seed)?
+*Customized for: uAgents Framework Runtime | Version: 1.1 | 2026-07-27*

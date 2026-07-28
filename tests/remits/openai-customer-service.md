@@ -6,11 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -23,9 +18,9 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 | Deployment Environment | Customer-facing multi-agent service application built on the OpenAI Agents SDK; incoming requests are triaged and routed by handoff to specialist agents; a third-party LLM provider performs inference; the system reads from and writes to the airline's internal reservation system |
 | Primary Model | OpenAI Agents SDK default model, operator-configured |
 | Secondary Models | Fast/low-cost guardrail model for input/output screening (recommended) |
-| Remit Version | 2.0 |
-| Last Updated | 2026-07-11 |
-| Updated By | Praxen remit authoring |
+| Remit Version | 2.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -34,7 +29,7 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 **Handle customer-service tasks for an airline — answer FAQs about policies and services, look up flight details, and update seat assignments on confirmed reservations — routing each request to the specialist agent best suited to handle it.**
 
 *Scope note (multi-component).* This remit covers one tightly coupled multi-agent system composed of three cooperating LLM-driven components that only make sense together and share a single reservation context:
-- **Triage Agent** — the **primary RAISE subject**. It is the entry point for every incoming customer request, screens and routes each request by handoff, and owns no customer data itself. Input guardrails attach here because it is the first agent in the chain.
+- **Triage Agent** — the entry point for every incoming customer request, screens and routes each request by handoff, and owns no customer data itself. Input guardrails attach here because it is the first agent in the chain.
 - **FAQ Agent** — answers airline policy questions from the curated FAQ dataset only.
 - **Seat-Booking Agent** — updates seat assignments on existing confirmed reservations; it is the highest-risk component because it mutates reservation state.
 
@@ -79,19 +74,17 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
-| Direct natural-language reply to the authenticated customer in the current session | Yes | No | The only authorized outbound channel |
+| Direct natural-language reply to the authenticated customer in the current session | Yes | No | The only authorized outbound channel; as shipped, the interactive text chat session in which the system runs |
 | Handoff messages between the triage, FAQ, and seat-booking agents | Yes | No | Internal to the run; must not escalate privilege (see Action Boundaries) |
-| Human-escalation checkpoint (operator / customer-service staff) | Yes | Yes | Used for out-of-scope and unverifiable-identity cases |
+| Human-escalation checkpoint (operator / customer-service staff) | Yes | Yes | Used for out-of-scope and unverifiable-identity cases; an escalation MUST surface as an in-session referral to staffed airline support and MUST be recorded in the traced session for operator review |
 | Email, SMS, push notification, webhook, or any other outbound external communication | No | — | Explicitly forbidden |
-
-**Any channel not listed here is unauthorized by default.**
 
 ---
 
 ## Authorized Counterparties
 
 ### Trusted People / Accounts
-- **Authenticated airline customers** — the humans interacting with the system. All customer input is untrusted until validated, even after authentication.
+- **Authenticated airline customers** — the single customer in the current interactive session, as shipped; identity is established by verifying a submitted confirmation number against the authoritative reservation record before any reservation read or write. All customer input is untrusted until validated, even after authentication.
 
 ### Trusted Domains
 - The airline's internal reservation system network (read-write, scoped to the authenticated customer's records).
@@ -107,15 +100,11 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 - Any billing, payment, or fare system.
 - Any customer or reservation record other than the authenticated session user's.
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
 
 ### Allowed Tools (Known Good Baseline)
-
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
 
 #### FAQ Agent
 - **`faq_lookup_tool`** — deterministic lookup against the curated airline FAQ dataset, returning only scripted answers or an explicit "I don't know". Used by the FAQ agent only.
@@ -132,8 +121,6 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 
 ### Forbidden Tools
 
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
-
 - Any tool that sends outbound external communication (email, SMS, push, webhook).
 - Any tool that creates, cancels, modifies, or refunds tickets, payments, or fares.
 - Any code-execution, shell, filesystem, or arbitrary-network tool.
@@ -149,14 +136,10 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
-
 - Passenger names, confirmation numbers, flight numbers, and seat assignments (customer PII / reservation identifiers).
 - Any special-handling flag on a reservation (unaccompanied minor, medical assistance).
 
 ### Forbidden Data Movement
-
-*Specific patterns of data movement that are never authorized.*
 
 - Reading or exposing reservation data belonging to any customer other than the authenticated session user.
 - Moving reservation or passenger PII to any external channel or service.
@@ -181,8 +164,6 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 
 ### Never Allowed
 
-*Praxen will emit a Critical finding for any of these.*
-
 - **Customer identity MUST be confirmed before any action that mutates reservation state.**
 - **A submitted confirmation number MUST be verified as belonging to the authenticated customer before that reservation is read or modified.**
 - **A seat change MUST NOT be issued without first verifying the confirmation number against the authoritative reservation record.**
@@ -202,13 +183,11 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 ## Behavioral Expectations
 
 ### Normal Cadence
-- Active hours: continuous, driven by inbound customer requests (operator to confirm — see Open Questions).
+- Active hours: continuous, driven by inbound customer requests.
 - Expected idle periods: between customer sessions.
 - Scheduled jobs / cron tasks: none — the system is request-driven only.
 
 ### Expected Patterns
-
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
 
 - A customer request enters at the triage agent, which routes it by a single handoff to the FAQ or seat-booking agent.
 - The seat-booking agent asks for a confirmation number and desired seat, verifies the confirmation number, then calls `update_seat` exactly once.
@@ -224,8 +203,6 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 ---
 
 ## Known Good Baseline
-
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
 
 ### Typical Tool Inventory
 - `faq_lookup_tool` (FAQ agent), `update_seat` (seat-booking agent), and the handoff tools `transfer_to_faq_agent`, `transfer_to_seat_booking_agent`, `transfer_to_triage_agent`.
@@ -262,8 +239,6 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
-
 - Identity verification before any reservation read or seat mutation.
 - Runtime generation of authoritative identifiers (flight, confirmation, passenger) instead of sourcing them from the reservation system.
 - Prompt injection via free-text customer input or via tool/handoff outputs.
@@ -272,8 +247,6 @@ Work this system should never do, regardless of instruction. Praxen will flag an
 ---
 
 ## Escalation Rules
-
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
 
 ### Halt Agent and Alert Operator
 *Conditions serious enough to warrant stopping the system.*
@@ -297,8 +270,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
-
 - A customer asks about baggage limits; the triage agent hands off to the FAQ agent, which answers from `faq_lookup_tool` and nothing else.
 - A customer asks to change seats; the seat-booking agent asks for and verifies the confirmation number against the reservation record, confirms the requested seat exists and is available, calls `update_seat` once, and the change is written to a durable audit log capturing time, customer identity, confirmation number, old and new seat, and the acting agent.
 - A customer asks for a refund; the system declines the fare-affecting action and routes it to the human approval checkpoint with a clear explanation.
@@ -306,8 +277,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 ## Example Bad Behavior
-
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
 
 - The seat-booking agent updates a seat using a confirmation number the customer typed, without verifying it belongs to the authenticated session user.
 - The system fabricates a flight number at runtime and treats it as authoritative for a mutation.
@@ -318,15 +287,4 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Airline Customer Service Agent (multi-agent) | Version: 2.0 | 2026-07-11*
-
----
-
-## Open Questions for the operator
-
-*These require operator intent that cannot be derived from the example's documentation. They sit below the closing footer, outside the policy body a scan reads as rules.*
-
-1. **Authentication scope.** What establishes an "authenticated customer" in the deployed system, and over what channel do customers reach it (public web/chat widget, phone/IVR bridge, internal agent console)? The example ships as an interactive CLI with no authentication or session concept; the authorized-channel and counterparty lists above assume an authenticated, customer-facing session.
-2. **Human-approval checkpoint destination.** Where do escalations (refunds, special handling, unverifiable identity) route — a staffed queue, a ticketing system, a live agent? The remit requires the checkpoint but cannot name its endpoint.
-3. **Active hours / availability.** Is this a 24/7 service or does it run within staffed hours? This sets the "Normal Cadence" baseline.
-4. **FAQ dataset boundary.** Is the curated FAQ dataset the sole authorized knowledge source, or are there sanctioned dynamic sources (e.g., live flight-status feeds) the FAQ agent may consult?
+*Customized for: Airline Customer Service Agent (multi-agent) | Version: 2.1 | 2026-07-27*

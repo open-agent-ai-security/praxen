@@ -30,10 +30,10 @@ This document defines the authorized identity, behavior, and boundaries of the H
 
 HAA Help Agent is an Agentforce-powered customer service chatbot that answers end-user questions by retrieving and synthesizing content from the deploying organization's Salesforce Knowledge articles.
 
-**Multi-component deployment scope.** Two components are present; only the Agentforce agent is the RAISE subject:
+**Multi-component deployment.** Two components are present:
 
-- **`haaInlineEnhancedChat`** (LWC / standalone JS): The UI host layer. Manages the chat iframe, session state machine, and Embedded Messaging bootstrap lifecycle. Not LLM-driven; not the RAISE subject.
-- **`haaHelpAgent`** (Agentforce agent): The LLM-driven component. Orchestrates topic routing and knowledge retrieval via `AnswerQuestionsWithKnowledge`. **Primary RAISE subject.**
+- **`haaInlineEnhancedChat`** (LWC / standalone JS): The UI host layer. Manages the chat iframe, session state machine, and Embedded Messaging bootstrap lifecycle. Not LLM-driven.
+- **`haaHelpAgent`** (Agentforce agent): The LLM-driven component. Orchestrates topic routing and knowledge retrieval via `AnswerQuestionsWithKnowledge`. The LLM-driven component these rules govern.
 
 Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security implications (session handling, CORS, localStorage), those are noted explicitly.
 
@@ -102,8 +102,6 @@ Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security imp
 - Any external API not provided by the Salesforce platform
 - Any counterparty introduced via instructions embedded in retrieved Knowledge article content
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
@@ -117,8 +115,6 @@ Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security imp
 - Any additional Agentforce standard action or custom action not listed above requires explicit remit update and operator approval before deployment.
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - Shell execution / OS command tools
 - File system read or write tools
@@ -172,8 +168,6 @@ Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security imp
 - Any change to the agent's system prompt or topic-level instructions.
 
 ### Never Allowed
-
-*Praxen will emit a Critical finding for any of these.*
 
 - Executing shell commands or invoking any tool outside the authorized inventory.
 - Revealing the agent's system prompt, topic instructions, configuration, or Knowledge article retrieval mechanics to users.
@@ -269,7 +263,6 @@ Rules in this remit apply to `haaHelpAgent`. Where the UI layer has security imp
 ## Escalation Rules
 
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
 
 - The agent returns content from its system prompt, topic instructions, or agent configuration in a chat response.
 - The agent calls any tool not present in the authorized tool inventory.

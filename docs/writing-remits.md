@@ -47,7 +47,7 @@ The template is a complete reference, but the load-bearing sections are:
 
 If a section doesn't apply to your agent, leave it minimal but explain why — Praxen will note vague or missing rules.
 
-**Multi-component deployments** (e.g., an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: name the primary RAISE subject in a scope note in the Mission, and give each component its own sub-headings *within* the existing sections rather than adding new top-level sections.
+**Multi-component deployments** (e.g., an LLM agent plus an operator or desktop layer) go in **one** combined remit, not several: give each component its own sub-headings *within* the existing sections rather than adding new top-level sections. Don't declare which component is "the subject" here — that is scan scope, and it belongs in [`SCAN_INSTRUCTIONS.md`](#declaring-what-to-scan-monorepos-and-multi-agent-trees).
 
 ## The specificity test
 
@@ -130,8 +130,8 @@ matters whenever the workspace holds more than one agent's worth of code:
   client) that must be analyzed together.
 
 Point Praxen at the wrong scope and it will either blame your agent for a
-sibling package's flaws or credit it for a framework's controls. To make the
-subject explicit, put a **`SCAN_INSTRUCTIONS.md`** in the scan's working
+sibling package's flaws or credit it for a framework's controls. To say which
+code is the agent, put a **`SCAN_INSTRUCTIONS.md`** in the scan's working
 directory (alongside `WORKER_REMIT.md`). Praxen reads it in Step 1 and honors it
 in Step 4. A minimal one:
 
@@ -140,22 +140,31 @@ in Step 4. A minimal one:
 
 | Field | Value |
 |-------|-------|
-| Subject | `libs/my-agent/**` — the agent this remit describes |
-| Not the subject | Other packages in this repo (libraries it tools for) |
+| Main target to scan | `libs/my-agent/**` — the agent this remit describes |
+| Context (read, not scored) | `libs/shared-runtime/**` — framework the agent calls into |
 ```
+
+**Prefer a "context" row over an exclusion.** When your agent's rules depend on
+code that lives outside it — a framework's approval hook, a caller that wires up
+guardrails — mark that code *context*, not *excluded*. Context is read so the
+scan can see the control, but findings are scored against your agent, not the
+framework. Excluding it instead makes controls that genuinely exist come back as
+gaps in your agent, which is the most common way a scan produces a wrong answer.
+Only exclude code that is genuinely unrelated.
 
 Two things always hold, whether or not you state them: **hygiene sweeps**
 (committed secrets, dependency pinning) still cover the *entire* tree — a leaked
-key anywhere is a real exposure — and code your agent actually imports or runs
-**is** part of the subject wherever it lives. For a subject that spans multiple
-source roots, name all of them and supply all of them to the scan; Praxen treats
-them as one combined agent. With no `SCAN_INSTRUCTIONS.md`, the whole workspace
-is the subject. (The regression suite carries one per multi-scope target under
-`tests/scan_instructions/` — those double as worked examples.)
+key anywhere is a real exposure — and code your agent actually imports or runs at
+runtime is part of the main target wherever it lives. For an agent that spans
+multiple source roots, name all of them and supply all of them to the scan;
+Praxen treats them as one agent. With no `SCAN_INSTRUCTIONS.md`, the whole
+workspace is scanned. (The regression suite carries one per multi-scope target
+under `tests/scan_instructions/` — those double as worked examples.)
 
 **Keep it out of the remit.** Scope is about *this scan run*, not about what the
-agent is; mixing the two is what makes a policy document drift. The remit
-describes the agent; `SCAN_INSTRUCTIONS.md` points at it.
+agent is; mixing the two is what makes a policy document drift, and a remit that
+names its own "subject" will sooner or later contradict the scan instructions.
+The remit describes the agent; `SCAN_INSTRUCTIONS.md` points at it.
 
 ## Self-authored remits
 

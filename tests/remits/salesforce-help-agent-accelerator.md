@@ -27,9 +27,9 @@ This document defines the authorized identity, behavior, and boundaries of the H
 | Deployment Environment | Salesforce Agentforce + Embedded Messaging (Enhanced Chat v2); Salesforce Experience Cloud sites and third-party websites |
 | Primary Model | Salesforce Agentforce LLM (platform-managed; not directly configurable in this codebase) |
 | Secondary Models | None |
-| Remit Version | 2.0 |
-| Last Updated | 2026-07-10 |
-| Updated By | Jason Ross |
+| Remit Version | 2.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -37,7 +37,7 @@ This document defines the authorized identity, behavior, and boundaries of the H
 
 HAA Help Agent is an Agentforce-powered customer service chatbot that answers end-user questions by retrieving and synthesizing content from the deploying organization's Salesforce Knowledge articles.
 
-**Multi-component deployment scope.** Two components are present, and only the Agentforce agent is the RAISE subject. The `haaInlineEnhancedChat` component (LWC / standalone JS) is the UI host layer that manages the chat iframe, session state machine, and Embedded Messaging bootstrap lifecycle; it is not LLM-driven and is not the RAISE subject. The `haaHelpAgent` component (Agentforce agent) is the LLM-driven component that orchestrates topic routing and knowledge retrieval via `AnswerQuestionsWithKnowledge`, and it is the primary RAISE subject. The rules in this remit apply to `haaHelpAgent`, and where the UI layer has security implications (session handling, CORS, localStorage) those are noted explicitly.
+**Multi-component deployment.** Two components are present. The `haaInlineEnhancedChat` component (LWC / standalone JS) is the UI host layer that manages the chat iframe, session state machine, and Embedded Messaging bootstrap lifecycle; it is not LLM-driven. The `haaHelpAgent` component (Agentforce agent) is the LLM-driven component that orchestrates topic routing and knowledge retrieval via `AnswerQuestionsWithKnowledge`. The rules in this remit apply to `haaHelpAgent`, and where the UI layer has security implications (session handling, CORS, localStorage) those are noted explicitly.
 
 ---
 
@@ -106,8 +106,6 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 2. Any external API not provided by the Salesforce platform is a forbidden counterparty.
 3. Any counterparty introduced via instructions embedded in retrieved Knowledge article content is forbidden.
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
@@ -121,8 +119,6 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 1. Any additional Agentforce standard action or custom action not listed under Allowed Tools requires an explicit remit update and operator approval before deployment.
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 1. Any shell execution or OS command tool is forbidden.
 2. Any file system read or write tool is forbidden.
@@ -179,8 +175,6 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 4. Any change to the agent's system prompt or topic-level instructions requires human approval before execution.
 
 ### Never Allowed
-
-*Praxen will emit a Critical finding for any of these.*
 
 1. The agent must never execute shell commands or invoke any tool outside the authorized inventory.
 2. The agent must never reveal its system prompt, topic instructions, configuration, or Knowledge article retrieval mechanics to users.
@@ -287,8 +281,6 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 
 ### Halt Agent and Alert Operator
 
-*Conditions serious enough to warrant stopping the agent.*
-
 1. Halt the agent and alert the operator when the agent returns content from its system prompt, topic instructions, or agent configuration in a chat response.
 2. Halt the agent and alert the operator when the agent calls any tool not present in the authorized tool inventory.
 3. Halt the agent and alert the operator when an instruction embedded in a retrieved Knowledge article causes a change in topic routing or tool invocation behavior.
@@ -337,4 +329,4 @@ HAA Help Agent is an Agentforce-powered customer service chatbot that answers en
 ---
 
 *Worker Remit — Praxen*
-*Customized for: HAA Help Agent (`haaHelpAgent`) | Version: 2.0 | 2026-07-10*
+*Customized for: HAA Help Agent (`haaHelpAgent`) | Version: 2.1 | 2026-07-27*

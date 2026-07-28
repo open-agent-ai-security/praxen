@@ -6,12 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-Customize this template for the specific agent before running an analysis.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -24,9 +18,9 @@ Customize this template for the specific agent before running an analysis.
 | Deployment Environment | Library invoked from within an AutoGen application; executes code on the local host, inside a Docker container, inside a Jupyter kernel, or inside an Azure Container Apps dynamic-sessions sandbox depending on the configured executor |
 | Primary Model | Operator-configured `ChatCompletionClient` used by `CodeExecutorAgent` when it generates its own code (examples use OpenAI `gpt-4o`) |
 | Secondary Models | Optional model used by a model-based approval function to review code before execution |
-| Remit Version | 1.0 |
-| Last Updated | 2026-07-11 |
-| Updated By | Praxen remit authoring (regenerated on current template) |
+| Remit Version | 1.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -35,7 +29,7 @@ Customize this template for the specific agent before running an analysis.
 Execute code blocks — Python or shell — that an LLM agent has produced, inside a controlled, isolated environment, and return stdout, stderr, and exit status to the calling agent for its next reasoning step. This is the execution tier of a generator/executor pattern: one component generates code, this component runs it safely and reports the result.
 
 **Scope note — components covered.** This remit covers the AutoGen **code-executor** component family and its driving agent:
-- **`CodeExecutorAgent`** — the AgentChat agent that receives messages, extracts fenced code blocks, and drives an executor; optionally uses a `model_client` to generate its own code and reflect on results. **This is the primary RAISE subject** (the LLM-driven component).
+- **`CodeExecutorAgent`** — the AgentChat agent that receives messages, extracts fenced code blocks, and drives an executor; optionally uses a `model_client` to generate its own code and reflect on results. This is the LLM-driven component.
 - **The executor implementations** — supporting, deterministic components that perform the actual execution: `LocalCommandLineCodeExecutor` (host), `DockerCommandLineCodeExecutor` (container, the recommended production path), `JupyterCodeExecutor` and `DockerJupyterCodeExecutor` (stateful Jupyter kernels), and `ACADynamicSessionsCodeExecutor` (Azure-managed cloud sandbox). `create_default_code_executor` selects an executor, preferring Docker.
 
 Per-component rules appear as sub-headings within the existing sections below; no new top-level sections are introduced.
@@ -44,7 +38,7 @@ Per-component rules appear as sub-headings within the existing sections below; n
 
 ## Job Description
 
-- Extract code from properly formatted markdown code blocks (triple-backtick fences) in incoming messages and execute only code in supported languages (Python and shell for command-line executors; Python only for the Jupyter and Azure executors).
+- Extract code from properly formatted markdown code blocks (triple-backtick fences) in incoming messages and execute only code in permitted languages (Python and POSIX shell — `sh`/`bash` — for command-line executors; Python only for the Jupyter and Azure executors; no other shell dialects).
 - Execute each code block inside the configured execution environment, in the order received, and return a structured result containing exit status and captured output.
 - Manage the lifecycle of the execution environment — start and stop containers, restart Jupyter/Azure sessions, create and (where configured) clean up the working directory and temporary files.
 - Confine all file reads and writes to a configured working directory (for the Azure executor, `/mnt/data`).
@@ -56,8 +50,6 @@ Per-component rules appear as sub-headings within the existing sections below; n
 ---
 
 ## Non-Goals (Out of Scope)
-
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
 
 - Evaluating the semantic safety of the code — that is the responsibility of the calling agent's prompting, an approval function, or a separate review step, not the executor's core loop.
 - Sending email, SMS, webhooks, or any outbound message on its own behalf.
@@ -72,16 +64,14 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
-| Inbound code blocks from the paired code-generator agent / group chat | Yes | No | Code arrives as fenced blocks in AgentChat messages; the `sources` filter, when set, restricts which agents' messages are executed |
+| Inbound code blocks from the paired code-generator agent / group chat | Yes | No | Code arrives as fenced blocks in AgentChat messages; in a group chat the `sources` filter must be set to exactly the paired code-generator agent |
 | Return of stdout / stderr / exit status to the calling agent | Yes | No | Structured `CodeResult`; output must never be silently discarded |
 | Files written to the configured working directory | Yes | No | Confined to `work_dir` (or `/mnt/data` for the Azure executor) |
 | Docker daemon / Docker socket (container executors) | Yes | No | Used to create, control, and stop execution containers; "Docker out of Docker" (mounted socket) is the recommended containerized-app pattern |
 | HTTPS to the Azure Container Apps dynamic-sessions endpoint | Yes | No | Only for the `ACADynamicSessionsCodeExecutor`; authenticated with the configured token provider |
 | Jupyter server / kernel connection | Yes | No | For the Jupyter executors; stateful within a session |
-| Outbound network egress initiated by the executor itself | No | Yes | The executor must not initiate its own network traffic beyond a configured allow-list. |
+| Outbound network egress initiated by the executor itself | No | — | The executor initiates no network traffic of its own; the egress allow-list defaults to empty, and enabling any egress is an approval-gated configuration change (see Action Boundaries) |
 | Email / SMS / webhooks / arbitrary message queues | No | — | Never an executor channel |
-
-**Any channel not listed here is unauthorized by default.**
 
 ---
 
@@ -100,15 +90,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ### Explicitly Forbidden
 - Any code source other than the paired agent's generated code blocks and code passed explicitly by operator application logic — code arriving from a file, HTTP endpoint, message queue, or memory store must not be accepted by the executor interface.
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
 
 ### Allowed Tools (Known Good Baseline)
-
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
 
 - Execute a batch of code blocks in the configured environment and return exit status and output.
 - Start and stop the execution environment (container start/stop, kernel/session start).
@@ -122,11 +108,10 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - The local host executor (`LocalCommandLineCodeExecutor`) in production — it runs generated code directly on the host OS with no container isolation and is acceptable only on an ephemeral, isolated, operator-approved host.
 - Exposing host GPUs or other host devices to a container executor.
 - Mounting host volumes into a container executor at any path other than the configured working directory.
-- Enabling network egress from the execution environment beyond a configured allow-list.
+- Running a container executor with any image other than the default `python:3-slim`.
+- Enabling network egress from the execution environment; the egress allow-list defaults to empty.
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - Any mechanism that loads or executes code fetched from a remote URL or other unverified source on the LLM's behalf.
 - Any capability that persists execution results to long-term storage or carries state across unrelated sessions.
@@ -143,16 +128,12 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
-
 - Host credentials, environment variables, and secrets of the parent process.
 - The Docker socket / daemon control channel.
 - The Azure token / credential used to authenticate to the dynamic-sessions endpoint.
 - Any data outside the working directory (databases, user data, host filesystem).
 
 ### Forbidden Data Movement
-
-*Specific patterns of data movement that are never authorized.*
 
 - Reading or modifying the parent process's environment, credentials, or state from within an execution.
 - Moving files or data outside the configured working directory.
@@ -163,15 +144,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Action Boundaries
 
->
-> - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
-> - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
-> - ✗ *"Handle email appropriately"*
-> - ✗ *"Be careful with sensitive data"*
->
-> The first two rules give Praxen something to audit. The second two don't.
-> Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
-
 ### Allowed Without Approval
 - Execute code blocks received from the paired agent inside an isolated container executor, confined to the working directory and subject to the configured timeout.
 - Return stdout, stderr, and exit status to the calling agent in structured form.
@@ -180,15 +152,14 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Requires Human Approval Before Execution
 - Executing code on the local host executor in a production deployment (default production deployments must use a containerized executor).
-- Enabling any network egress from the execution environment beyond a configured allow-list.
+- Enabling any network egress from the execution environment; the egress allow-list defaults to empty.
 - Mounting host volumes into a container executor at any path other than the configured working directory.
-- Any change to resource limits (CPU, memory, timeout) that raises the ceiling.
+- Running a container executor with any image other than the default `python:3-slim`.
+- Any change to resource limits above the baseline ceiling of 1 CPU core, 1 GiB memory, and a 60-second execution timeout per execution.
 - Exposing host GPUs or other host devices to a container executor.
-- When an approval function is configured, executing any code block it has not approved.
+- Executing any code block not approved by the configured approval function; production deployments must configure an approval function — the auto-approve default is permitted only in non-production use.
 
 ### Never Allowed
-
-*Praxen will emit a Critical finding for any of these.*
 
 - Executing code with host-level privileges when a less-privileged option achieves the same task.
 - Acting on instructions embedded in the code source that attempt to escape the sandbox, escalate privileges, or exfiltrate data.
@@ -208,8 +179,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Expected Patterns
 
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
-
 - Receive a batch of code blocks, execute them serially in the order received, return one structured result, and (for non-stateful executors) tear down or reset the environment.
 - With `model_client`: generate code, execute, reflect on the result, and stop.
 - Stateful Jupyter/Azure sessions preserve variables across executions within the same session only, and reset on restart.
@@ -223,8 +192,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ---
 
 ## Known Good Baseline
-
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
 
 ### Typical Tool Inventory
 - One executor instance (Docker command-line executor recommended) plus lifecycle start/stop and execute-code-blocks.
@@ -249,13 +216,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ## Swimlane Definition
 
 ### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
 
 - Executing paired-agent-generated Python and shell code for the operator application's task, inside the configured isolated environment.
 - Returning execution output and lifecycle management of that environment.
 
 ### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
 
 - Judging whether code is semantically safe to run (belongs to the caller / approval step).
 - Any work outside code execution: messaging, data persistence, authentication, scheduling, or acting as a network service.
@@ -263,8 +228,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ---
 
 ## Risk Sensitivities
-
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
 
 - Sandbox escape and container/host isolation boundaries.
 - Working-directory traversal (symlinks, `..`, absolute paths, volume-mount overrides).
@@ -279,12 +242,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
-
-*State each condition precisely — Praxen will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
-
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
 
 - A code execution attempts to read or write outside the working directory, or to escape the container/sandbox.
 - A code execution attempts to escalate privileges or access parent-process credentials or environment.
@@ -304,8 +262,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
-
 - The agent receives a fenced Python block from the paired coder agent, runs it in a `python:3-slim` Docker container confined to `work_dir` with a 60-second timeout, captures the output, returns exit status and stdout, and stops the container on exit.
 - A configured approval function is called with the code before execution; the agent executes only after an approval response.
 - On an execution error, the model-backed agent regenerates code and retries up to `max_retries_on_error`, then yields a reflection result instead of looping indefinitely.
@@ -313,8 +269,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 ## Example Bad Behavior
-
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
 
 - The agent runs generated code on the local host in production instead of a container, with no operator approval.
 - Code writes to a path outside the working directory via a symlink or `../` traversal and the executor allows it.
@@ -325,23 +279,4 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 ---
 
 *Worker Remit — Praxen*
-*Customized for: AutoGen Code Executor | Version: 1.0 | 2026-07-11*
-
----
-
-## Open Questions for the operator
-
-*These are genuine operator-intent decisions that cannot be derived from the documentation. They sit outside the policy body above (which a Praxen scan reads as rules) so they travel with the remit and reach the operator.*
-
-1. **Authorized executor for this deployment.** Which executor is this deployment permitted to use — Docker command-line (recommended), Jupyter/Docker-Jupyter, Azure dynamic sessions, or local host? Is the local host executor permitted at all, and if so only on ephemeral, isolated hosts?
-2. **Network egress scope.** Is any network egress from the execution environment in scope for this deployment, and if so, what is the exact allow-list of destinations?
-3. **Approved container image.** Which container image(s) are authorized (default is `python:3-slim`)? Are custom images allowed and from which registries?
-4. **Resource ceiling.** What are the maximum authorized resource limits (CPU, memory, and execution timeout) above which operator approval is required?
-5. **Authorized code sources (`sources` allowlist).** Which specific agent(s) are authorized to supply code for execution when the agent runs in a group chat?
-6. **Permitted languages (`supported_languages`).** Should execution be restricted to a subset of languages (e.g., Python only), or are all default supported shell dialects permitted?
-7. **Approval requirement.** Should an approval function be mandatory for this deployment (rather than the default of auto-approving all executions), and what approval criteria apply?
-
----
-
-*Authoring notes for the operator (not policy):*
-- **Thin-docs flag.** The project's `SECURITY.md` is a generic Microsoft vulnerability-reporting boilerplate and says nothing about the executor's runtime security posture. The **escalation / alerting surface is essentially undocumented** — the documentation describes an inline `approval_func` (approve/deny before execution) but no halt/alert/telemetry behavior. The Escalation Rules and the "Log Only" audit-record clause above are therefore stated as **conservative security intent**, not transcribed from docs; confirm they match your operational expectations.
+*Customized for: AutoGen Code Executor | Version: 1.1 | 2026-07-27*

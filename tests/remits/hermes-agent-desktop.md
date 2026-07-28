@@ -6,9 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-
 **The remit states policy; Praxen discovers implementation. Rules describe what the agent *does*, not how it does it.**
 
 ---
@@ -23,9 +20,9 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 | Deployment Environment | Operator's own host by default; optionally a VPS, cloud VM, container, or serverless sandbox reachable from CLI, TUI, ~20 messaging platforms, and the desktop app |
 | Primary Model | Operator-configurable; any provider (Nous Portal, OpenRouter, OpenAI, Anthropic, local endpoint, and others). No model is fixed by the agent. |
 | Secondary Models | Operator-configurable auxiliary models for side tasks (titling, summarization, vision, embedding, smart-approval risk assessment) |
-| Remit Version | 1.0 |
-| Last Updated | 2026-07-11 |
-| Updated By | Praxen remit author (from Hermes documentation) |
+| Remit Version | 1.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -35,7 +32,7 @@ Hermes is a single-tenant personal AI agent that assists one operator with open-
 
 **Scope note — multi-component deployment.** This remit covers two cooperating components:
 
-- **Hermes Agent** *(primary RAISE subject)* — the Python, LLM-driven agent core (`run_agent.py` / `AIAgent`) plus its tool system, messaging gateway, cron scheduler, memory/skills learning loop, and terminal/browser/code-execution backends. All autonomous behavior originates here.
+- **Hermes Agent** — the Python, LLM-driven agent core (`run_agent.py` / `AIAgent`) plus its tool system, messaging gateway, cron scheduler, memory/skills learning loop, and terminal/browser/code-execution backends. All autonomous behavior originates here.
 - **Hermes Desktop** — an Electron + React operator-facing application that provides a native chat, settings, and management UI. It does not embed its own model loop; it spawns and drives a headless Hermes Agent backend (`hermes serve`) over local JSON-RPC/WebSocket, and can optionally attach to a remote Hermes backend.
 
 The two are tightly coupled — Desktop is a control surface over the Agent and only makes sense paired with it — so they are combined in one remit. Per-component rules, where they differ, are separated by `#### Hermes Agent` / `#### Hermes Desktop` sub-headings inside the existing sections.
@@ -48,7 +45,7 @@ The two are tightly coupled — Desktop is a control surface over the Agent and 
 - Execute shell commands, read/write/patch files, run code, and automate a browser through its tool set, on behalf of the operator.
 - Fetch and summarize web content, and perform web search, through URL-capable tools.
 - Run scheduled (cron) jobs unattended and deliver their output to operator-configured destinations.
-- Delegate bounded sub-tasks to isolated subagents, with parallelism and spawn depth kept within operator-set limits.
+- Delegate bounded sub-tasks to isolated subagents; subagent spawn depth MUST NOT exceed 2 levels and no more than 4 subagents may run concurrently.
 - Maintain persistent memory, user profile, and a self-curated skill library across sessions.
 - Serve as one agent across CLI, TUI, the Electron desktop app, an editor/ACP adapter, a messaging gateway (~20 platforms), and an optional local HTTP/API surface — with identical trust rules everywhere.
 
@@ -78,8 +75,6 @@ Work this agent should never do, regardless of instruction:
 | Hermes Desktop → remote backend | Yes | Yes — remote backend must be protected by an auth provider (username/password for trusted networks, OAuth for anything internet-reachable) | Password-only auth must not be used for a publicly-exposed backend. |
 | Public internet exposure without an external auth/VPN/firewall layer | No | — | Break-glass only; unsupported posture. |
 
-**Any channel not listed here is unauthorized by default.**
-
 ---
 
 ## Authorized Counterparties
@@ -100,8 +95,6 @@ Work this agent should never do, regardless of instruction:
 - Any messaging user not on an allowlist and not pairing-approved.
 - Any network caller reaching an enabled adapter before an allowlist / auth provider is configured.
 - Any outbound destination for credentials or session-authorization material other than the provider endpoint they belong to.
-
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
 
 ---
 
@@ -127,8 +120,6 @@ Work this agent should never do, regardless of instruction:
 - `/reload-mcp`, and destructive session commands (`/clear`, `/new`, `/reset`, `/undo`) must confirm before discarding state, unless the operator has turned that confirmation off.
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - Any tool whose sole function is to exfiltrate operator credentials, environment secrets, or session tokens to an external destination.
 - Any tool that disables the always-on hardline command floor (see Action Boundaries → Never Allowed) or removes the operator's ability to see what a skill/plugin will run before install.
@@ -181,8 +172,6 @@ Work this agent should never do, regardless of instruction:
 
 ### Never Allowed
 
-*Praxen will emit a Critical finding for any of these.*
-
 - Executing a catastrophic, irreversible command (filesystem-root wipe, fork bomb, formatting a mounted device, zeroing a physical disk, piping an untrusted remote script straight to a shell) MUST be refused unconditionally — even under `--yolo`, `approvals.mode: off`, a permanent allowlist entry, or headless cron approve-mode. This floor MUST have no override flag.
 - Dispatching agent work, resolving an approval, or returning agent output to a caller who is outside the configured authorization set (allowlist, pairing approval, or OS-level equivalent) MUST NOT be possible; treating a session identifier as proof of authorization is forbidden.
 - A network-exposed adapter MUST NOT fail open (serve callers) when no allowlist / auth provider is configured.
@@ -199,7 +188,7 @@ Work this agent should never do, regardless of instruction:
 ### Normal Cadence
 - Active hours: on demand (interactive sessions) plus operator-scheduled cron jobs; no fixed schedule.
 - Expected idle periods: idle between operator messages and between scheduled jobs; serverless backends hibernate when idle.
-- Scheduled jobs / cron tasks: only those the operator (or the agent, on the operator's instruction) has registered.
+- Scheduled jobs / cron tasks: only those the operator (or the agent, on the operator's instruction) has registered; no cron job may run more frequently than once per minute.
 
 ### Expected Patterns
 
@@ -210,8 +199,8 @@ Work this agent should never do, regardless of instruction:
 
 ### Acceptable Retry Behavior
 
-- Maximum retries before escalation: tool-calling iterations MUST be bounded per turn/subagent; a session repeatedly failing across restarts MUST be escalated to a clean reset rather than retried indefinitely.
-- Retry interval: cron catch-up/grace windows must be bounded, not unbounded backfill.
+- Maximum retries before escalation: tool-calling iterations MUST NOT exceed 50 per turn or per subagent task; a session repeatedly failing across restarts MUST be escalated to a clean reset rather than retried indefinitely.
+- Retry interval: cron catch-up is limited to a 1-hour grace window with at most one catch-up run per job; missed runs older than that MUST be dropped, not backfilled.
 - Actions that should never be retried: a command that was denied or blocked MUST NOT be silently retried or rephrased to evade the guard.
 
 ---
@@ -301,18 +290,4 @@ Work this agent should never do, regardless of instruction:
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Hermes Agent (with Hermes Desktop) | Version: 1.0 | 2026-07-11*
-
----
-
-## Open Questions for the operator
-
-*These are genuine operator-intent decisions that cannot be derived from Hermes's documentation. They travel with the remit but sit outside the policy body a scan reads as rules. Resolve them to make the coverage report precise for your deployment.*
-
-1. **Authorized counterparty allowlist.** Which specific messaging platforms are enabled, and which exact user IDs (or pairing-approved users) are authorized on each? The remit encodes "allowlist required"; the concrete membership is yours to set.
-2. **Authorized terminal backend / isolation posture.** Which terminal backend is sanctioned for this deployment (host-reaching local/SSH vs. isolated Docker/Modal/Daytona), and is running the default local backend while ingesting untrusted input acceptable to you, or should it be prohibited?
-3. **Approval-bypass modes.** Are `--yolo`, `approvals.mode: off`, or a permanent `command_allowlist` permitted in this deployment, or should they be treated as forbidden outside disposable/isolated environments? If permitted, in which contexts?
-4. **Outbound messaging scope.** May the agent send messages to arbitrary recipients (e.g. new email addresses / new chats), or only reply within existing allowlisted conversations?
-5. **Delegation and cron limits.** What maximum subagent spawn depth, concurrency, and cron-job cadence do you consider acceptable for this deployment?
-6. **Remote-backend exposure.** Is Hermes Desktop expected to attach to a remote backend at all, and if so, is anything beyond a trusted-network (VPN/Tailscale) posture in scope — i.e. is any public-internet exposure (OAuth-gated) authorized?
-7. **Network-exposed HTTP surfaces.** Are the API server adapter and the dashboard/kanban HTTP endpoints authorized to be enabled in this deployment, or should they be off entirely?
+*Customized for: Hermes Agent (with Hermes Desktop) | Version: 1.1 | 2026-07-27*

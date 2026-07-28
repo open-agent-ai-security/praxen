@@ -6,12 +6,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-Customize this template for the specific agent before running an analysis.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -24,9 +18,9 @@ Customize this template for the specific agent before running an analysis.
 | Deployment Environment | Local developer command-line tool, run one-shot under direct supervision. Talks to the LangSmith Managed Deep Agents platform (`/v1/deepagents/*`) and the LangChain Hub (`/v1/platform/hub`) over HTTPS using the developer's own `LANGSMITH_API_KEY` / `LANGCHAIN_API_KEY`. |
 | Primary Model | Not applicable — the CLI performs no LLM inference. Model identifiers it handles (e.g. the scaffold default `openai:gpt-5.5`) are declared configuration carried into the bundle for the *deployed* agent to consume; the CLI itself never calls a model. |
 | Secondary Models | None |
-| Remit Version | 1.0 |
-| Last Updated | 2026-07-11 |
-| Updated By | Praxen remit authoring (from package documentation and module docstrings) |
+| Remit Version | 1.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -51,8 +45,6 @@ Customize this template for the specific agent before running an analysis.
 
 ## Non-Goals (Out of Scope)
 
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
-
 - Running the deployed agent itself, or performing any LLM inference — the CLI produces the artifact and hands it to the platform; it never invokes a model.
 - Acting as an interactive coding assistant or REPL — that surface moved to the separate `deepagents-code` (`dcode`) package; a bare `deepagents` invocation only redirects the user there.
 - Operating as a hosted, multi-tenant, or long-running background service — it is a one-shot local developer tool run under direct supervision.
@@ -74,8 +66,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 | User-local state under `~/.deepagents/` | Yes | No | Deploy state / MCP-id cache keyed by project root + endpoint. Repo-local state is intentionally ignored for auth decisions. |
 | Browser launch for MCP OAuth (`mcp-servers connect`) | Yes | No | Opens the verification URL; `--no-browser` prints it instead. |
 | Any other outbound network destination (email, arbitrary HTTP hosts, telemetry) | No | — | Not part of the tool's surface. |
-
-**Any channel not listed here is unauthorized by default.**
 
 ---
 
@@ -99,15 +89,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - MCP servers that are not already registered in the workspace, or that the caller's identity cannot invoke.
 - Any outbound destination beyond the platform, Hub, tracing, and MCP-OAuth verification URLs.
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
 
 ### Allowed Tools (Known Good Baseline)
-
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
 
 - `deepagents init [name] [--force]` — scaffold a starter project.
 - `deepagents deploy [--dir] [--dry-run] [--detach] [--reset] [--yes]` — validate, bundle, and upsert the managed agent.
@@ -123,8 +109,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 - Deleting a workspace agent or MCP server — gated behind an interactive confirmation (or `--yes`).
 
 ### Forbidden Tools
-
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
 
 - Any LLM/model client invoked by the CLI itself (the tool performs no inference).
 - Any interactive-REPL / coding-agent surface (belongs to `deepagents-code`).
@@ -142,15 +126,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
-
 - Platform / model-provider / Hub / tracing credentials and API keys.
 - MCP server auth headers (e.g. API keys passed via `--header`).
 - The project's system prompt, skills, and subagent instructions (carried into the bundle).
 
 ### Forbidden Data Movement
-
-*Specific patterns of data movement that are never authorized.*
 
 - Writing, committing to version control, logging, or printing platform / provider / Hub / tracing credentials or MCP auth-header values. (MCP header values are redacted to `***` on `mcp-servers get`.)
 - Folding secret material (e.g. `.env` contents) into the seeded bundle payload — environment stays environment; it is never merged into the skills, subagent, or managed-directory payload.
@@ -175,8 +155,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Never Allowed
 
-*Praxen will emit a Critical finding for any of these.*
-
 - Shipping a bundle assembled from anything other than the project's declared sources.
 - Deploying a project that failed configuration validation.
 - Reaching the platform over a non-HTTPS endpoint, or one carrying userinfo.
@@ -196,8 +174,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Expected Patterns
 
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
-
 - Each invocation runs to completion and exits; it does not linger or poll except for the bounded post-deploy health check and OAuth session polling (with a `--timeout`).
 - `deploy` prints a beta warning, validates, resolves referenced MCP servers against the live workspace list, upserts, then prints a deploy summary (agent name, id, revision, console URL) and an optional health check unless `--detach`.
 - A malformed project stops the deploy with a specific error rather than shipping a partial or invalid bundle.
@@ -211,8 +187,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ---
 
 ## Known Good Baseline
-
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
 
 ### Typical Tool Inventory
 - Subcommands `init`, `deploy`, `agents`, `mcp-servers` — and nothing that invokes a model, opens a REPL, or spawns a local server.
@@ -237,13 +211,11 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ## Swimlane Definition
 
 ### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
 
 - Scaffolding, validating, bundling, and deploying a declared Managed Deep Agents project.
 - Managing the workspace agents and MCP servers that project references.
 
 ### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
 
 - Running or reasoning as the deployed agent; any LLM inference.
 - Interactive coding-assistant work (defer to `deepagents-code`).
@@ -252,8 +224,6 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ---
 
 ## Risk Sensitivities
-
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
 
 - **Bundle fidelity** — the CLI's central promise is that the deployed bundle faithfully and *only* reflects the developer's declared, reviewed project; any path escape, symlink follow, or undeclared source folded into the bundle is a core-guarantee break.
 - **Credential handling** — keys and MCP auth headers must never be persisted, logged, printed, or folded into the bundle payload.
@@ -265,10 +235,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
-
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
 
 - Project configuration fails validation (bad `agent.json`/`tools.json`, missing required files, invalid backend/permissions, malformed skill frontmatter) — stop with the specific error; do not ship.
 - A referenced MCP server URL is unregistered or uninvokable by the caller's identity — stop with a registration/connect hint.
@@ -290,8 +257,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
-
 - `deepagents deploy --dry-run` prints the full payload and managed-directory files and sends nothing.
 - `deploy` refuses a project whose `tools.json` references an MCP URL not registered in the workspace, and tells the developer exactly which URL and how to register it.
 - Deploying to a declared `agent_id` first prints "Deploy to agent <name> (<id>)? This will update that remote agent" and waits for `y`.
@@ -302,8 +267,6 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Bad Behavior
 
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
-
 - The bundle includes a file reached through a symlink or `../` path escape outside the project root.
 - A deploy proceeds over `http://` or an endpoint with embedded userinfo.
 - Credentials or an MCP auth-header value are written into the project, committed, logged, or printed in cleartext.
@@ -313,14 +276,7 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ---
 
-## Open Questions for the operator
-
-- **`dev` command discrepancy:** `libs/cli/README.md` and `DEVELOPMENT.md` document a `deepagents dev` command (bundle the project and run it on a local dev server, with a `print_bundle_summary`). The migrated code (`main.py._dispatch_command`, `deploy/commands.py.setup_deploy_parsers`) only wires `init`, `deploy`, `agents`, and `mcp-servers` — there is **no** `dev` command. The prior remit's Known Good Baseline listed `init`, `dev`, `deploy` as the surface. This remit encodes the actual wired surface; confirm whether `dev` was removed (docs stale) or lives in another package before re-adding it.
-- **"Unauthenticated-API deploy confirmation" (re-homed from the prior remit):** the prior remit's central approval rule was that a deploy leaving the agent's API "open to anyone with the URL" must require explicit operator confirmation. The current deploy surface has no such gate — agent authentication and frontend access are now **platform-managed** (the legacy `[auth]`/`[frontend]` config is explicitly rejected with a "managed by the platform now" hint). The only confirmation gate in the current code is the **deploy-target** confirmation (updating a remote agent declared by `agent_id`). This remit re-homed the prior intent onto that real gate. Confirm the unauthenticated-API concern is genuinely out of scope for this CLI (it appears to derive from the retired local dev-server surface, `LANGGRAPH_AUTH_TYPE=noop`).
-- **MCP-TLS enforcement point:** this remit requires remote MCP server URLs to use TLS (Action Boundaries → Never Allowed). Confirm *where* that guarantee is applied — at registration time (`mcp-servers add`), at bundle/deploy time, or platform-side — since the current deploy path does not itself re-check the scheme of already-registered MCP URLs.
-- **Bundle dependency pinning / integrity:** the prior remit asserted the bundle's dependency set is derived only from declared providers and that remote MCP servers are pinned to a known-good, integrity-checked version. No dependency-bundling step is visible in the migrated deploy surface (deps are platform-resolved). Confirm where, if anywhere, this now lives.
-
 ---
 
 *Worker Remit — Praxen*
-*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.0 | 2026-07-11*
+*Customized for: Deep Agents CLI (`deepagents-cli`) | Version: 1.1 | 2026-07-27*

@@ -11,11 +11,6 @@
 # Worker Remit
 *Praxen — Agent Policy*
 
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
-
 ---
 
 ## Identity
@@ -28,9 +23,9 @@ It is the policy contract Praxen evaluates the agent's code and configuration ag
 | Deployment Environment | Self-hosted on the operator's own Windows / macOS / Linux machine |
 | Primary Model | Operator-selected LLM (OpenAI, Google Gemini, Anthropic Claude, OpenRouter, or local Ollama) |
 | Secondary Models | Vision / embedding / image / video models as configured |
-| Remit Version | 1.0 |
-| Last Updated | 2026-07-10 |
-| Updated By | Praxen (operator to review) |
+| Remit Version | 1.1 |
+| Last Updated | 2026-07-27 |
+| Updated By | Praxen remit maintenance (template de-cruft, v1.2) |
 
 ---
 
@@ -69,7 +64,7 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 | Operator-connected email / social (Gmail, Outlook, LinkedIn, Twitter/X) | Yes | Yes | Sending mail or posting publicly is a high-impact outbound action. |
 | Operator-connected productivity/data services (Google Drive/Docs/Calendar/YouTube, Notion, Jira, HubSpot, GitHub, Stripe) | Yes | Yes for state-changing / financial operations | Read is lower-risk; writes, payments, and deletions are high-impact. |
 
-**Any channel not listed here is unauthorized by default. Inbound messages from a messaging channel must never be treated as authenticated operator commands without a sender-identity check.**
+**Any channel not listed here is unauthorized by default. Inbound messages from a messaging channel must never be treated as authenticated operator commands without a sender-identity check. Only the identity-verified operator may be answered or acted on automatically; a reply to, or action on behalf of, any other sender requires explicit operator approval.**
 
 ---
 
@@ -88,8 +83,6 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 - Unknown inbound senders on any messaging channel, treated as trusted commanders without an identity check.
 - Any outbound destination (email address, chat, API, URL) the operator has not directed for the task at hand.
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
@@ -104,8 +97,8 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 - Shell / code execution and Living-UI process management (see Restricted).
 
 ### Restricted Tools (Require Approval Before Use)
-- Arbitrary shell or code execution on the host. Because this capability can read, modify, or destroy any file the operator can and can reach the network, it MUST run isolated from the host or require operator approval before executing a state-changing or destructive command, and it MUST NOT silently inherit the operator's full secret-bearing environment.
-- Running imported / marketplace Living UI projects and third-party MCP servers, which execute third-party code. These MUST be isolated from the operator's credentials and broader filesystem and MUST come from a source the operator approved.
+- Arbitrary shell or code execution on the host. Because this capability can read, modify, or destroy any file the operator can and can reach the network, it MUST require per-command operator approval before executing any state-changing or destructive command, and it MUST NOT silently inherit the operator's full secret-bearing environment.
+- Running imported / marketplace Living UI projects and third-party MCP servers, which execute third-party code. These MUST be isolated from the operator's credentials and broader filesystem, and each item MUST be explicitly approved by the operator before its first run; no marketplace or MCP code may be installed or executed automatically.
 
 ### Forbidden Tools
 - Any capability that exposes agent control, files, or credentials to a network-reachable, unauthenticated caller.
@@ -138,6 +131,8 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 - Any irreversible or externally-visible action: sending email/messages, posting publicly, making payments or other financial operations, and creating/modifying/deleting data in a connected third-party account.
 - Executing shell commands or code that changes host state, and installing/running third-party code (MCP servers, imported projects).
 - Proactive (agent-initiated, unprompted) actions that reach beyond silent internal analysis — an agent-initiated high-impact action requires explicit operator approval, and this gating MUST be enforced by code, not left to model discretion alone.
+
+Approval means an explicit, per-action operator confirmation in the local browser UI / CLI before the action executes; a standing or default-on setting does not constitute approval.
 
 ### Never Allowed
 - Fabricating success for an action that failed.
@@ -233,15 +228,4 @@ CraftBot is a self-hosted, general-purpose personal AI agent that works alongsid
 ---
 
 *Worker Remit — Praxen*
-*Customized for: CraftBot | Version: 1.0 | 2026-07-10*
-
----
-
-## Open Questions for the operator
-
-*These require operator intent that could not be derived from CraftBot's documentation. Resolve each — answer as a real clause or delete — before relying on this remit.*
-
-1. **Shell/code execution scope.** Is arbitrary host shell/code execution an intended first-class capability of this agent at all, or should it be disabled / confined to a container? If intended, what is the approval or isolation requirement you want (per-command approval, allow/deny list, container-only)?
-2. **Inbound messaging auto-reply.** For connected messaging channels with `auto_reply` enabled, which senders (if any) may the agent answer or act on automatically, and which require explicit operator approval?
-3. **Outbound approval threshold.** Which specific outbound/third-party actions require approval every time (all sends? only payments and deletes?), and what constitutes "approval" (a UI confirmation, a typed token)?
-4. **Third-party MCP / marketplace Living UI provenance.** What is your allowlist / vetting requirement for MCP servers and imported/marketplace Living UI projects before they may run on the host?
+*Customized for: CraftBot | Version: 1.1 | 2026-07-27*
