@@ -21,6 +21,7 @@ import datetime
 import html
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -28,7 +29,25 @@ THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 from theme_utils import load_theme_css, masthead  # noqa: E402
 
-DEFAULT_BASELINE = THIS_DIR / "v1.1-claude48"
+def _baseline_sort_key(p: Path):
+    """Version-aware sort key for `v*` baseline dirs (v1.2 sorts above v1.1)."""
+    nums = [int(x) for x in re.findall(r"\d+", p.name)]
+    return nums or [0]
+
+
+def _default_baseline() -> Path:
+    """Return the canonical baseline named in CURRENT, falling back to the newest v* dir."""
+    current_file = THIS_DIR / "CURRENT"
+    if current_file.is_file():
+        candidate = THIS_DIR / current_file.read_text(encoding="utf-8").strip()
+        if candidate.is_dir():
+            return candidate
+    candidates = sorted([p for p in THIS_DIR.glob("v*") if p.is_dir()],
+                        key=_baseline_sort_key, reverse=True)
+    return candidates[0] if candidates else THIS_DIR / "v1.1-claude48"
+
+
+DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "suite-health-report.html"
 SNAPSHOT_DATE = "2026-07-11"
 
@@ -107,8 +126,18 @@ def rows_table(rows, out_dir: Path):
                 rep = f' · <a href="{html.escape(str(rel))}">report ↗</a>'
             except ValueError:
                 pass
+        # Pretty-printed Worker Remit (the policy the report was scored against),
+        # rendered alongside the report in the same target dir by render_all_remits.py.
+        remit_html = DEFAULT_BASELINE / slug / f"{slug}-remit.html"
+        rem = ""
+        if remit_html.is_file():
+            try:
+                rel = remit_html.resolve().relative_to(out_dir.resolve())
+                rem = f' · <a href="{html.escape(str(rel))}">remit ↗</a>'
+            except ValueError:
+                pass
         body.append(f"""      <tr>
-        <td class="t-name">{html.escape(disp)}<div class="t-repo"><a href="https://github.com/{html.escape(repo)}" target="_blank" rel="noopener">{html.escape(repo)}</a>{rep}</div></td>
+        <td class="t-name">{html.escape(disp)}<div class="t-repo"><a href="https://github.com/{html.escape(repo)}" target="_blank" rel="noopener">{html.escape(repo)}</a>{rem}{rep}</div></td>
         <td class="sponsor">{html.escape(SPONSOR.get(slug, "—"))}</td>
         <td class="num">{star_str(stars)}</td>
         <td>{fresh_pill(fresh)}</td>
