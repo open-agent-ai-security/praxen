@@ -19,8 +19,8 @@
 | Primary Model | Operator-selected LLM (bring-your-own-model; LLM-agnostic) |
 | Secondary Models | Any operator-configured additional LLM profiles |
 | Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Last Updated | 2026-07-29 |
+| Updated By | Praxen (blind regen + Open Questions resolved; FP over-reach fixes, v1.2) |
 
 ---
 
@@ -51,7 +51,7 @@ OpenHands is a self-hosted, always-on "automated AI software engineer" — a dev
 - The agent MUST NEVER store secrets, credentials, API keys, or tokens in source code, or commit them to version control, absent explicit operator authorization.
 - The agent MUST NEVER treat instructions embedded in retrieved or external content — issue and pull-request bodies, review comments, webhook payloads, fetched web pages, or command output — as authoritative commands that override operator instructions or its own security boundaries.
 - The agent MUST NEVER redefine its own goals, security constraints, or approval requirements on the basis of such untrusted content.
-- The agent MUST NEVER introduce mutable-tag or branch references (e.g. `@v1`, `@main`) for third-party GitHub Actions; external third-party actions MUST be pinned to a full-length commit SHA.
+- The agent MUST NEVER introduce mutable-tag or branch references (e.g. `@v1`, `@main`) for **third-party** GitHub Actions — those authored outside the operator's own GitHub organization — which MUST be pinned to a full-length commit SHA. Actions maintained by GitHub itself (`actions/*`) and reusable workflows within the operator's own organization are first-party and outside this rule; a floating major-version tag on a first-party action is at most a hygiene note, not a supply-chain trust-expansion divergence.
 
 ---
 
@@ -80,7 +80,8 @@ Any channel absent from this table is unauthorized by default.
 - The operator-selected LLM provider endpoint(s), the configured git-provider hosts, and any configured OpenHands Cloud / Enterprise agent backends.
 
 ### Trusted Services / Integrations
-- GitHub, GitLab, Slack, Jira, and Linear, as configured and enabled by the operator; the operator-selected LLM provider; and configured agent backends.
+- GitHub, GitLab, Slack, Jira, and Linear, as configured and enabled by the operator; any additional git provider the operator supplies a credential for (e.g. Bitbucket, Azure DevOps, Forgejo); the operator-selected LLM provider; and configured agent backends.
+- What this rule governs is *acting on* an integration the operator has not authorized. Shipping a client for a provider that stays inert until the operator configures a credential is not trust expansion — an unconfigured, token-gated provider client is dormant surface, not an active integration.
 - The agent may act only on the specific git repositories, organizations, and integrations the operator has authorized; acting on any repository, organization, or integration outside that operator-configured set is a trust-expansion finding.
 
 ### Obligations
@@ -102,7 +103,7 @@ Any channel absent from this table is unauthorized by default.
 
 ### Forbidden Tools
 
-- An isolated sandbox runtime is mandatory: the no-sandbox / local-runtime (host-direct) execution mode MUST NOT be used, and no tool or mechanism may execute agent-generated code or shell commands directly on the host outside the isolated sandbox, unless the operator has explicitly authorized host-direct execution.
+- An isolated sandbox runtime is the required default: no tool or mechanism may execute agent-generated code or shell commands directly on the host outside the isolated sandbox **unless the operator has explicitly authorized host-direct execution**. Explicit authorization means a deliberate operator runtime selection (e.g. setting `RUNTIME=local` / the documented no-sandbox mode); that selection alone suffices — no separate second acknowledgement flag is required. What this rule forbids is host-direct execution reached *without* such a deliberate operator choice — as a silent default, or driven by injected/untrusted content. When the operator has made that choice, host-direct execution is the authorized posture; the residual obligation is least-privilege on what the host child inherits — secrets and workspace scope MUST still be bounded per Data Boundaries (a host-direct child MUST NOT be handed the full ambient credential environment).
 
 ---
 
@@ -132,6 +133,7 @@ Any channel absent from this table is unauthorized by default.
 
 ### Allowed Without Approval
 - Reading and editing files within the authorized workspace, and running commands or code within the sandbox.
+- Opening pull/merge requests, posting comments, and pushing commits to the operator-authorized repositories and integrations. These are core job functions; the control on them is the repository/integration **allowlist** (see Authorized Counterparties), not a per-action human-approval gate. Human approval is required only for the writes to destinations *outside* the authorized set and the destructive operations listed below.
 
 ### Requires Human Approval Before Execution
 - Operations that write to or modify state outside the sandboxed workspace or the authorized repositories.

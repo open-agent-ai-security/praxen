@@ -38,7 +38,7 @@ characterized run-to-run variance (bands below).
 | uagents | run1 | 1.70 | 0.45 (wide) |
 | aider | run1 | 1.70 | 0.30 |
 | openai-customer-service | run2 | 1.75 | 0.30 |
-| openhands | run2 | 2.00 | 0.15 |
+| openhands | run2 | 2.00 | 0.10 (re-scan) |
 | deepagents-cli | run1 | 2.15 | 0.15 |
 | yaah | run1 | 2.15 | 0.00 |
 | hermes-agent-desktop | run1 | 2.55 | 0.30 |
@@ -65,13 +65,22 @@ of **generator authoring defects**:
   mandatory-sandbox; operator-install vs transitive-bundle), **yaah** (host-posture scoped to
   permission-mode; MCP-path audit), **hermes** (R-02 rescoped to authority-escalation
   exempting the self-improvement loop; R-16 credential classes; R-04 output scope; closure
-  obligation surfaced; escalation response-not-restatement).
+  obligation surfaced; escalation response-not-restatement), **openhands** (R-04 "third-party"
+  defined as outside the operator's own org so first-party / GitHub-maintained actions aren't
+  flagged; Trusted Services notes dormant token-gated provider clients aren't trust expansion;
+  R-17 defines what authorizes host-direct execution while keeping the host-child
+  least-privilege obligation; PR/MR creation to authorized repos is allowlist-gated, not
+  per-action approval). Re-scan held the weighted score at 2.00; the change was in the finding
+  mix — Highs dropped and the over-reaching supply-chain / approval findings resolved to
+  positives, with every real core (control-plane auth-absent, CORS-open, plaintext-secret
+  store, `os.environ.copy()` host-child leak, missing repo allowlist) preserved.
 - **Clean** (no cleanup): openai-cs.
 - **Known over-reach, not yet fixed** (documented, tracked for follow-up): **helperbot**
   (fabricated topic-scope), **craftbot** (fabricated config params; GUI per-action approval),
   **salesforce** (invented public-only KB rule; overstated no-human-queue), **autogen**
   (mis-scoped R-01), **uagents** (value-transfer vs authorized-registration collision). These
-  produce a handful of over-severe / mis-mapped findings in their frozen reports.
+  produce a handful of over-severe / mis-mapped findings in their frozen reports. **aider** is
+  tracked separately under #200.
 
 The **durable fix is the generator, not per-remit hand-editing** — see RFE **#198**
 (emit well-formed, docs-grounded, non-over-reaching statements). The heading-as-rule pattern
