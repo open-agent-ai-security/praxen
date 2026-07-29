@@ -734,6 +734,16 @@ def main():
     except schema.SchemaError:
         check("N/A: non-renormalized weighted_overall with an N/A category is rejected", True)
 
+    # ── pretty-remit freshness ────────────────────────────────────────────────
+    # Every WORKER_REMIT.html (examples) and <slug>-remit.html (current baseline)
+    # is a deterministic render of its source Markdown. render_all_remits.py --check
+    # re-renders each and fails on any drift, so an edited remit whose HTML wasn't
+    # regenerated is caught here. Delegating keeps the source→dest map in one place.
+    rar = os.path.join(REPO_ROOT, "tests", "render", "render_all_remits.py")
+    r = subprocess.run([sys.executable, rar, "--check"], capture_output=True, text=True)
+    check("pretty-remit HTML is in sync with its remit (render_all_remits.py --check)",
+          r.returncode == 0, (r.stdout + r.stderr).strip())
+
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0
 

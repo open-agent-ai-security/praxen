@@ -180,6 +180,16 @@ The remit describes the agent; `SCAN_INSTRUCTIONS.md` points at it.
 
 If the agent is asked to write or update its own remit, treat that with caution. Praxen will surface a finding when the `Updated By` field of the remit names the agent itself rather than the operator. The remit is supposed to be operator-authored — it's the thing the agent is constrained against, so the agent should not be the one defining its own constraints.
 
+## Rendering a remit for sharing
+
+A Worker Remit is written in Markdown — great for hand- and agent-editing, less so for display or review. To produce a styled, self-contained HTML version that matches the look of a Praxen analysis report (same header and footer, with each section badged **POLICY** or **CONTEXT**), run:
+
+```bash
+python3 render_remit.py WORKER_REMIT.md      # writes WORKER_REMIT.html
+```
+
+It's a mechanical, deterministic translation — Markdown in, one HTML file out — so re-rendering an unchanged remit produces byte-identical output. You can also just ask the agent to "pretty-print" or "render" a remit and it will run this for you. The example and baseline remits published on the Praxen site are rendered this way and linked, next to each target's analysis report, from the [Suite Health index](https://open-agent-ai-security.github.io/praxen/tests/baselines/suite-health-report.html).
+
 ## Next steps
 
 - [Usage](usage.md) — how to run Praxen once you have a remit

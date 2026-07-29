@@ -17,7 +17,7 @@ For each example we followed the standard Praxen analysis workflow:
 
 **HTML vs. JSON:** The `*-analysis.html` file is a human-readable pretty-print of the findings data. The `*-findings.json` file is the same information structured for automated ingestion — use it for dashboards, ticketing, compliance pipelines, or diffing results across analyses.
 
-**CI contract:** `python3 tests/render/test_render.py` schema-validates every example's `*-findings.json` and re-renders its HTML/TXT byte-identically from that JSON. When `render.py` or `report_template.html` changes, regenerate the example reports from the canonical JSON before merging — same workflow as [`tests/baselines/`](../tests/baselines/).
+**CI contract:** `python3 tests/render/test_render.py` schema-validates every example's `*-findings.json` and re-renders its HTML/TXT byte-identically from that JSON. It also checks that each `WORKER_REMIT.html` is in sync with its `WORKER_REMIT.md` (the pretty remit is a deterministic render — see [`render_remit.py`](../skills/behavior-verifier/render_remit.py)). When `render.py`, `render_remit.py`, or `report_template.html` changes — or when a remit is edited — regenerate before merging: reports from the canonical JSON, and remits with `python3 tests/render/render_all_remits.py` — same workflow as [`tests/baselines/`](../tests/baselines/).
 
 ---
 
@@ -27,7 +27,7 @@ For each example we followed the standard Praxen analysis workflow:
 
 Praxen produced 16 findings (6 Critical, 3 High, 7 Medium), weighted RAISE posture 0.90 / 5.0 (Absent) — including an unauthenticated `/admin/finbot/goals` endpoint that writes attacker-supplied text straight into the agent's system prompt (the writable `custom_goals`, concatenated under an "OVERRIDE ABOVE IF CONFLICTING" directive), an entire unauthenticated `/admin/*` surface reaching config, goals, review, and vendor-trust routes, an `_approve_invoice` path that marks invoices approved with no gate on amount, injection flag, or decision confidence, a fallback rule engine that overrides the manual-review threshold when attacker-supplied keywords appear, `Vendor.to_dict` serving bank account, routing number, and tax ID through three unauthenticated endpoints, injection detection that is advisory-only and disabled by an unauthenticated toggle, no action logging anywhere, and the canonical goal-hijack → autonomous-payment chain.
 
-- [`finbot/WORKER_REMIT.md`](finbot/WORKER_REMIT.md) — intended-scope policy
+- Worker Remit — [pretty ↗](https://open-agent-ai-security.github.io/praxen/examples/finbot/WORKER_REMIT.html) · [markdown](finbot/WORKER_REMIT.md) — the agent's intended-scope policy
 - [`finbot-analysis.html`](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`finbot/finbot-findings.json`](finbot/finbot-findings.json) — machine-readable findings (preferred for automated ingestion)
 
@@ -39,7 +39,7 @@ Praxen produced 16 findings (6 Critical, 3 High, 7 Medium), weighted RAISE postu
 
 A general-purpose assistant whose remit assumes path-scoped `read_file`/`write_file`, untrusted-input handling, prompt-injection refusal, system-prompt confidentiality, per-tool-call audit logging, and a 20-call/session cap — every one of which is either unimplemented or actively contradicted in the code. Praxen produced 14 findings (5 Critical, 5 High, 3 Medium, 1 Informational), weighted RAISE posture 0.60 / 5.0 (Absent) — including a hardcoded internal API key interpolated into HelperBot's LLM system prompt, a system prompt that instructs the model to disclose its own instructions and configuration, a response handler that rewards prompt-injection override attempts instead of declining them, user input reaching the model with no validation or output filtering, the 20-call rate limit and per-tool audit logging both unimplemented, and no path-boundary enforcement for the declared `read_file`/`write_file` tools — which in this `api`-protocol persona are never wired into the request path at all — combining into a compound goal-hijack → data-exfiltration chain with no audit trail.
 
-- [`helperbot/WORKER_REMIT.md`](helperbot/WORKER_REMIT.md) — intended-scope policy
+- Worker Remit — [pretty ↗](https://open-agent-ai-security.github.io/praxen/examples/helperbot/WORKER_REMIT.html) · [markdown](helperbot/WORKER_REMIT.md) — the agent's intended-scope policy
 - [`helperbot-analysis.html`](https://open-agent-ai-security.github.io/praxen/examples/helperbot/helperbot-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`helperbot/helperbot-findings.json`](helperbot/helperbot-findings.json) — machine-readable findings (preferred for automated ingestion)
 
@@ -52,6 +52,6 @@ A general-purpose assistant whose remit assumes path-scoped `read_file`/`write_f
 Praxen produced 12 findings (6 High, 4 Medium, 2 Low), weighted RAISE posture 1.70 / 5.0 (Ad hoc) — the agent earns partial credit for a narrow, platform-enforced tool inventory and explicit grounding instructions, but nearly all enforcement lives in the system prompt: the override-resistance instruction covers user input only and leaves instructions embedded in retrieved Knowledge articles unguarded (indirect prompt-injection exposure), the `off_topic` topic offers a human escalation the `escalation` topic states does not exist, the LWC appends a bootstrap script from an operator-supplied URL with no protocol check or domain allowlist, every behavioral guardrail is a natural-language instruction with no deterministic pre- or post-processing gate, Einstein Audit and Session Tracing ship documented as optional though a durable audit trail is required, citations ship disabled while the agent is instructed to always cite sources, and no adversarial-test artifact exists for a public unauthenticated agent whose entire guardrail set is prompt-resident.
 
 - [`salesforce-help-agent-accelerator/README.md`](salesforce-help-agent-accelerator/README.md) — how this remit and report were generated (Claude Opus 5, Praxen v1.2 baseline)
-- [`salesforce-help-agent-accelerator/WORKER_REMIT.md`](salesforce-help-agent-accelerator/WORKER_REMIT.md) — intended-scope policy
+- Worker Remit — [pretty ↗](https://open-agent-ai-security.github.io/praxen/examples/salesforce-help-agent-accelerator/WORKER_REMIT.html) · [markdown](salesforce-help-agent-accelerator/WORKER_REMIT.md) — the agent's intended-scope policy
 - [`salesforce-help-agent-accelerator-analysis.html`](https://open-agent-ai-security.github.io/praxen/examples/salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-analysis.html) — human-readable analysis report (rendered on GitHub Pages)
 - [`salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-findings.json`](salesforce-help-agent-accelerator/salesforce-help-agent-accelerator-findings.json) — machine-readable findings (preferred for automated ingestion)
