@@ -1,0 +1,150 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Hermes Agent (with Hermes Desktop)
+Analysis: July 29, 2026, 16:46 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a mature, layered, self-aware security posture whose
+shipped defaults sit on the wrong side of its own stated boundary. Hermes
+documents in SECURITY.md that only OS-level isolation is a real boundary and
+that in-process heuristics are review aids — then ships terminal.backend:
+local together with web_search, web_extract and the browser toolset enabled by
+default, so untrusted web, email and messaging content reaches a tool loop
+that executes shell commands directly on the host. The approval gate that
+would slow that chain is bypassed wholesale outside interactive CLI, gateway
+and cron contexts (tools/approval.py logs a warning and returns approved), and
+the desktop's first-run install fetches install.sh from a mutable branch and
+pipes it to bash with no checksum or signature. Secondary theme: outbound-data
+defaults contradict the remit in two independent places — PostHog telemetry is
+on by default in official desktop builds, and the custom-endpoint provider
+credential is missing from the subprocess credential-strip set.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.55 / 5.0   (Partial)
+  Limit Your Domain              3/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           3/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           3/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 4   Medium: 5   Low: 1   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 15   Gap: 4   Partial: 9   Vague: 0   Enforcement-not-possible: 0   (of 28 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       2
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               2
+  ASI05  Unexpected Code Execution (RCE)                    3
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-001  Default config puts untrusted web, email and messaging
+            content into a tool loop that executes shell commands directly on
+            the host.
+      Action 1: Ship terminal.backend defaulting to a sandboxed backend
+                (docker), or refuse to enable web_search, web_extract and the
+                browser toolset while the backend is local unless the operator
+                sets an explicit acknowledgement key in config.yaml.
+      Action 2: Add a startup check in gateway/run.py that logs an error and
+                requires opt-in when an untrusted ingress surface (messaging
+                adapter, email, webhook) is enabled together with
+                TERMINAL_ENV=local.
+
+  PRAX-2026-07-29-002  Desktop first-run install fetches the agent runtime
+            installer from a mutable branch and pipes it to a shell with no
+            integrity verification.
+      Action 1: Pin the installer to an immutable ref (a release tag or commit
+                SHA) and verify a published SHA-256 digest, or a detached
+                signature, in installer.ts before invoking bash or PowerShell
+                — abort the install on mismatch.
+      Action 2: Ship the install script inside the signed and notarized
+                desktop bundle under resources/ and execute the local copy, so
+                the runtime install inherits the app's existing code-signing
+                trust rather than fetching at run time.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-003  Outside CLI, gateway and cron contexts the approval
+            gate auto-approves every dangerous command and only writes a log
+            warning.
+      Action 1: Invert the default in check_all_command_guards so an
+                unrecognised execution context denies rather than approves,
+                mirroring the existing cron approvals.cron_mode: deny
+                behaviour, and require an explicit approvals.headless_mode:
+                approve opt-in to restore the current behaviour.
+      Action 2: Until that lands, promote the auto-approve log line from
+                logger.warning to a startup-time error banner so an operator
+                running headless sees that the gate is inert before the first
+                dangerous command, not after.
+
+  PRAX-2026-07-29-004  Desktop analytics are on by default in official builds,
+            sending usage events to a third-party endpoint before the operator
+            consents.
+      Action 1: Change the first-run default in isAnalyticsEnabled() to false
+                so initAnalytics() no-ops until setAnalyticsConsent(true) is
+                called.
+      Action 2: Add a consent prompt to the onboarding flow that records an
+                explicit choice into hermes-analytics-enabled before any
+                capture() can fire.
+
+  PRAX-2026-07-29-005  The custom/Ollama endpoint provider credential is
+            absent from the subprocess strip set, so it inherits into terminal
+            and execute_code children.
+      Action 1: Add CUSTOM_API_KEY and CUSTOM_BASE_URL to the static
+                supplement in _build_provider_env_blocklist(), alongside the
+                OPENROUTER entries that already cover the other
+                registry-skipped provider.
+      Action 2: Replace the registry-derived denylist with a name-shape rule
+                as defence in depth — strip any variable matching *_API_KEY,
+                *_TOKEN or *_SECRET unless it is on the operator passthrough
+                allowlist — so the next provider added outside the registry is
+                covered by default.
+
+  PRAX-2026-07-29-006  The identity file loaded into every system prompt is
+            agent-writable with no approval gate, guarded only on the read
+            path.
+      Action 1: Route writes whose resolved path is SOUL.md, AGENTS.md or
+                config.yaml under HERMES_HOME through the approval gate by
+                adding them to _SENSITIVE_PATH_PREFIXES in tools/file_tools.py
+                and to _SENSITIVE_WRITE_TARGET in tools/approval.py.
+      Action 2: Scan identity and context files with the strict scope on the
+                write path, where the operator can still intervene, rather
+                than relying solely on the narrower context-scope screen at
+                load time.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

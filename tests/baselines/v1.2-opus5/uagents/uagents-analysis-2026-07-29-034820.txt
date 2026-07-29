@@ -1,0 +1,163 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    uAgents (Fetch.ai uAgent)
+Analysis: July 29, 2026, 03:48 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a runtime that authenticates its peers but never
+authorizes them. Envelope signatures are genuinely verified with ECDSA in
+asgi.py and envelope.py, yet nothing downstream asks whether a verified sender
+is an authorized counterparty: the AccessControlList that would answer that
+question lives in the opt-in QuotaProtocol and defaults to allow-all, and the
+signed envelope carries expires and nonce fields that the receive path never
+checks, so a captured message replays forever. Compounding this, the
+agent-inspector REST routes are on by default behind a loopback check that
+forwarded_allow_ips="*" makes spoofable on a 0.0.0.0 bind, putting /connect —
+which re-registers the agent's signed identity against a caller-supplied
+endpoint URL — within reach of any remote client.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.70 / 5.0   (Ad hoc)
+  Limit Your Domain              3/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 6   Medium: 4   Low: 0   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 11   Gap: 9   Partial: 11   Vague: 0   Enforcement-not-possible: 0   (of 31 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       5
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 3
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-001  Default-on agent-inspector routes sit behind a
+            spoofable loopback check on a 0.0.0.0 bind, letting any remote
+            caller re-register the agent's identity.
+      Action 1: In asgi.py, replace forwarded_allow_ips="*" at line 184 with
+                the operator-configured trusted-proxy list (uvicorn's
+                127.0.0.1 default when unset), and make HOST at line 23 a
+                constructor parameter defaulting to 127.0.0.1.
+      Action 2: Flip enable_agent_inspector at agent.py:305 to default False,
+                and require an operator-supplied bearer token on /connect,
+                /disconnect, /messages and /agent_info rather than relying on
+                a network-position check.
+
+  PRAX-2026-07-29-002  The shipped Helm chart carries a working default agent
+            seed in values.yaml, deriving a publicly-known identity and wallet
+            for any chart-default deployment.
+      Action 1: Remove the literal from values.yaml:16, leave agent.seed
+                empty, and make the chart fail rendering when it is unset
+                (required in secrets.yaml) so a seed must be supplied per
+                deployment.
+      Action 2: Treat the committed phrase as compromised: rotate any agent
+                identity or wallet ever deployed from chart defaults, and
+                document seed provisioning in deployment/README.md.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-003  The runtime authenticates senders but never authorizes
+            them — the counterparty allowlist is an opt-in protocol that
+            defaults to allow-all.
+      Action 1: Add an agent-level counterparty allowlist checked in
+                _process_single_message() before handler dispatch, so
+                authorization is enforced on the default Agent.on_message path
+                rather than only inside QuotaProtocol.
+      Action 2: Change the QuotaProtocol.wrap() fallback at quota.py:183 from
+                AccessControlList(default=True) to deny-by-default, and
+                require handlers marked allow_unverified to declare that they
+                perform no state-changing action.
+
+  PRAX-2026-07-29-004  Envelope expires and nonce fields are covered by the
+            signature but never checked on receipt, so any captured message
+            replays indefinitely.
+      Action 1: In asgi.py, reject the envelope before dispatch when
+                env.expires is absent or already past, mirroring the freshness
+                the digest already commits to.
+      Action 2: Populate nonce in context.py:509 and keep a bounded per-sender
+                seen-nonce set in the agent's storage so a replayed envelope
+                is dropped rather than re-handled.
+
+  PRAX-2026-07-29-005  Synchronous response envelopes are built without a
+            signature, and the requesting agent skips verification entirely
+            when a signature is absent.
+      Action 1: Sign the response envelope in enclose_response_raw() with the
+                responding agent's identity before it is returned by the
+                /submit sync path in asgi.py.
+      Action 2: Change communication.py:157 to require a signature on any
+                response whose sender is an agent address, rejecting unsigned
+                responses instead of accepting them.
+
+  PRAX-2026-07-29-006  No approval gate, threshold or authorization flag
+            exists on any wallet-spending path, and Almanac registration
+            spends funds automatically at startup.
+      Action 1: Add a value_transfer_approval_threshold parameter to
+                Agent.__init__ and interpose a policy check in network.py
+                before any transaction carrying funds is broadcast, halting
+                and logging when the amount exceeds it or authorization is
+                absent.
+      Action 2: Make paid Almanac registration opt-in — when no authorization
+                flag is set, register through the fee-free Agentverse API path
+                and surface the skipped on-chain registration to the operator.
+
+  PRAX-2026-07-29-007  Identity and wallet private keys are auto-generated
+            into a plaintext JSON file in the working directory with default
+            permissions and no guard.
+      Action 1: Create private_keys.json with 0o600 (open with os.open(...,
+                O_CREAT|O_WRONLY, 0o600)) in save_private_keys(), and fail
+                loudly if an existing file is group- or world-readable.
+      Action 2: Emit an explicit warning from
+                _initialize_wallet_and_identity() when keys are auto-persisted
+                to disk, and document the seed-from-environment path as the
+                supported production configuration.
+
+  PRAX-2026-07-29-008  get_or_create_private_keys persists a freshly generated
+            wallet key that is not the one it returns, so the running wallet's
+            key is never saved.
+      Action 1: In storage/__init__.py:149, pass the already-generated
+                wallet_key to save_private_keys() instead of calling
+                PrivateKey() a second time.
+      Action 2: Add a regression test asserting that two successive
+                get_or_create_private_keys(name) calls return the same wallet
+                key and that it matches the persisted file.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

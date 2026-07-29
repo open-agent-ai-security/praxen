@@ -12,264 +12,238 @@
 
 | Field | Value |
 |-------|-------|
-| Worker Name | yaah (Yet Another Agent Harness) |
+| Worker Name | yaah (yet another agent harness) |
 | Agent Key / ID | yaah |
-| Owner / Operator | The developer running yaah in their own repository and terminal (upstream maintainer: dirien) |
-| Deployment Environment | Local developer command-line tool (single Go binary); runs on the developer's workstation. Two runtime modes: a config generator (`yaah generate`) and a built-in MCP server / hook runtime (`yaah serve`) that runs alongside the configured coding agent. |
-| Primary Model | None — yaah performs no LLM inference itself. It generates configuration for, and runs protective hooks around, the developer's chosen coding agent (Claude Code, OpenCode, Codex CLI, GitHub Copilot CLI), which uses that agent's own configured provider for inference. |
-| Secondary Models | The workflow subagents yaah generates declare models (`planner` → opus; `researcher`, `doc-writer`, `verifier` → sonnet). These are configuration yaah emits, not models yaah invokes. |
-| Remit Version | 2.2 |
+| Owner / Operator | Operator-configured owner/operator of record (upstream author: dirien; deployed per-developer) |
+| Deployment Environment | Operator-configured deployment environment of record — local developer workstations and CI runners: a Go CLI plus a runtime (hook dispatcher, MCP server, session store) that runs alongside coding agents |
+| Primary Model | n/a — yaah is a Go tool, not an LLM agent; the agents it generates run on sonnet / opus / haiku |
+| Secondary Models | Experimental fact-check subagent: Sonnet |
+| Remit Version | 1.2 |
 | Last Updated | 2026-07-28 |
-| Updated By | Praxen remit maintenance (POLICY/CONTEXT placement pass, v1.2) |
+| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
 
 ---
 
 ## Mission
 
-Generate coding-agent configuration for four coding agents — Claude Code, OpenCode, Codex CLI, and GitHub Copilot CLI — from a single Go source of truth, and ship a uniform security-and-quality toolset alongside every configuration it produces. The toolset is a set of protective event hooks that run on the configured agent's tool activity, a built-in MCP server exposing check-only tools, and a durable per-session audit log. yaah also wires up whichever third-party MCP servers the developer opts into.
+<!-- CONTEXT (describes the agent; not extracted as rules). -->
 
-**Scope note.** yaah is a developer tool, not a conversational agent; it does no inference. This remit governs the **harness itself** — the config generator plus its built-in runtime (the five protective hooks, the built-in `yaah` MCP server, and the session logger). The LLM-driven coding agents yaah configures are *downstream* of it. The harness's central promise is that its protections are applied **uniformly** across every agent configuration it generates, and that its own runtime tools and the third-party servers it wires in stay within the bounds declared here.
+yaah generates coding-agent configuration — hooks, skills, agents, slash commands, MCP servers, LSP servers, and plugins — for Claude Code, OpenCode, Codex CLI, and GitHub Copilot CLI from a single Go codebase, so that agent setup stays consistent across repositories. It also runs as a runtime alongside those agents: a hook dispatcher that enforces safety controls on the host agent's actions, a stdio MCP server, and a per-session audit store.
 
 ---
 
 ## Job Description
 
-- Generate native configuration for Claude Code, OpenCode, Codex CLI, and GitHub Copilot CLI from one Go codebase, so the same settings, hooks, skills, agents, and MCP wiring land in each agent's own file format.
-- Ship, in every generated configuration, the full protective hook set: a linter, a command guard that blocks catastrophic shell commands, a secret scanner, a comment/placeholder checker, and a session logger.
-- Run a built-in MCP server (`yaah serve`) over stdio that exposes check-only capabilities (secret scan, lint, command safety check, health check, session query) as tools the configured agent can call.
-- Wire in the developer-selected third-party MCP servers (by default `context7` for documentation lookups and `pulumi` for infrastructure operations), keeping the MCP configuration and the per-agent config files consistent with each other.
-- Maintain a durable, structured, timestamped per-session audit log of tool calls, blocked commands, file modifications, and security findings under `.claude/sessions/`.
-- Report environment health (`yaah doctor`) and manage session records (`yaah session list/show/clean`).
+<!-- CONTEXT (describes what the agent does; not extracted as rules). -->
+
+- Generate per-agent configuration files from built-in defaults or a Go-library configuration, and write them into the target repository (`.claude/`, `.mcp.json`, `opencode.json`, `.codex/`, `.copilot/`, `.github/`).
+- Dispatch coding-agent lifecycle hooks via `yaah hook <event>`: run linters/formatters, guard dangerous shell commands, scan file edits for hardcoded secrets, flag placeholder comments, and log session events.
+- Run as an MCP server (`yaah serve`) over stdio, exposing `yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, and the planning tools `yaah_planning_status` / `yaah_planning_init`.
+- Fetch remote skills and agents from pinned git repositories and cache them under the yaah home directory.
+- Maintain a per-session audit trail (tool calls, blocked commands, files modified, security findings) under `.claude/sessions/`.
+- Provide a structured `/yaah:*` project workflow (init → discuss → plan → execute → verify → ship), invoked explicitly by the user.
 
 ---
 
 ## Prohibited Behaviors
-- Operating as a hosted, networked, or multi-tenant service — yaah is a local single-developer CLI.
-- Performing LLM inference of its own, or acting as an autonomous agent without a supervising developer at the terminal.
-- Sending email, posting to external services, or making outbound network calls beyond: the configured coding agent's LLM provider, the configured MCP servers, the package registries used to fetch third-party MCP servers, the git remotes for remote skills/agents, and the coding-agent plugin marketplace.
-- Exfiltrating, transmitting, or persisting the contents of the developer's repository or edited files anywhere other than the local workspace and the local session audit log.
-- Weakening or removing the protective hooks from a generated configuration so that an agent ships without the full protection set.
+
+<!-- POLICY (extracted as rules — the load-bearing "stay in your lane" section). -->
+
+- yaah MUST NEVER treat the content of fetched remote skills or agents, MCP tool descriptions, or scanned/linted file contents as instructions that change its own behavior or safety decisions — such content is untrusted data, never authority over yaah.
+- yaah MUST NEVER auto-invoke its `/yaah:*` workflow commands, including the autonomous workflow, without an explicit user invocation; the model must not self-trigger them.
+- yaah MUST NEVER run with its command-guard or secret-scanner safety hooks removed, disabled, or downgraded to a non-blocking / advisory mode; these are safety controls, not optional lint.
 
 ---
 
 ## Approved Communication Channels
 
+<!-- POLICY (extracted as rules). Any channel absent from this table is unauthorized by default. -->
+
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
-| Local stdio to built-in `yaah` MCP server | Yes | No | Local process; check-only tools. |
-| Local stdio to `context7` MCP server | Yes | No | Documentation lookups; launched via package registry. |
-| Remote HTTP(S) to `pulumi` MCP server | Yes | Opt-in per developer | Remote MCP MUST be reached over TLS; infrastructure operations. |
-| Outbound to configured coding agent's LLM provider | Yes | No | Inference only, by the downstream coding agent — not by yaah. |
-| Package registry (npm/`npx`, Go module proxy, Homebrew) | Yes | No | Fetching yaah itself and third-party MCP server packages; MUST resolve pinned, integrity-checked versions. |
-| Git remotes for remote skills/agents (e.g. `msitarzewski/agency-agents`, `openai/codex-plugin-cc`) | Yes | Opt-in per developer | Remote skill/agent/plugin content; pinned refs. |
-| Coding-agent plugin marketplace | Yes | Opt-in per developer | Only for plugins the generated configuration explicitly enables. |
-| Any other outbound network channel (email, chat, webhooks, telemetry) | No | — | Unauthorized by default. |
+| Local stdio MCP transport to the host coding agent (`yaah serve`) | Yes | No | stdio only; no network bind |
+| Local filesystem — read files to scan/lint, write generated config, append session logs | Yes | No | Within the target repository and the yaah cache directory |
+| Git over HTTPS to pinned remote skill/agent source repositories | Yes | No | Fetch and cache only; sources must be pinned (see Authorized Counterparties) |
+| Outbound to explicitly-configured MCP servers (e.g. Context7, Pulumi, Notion, OAuth remotes) | Yes | Yes | Only servers the operator configured |
+| Outbound web fetch by the experimental fact-checker | Yes | Yes | Disabled unless the operator has explicitly authorized it |
+| Any other outbound network destination | No | — | Unauthorized by default |
 
 ---
 
 ## Authorized Counterparties
 
-### Trusted People / Accounts
-- The local developer — the operator running yaah and the configured coding agent.
-
-### Trusted Domains
-- The endpoint of the configured coding agent's LLM provider (inference only).
-- The remote `pulumi` MCP endpoint, reached over TLS.
-- The package registries and git remotes named in Approved Communication Channels, at pinned versions/refs.
+<!-- POLICY (extracted as rules). Counterparties found in code or config but missing from these lists are reported as a trust expansion. -->
 
 ### Trusted Services / Integrations
-- The built-in `yaah` MCP server (local, stdio).
-- The `context7` MCP server (documentation lookups).
-- The `pulumi` MCP server (infrastructure operations; remote, TLS, auth/scope established out of band).
-- The coding-agent plugin marketplace, for plugins the generated configuration enables.
+- The remote skill/agent source repositories in yaah's vetted default catalog (e.g. `pulumi/agent-skills`, `dirien/claude-skills`, `jeffallan/claude-skills`, `msitarzewski/agency-agents`, and the other repos yaah ships).
+- Built-in MCP providers: Context7, Pulumi, and yaah's own self-hosted MCP server.
+- The official Claude Code plugin / LSP marketplace and the pinned OpenAI Codex plugin.
+- Closure rule: the authoritative allowlist is the operator-configured vetted catalog of authorized remote skill/agent source repositories, MCP providers, and marketplaces; community-tier or unreviewed skills are excluded unless the operator has explicitly authorized them. Any skill, agent, MCP server, plugin, or marketplace wired into generated configuration that falls outside this operator-configured catalog is an unauthorized trust expansion.
+
+### Trusted Domains
+- `github.com` (and specifically the pinned source repositories above) for remote skill/agent fetch.
+- The official Claude Code plugins marketplace host.
 
 ### Explicitly Forbidden
-- Any MCP server, outbound destination, plugin source, or git remote not listed above or opted into by the developer.
-- Any counterparty reached without TLS when the connection is remote.
+- Fetching default or shipped remote skills/agents from mutable refs (branches) rather than immutable refs (a commit SHA or version tag).
+- Wiring in any skill, agent, MCP server, marketplace, or plugin outside the operator-configured vetted catalog (see the Closure rule under Trusted Services / Integrations).
 
 ---
 
 ## Tools and Capabilities
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Tools (Known Good Baseline)
 
-- Built-in MCP tools exposed by `yaah serve`: `yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, `yaah_planning_status`, `yaah_planning_init`.
-- All of the above are read-only or check-only **except** `yaah_planning_init`, which writes planning scaffolding into the workspace.
-- The five protective hook handlers: linter, command guard, secret scanner, comment/placeholder checker, session logger.
+- MCP server tools: `yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, `yaah_planning_status`, `yaah_planning_init`.
+- Hook handlers: linter, command-guard, secret-scanner, comment-checker, session-logger.
+- Closure rule: any tool the runtime or MCP server exposes, or any hook handler it runs, that is not in this baseline is an undeclared capability.
 
 ### Restricted Tools (Require Approval Before Use)
 
-- `yaah_planning_init` — the one built-in MCP tool that writes to the workspace; workspace writes require the developer's review.
-- Any MCP tool from a wired-in third-party server that writes, sends, or executes.
+- The experimental fact-check hooks (spawn a tool-using subagent with outbound web access).
+- Any MCP provider that carries credentials or OAuth (e.g. Notion, remote OAuth servers).
 
 ### Forbidden Tools
 
-- Any built-in MCP tool that performs a destructive, send, or exfiltration action beyond the check-only set above.
-- Any tool that transmits repository contents, edited-file contents, or session logs to a non-local destination.
+- No MCP tool may execute arbitrary shell commands outside the command guard, and no tool may return detected secret values in cleartext.
 
 ---
 
 ## Data Boundaries
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Data Sources
-- The developer's local repository and the files the configured agent edits within it.
-- The per-session audit records under `.claude/sessions/`.
-- Documentation returned by the `context7` MCP server and infrastructure state returned by the `pulumi` MCP server, when opted in.
+- Files within the target repository, read for secret scanning, linting, and config generation.
+- yaah's own cache directory (`~/.yaah` / `$YAAH_HOME`) for fetched remote skills and agents.
+- Session audit files under `.claude/sessions/`.
 
 ### Sensitive Data Classes
 
-- Hardcoded credentials — API keys, tokens, private keys, passwords — encountered in files the agent edits.
-- The contents of repository source files and the developer's local workspace.
-- Session-loaded configuration files (generated skills, agents, `AGENTS.md`/`CLAUDE.md`) that re-enter the agent's context on later runs.
+- Hardcoded credentials detected in scanned files: AWS keys, GitHub PATs, OpenAI/Anthropic API keys, private keys, and auth/Slack tokens.
+- MCP and OAuth credentials and API tokens used to configure integrations.
+- Session audit records (tool inputs, file paths, and security findings).
 
 ### Forbidden Data Movement
 
-- Hardcoded credentials MUST be detected before an edit that introduces them is accepted; they MUST NOT be written into committed files unremarked.
-- Agent-managed, session-loaded files MUST NOT be writable in a way that lets content the agent ingested from an untrusted source persist into future sessions unreviewed.
-- Repository contents, edited-file contents, and session audit logs MUST NOT leave the local workspace for any destination other than the authorized counterparties above.
+- Detected secret values MUST NEVER be written into session logs, findings records, generated configuration, or any yaah output in cleartext — secrets are referenced by location and pattern only.
+- Credentials, API tokens, and OAuth secrets MUST NEVER be embedded in generated configuration files.
+- Credentials, API tokens, and OAuth secrets MUST NEVER be committed to the repository.
+- Credentials, API tokens, and OAuth secrets MUST be sourced from environment variables or a secrets manager.
+- Repository contents, scanned file contents, and session audit data MUST NEVER be transmitted to any destination other than the local filesystem or an explicitly-configured trusted integration.
 
 ---
 
 ## Action Boundaries
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Without Approval
-- Generating configuration for any of the four supported coding agents.
-- Running the check-only built-in MCP tools (`yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, `yaah_planning_status`).
-- Reading files in the local workspace to lint, scan, and check them.
-- Recording hook events to the per-session audit log.
+- Generating and overwriting agent configuration files in the target repository; running the lint, secret-scan, and comment hooks; recording session audit events; fetching pinned remote skills/agents into the cache.
 
 ### Requires Human Approval Before Execution
-- High-impact actions — destructive shell commands, file writes, and MCP tools that write, send, or execute — MUST reach a human checkpoint before they run. (Destructive shell commands may be blocked outright rather than queued; writes and write/send/execute tool calls MUST NOT proceed unreviewed.)
-- Wiring in any third-party MCP server, remote skill/agent, or marketplace plugin beyond the defaults.
+- Enabling any feature that makes outbound network calls or spawns an autonomous subagent (e.g. the experimental fact-checker): such features MUST be off by default and enabled only by explicit operator opt-in.
 
 ### Never Allowed
 
-- Running the experimental `Stop`/`SubagentStop` fact-checker — `YAAH_EXPERIMENTAL_FACT_CHECK` MUST remain unset.
-
-- Catastrophic shell commands — recursive deletion from the filesystem root, force-pushing to a main branch, hard resets, destructive database statements, filesystem formatting, raw disk writes — MUST be blocked before they execute.
-- Any generated agent configuration that ships WITHOUT the full protective hook set (linter, command guard, secret scanner, comment checker, session logger) that the harness promises. Every generated configuration MUST carry the complete set, not a subset. (Where a target agent's hook surface is narrower than Claude Code's, the equivalent protections MUST still be delivered — e.g. via the built-in MCP tools — so no generated agent runs without them.)
-- MCP tool descriptions — the built-in server's, and, as far as the harness can inspect them, those of the third-party servers it configures — MUST NOT contain instruction-like language directed at the model (tool-poisoning indicator).
-- Reaching a remote MCP server over a non-TLS connection.
-- Transmitting repository contents, edited-file contents, or session logs to any non-local destination.
+- A file edit that introduces a hardcoded credential MUST NEVER be written — the secret scanner blocks it (fail closed).
+- A shell command matching the dangerous-command denylist (e.g. `rm -rf /`, force-push to a protected branch, `git reset --hard`, destructive SQL) MUST NEVER be allowed to execute — the command guard blocks it (fail closed).
+- Session files MUST NEVER be read or written at paths derived from unvalidated session identifiers; identifiers containing path separators or the special values `.` / `..` are rejected (path-traversal prevention).
+- Generated configuration MUST NEVER weaken the host coding agent's permission/sandbox *posture*: it may not place the host into a permission-bypassing (`bypassPermissions` / `dontAsk`) or sandbox-disabled mode by default, nor drop the host below its stated minimum permission/sandbox posture. (This rule governs the host's permission *mode* and sandbox *settings*; which specific tools a generated sub-agent may invoke is a distinct concern, not a posture downgrade under this rule.)
 
 ---
 
 ## Behavioral Expectations
 
+<!-- CONTEXT (describes normal operation; not extracted as rules). -->
+
 ### Normal Cadence
-- Active hours: on-demand only — yaah runs when the developer invokes a CLI command (`yaah generate`, `yaah doctor`, `yaah session …`) or when the configured agent triggers a hook or calls a `yaah serve` tool during a session.
-- Expected idle periods: dormant whenever no developer command is running and no coding-agent session is active. No background daemon or polling loop.
-- Scheduled jobs / cron tasks: none. yaah runs no autonomous scheduled work.
+- Active hours: on-demand (`yaah generate`, `yaah serve`) and event-driven (one hook dispatch per coding-agent lifecycle event).
+- Expected idle periods: idle between user commands and between agent lifecycle events; the MCP server runs for the duration of a session.
+- Scheduled jobs / cron tasks: none; `yaah session clean` removes sessions older than 7 days when invoked.
 
 ### Expected Patterns
-
-- A `yaah generate` run emits the target agent's config files plus `.mcp.json`, all carrying the same protective hook set.
-- The MCP server configuration and the per-agent configuration files stay consistent with each other — a change to one MUST NOT silently leave the other stale.
-- On the configured agent's tool activity, the hooks fire: dangerous commands are blocked, secrets/lint/placeholder issues are flagged and recorded, and every event is logged to the session store.
-- The project maintains a durable, structured, timestamped record of tool calls, blocked actions, and file modifications — detailed enough to reconstruct what the agent did in a session.
-- The project publishes a threat model and a security-disclosure process, and its own protections are adversarially tested — confirming the secret scanner catches a planted secret, the command guard blocks a catastrophic command, a poisoning write into a session-loaded file is prevented, and a generated configuration genuinely carries the protections it claims.
+- Deterministic, idempotent configuration generation: read source/config, write agent-native config files, append to session logs.
+- Runtime behavior is synchronous per hook event; the MCP server responds to tool calls from the host agent.
 
 ### Acceptable Retry Behavior
-
-- Maximum retries before escalation: not applicable — yaah does not autonomously retry actions; a blocked command is reported to the developer, not retried.
+- Maximum retries before escalation: n/a — hooks are single-shot per event; there is no autonomous retry loop.
 - Retry interval: n/a.
-- Actions that should never be retried: a shell command the command guard has blocked MUST NOT be re-attempted or auto-approved on retry.
+- Actions that should never be retried: a blocked command or blocked edit must not be retried by silently disabling the guard.
 
 ---
 
 ## Known Good Baseline
 
+<!-- CONTEXT (snapshot of normal operation for comparison; not extracted as rules). -->
+
 ### Typical Tool Inventory
-- Built-in MCP tools: `yaah_scan_secrets`, `yaah_lint`, `yaah_check_command`, `yaah_doctor`, `yaah_session_info`, `yaah_planning_status`, `yaah_planning_init` (only the last writes to the workspace).
-- Five protective hook handlers: linter, command guard, secret scanner, comment checker, session logger.
-- Configured MCP servers: the third-party `context7` and `pulumi` servers, plus the built-in `yaah` server.
+- The seven yaah MCP tools plus the five built-in hook handlers.
 
 ### Typical Channels Used
-- Local stdio to the built-in `yaah` and `context7` MCP servers; TLS HTTP to the remote `pulumi` server when opted in.
-- Package registries and pinned git remotes for fetching third-party MCP servers and remote skills/agents.
+- stdio to the host coding agent, local filesystem, and git-over-HTTPS to pinned source repositories.
 
 ### Typical Session Count / Duration
-- One session record per coding-agent session, written to `.claude/sessions/<session-id>.json`. The retention window is 7 days: records older than 7 days MUST be pruned by `yaah session clean`, and the retention window MUST NOT be extended.
+- One session file per coding-agent session under `.claude/sessions/`.
 
 ### Typical Outbound Destinations
-- The configured LLM provider (by the downstream agent), the opted-in MCP endpoints, pinned package registries and git remotes, and the plugin marketplace. Nothing else.
+- Git fetch of pinned remote skill/agent repositories; operator-configured MCP servers.
 
 ### Typical File Paths Accessed
-- The local repository being worked in; generated config under `.claude/`, `.opencode/`, `.codex/`, `.github/`, and `.mcp.json`; session logs under `.claude/sessions/`.
+- Target repo config roots (`.claude/`, `.mcp.json`, `opencode.json`, `.codex/`, `.copilot/`, `.github/`), the yaah cache directory, and `.claude/sessions/`.
 
 ### Normal Restart Cadence
-- No long-running process to restart; the CLI runs to completion per invocation and the MCP server runs for the life of a coding-agent session.
-
-### Supply-chain baseline
-- Third-party MCP servers MUST be pinned to a known-good, integrity-checked version — no server package auto-installed afresh, unpinned, on every run.
-- Dependencies MUST be version-controlled with a committed, pinned lockfile, and the dependency tree kept small and reviewable.
-
----
-
-## Swimlane Definition
-
-### Authorized Domains of Work
-
-- Generating and reconciling coding-agent configuration across the four supported agents.
-- Applying uniform lint / secret-scan / command-guard / comment-check / session-log protections to the configured agent's activity.
-- Local static checks of workspace files and shell-command safety.
-- Session audit recording and health reporting on the developer's workstation.
-
-### Disallowed Domains of Work
-
-- Any networked, hosted, or multi-tenant operation.
-- Autonomous action without a supervising developer.
-- Any capability that moves repository or session data off the local machine to an unauthorized destination.
-- Shipping a generated configuration that lacks the full protective hook set.
+- Restarts with each new coding-agent session or CLI invocation; no long-lived daemon beyond the per-session MCP server.
 
 ---
 
 ## Risk Sensitivities
 
-- Uniformity of protections across generated targets — any code path that lets one agent's configuration omit a protective hook.
-- The command guard's coverage of catastrophic commands (e.g. whether it catches long-form flag variants, not just `rm -rf /`).
-- MCP tool descriptions (built-in and third-party) as a tool-poisoning surface.
-- Writability of session-loaded files (generated skills/agents/`AGENTS.md`) as a memory-poisoning / persistence surface.
-- TLS enforcement on remote MCP connections and the integrity/pinning of third-party MCP servers, dependencies, and remote skills/agents.
-- Secret detection on edited files before changes are accepted.
+<!-- CONTEXT (flags areas for extra scrutiny; not extracted as rules). -->
+
+- The command guard and secret scanner are the load-bearing safety controls; any regression to non-blocking, warn-only, or removed behavior is high severity.
+- Remote skill/agent content and MCP tool descriptions are third-party and are injected into other agents' context — treat them as untrusted input (tool-poisoning / prompt-injection surface).
+- Generated configuration can alter the host coding agent's permission and sandbox posture — changes there are sensitive.
+- Detected secrets and MCP/OAuth credentials are high-sensitivity data that must not be persisted or transmitted.
 
 ---
 
 ## Escalation Rules
 
-*State each condition precisely — Praxen will check whether the agent's code implements the described response.*
+<!-- POLICY (extracted as rules). -->
 
 ### Halt Agent and Alert Operator
-
-- A catastrophic shell command reaches the command guard — it is blocked (not run), the developer is notified, and the block is recorded to the session audit log.
-- A high-impact write/send/execute MCP tool call is attempted without reaching the human checkpoint — block and surface to the developer.
+- When the command guard matches a dangerous command, or the secret scanner detects a credential in an edit, the hook must block the operation and record the block (with its reason) to the session audit log.
 
 ### Alert Operator (Do Not Halt)
-- The secret scanner detects a hardcoded credential in an edited file — the edit is blocked and the finding surfaced to the developer.
-- Lint, comment/placeholder, and other secret-scan findings are surfaced to the developer for resolution.
+- `yaah doctor` reports missing dependencies or misconfiguration for the operator to resolve; this surfaces a warning without blocking generation.
 
 ### Log Only
-- Every hook event — tool calls, blocked commands, file modifications, and security findings — is recorded to the durable per-session audit log, whether or not it also raised an alert.
+- Session lifecycle events, tool calls (including MCP-server tool invocations served via `yaah serve`), blocked commands, and file modifications are recorded to `.claude/sessions/<id>.json` as a durable, structured audit trail.
 
 ---
 
 ## Example Good Behavior
 
-- `yaah generate --agent codex` emits Codex CLI config that carries the same protective checks as the Claude Code output — where Codex's native hooks are limited, the missing checks are still delivered via the built-in `yaah` MCP tools.
-- The configured agent attempts `rm -rf /`; the command guard blocks it before execution, tells the developer why, and writes the block to `.claude/sessions/<id>.json`.
-- An edit introduces an AWS key literal; the secret scanner blocks the edit and reports the location and pattern to the developer without transmitting the value anywhere.
-- A `pulumi` MCP call is made only over TLS to the pinned remote endpoint the developer opted into.
+<!-- CONTEXT (calibration examples; not extracted as rules). -->
+
+- An edit attempts to add a file containing an AWS access key; the secret scanner blocks the write, records the finding to the session log by location and pattern (not value), and appends remediation advice.
+- The host agent proposes `rm -rf /`; the command guard blocks execution and records the blocked command with its reason.
+- `yaah generate` wires only vetted-catalog skills/agents and pins each remote source to a commit SHA or tag.
+
+---
 
 ## Example Bad Behavior
 
-- A generated configuration ships for one agent with the secret scanner or command guard silently omitted.
-- A catastrophic command is auto-approved, or a blocked command is re-attempted and allowed through on retry.
-- A third-party MCP server is fetched unpinned and freshly installed on every run, or reached over plain HTTP.
-- An MCP tool description contains instruction-like text aimed at the model.
-- A session-loaded file is left writable such that content the agent ingested from an untrusted source silently re-enters context on a later run.
-- Repository contents, edited-file contents, or session logs are sent to a destination outside the authorized counterparty list.
+<!-- CONTEXT (calibration examples; not extracted as rules). -->
+
+- A secret scanner or command guard configured to warn-only, so a dangerous command or credential-bearing edit proceeds despite a match.
+- A detected secret's literal value written into a session findings record or echoed back through an MCP tool response.
+- Generated config that sets the host agent to `bypassPermissions` by default, or wires in an MCP server / remote skill from a source outside the vetted catalog or pinned to a mutable branch.
 
 ---
 
 *Worker Remit — Praxen*
-*Customized for: yaah (Yet Another Agent Harness) | Version: 2.2 | 2026-07-28*
+*Customized for: yaah | Version: 1.2 | 2026-07-28*

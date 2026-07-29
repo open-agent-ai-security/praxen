@@ -1,0 +1,178 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Deep Agents Code (DeepAgents CLI / `dcode`)
+Analysis: July 29, 2026, 15:32 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a strong control that stops at the edge of the
+interactive path. _add_interrupt_on gates ten side-effecting tools with
+fail-closed mode coercion, and the codebase repeatedly gets the hard parts
+right — a DNS-pinned SSRF guard in tools.py, a fail-closed per-server MCP
+trust prompt, symlink-re-verifying skill trust, secret-stripped hook
+environments. The parallel execution paths inherit none of it:
+_make_hitl_decision in client/non_interactive.py inspects only execute and
+unconditionally approves everything else, is_shell_command_allowed returns
+True before any pattern check when the allow-list is all, and js_eval ships
+enabled and intentionally un-gated. That asymmetry produces the scan's one
+compound chain: project content reaches the system prompt unlabelled through
+local_context.py, the agent is prompted to persist learnings into the same
+AGENTS.md files it loads at the start of every session, and in headless mode
+the write_file that closes the loop is auto-approved — poisoning that survives
+into all later sessions. The same one-sided pattern governs credentials:
+hooks/env.py strips secrets before spawning hook subprocesses, while
+client/launch/server.py hands the runtime server the entire parent environment
+and sandbox_factory.py interpolates it into a script run on a third-party
+host.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.15 / 5.0   (Partial)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           3/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 5   Medium: 7   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 8   Gap: 9   Partial: 18   Vague: 0   Enforcement-not-possible: 1   (of 36 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   4
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       3
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    4
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-001  Headless mode auto-approves every side-effecting tool
+            except shell, so file writes, deletes, web fetches and sub-agent
+            launches run ungated.
+      Action 1: In `client/non_interactive.py`, replace the terminal `return
+                {"type": "approve"}` at line 897 with a fail-closed reject for
+                any tool not covered by an explicit operator opt-in, mirroring
+                the `execute` branch's treatment of a missing allow-list.
+      Action 2: Add per-capability headless opt-in flags (for example
+                `--allow-write`, `--allow-web`, `--allow-subagents`) so a CI
+                run grants only the tool classes the task needs instead of
+                inheriting all of them from a shell allow-list.
+
+  PRAX-2026-07-29-002  The `--shell-allow-list all` sentinel returns approval
+            before any pattern or token check, giving model-chosen commands
+            unrestricted host execution.
+      Action 1: Remove the `all` sentinel from `parse_shell_allow_list` in
+                `config.py:1845`, or gate it behind the same versioned risk
+                acknowledgement that `approval_mode.has_yolo_acknowledgement`
+                already enforces for YOLO.
+      Action 2: If the sentinel is retained for interactive use, refuse it in
+                the headless path at `main.py:3768` alongside `--yolo` and
+                `--auto-approve`, which are already rejected there.
+
+  PRAX-2026-07-29-003  Untrusted project content reaches the system prompt,
+            and the agent can write its own session-loaded memory ungated in
+            headless mode, poisoning all later sessions.
+      Action 1: Wrap the detector output in
+                `local_context._get_modified_request` in an explicit
+                untrusted-content delimiter and add a standing instruction in
+                `system_prompt.md` that content inside it is data, never
+                instructions — the module already sanitizes MCP error text and
+                LangSmith project names this way at lines 59 and 82.
+      Action 2: Require approval for writes to any path that
+                `MemoryMiddleware` loads, regardless of mode, by extending
+                `memory_guard.py` from the onboarding block to the whole set
+                of session-loaded `AGENTS.md` files.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-004  Makefile contents and a directory listing are appended
+            verbatim to the system prompt every turn with no provenance label
+            or untrusted-content guidance.
+      Action 1: Fence the detector output inside a clearly-marked
+                untrusted-content block in
+                `local_context._get_modified_request` and move it out of the
+                system prompt into a user-role or tool-role message so it does
+                not inherit system authority.
+      Action 2: Add a standing untrusted-content clause to `system_prompt.md`
+                stating that project files, fetched pages, tool results and
+                MCP responses are data and never instructions.
+
+  PRAX-2026-07-29-005  The sandbox setup script is expanded against the entire
+            local environment, so any named provider API key is resolved and
+            shipped to a third-party sandbox.
+      Action 1: In `sandbox_factory._run_sandbox_setup`, substitute from an
+                explicit operator-declared variable allowlist instead of
+                `os.environ`, or reuse `config_manifest._is_secret_env` to
+                drop secret-named keys before calling `safe_substitute`.
+      Action 2: Pass any credential the sandbox genuinely needs through the
+                backend's secret-injection API rather than inlining it into a
+                shell command string.
+
+  PRAX-2026-07-29-006  The runtime server subprocess receives a full copy of
+            the parent environment, so every provider credential reaches it,
+            not only the selected provider's.
+      Action 1: In `client/launch/server.py:_build_server_env`, forward only
+                the credential the resolved provider requires — the model
+                provider is already known at spawn time via `ServerConfig` —
+                and drop all other keys matching
+                `config_manifest._is_secret_env`.
+      Action 2: Extend the existing `_SERVER_ENV_DENYLIST` unit coverage with
+                a test asserting that an unrelated provider key set in the
+                parent process does not appear in the child environment.
+
+  PRAX-2026-07-29-007  A QuickJS `js_eval` code-execution tool is enabled by
+            default, exempt from the approval gate by design, and absent from
+            the remit's authorized tool baseline.
+      Action 1: Flip `INTERPRETER_ENABLE_DEFAULT` to `False` in
+                `config_manifest.py:53` so the interpreter is an explicit
+                operator opt-in, matching how `--sandbox` and hooks are
+                treated.
+      Action 2: Add `js_eval` to the `_add_interrupt_on` map in
+                `agent.py:2117` at least for its first invocation per session,
+                so the operator sees that a JavaScript execution surface is
+                active even if per-call approval is judged too noisy.
+
+  PRAX-2026-07-29-008  No durable structured record of tool executions or
+            approval decisions exists by default, leaving every gated action
+            unauditable after the session ends.
+      Action 1: Promote the `hooks/transcript.py` writer to an always-on
+                session audit sink, or add a sibling append-only JSONL that
+                records one record per gated tool call with tool name,
+                arguments digest, approval mode, decision and timestamp.
+      Action 2: Record approval-mode transitions and Auto-mode classifier
+                denials to that same sink, so an operator can later tell which
+                mode a given action executed under.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

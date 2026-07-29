@@ -1,0 +1,168 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: July 29, 2026, 04:08 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a sandbox with the shape of isolation but not the
+substance: the isolation boundary is real when Docker is chosen, but every
+path around it is unguarded and several downgrade silently.
+create_default_code_executor() answers an unreachable Docker daemon with a
+warnings.warn and a host-local executor rather than the halt-and-alert the
+remit requires, the LocalCommandLineCodeExecutor docstring advertises a regex
+sanitizer against dangerous commands that exists nowhere in the code, and the
+bundled Jupyter kernel gateway binds 0.0.0.0 with publish_all_ports=True over
+cleartext WebSocket. Underneath that sits the Step-7 chain a security lead
+should read first: code blocks arrive with no provenance check, no
+confirmation gate is active by default, and the resulting process inherits the
+full host environment — untrusted content to host execution in one hop. Even
+on the intended Docker path the container is created with no network, user,
+capability, or resource restrictions, and no backend records what it executed.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 6   Medium: 5   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 11   Partial: 9   Vague: 0   Enforcement-not-possible: 3   (of 27 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    8
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-001  Default executor factory answers an unreachable Docker
+            daemon with a warning and runs agent-generated code directly on
+            the host.
+      Action 1: In create_default_code_executor(), raise instead of falling
+                back: when _is_docker_available() is false or
+                DockerCommandLineCodeExecutor construction fails, halt and
+                surface an operator-facing error rather than returning a host
+                executor.
+      Action 2: Gate the host path behind an explicit opt-in argument (for
+                example allow_local_fallback=False by default) so selecting
+                unsandboxed execution requires a deliberate operator decision,
+                as the remit's restricted-tool clause demands.
+
+  PRAX-2026-07-29-002  Bundled Jupyter kernel gateway binds 0.0.0.0 and is
+            published on every host interface, giving inbound arbitrary-code
+            execution over cleartext WebSocket.
+      Action 1: Replace publish_all_ports=True in DockerJupyterServer.__init__
+                with an explicit loopback mapping (ports={"8888/tcp":
+                ("127.0.0.1", 0)}) so the gateway is reachable only from the
+                host running the runtime.
+      Action 2: Derive the WebSocket scheme from use_https in
+                _get_ws_base_url() and reject an empty token rather than
+                documenting it as a no-auth option.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-003  Sandbox container is created with default networking
+            and no capability restrictions, so executed code has unrestricted
+            outbound access that nothing detects.
+      Action 1: Default the container to network_mode="none" in
+                DockerCommandLineCodeExecutor.start() and require an explicit
+                operator argument to enable networking, so the remit's
+                operator-configured-destinations clause has a code-level
+                default.
+      Action 2: Add cap_drop=["ALL"], a non-root user, and read_only=True with
+                a writable mount only for the working directory to the same
+                containers.create() call.
+
+  PRAX-2026-07-29-004  Local executor documents a regex sanitizer against
+            dangerous commands that is not implemented anywhere in the
+            codebase.
+      Action 1: Delete the sanitization sentence from the
+                LocalCommandLineCodeExecutor docstring so the documented
+                behaviour matches the code, and state plainly that no command
+                screening is performed.
+      Action 2: If screening is intended, implement it as a deny policy
+                evaluated in _execute_code_dont_check_setup before
+                create_subprocess_exec, and treat it as defence in depth
+                rather than a substitute for the sandbox requirement.
+
+  PRAX-2026-07-29-005  No confirmation gate exists in any executor; the only
+            gate is an opt-in caller parameter, and package installs run
+            beneath it entirely.
+      Action 1: Move the approval hook into the CodeExecutor base class so
+                every backend requires a confirmation callback, and make the
+                constructor argument mandatory rather than defaulted to None.
+      Action 2: Route _setup_functions() package installation through the same
+                gate in each backend, so the install is presented for
+                confirmation before pip install runs.
+
+  PRAX-2026-07-29-006  Executors run any CodeBlock handed to them with no
+            origin or trust check, so code lifted from untrusted content
+            executes identically to authorized code.
+      Action 1: Add a provenance field to CodeBlock (originating source and
+                trust tier) and reject blocks lacking an authorized origin in
+                the CodeExecutor base class before dispatch to a backend.
+      Action 2: Default the caller's sources allowlist to the authorized coder
+                agent rather than None, so unlisted senders cannot supply
+                executable content.
+
+  PRAX-2026-07-29-007  Local executor copies the entire host environment into
+            the process running generated code, exposing backend and cloud
+            credentials to that code.
+      Action 1: Build the subprocess environment from an explicit allowlist in
+                _execute_code_dont_check_setup (PATH, HOME, LANG and
+                operator-named variables) instead of os.environ.copy().
+      Action 2: Apply the same minimisation to the Docker backend's container
+                environment and document that any variable passed in is
+                readable by executed code.
+
+  PRAX-2026-07-29-008  A second unsandboxed host-execution backend ships
+            outside the remit's tool baseline and, unlike the local executor,
+            warns nobody at construction.
+      Action 1: Add the same explicit-authorization argument and constructor
+                UserWarning that the local command line executor carries to
+                JupyterCodeExecutor.__init__, so selecting host execution is a
+                deliberate act.
+      Action 2: Either add the host Jupyter backend to the remit's Known Good
+                Baseline as a restricted tool or route users to
+                DockerJupyterCodeExecutor, which provides the same stateful
+                semantics inside a container.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

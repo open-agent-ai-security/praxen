@@ -1,0 +1,199 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    CraftBot
+Analysis: July 28, 2026, 22:25 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Every boundary this remit declares exists in CraftBot as prompt text rather
+than code. The single interposition on the action path is an idempotency
+ledger for irreversible=True actions — a de-duplication check, not an approval
+gate — so the approval requirements, permission tiers, harness-managed-file
+protections and third-party-message rules are all instructions the model is
+asked to honour rather than controls that can refuse. The sharpest consequence
+is a one-hop chain: a message or web page from an untrusted source is
+interpolated into the model's context behind a text label, and the same
+session can call run_shell, which runs with shell=True directly on the host
+with the parent process environment — including the owner's provider API keys
+— and no isolation beyond a shared virtualenv. Reinforcing the pattern, the
+repository ships a complete injection-detection module at
+app/security/prompt_sanitizer.py that has zero call sites anywhere in the
+codebase.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.30 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           3/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 7   Medium: 4   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 15   Partial: 10   Vague: 0   Enforcement-not-possible: 0   (of 29 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   5
+  LLM04  Supply Chain                                       3
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     1
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    1
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               2
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       2
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-28-001  Untrusted content reaching the model can drive
+            run_shell, which executes on the host with the parent environment
+            and no isolation.
+      Action 1: Execute run_shell and any generated code inside a real
+                isolation boundary (container, VM or an E2B-style remote
+                sandbox) with an explicit environment allowlist instead of
+                os.environ.copy(), so provider keys never enter a command's
+                environment.
+      Action 2: Add a deterministic pre-execution policy decision point in
+                agent_core/core/impl/action/manager.py that requires owner
+                approval for run_shell whenever the session has ingested
+                externally-sourced content.
+
+  PRAX-2026-07-28-002  No approval gate exists on the action path — every
+            remit approval requirement is prompt text the model may ignore.
+      Action 1: Add a policy decision point in ActionManager.execute_action
+                that blocks on explicit owner confirmation for any action
+                carrying irreversible=True or writing outside the workspace,
+                rendering the exact action and arguments rather than a
+                summary.
+      Action 2: Make the proactive permission tier the input to that gate so
+                tier 2 and tier 3 tasks cannot execute until the owner
+                responds.
+
+  PRAX-2026-07-28-003  Nothing prevents stored tokens and provider API keys
+            from reaching chat, logs or the action database — no sink redacts
+            secrets.
+      Action 1: Pass an explicit environment allowlist to run_shell instead of
+                os.environ.copy(), and load provider keys from the credential
+                store at call time rather than leaving them in the process
+                environment.
+      Action 2: Add a secret-scrubbing filter to the loguru sinks in
+                app/logger.py and to StoredActionItem input_data/output_data
+                before they are written to actions.db.
+
+  PRAX-2026-07-28-004  External content is distilled into the ChromaDB memory
+            and agent-writable context files with no validation, persisting
+            across every future session.
+      Action 1: Validate and label content on the way into the memory pipeline
+                — mark externally-sourced chunks in ChromaDB metadata and
+                strip instruction-shaped text before embedding — rather than
+                trusting the distillation output.
+      Action 2: Enforce the harness-managed-file rule in code by denying
+                write_file and the filesystem MCP server any path under the
+                agent file system, leaving those files to the pipelines that
+                own them.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-28-005  The untrusted-input boundary is prose only — a full
+            injection-detection module ships with zero call sites anywhere in
+            the codebase.
+      Action 1: Wire a deterministic ingress boundary in
+                _handle_external_event and the web_fetch and read_file result
+                paths that structurally separates untrusted content from
+                instructions, rather than relying on a label the model may
+                disregard.
+      Action 2: Either wire PromptSanitizer into that path and make it reject
+                rather than log, or delete the module so it stops reading as
+                an active control.
+
+  PRAX-2026-07-28-006  Every Living UI backend binds 0.0.0.0, exposing the
+            owner's app data to the whole network despite a loopback-only
+            remit rule.
+      Action 1: Change both uvicorn invocations to bind 127.0.0.1 and route
+                external access, if ever needed, through an explicit
+                owner-approved tunnel.
+      Action 2: Require the bridge token on the backend's own routes so a
+                reachable port is not equivalent to unauthenticated access to
+                the project's data.
+
+  PRAX-2026-07-28-007  157 preconfigured MCP servers auto-connect with
+            unpinned npx fetches and no integrity verification, and the
+            default filesystem server is rooted at the credential directory.
+      Action 1: Pin every MCP entry to an explicit package version and verify
+                integrity before launch, replacing the bare npx and @latest
+                invocations.
+      Action 2: Scope the default filesystem server to a dedicated workspace
+                directory that excludes .credentials/, and require explicit
+                owner confirmation before an imported bundle's MCP servers
+                become connectable.
+
+  PRAX-2026-07-28-008  The proactive permission_tier is stored metadata that
+            no execution path reads, and the agent can set and raise its own
+            tier.
+      Action 1: Make the scheduler read permission_tier before dispatch and
+                route tier 2 and tier 3 tasks through the owner-approval gate,
+                emitting the tier 1 notification the remit requires.
+      Action 2: Remove permission_tier from the agent-updatable field lists in
+                recurring_add and recurring_update_task, or require owner
+                confirmation for any change that lowers it.
+
+  PRAX-2026-07-28-009  File actions accept any absolute path with no
+            allowlist, so the agent reads and writes the entire host rather
+            than its own workspace.
+      Action 1: Resolve every file path with os.path.realpath and reject
+                anything outside a configured workspace root in both
+                write_file and read_file, with .credentials/ denied even
+                inside that root.
+      Action 2: Apply the same containment to the grep_files, find_files,
+                list_folder and stream_edit actions so the restriction cannot
+                be sidestepped by a different tool.
+
+  PRAX-2026-07-28-010  GUI computer-use control of the host ships enabled by
+            default with no explicit authorization step and no per-action
+            approval.
+      Action 1: Default gui.enabled to false and require an explicit operator
+                opt-in that is distinct from the setting the agent itself can
+                reach.
+      Action 2: Gate each synthetic input and screenshot action behind the
+                owner-approval decision point rather than allowing an
+                authorized capability to run unattended.
+
+  PRAX-2026-07-28-011  The main agent loop has no failure-loop halt and no
+            per-task action or token budget — both remit escalation triggers
+            are absent from the code.
+      Action 1: Implement the two named budget parameters as per-task counters
+                checked in ActionManager, pausing the task and prompting the
+                owner to continue or abort when either is reached.
+      Action 2: Add a failure-loop detector keyed on action name, input hash
+                and error signature that halts and escalates after a repeated
+                identical failure instead of retrying.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

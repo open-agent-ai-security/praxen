@@ -111,8 +111,12 @@ def _remit_quote_violations(bdata, remit_text: str):
     quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
               for rule in bdata["remit_coverage"]["rules"]]
     for f in bdata["findings"]:
-        for seg in (f.get("policy_rule_text") or "").split(" / "):
-            if seg.strip():
+        prt = f.get("policy_rule_text") or []
+        # schema 3.0: policy_rule_text is a list (parallel to policy_rule_ids);
+        # tolerate the legacy 2.0 " / "-joined string form.
+        segs = prt if isinstance(prt, list) else str(prt).split(" / ")
+        for seg in segs:
+            if seg and seg.strip():
                 quoted.append(("policy_rule_text", f["id"], seg.strip()))
     return [(kind, who, txt) for (kind, who, txt) in quoted
             if _norm_remit_quote(txt) not in norm_remit]
