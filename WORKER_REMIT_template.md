@@ -30,6 +30,12 @@
   never inventoried — it silently does nothing. Put obligations in POLICY
   sections.
 
+  STATE EACH OBLIGATION ONCE. An obligation can touch several POLICY sections
+  (a "no shell" rule reads as a forbidden tool AND a never-allowed action). Put
+  it in the single most specific section and nowhere else — restating it in
+  every section it could fit inflates the report without adding a check. The
+  scan verifies an obligation as well from one clear statement as from five.
+
   WHICH CODE GETS SCANNED is a separate question from what this agent does.
   Do not declare scan scope here. If the agent lives in a monorepo, spans more
   than one repository, or ships as an example inside a framework, declare the
@@ -72,7 +78,7 @@
 
 ## Job Description
 
-<!-- CONTEXT (describes what the agent does; not extracted as rules). Be specific — this frames the analysis even though it produces no rules. -->
+<!-- CONTEXT (describes what the agent does; not extracted as rules). Be specific — this frames the analysis even though it produces no rules. This is also where the agent's subject-matter scope goes: the topics/domains it is meant to work in ("airline reservation and policy questions"). The negative side — topics it must decline — is a prohibition; put that in Prohibited Behaviors. -->
 
 - 
 - 
@@ -92,6 +98,11 @@
   operations *inside* work the agent IS allowed to do. Rule of thumb: if the
   agent should never be in this territory at all, it goes here; if it's a
   forbidden move within permitted territory, it goes in Never Allowed.)
+
+  Off-topic subject-matter declines also belong here ("declines and escalates
+  any request outside airline customer service") — staying in the agent's
+  subject lane is a whole-category boundary. The positive side (what topics the
+  agent DOES cover) is descriptive; put it in Job Description.
 -->
 
 - 
@@ -255,26 +266,6 @@
 
 ---
 
-## Swimlane Definition
-
-<!--
-  POLICY (extracted as rules). Topic/subject-matter lanes — the areas of work
-  the agent engages with vs declines. Keep whole-category prohibitions in
-  Prohibited Behaviors; use this for topic-level lane definition within the
-  agent's remit.
--->
-
-### Authorized Domains of Work
-- 
-
-### Disallowed Domains of Work
-
-<!-- Topics the agent must decline or escalate. -->
-
-- 
-
----
-
 ## Risk Sensitivities
 
 <!-- CONTEXT (flags areas for extra scrutiny; not extracted as rules). Findings in these areas are held to a lower threshold. -->
@@ -293,6 +284,13 @@
   "Alert if something suspicious happens" cannot be checked.
   "Alert the operator when a reply is addressed to any address not in the
    Rolodex" can.
+
+  These entries name a CONDITION and the RESPONSE (halt / alert / log); they do
+  not re-declare a prohibition stated elsewhere. Reference it by its trigger:
+  "Halt and alert if the agent attempts shell execution" — not a second copy of
+  "the agent must never run shell". (An obligation stated once plus a distinct
+  escalation response is not duplication — the response is a separate control
+  the scan checks: does the code actually halt?)
 -->
 
 ### Halt Agent and Alert Operator
