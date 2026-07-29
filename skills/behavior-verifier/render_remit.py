@@ -41,19 +41,15 @@ class RemitRenderError(Exception):
 
 
 # ── brand-chrome extraction (shared with the report template) ─────────────────
-def _extract_between(text, open_pat, close, *, greedy, what):
-    """Return the substring from the first `open_pat` match to its `close`."""
+def _extract_between(text, open_pat, close, *, what):
+    """Return the substring from the first `open_pat` match to the next `close`."""
     m = re.search(open_pat, text)
     if not m:
         raise RemitRenderError(f"template is missing {what} (no {open_pat!r})")
-    start = m.start()
-    if greedy:
-        idx = text.rfind(close)
-    else:
-        idx = text.find(close, m.end())
-    if idx == -1 or idx < m.end():
+    idx = text.find(close, m.end())
+    if idx == -1:
         raise RemitRenderError(f"template is missing the {close!r} that closes {what}")
-    return text[start:idx + len(close)]
+    return text[m.start():idx + len(close)]
 
 
 def extract_chrome(template_html):
@@ -61,15 +57,25 @@ def extract_chrome(template_html):
     # The head's brand stylesheet: the FIRST <style> block. SVG-local <style>
     # blocks live later in <body>, so the first open/close pair is the brand CSS.
     style = _extract_between(template_html, r"<style>", "</style>",
-                             greedy=False, what="the brand <style> block")
+                             what="the brand <style> block")
     # The Praxen wordmark: the <svg> inside the masthead logo div. The SVG holds
     # no <div>, so a non-greedy match to the next </div> captures exactly it.
     logo_div = _extract_between(template_html, r'<div class="masthead-logo">', "</div>",
-                                greedy=False, what="the masthead logo")
+                                what="the masthead logo")
     logo_svg = logo_div[len('<div class="masthead-logo">'):-len("</div>")]
-    # The page footer: the last <div class="footer"> … </div> before </body>.
-    footer = _extract_between(template_html, r'<div class="footer">', "</div>",
-                              greedy=True, what="the footer block")
+    # The page footer: <div class="footer"> … its last </div> BEFORE </body>.
+    # Bounding the search to </body> keeps the greedy close from over-capturing an
+    # element added after the footer; a missing marker raises rather than emits garbage.
+    fstart = template_html.find('<div class="footer">')
+    if fstart == -1:
+        raise RemitRenderError('template is missing the footer (no <div class="footer">)')
+    bend = template_html.find("</body>", fstart)
+    if bend == -1:
+        raise RemitRenderError("template is missing the </body> that bounds the footer")
+    fclose = template_html.rfind("</div>", fstart, bend)
+    if fclose == -1:
+        raise RemitRenderError("template is missing the </div> that closes the footer")
+    footer = template_html[fstart:fclose + len("</div>")]
     return style, logo_svg, footer
 
 
@@ -223,7 +229,13 @@ def _render_table(rows):
     def cells(r):
         return [c.strip() for c in r.strip().strip("|").split("|")]
     header = cells(rows[0])
-    body = [r for r in rows[2:]]  # rows[1] is the |---| separator
+    # rows[1] is the |---| separator when present (only |, :, -, spaces). Skip it
+    # only if it really is one, so a table written without a separator row doesn't
+    # silently drop its first data row.
+    def _is_sep(r):
+        s = r.strip()
+        return bool(s) and set(s) <= set("|:- ")
+    body = rows[2:] if len(rows) > 1 and _is_sep(rows[1]) else rows[1:]
     out = ['<table class="remit-table"><thead><tr>']
     out += [f"<th>{inline(h)}</th>" for h in header]
     out.append("</tr></thead><tbody>")
@@ -296,7 +308,8 @@ def render_remit(md, template_html, praxen_version):
         s = line.strip()
         if s.startswith("# ") and not s.startswith("## "):
             title = s[2:].strip()
-        elif s.startswith("*") and s.endswith("*") and len(s) > 2 and title:
+        elif (s.startswith("*") and not s.startswith("**") and s.endswith("*")
+              and len(s) > 2 and title):
             subtitle = s.strip("*").strip()
             break
         elif s.startswith("## "):
