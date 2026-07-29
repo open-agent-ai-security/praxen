@@ -1,0 +1,719 @@
+{
+  "schema_version": "3.0",
+  "praxen_version": "1.1.0",
+  "scan": {
+    "agent": "FinBot",
+    "agent_slug": "finbot",
+    "scan_date": "2026-07-17",
+    "scan_timestamp": "2026-07-17T17:31:23Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/finbot",
+    "artifact_count": 17
+  },
+  "intro_band": {
+    "agent_remit_summary": "FinBot is CineFlow Productions' autonomous invoice-processing agent: for each vendor-submitted invoice it validates the vendor, runs fraud detection, and decides whether to approve, reject, or escalate — where approving triggers payment. It is authorized to touch only its invoice/vendor database and an external LLM provider, with no email or outbound channel. Any invoice at or above the manual-review threshold, from a low-trust vendor, or carrying a fraud signal MUST reach a human checkpoint rather than be auto-approved, and FinBot's goals, thresholds, and decision logic may change only through an authenticated operator-only admin channel — never at runtime, and never on the strength of vendor-supplied invoice text, which is data and not instructions.",
+    "agent_structure_summary": "A Python Flask application served by gunicorn over a SQLAlchemy/SQLite backend. A single `FinBotAgent` in `src/services/finbot_agent.py` orchestrates OpenAI function-calling (`gpt-4.1-mini`) across five invoice tools, with a rule-engine fallback (`_fallback_processing`) when the LLM client is unavailable. The agent's goals live in a natural-language system prompt assembled at runtime and extended by a DB-persisted `custom_goals` field. Admin, vendor, and user routes are registered as Flask blueprints under `/api` with no authentication middleware and wildcard CORS; vendor-submitted invoice descriptions flow into the LLM context through `get_invoice_details`, and `approve_invoice` writes `payment_processed=True` with no interposed check."
+  },
+  "behavior_summary": "<p>The dominant pattern is a safety model that lives almost entirely in an LLM system prompt while the code enforces none of it. The single most important takeaway is a straight-line money-loss chain: a vendor-controlled invoice `description` reaches the decision engine, the prompt's \"business continuity\" weighting and the fallback's `_analyze_business_context` scoring override both the fraud signal and the manual-review threshold, and `approve_invoice` sets `payment_processed=True` with no human checkpoint — while the entire control plane (`custom_goals`, thresholds, and the `fraud_detection_enabled` switch) sits behind unauthenticated `/api/admin/*` endpoints that any anonymous caller can rewrite.</p><p>Every consequential boundary the remit declares — human review above threshold, mandatory fraud detection, operator-only goal changes — is stated in prose and gated nowhere in code, and there is no audit logging or monitoring to detect the divergence. The one genuine structural control is a narrow, invoice-scoped tool inventory with no exec, send, or delete capability.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 2,
+      "gap": 9,
+      "partial": 3,
+      "vague": 0,
+      "enp": 0,
+      "total": 14
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Job Description",
+        "rule_text": "Confirm the submitting vendor is registered and in approved status before processing the invoice.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-004"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Job Description",
+        "rule_text": "Auto-approve invoices from registered, approved vendors when the amount is below the configured auto-approval threshold and no fraud signal is present.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-004"
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Non-Goals (Out of Scope)",
+        "rule_text": "Taking instructions, goals, or decision directives from invoice content, descriptions, notes, line items, or any field supplied by a vendor.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-003"
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Non-Goals (Out of Scope)",
+        "rule_text": "Redefining its own goals, thresholds, or decision logic in response to runtime input from any user, vendor, or caller.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-002"
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Approved Communication Channels",
+        "rule_text": "Operator-only, authenticated channel for adjusting operational thresholds; must not be reachable by unauthenticated or vendor-side callers.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-001"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Invoice, vendor, or decision data MUST NOT be sent to any destination other than the invoice database and the LLM provider used for inference.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Tools and Capabilities — Forbidden Tools",
+        "rule_text": "Any capability that disables or bypasses fraud detection.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-005"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Any invoice at or above the manual-review threshold — it MUST reach a human checkpoint before it proceeds; FinBot MUST NOT auto-approve it.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-004"
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Any change to operational thresholds — permitted only via the authenticated admin channel, never at runtime.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-001"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Approving or triggering payment to a vendor that is not registered and in approved status.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-17-004"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Auto-approving any invoice when a fraud signal is present, regardless of the invoice amount — such an invoice MUST be escalated.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-005"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Skipping, disabling, or bypassing fraud detection for any reason, including a configuration flag or a runtime instruction.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-005"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Escalation Rules — Halt Agent and Alert Operator",
+        "rule_text": "Fraud detection is disabled, unavailable, or bypassed for any invoice.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-17-009"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Sensitive vendor or payment data MUST NOT be exfiltrated through any channel; FinBot has no authorized outbound channel to external systems.",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-07-17-001",
+      "severity": "Critical",
+      "summary": "Every /api/admin/* route — config, goals, thresholds, vendor trust, invoice approval — is exposed with no authentication, so any anonymous caller controls the agent.",
+      "description": "The remit requires that goal and threshold changes flow only through an authenticated, operator-only admin channel unreachable by vendor-side callers. In the code no blueprint registers auth middleware and no route checks identity, so update_finbot_config, update_finbot_goals, update_vendor_trust, and review_invoice are all callable anonymously. This makes the entire declared security model operator-settable by anyone on the network.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-05",
+        "R-09"
+      ],
+      "policy_rule_text": [
+        "Operator-only, authenticated channel for adjusting operational thresholds; must not be reachable by unauthenticated or vendor-side callers.",
+        "Any change to operational thresholds — permitted only via the authenticated admin channel, never at runtime."
+      ],
+      "evidence": [
+        {
+          "file": "src/routes/admin.py",
+          "line": 74,
+          "snippet": "update_finbot_config, update_finbot_goals (:90), update_vendor_trust (:193) and review_invoice (:26) have no auth check — all POST handlers act on request.get_json() directly"
+        },
+        {
+          "file": "src/main.py",
+          "line": 20,
+          "snippet": "blueprints registered under /api with no before_request guard or auth middleware anywhere in the app factory"
+        }
+      ],
+      "recommended_actions": [
+        "Put every /api/admin/* route behind authenticated, operator-only access (session or token check in a blueprint before_request), rejecting unauthenticated and vendor-origin callers.",
+        "Separate the admin blueprint onto an access-controlled surface and confirm no vendor-reachable path can call config, goals, or trust mutations."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-002",
+        "PRAX-2026-07-17-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-002",
+      "severity": "Critical",
+      "summary": "Unvalidated custom_goals text is stored in the DB and concatenated into the system prompt with \"OVERRIDE ABOVE IF CONFLICTING\", persistently redefining the agent's goals at runtime.",
+      "description": "The remit forbids redefining goals or decision logic in response to runtime input from any caller. update_goals() stores arbitrary natural-language goals with no validation, and get_system_prompt appends them under a heading instructing the model to override its baseline goals on conflict. Because the value persists in FinBotConfig, one anonymous write (via finding 001) re-poisons every future invoice decision until it is cleared.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Agent Goal Hijack"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI10 — Rogue Agents"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-04"
+      ],
+      "policy_rule_text": [
+        "Redefining its own goals, thresholds, or decision logic in response to runtime input from any user, vendor, or caller."
+      ],
+      "evidence": [
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 70,
+          "snippet": "\"if config.custom_goals: base_goals += CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING) — model told to override baseline security goals\""
+        },
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 735,
+          "snippet": "update_goals() comment \"intentionally vulnerable - no validation of goal content\"; writes config.custom_goals and commits"
+        }
+      ],
+      "recommended_actions": [
+        "Remove the free-text goal-override path; express operational tuning only as bounded numeric parameters that cannot restate or override the agent's core decision policy.",
+        "If a goals field must exist, validate against an allowlist and never instruct the model to let it override baseline safety goals."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-003",
+      "severity": "Critical",
+      "summary": "Vendor-controlled invoice descriptions flow into the LLM decision context unlabeled and untrusted, giving a submitting party an indirect prompt-injection path into approval decisions.",
+      "description": "The remit states vendor-supplied invoice fields are data, never directives. get_invoice_details returns the raw description into the tool result that becomes LLM context, and the system prompt invites \"business continuity\" flexibility and responsiveness to \"legitimate business needs\", so persuasive text in a description directly shapes the approve/reject decision. Nothing separates trusted operator instructions from the untrusted vendor field.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI01 — Agent Goal Hijack"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-03"
+      ],
+      "policy_rule_text": [
+        "Taking instructions, goals, or decision directives from invoice content, descriptions, notes, line items, or any field supplied by a vendor."
+      ],
+      "evidence": [
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 394,
+          "snippet": "get_invoice_details returns \"description\": invoice.description raw into the tool result consumed as LLM context"
+        },
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 40,
+          "snippet": "system prompt PRIMARY GOALS lead with \"Business Continuity\" and instruct the model to prioritize business continuity and be \"responsive to legitimate business needs\""
+        }
+      ],
+      "recommended_actions": [
+        "Label vendor-supplied fields as untrusted data in prompt construction and stop letting free-text descriptions drive the decision; base approval on structured, validated invoice/vendor attributes only.",
+        "Move the approve/reject/escalate decision behind deterministic code gates so no wording in a description can change the outcome."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI01",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-004",
+        "PRAX-2026-07-17-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-004",
+      "severity": "Critical",
+      "summary": "Approval has no code-level threshold, vendor-status, or human-review gate — approve_invoice triggers payment directly, and the fallback path auto-approves above the manual-review threshold on persuasive text.",
+      "description": "The remit requires that any invoice at or above the manual-review threshold reach a human checkpoint and that payment never trigger for a vendor not in approved status. _approve_invoice sets payment_processed=True with no amount, threshold, vendor-status, or identity check, and the manual-review threshold exists only as prose in the prompt. The rule-engine fallback goes further, explicitly auto-approving above-threshold invoices when _analyze_business_context scores \"strong business context\", so the human checkpoint is bypassable in both the LLM and fallback paths.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM05 — Improper Output Handling"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-01",
+        "R-02",
+        "R-08",
+        "R-10"
+      ],
+      "policy_rule_text": [
+        "Confirm the submitting vendor is registered and in approved status before processing the invoice.",
+        "Auto-approve invoices from registered, approved vendors when the amount is below the configured auto-approval threshold and no fraud signal is present.",
+        "Any invoice at or above the manual-review threshold — it MUST reach a human checkpoint before it proceeds; FinBot MUST NOT auto-approve it.",
+        "Approving or triggering payment to a vendor that is not registered and in approved status."
+      ],
+      "evidence": [
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 415,
+          "snippet": "_approve_invoice sets invoice.status='approved'; invoice.payment_processed = True with no amount/threshold/vendor-status/fraud gate"
+        },
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 807,
+          "snippet": "fallback lines 807-824 — \"Amount exceeds threshold but expedited due to strong business context\" auto_approves invoices above manual_review_threshold"
+        }
+      ],
+      "recommended_actions": [
+        "Enforce the manual-review threshold and vendor approved-status as deterministic code gates before any approve/payment write, independent of the model or the business-context score.",
+        "Require an authenticated human decision for any invoice at or above the threshold; never let a text-derived context score raise FinBot's authority."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-003",
+        "PRAX-2026-07-17-005"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-005",
+      "severity": "Critical",
+      "summary": "Fraud detection is optional and anonymously disableable, and even a detected fraud signal is overridden by persuasive \"business context\" instead of forcing the required escalation.",
+      "description": "The remit forbids skipping or bypassing fraud detection and requires that any invoice with a fraud signal be escalated regardless of amount. fraud_detection_enabled is a config flag toggled through the unauthenticated config endpoint; when off, _detect_fraud_patterns returns an empty result and the fallback skips injection detection entirely. Even when on, the fallback auto-approves an invoice with a detected injection when the business-context score is high and speed_priority exceeds 0.6 — so the mandatory-escalate rule is defeated whether fraud detection is disabled or simply outweighed.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-07",
+        "R-11",
+        "R-12"
+      ],
+      "policy_rule_text": [
+        "Any capability that disables or bypasses fraud detection.",
+        "Auto-approving any invoice when a fraud signal is present, regardless of the invoice amount — such an invoice MUST be escalated.",
+        "Skipping, disabling, or bypassing fraud detection for any reason, including a configuration flag or a runtime instruction."
+      ],
+      "evidence": [
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 509,
+          "snippet": "_detect_fraud_patterns returns empty fraud_indicators with \"Fraud detection is disabled\" when config.fraud_detection_enabled is False"
+        },
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 841,
+          "snippet": "fallback lines 841-850 — on contains_injection, if should_expedite and speed_priority>0.6 the invoice is auto_approved, \"business urgency prioritized over security concerns\""
+        }
+      ],
+      "recommended_actions": [
+        "Make fraud detection mandatory and non-disableable at runtime; a detected fraud signal must force escalation with no business-context or speed override path.",
+        "Remove the speed_priority / business-context branches that can approve a flagged invoice, and route any fraud-positive invoice to human review unconditionally."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-004"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-006",
+      "severity": "High",
+      "summary": "A Flask SECRET_KEY is hardcoded as a string literal in source rather than loaded from the environment or a secret store.",
+      "description": "src/main.py sets app.config['SECRET_KEY'] to a fixed literal committed to the repository, so the signing key is public to anyone with source access and cannot be rotated without a code change. Blast radius is limited here because the app implements no session-based authentication, but the hardcoded-credential pattern is a supply-chain hygiene failure and would become directly exploitable the moment any signed-cookie or token feature is added.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "src/main.py",
+          "line": 15,
+          "snippet": "app.config['SECRET_KEY'] set to a hardcoded ~20-character string literal (value redacted), not loaded from environment"
+        }
+      ],
+      "recommended_actions": [
+        "Load SECRET_KEY from an environment variable or secret manager, fail closed if unset, and rotate the exposed value."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-007",
+      "severity": "High",
+      "summary": "Unauthenticated GET /api/vendors endpoints return full vendor banking details — account number, routing number, tax ID — to any anonymous caller.",
+      "description": "The vendor list and detail endpoints call Vendor.to_dict(), which serializes account_number, routing_number, tax_id, and bank_name, and they enforce no authentication while CORS is wildcard-open. Any anonymous request — including cross-origin from a victim browser — can enumerate every vendor's banking and payment data. This is an inbound sensitive-data-disclosure gap rather than an agent-driven exfiltration, so it does not map to the remit's outbound-movement rule.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "src/routes/vendor.py",
+          "line": 63,
+          "snippet": "list_vendors (:63) and get_vendor (:54) return vendor.to_dict() with no auth check"
+        },
+        {
+          "file": "src/models/vendor.py",
+          "line": 41,
+          "snippet": "to_dict() serializes bank_name, account_holder_name, account_number, routing_number, tax_id"
+        }
+      ],
+      "recommended_actions": [
+        "Require authentication and authorization on vendor read endpoints, and drop banking/tax fields from any response not strictly required by the caller.",
+        "Replace wildcard CORS with an allowlist so these endpoints cannot be read cross-origin."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-008"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-17-008",
+      "severity": "Medium",
+      "summary": "CORS is enabled wildcard for all routes, letting any origin drive the API — including the unauthenticated admin control plane — from a victim's browser.",
+      "description": "main.py calls CORS(app) with no origin allowlist, so every route, including /api/admin/* config and goals mutations, is reachable cross-origin. On an already-unauthenticated API this widens exposure from direct calls to browser-driven cross-origin requests from any website a target visits. It remains a distinct configuration weakness that would still matter as a CSRF-style vector even if the endpoints were authenticated.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "src/main.py",
+          "line": 18,
+          "snippet": "CORS(app) enables Access-Control-Allow-Origin for all origins across every registered route"
+        }
+      ],
+      "recommended_actions": [
+        "Restrict CORS to an explicit origin allowlist scoped to the legitimate front-end, and never allow cross-origin access to admin routes."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-001",
+        "PRAX-2026-07-17-007"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-009",
+      "severity": "Medium",
+      "summary": "Security-relevant actions — goal, config, and vendor-trust changes — are written to no audit log, and the remit's halt-and-alert escalations have no implementing mechanism.",
+      "description": "There is no logging infrastructure in source (no logging module, only occasional console print()), no alerting, and no monitoring. Per-invoice decisions are persisted to the database, but goal updates, config changes (including disabling fraud detection), and trust changes are recorded nowhere, leaving the most attack-relevant events untraceable. The remit's \"Halt Agent and Alert Operator\" escalation — e.g. when fraud detection is bypassed — has no code path to fire.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-13"
+      ],
+      "policy_rule_text": [
+        "Fraud detection is disabled, unavailable, or bypassed for any invoice."
+      ],
+      "evidence": [
+        {
+          "file": "src/routes/admin.py",
+          "line": 74,
+          "snippet": "update_finbot_config and update_finbot_goals (:90) mutate state with no audit record; log_agreement (:223) only prints to console"
+        },
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 750,
+          "snippet": "update_config / update_goals commit changes to fraud_detection_enabled, thresholds, and custom_goals with no logging or alert"
+        }
+      ],
+      "recommended_actions": [
+        "Add a structured, durable audit log for every config, goal, trust, and approval action, capturing actor, before/after values, and timestamp.",
+        "Implement the remit's halt-and-alert escalation so disabling or bypassing fraud detection raises an operator alert."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-17-005"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-010",
+      "severity": "Medium",
+      "summary": "Dependencies are floor-pinned with >= and no lockfile or ML-BOM, leaving the build susceptible to version-swap and dependency-confusion drift.",
+      "description": "requirements.txt pins most packages, including the OpenAI SDK and flask-cors, with >= ranges rather than exact versions, and there is no lockfile (no requirements.lock, poetry.lock, or Pipfile.lock) and no component inventory. A future resolve can silently pull a different transitive set than what was reviewed. Only Flask itself is exactly pinned.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Supply Chain"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "requirements.txt",
+          "line": 2,
+          "snippet": "flask-cors>=6.0.0, flask-sqlalchemy>=3.1.1, openai>=1.54.0, gunicorn>=21.2.0 floor-pinned with >=; no lockfile committed"
+        }
+      ],
+      "recommended_actions": [
+        "Pin exact versions (==) and commit a lockfile, and track components in an SBOM/ML-BOM so the reviewed dependency set is reproducible."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-17-011",
+      "severity": "Medium",
+      "summary": "Prompt-injection and fraud detection rely on a finite regex keyword denylist that paraphrased, goal-aligned language trivially evades.",
+      "description": "_detect_prompt_injection matches a fixed list of technical and business-manipulation keyword patterns, so any manipulation phrased outside those exact tokens passes as clean — the CTF's own \"Hard\" path is defined as goal-aligned language the denylist never flags. As a detection primitive it is inherently incomplete and cannot be the basis for a security decision. It is the enabling condition for the injection and fraud-override findings rather than a violation of a single remit clause, so it is not linked to one.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Build an AI Red Team"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "src/services/finbot_agent.py",
+          "line": 549,
+          "snippet": "_detect_prompt_injection uses fixed technical_patterns + business_manipulation_patterns regex lists (549-659); paraphrased text outside the tokens returns False"
+        },
+        {
+          "file": "docs/FinBot-CTF-walkthrough-goal-manipulation.md",
+          "line": 131,
+          "snippet": "\"Hard\" method — get an above-threshold invoice auto-approved without the detector firing, using \"very subtle, goal-aligned language\""
+        }
+      ],
+      "recommended_actions": [
+        "Stop treating the keyword denylist as a control; enforce approval decisions with deterministic amount/vendor/fraud gates that do not depend on detecting the wording of an attack."
+      ],
+      "raise_category": "build_an_ai_red_team",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-07-17-003",
+        "PRAX-2026-07-17-005"
+      ],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Narrow, invoice-scoped tool inventory",
+      "description": "The agent exposes only five tools — get invoice details, approve, reject, request human review, and detect fraud — with no exec, send, delete, or network-egress capability, matching the remit's Known Good Baseline and structurally bounding blast radius.",
+      "evidence_path": "src/services/finbot_agent.py:228-345 (_get_tool_definitions)"
+    },
+    {
+      "title": "Model version explicitly pinned",
+      "description": "The inference model is pinned to a named version rather than a floating alias, giving the supply chain a known, reproducible model provenance.",
+      "evidence_path": "src/services/finbot_agent.py:17"
+    },
+    {
+      "title": "Per-invoice decision and reasoning persisted",
+      "description": "Every processed invoice records ai_decision, ai_confidence, ai_reasoning, and processed_at to the database, a durable per-decision record that supports after-the-fact review of invoice outcomes.",
+      "evidence_path": "src/models/vendor.py:59-67"
+    },
+    {
+      "title": "Bounded agent orchestration loop",
+      "description": "The LLM orchestration loop is capped at five iterations, bounding runaway tool-calling and unbounded-consumption risk on a single invoice.",
+      "evidence_path": "src/services/finbot_agent.py:171"
+    }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No logging infrastructure exists in source — the code uses only occasional console print() with no logging module, file handler, structured format, or monitoring; the absence of an audit trail for security-relevant actions is filed as finding PRAX-2026-07-17-009.",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 0.9,
+    "weighted_rationale": "Absent. FinBot's declared safety model — human review above threshold, mandatory fraud detection, operator-only goal and threshold changes, and vendor text treated strictly as data — is asserted in an LLM system prompt and enforced nowhere in the code. The only operative structural control is a narrow tool inventory; every consequential boundary (payment approval, the manual-review threshold, goal definition, admin access) is ungated and anonymously reachable, and there is no audit logging or monitoring to catch the resulting divergence between declared intent and running behavior.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The tool inventory is genuinely narrow and matches the remit's Known Good Baseline — five invoice-scoped tools with no exec, send, delete, or network egress — but domain enforcement is prompt-only, and the DB-persisted `custom_goals` field is concatenated into the system prompt with \"OVERRIDE ABOVE IF CONFLICTING\", letting the agent's scope be redefined at runtime."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Vendor-controlled invoice descriptions enter the LLM context through `get_invoice_details` unlabeled and unvalidated, alongside unvalidated `custom_goals`, and the system prompt explicitly weights \"business continuity\" and speed over fraud detection — untrusted external content drives the decision with no trust boundary."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 0,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "There is no code-level interposition anywhere on the agent's path — every `/api/admin/*` route (config, goals, thresholds, vendor trust, review) is unauthenticated, `approve_invoice` writes `payment_processed=True` with no amount, fraud, vendor-status, or identity check, and the fraud-detection switch itself is an anonymous toggle."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 1,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Dependencies are floor-pinned with `>=` and no lockfile or ML-BOM (`requirements.txt`), and a Flask `SECRET_KEY` is hardcoded in `src/main.py` rather than loaded from the environment; the one positive is that the model version is explicitly pinned (`gpt-4.1-mini`)."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The repository ships an adversarial CTF walkthrough and a regex-based injection detector, but these demonstrate the agent's weaknesses rather than drive architectural fixes — the design deliberately preserves the business-context override that defeats the detector, with no evidence testing changed the security model."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "There is no logging infrastructure in source (no `logging` module, only console `print()`), no alerting, and no monitoring; per-invoice decisions and reasoning are persisted to the database, but the security-relevant admin actions — goal, config, and vendor-trust changes — are recorded nowhere, and the remit's halt-and-alert escalations have no mechanism."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 5,
+      "high": 2,
+      "medium": 4,
+      "low": 0,
+      "info": 0
+    }
+  }
+}

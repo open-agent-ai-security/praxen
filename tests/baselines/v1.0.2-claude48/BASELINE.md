@@ -5,7 +5,7 @@
 
 # Baseline — v1.0.2-claude48 (current)
 
-> Built by `RELEASE_1.0.2_BASELINE_REFRESH.md`. **The current regression baseline** — 12
+> Built by `plans/RELEASE_1.0.2_BASELINE_REFRESH.md`. **The current regression baseline** — 12
 > targets characterized median-of-3 on the 1.0.x skill (Opus 4.8), each frozen on its
 > median-weighted run. Supersedes `v0.7.7-claude48` (now archival). Roster prominence +
 > development-activity data lives in `../ROSTER_HEALTH.md`.

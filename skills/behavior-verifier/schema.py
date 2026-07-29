@@ -31,7 +31,7 @@ import re
 # too: a document must declare this version. A future MINOR ships an additive schema
 # and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
 # to read a version we cannot actually validate.
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "3.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder
@@ -52,6 +52,16 @@ RAISE_NAMES = {
 }
 # Zero Trust counts double (0.25); the other five each count 0.15.
 RAISE_WEIGHTS = {k: (0.25 if k == "implement_zero_trust" else 0.15) for k in RAISE_KEYS}
+# Vector-scored categories (KB Scoring Model Step B3) may be N/A (score: null)
+# when every applicability trigger fails — the category is excluded and the
+# weighted overall renormalizes over the rest. Presence-scored categories
+# (Red Team, Monitor) can never be N/A: their absence is a 0, not an exclusion.
+NA_ELIGIBLE_KEYS = frozenset({
+    "limit_your_domain",
+    "balance_your_knowledge_base",
+    "implement_zero_trust",
+    "manage_your_supply_chain",
+})
 
 SEVERITIES = ["Critical", "High", "Medium", "Low", "Informational"]
 SEVERITY_COUNT_KEYS = {              # finding.severity -> footer.severity_counts key
@@ -253,18 +263,24 @@ def _validate_findings(data):
             _obj(tag, tp)
             _enum(tag, "kind", tp, TAG_KINDS)
             _nonempty_str(tag, "label", tp)
-        # policy_rule_ids / policy_rule_text are null together when the finding
-        # does not trace to a specific remit rule (a RAISE-category or
-        # detection-pattern finding), and non-empty strings together when it does.
-        pri = _str(f, "policy_rule_ids", p, allow_none=True)
-        if pri is not None and not pri.strip():
-            _err(f"{p}.policy_rule_ids", "must be a non-empty string or null")
-        prt = _str(f, "policy_rule_text", p, allow_none=True)
-        if prt is not None and not prt.strip():
-            _err(f"{p}.policy_rule_text", "must be a non-empty string or null")
+        # policy_rule_ids / policy_rule_text (schema 3.0: parallel arrays, #7).
+        # Both null together when the finding does not trace to a specific remit
+        # rule (a RAISE-category or detection-pattern finding), and non-empty
+        # arrays of equal length together when it does — element i of
+        # policy_rule_ids is the id whose text is element i of policy_rule_text.
+        pri = f.get("policy_rule_ids")
+        prt = f.get("policy_rule_text")
         if (pri is None) != (prt is None):
             _err(p, "policy_rule_ids and policy_rule_text must both be set or both be "
-                    "null (a finding either cites a remit rule or it does not)")
+                    "null (a finding either cites remit rules or it does not)")
+        if pri is not None:
+            pri = _str_list(f["policy_rule_ids"], f"{p}.policy_rule_ids")
+            prt = _str_list(f["policy_rule_text"], f"{p}.policy_rule_text")
+            if not pri:
+                _err(f"{p}.policy_rule_ids", "must be a non-empty array or null")
+            if len(pri) != len(prt):
+                _err(p, f"policy_rule_ids ({len(pri)}) and policy_rule_text "
+                        f"({len(prt)}) must have the same length (parallel arrays)")
         ev = _list(f, "evidence", p, min_len=1)
         for j, item in enumerate(ev):
             ip = f"{p}.evidence[{j}]"
@@ -364,7 +380,13 @@ def _validate_raise_posture(data):
         name = _nonempty_str(c, "name", p)
         if name != RAISE_NAMES[key]:
             _err(f"{p}.name", f"must be {RAISE_NAMES[key]!r} for key {key!r}; got {name!r}")
-        _int(c, "score", p, minimum=0, maximum=5)
+        score = _get(c, "score", p)
+        if score is None:
+            if key not in NA_ELIGIBLE_KEYS:
+                _err(f"{p}.score",
+                     f"category {key!r} is presence-scored and may not be N/A (null)")
+        else:
+            _int(c, "score", p, minimum=0, maximum=5)
         _enum(c, "confidence", p, CONFIDENCES)
         w = _number(c, "weight", p, minimum=0.0, maximum=1.0)
         if abs(w - RAISE_WEIGHTS[key]) > 1e-9:
@@ -423,17 +445,33 @@ def _validate_consistency(data, findings, finding_ids):
                 _err(f"$.findings ({f['id']}).related_findings",
                      f"references finding {r!r} which does not exist in findings[]")
 
-    # 4. weighted overall matches Σ(score × weight).
-    # Scores are integers and weights are exact (0.25 / 0.15), so the true sum
-    # has no floating-point error; the only slack we allow is the rounding in
-    # the two-decimal JSON representation (so 0.011, just over half a unit in
-    # the last place) — not a fudge factor for anything else.
+    # 3c. every finding's policy_rule_ids[] resolves to a real remit rule (#5 —
+    # the reverse of check 3). Closes the gap where a finding could cite an
+    # R-NN id that no rule in remit_coverage.rules[] defines; the array shape
+    # (schema 3.0) makes this a clean per-id membership test.
+    rule_ids = {r["rule_id"] for r in rules}
+    for f in findings:
+        for rid in (f.get("policy_rule_ids") or []):
+            if rid not in rule_ids:
+                _err(f"$.findings ({f['id']}).policy_rule_ids",
+                     f"references rule {rid!r} which does not exist in remit_coverage.rules[]")
+
+    # 4. weighted overall matches Σ(score × weight) over the scored categories,
+    # renormalized: N/A (null-score) categories are excluded and the remaining
+    # weights divided by their sum (KB Scoring Model B3). With no N/A category
+    # the divisor is exactly 1.0 and this is the classic fixed-weight sum. The
+    # divisor can never be 0 (Red Team and Monitor may not be N/A). The only
+    # slack allowed is the two-decimal JSON rounding (0.011, just over half a
+    # unit in the last place) — not a fudge factor for anything else.
     cats = data["raise_posture"]["categories"]
-    computed = sum(c["score"] * c["weight"] for c in cats)
+    scored = [c for c in cats if c["score"] is not None]
+    wsum = sum(c["weight"] for c in scored)
+    computed = sum(c["score"] * c["weight"] for c in scored) / wsum
     declared = data["raise_posture"]["weighted_overall"]
     if abs(computed - declared) > 0.011:
         _err("$.raise_posture.weighted_overall",
-             f"declared {declared} but Σ(score×weight) = {computed:.4f}")
+             f"declared {declared} but renormalized "
+             f"Σ(score×weight)/Σ(weight) = {computed:.4f}")
 
 
 # ── public API ───────────────────────────────────────────────────────────────

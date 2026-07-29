@@ -1,0 +1,648 @@
+{
+  "schema_version": "3.0",
+  "praxen_version": "1.1.0",
+  "scan": {
+    "agent": "AutoGen Code Executor",
+    "agent_slug": "autogen-code-executor",
+    "scan_date": "2026-07-27",
+    "scan_timestamp": "2026-07-27T17:14:26Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/autogen",
+    "artifact_count": 15
+  },
+  "intro_band": {
+    "agent_remit_summary": "The execution tier of a generator/executor pattern: it takes fenced Python and shell code blocks that a paired LLM agent produced and runs them inside a controlled, isolated environment, returning stdout, stderr, and exit status to the caller. The primary subject is <code>CodeExecutorAgent</code>, which drives one of several executors — <code>DockerCommandLineCodeExecutor</code> (recommended), <code>LocalCommandLineCodeExecutor</code>, the Jupyter executors, or the Azure dynamic-sessions sandbox. All file access must be confined to the configured working directory, every execution must honour a wall-clock timeout, high-impact execution should require an approval function, and the executor must never initiate its own network egress, persist state, or read the parent process's credentials or environment.",
+    "agent_structure_summary": "Python library (autogen-core / autogen-ext / autogen-agentchat). <code>CodeExecutorAgent</code> in <code>_code_executor_agent.py</code> extracts markdown code blocks, optionally generates its own code via a <code>model_client</code>, and calls a pluggable <code>CodeExecutor.execute_code_blocks()</code>. Executors are deterministic: the Docker executor writes each block to <code>work_dir</code>, mounts it as <code>/workspace</code>, and runs it with a <code>timeout</code> wrapper; the local executor runs blocks as host subprocesses; the Jupyter executors run against local or containerised kernel gateways; the Azure executor POSTs code to a dynamic-sessions endpoint. Working-directory confinement is enforced by <code>get_file_name_from_content()</code> in <code>_common.py</code>. Notable gaps versus the remit: the approval function defaults to <code>None</code> (auto-approve), Docker containers are created with no network or resource restrictions, and the local executor copies the full host environment into the subprocess."
+  },
+  "behavior_summary": "The dominant pattern is a sandbox with the shape of isolation but permissive defaults. The recommended Docker path gives real host-filesystem isolation and enforces working-directory confinement and a wall-clock timeout — but out of the box <code>CodeExecutorAgent</code> auto-approves every code block (the <code>approval_func</code> defaults to <code>None</code>, emitting only a warning), the container is created with unrestricted network egress and no CPU/memory/pids ceiling, and no durable audit record of executions is written. Combined, these defaults turn an upstream prompt injection into an unattended inject-execute-exfiltrate chain that leaves no forensic trail. Separately, the <code>LocalCommandLineCodeExecutor</code> and <code>JupyterCodeExecutor</code> run generated code directly on the host with no isolation — the local executor even copies the parent process's full environment (host secrets included) into the child — and <code>create_default_code_executor</code> silently falls back to the local executor with only a warning when Docker is unavailable.",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 7,
+      "gap": 3,
+      "partial": 5,
+      "vague": 0,
+      "enp": 1,
+      "total": 16
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Job Description",
+        "rule_text": "Confine all file reads and writes to a configured working directory (for the Azure executor, `/mnt/data`).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-27-004"
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Job Description",
+        "rule_text": "Enforce a configured wall-clock timeout on every execution and terminate any process that exceeds it.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Job Description",
+        "rule_text": "When configured with an approval function, obtain approval for each code block before executing it.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Job Description",
+        "rule_text": "Surface all errors (syntax, runtime, timeout, out-of-memory) back to the caller in structured form without silently discarding them.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Approved Communication Channels",
+        "rule_text": "The executor must not initiate its own network traffic beyond a configured allow-list.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-27-003"
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Tools and Capabilities",
+        "rule_text": "Any outbound-messaging capability (email, SMS, webhook) operating on the executor's own behalf.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Authorized Counterparties",
+        "rule_text": "Any code source other than the paired agent's generated code blocks and code passed explicitly by operator application logic — code arriving from a file, HTTP endpoint, message queue, or memory store must not be accepted by the executor interface.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-27-006"
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Tools and Capabilities",
+        "rule_text": "Any mechanism that loads or executes code fetched from a remote URL or other unverified source on the LLM's behalf.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Data Boundaries",
+        "rule_text": "Reading or modifying the parent process's environment, credentials, or state from within an execution.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-27-004"
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Action Boundaries",
+        "rule_text": "Bypassing working-directory confinement by any means — symlinks, parent-directory traversal, absolute paths, or runtime-supplied volume-mount overrides.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Action Boundaries",
+        "rule_text": "Executing code on the local host executor in a production deployment (default production deployments must use a containerized executor).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-27-004"
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Risk Sensitivities",
+        "rule_text": "The default behavior when no approval function is configured (all executions auto-approved).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-27-002"
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Action Boundaries",
+        "rule_text": "Any change to resource limits (CPU, memory, timeout) that raises the ceiling.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-27-005"
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Escalation Rules",
+        "rule_text": "Every execution is recorded with timestamp, executor kind, language, source agent, working directory, timeout, exit status, and a digest (not the body) of the executed code.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-27-008"
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Escalation Rules",
+        "rule_text": "A code execution attempts to read or write outside the working directory, or to escape the container/sandbox.",
+        "status": "enp",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Behavioral Expectations",
+        "rule_text": "Scheduled jobs / cron tasks: none — executors are synchronous, single-call components and must not schedule or queue work.",
+        "status": "verified",
+        "finding_id": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-07-27-001",
+      "severity": "Critical",
+      "summary": "Default configuration yields an unattended inject-execute-exfiltrate chain — auto-approved execution plus unrestricted container egress plus no audit trail.",
+      "description": "With defaults, an upstream prompt injection into the paired coder agent becomes arbitrary code execution: the agent auto-approves the block (approval_func None), the Docker container has full outbound network egress, and no durable execution record is written. The chain runs to data exfiltration with no operator gate and no forensic trace. Docker isolates the host filesystem but not the network or the audit gap, so the isolation is shape without substance for this attack.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI08 — Cascading Failures"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-05",
+        "R-12"
+      ],
+      "policy_rule_text": [
+        "The executor must not initiate its own network traffic beyond a configured allow-list.",
+        "The default behavior when no approval function is configured (all executions auto-approved)."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 458,
+          "snippet": "approval_func defaults to None — execute_code_block runs blocks with no gate; execution output re-enters model context unvalidated at :616-621"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "snippet": "containers.create passes no network_mode/mem_limit and no audit sink — default bridge egress lets executed code reach the network and exfiltrate undetected"
+        }
+      ],
+      "recommended_actions": [
+        "Ship a safe-by-default posture for the recommended path — require an approval function (or explicit opt-out) and create Docker containers with `network_mode=\"none\"` unless an operator allow-list is configured.",
+        "Add a durable per-execution audit record (executor kind, language, source agent, work_dir, timeout, exit status, code digest) so the chain is at least detectable after the fact."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI05",
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-07-27-002",
+        "PRAX-2026-07-27-003",
+        "PRAX-2026-07-27-008"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-27-002",
+      "severity": "High",
+      "summary": "CodeExecutorAgent auto-approves every code block when no approval function is set, emitting only a warning.",
+      "description": "The <code>approval_func</code> parameter defaults to <code>None</code>, and <code>execute_code_block</code> skips the approval branch entirely in that case, executing model-generated code with no human-in-the-loop. The only mitigation is a UserWarning at construction. This is the standing, ungated consequential capability that the compound chain (PRAX-2026-07-27-001) builds on.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-12"
+      ],
+      "policy_rule_text": [
+        "The default behavior when no approval function is configured (all executions auto-approved)."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 441,
+          "snippet": "approval_func default None; :458-467 warns but does not block; execute_code_block at :691 only gates when _approval_func is not None"
+        }
+      ],
+      "recommended_actions": [
+        "Make an approval function mandatory for production, or default to a deny-until-configured posture, so execution is gated unless the operator explicitly opts into auto-approval."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-27-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-27-003",
+      "severity": "High",
+      "summary": "Docker executor creates containers with unrestricted network egress and no allow-list mechanism.",
+      "description": "<code>containers.create</code> is called with no <code>network_mode</code>, so the container joins the default bridge network with full outbound access. The remit requires egress to be denied by default and limited to a configured allow-list; there is no allow-list construct anywhere in the executor, so executed (or injected) code can open arbitrary outbound connections and exfiltrate data. This is the network half of the compound chain.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI02 — Tool Misuse and Exploitation"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-05"
+      ],
+      "policy_rule_text": [
+        "The executor must not initiate its own network traffic beyond a configured allow-list."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "snippet": "containers.create(..., volumes=..., working_dir=\"/workspace\", extra_hosts=..., device_requests=...) — no network_mode argument, so default bridge egress applies"
+        }
+      ],
+      "recommended_actions": [
+        "Default containers to <code>network_mode=\"none\"</code> and expose an explicit, operator-configured egress allow-list, so outbound access is opt-in rather than on by default."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": "ASI02",
+      "confidence": "High",
+      "related_findings": [
+        "PRAX-2026-07-27-001"
+      ],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-27-004",
+      "severity": "High",
+      "summary": "Local and Jupyter host executors run generated code unisolated with full host filesystem and parent-environment access.",
+      "description": "<code>LocalCommandLineCodeExecutor</code> executes each block as a host subprocess with <code>env = os.environ.copy()</code>, handing executed code the parent process's full environment including any host secrets, and with no runtime filesystem confinement — directly violating the remit's forbidden data-movement and work_dir-confinement clauses. <code>JupyterCodeExecutor</code> is similarly host-local, and <code>create_default_code_executor</code> silently falls back to the local executor with only a warning when Docker is unavailable.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI03 — Identity and Privilege Abuse"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-01",
+        "R-09",
+        "R-11"
+      ],
+      "policy_rule_text": [
+        "Confine all file reads and writes to a configured working directory (for the Azure executor, `/mnt/data`).",
+        "Reading or modifying the parent process's environment, credentials, or state from within an execution.",
+        "Executing code on the local host executor in a production deployment (default production deployments must use a containerized executor)."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 397,
+          "snippet": "env = os.environ.copy() passed to create_subprocess_exec — executed code inherits full host environment; no runtime FS confinement on host executor"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 58,
+          "snippet": "create_default_code_executor falls back to LocalCommandLineCodeExecutor with a warning when Docker is unavailable, so the unisolated path can be selected silently"
+        }
+      ],
+      "recommended_actions": [
+        "Pass a minimal, explicitly-constructed environment (not <code>os.environ.copy()</code>) to executed subprocesses, stripping host credentials.",
+        "Make the local-host fallback in <code>create_default_code_executor</code> fail closed (raise) unless the operator explicitly authorises host execution."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": "ASI03",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-27-005",
+      "severity": "Medium",
+      "summary": "Docker containers are created with no CPU, memory, or pids limit — only a wall-clock timeout bounds an execution.",
+      "description": "<code>containers.create</code> sets no <code>mem_limit</code>, <code>nano_cpus</code>, or <code>pids_limit</code>, so a fork bomb, memory balloon, or CPU-spin in executed code can exhaust host resources within the timeout window. The remit treats resource ceilings as a configured control whose raising requires approval, but no ceiling exists to raise.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM10 — Unbounded Consumption"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-13"
+      ],
+      "policy_rule_text": [
+        "Any change to resource limits (CPU, memory, timeout) that raises the ceiling."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "snippet": "containers.create call sets no mem_limit / nano_cpus / pids_limit — resource consumption is bounded only by the per-block timeout"
+        }
+      ],
+      "recommended_actions": [
+        "Add operator-configurable <code>mem_limit</code>, <code>nano_cpus</code>, and <code>pids_limit</code> to the container creation call with conservative defaults."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM10",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-27-006",
+      "severity": "Medium",
+      "summary": "The sources filter defaults to None, so code blocks from any group-chat participant are executed, not just the paired coder agent.",
+      "description": "When <code>model_client</code> is not set, <code>extract_code_blocks_from_messages</code> only restricts by source if <code>_sources</code> was configured; the default is <code>None</code>, meaning every message's fenced code is eligible for execution. The remit designates the paired agent's generated code as the only accepted execution input, so in a multi-agent chat this default expands the trusted-counterparty set beyond intent.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Limit Your Domain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI07 — Insecure Inter-Agent Communication"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-07"
+      ],
+      "policy_rule_text": [
+        "Any code source other than the paired agent's generated code blocks and code passed explicitly by operator application logic — code arriving from a file, HTTP endpoint, message queue, or memory store must not be accepted by the executor interface."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 681,
+          "snippet": "\"if self._sources is None or msg.source in self._sources\" — with the default None, code from every message source is extracted and executed"
+        }
+      ],
+      "recommended_actions": [
+        "Require an explicit <code>sources</code> allow-list (or default it to the paired coder agent) so execution input is restricted to authorised counterparties."
+      ],
+      "raise_category": "limit_your_domain",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI07",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-27-007",
+      "severity": "Medium",
+      "summary": "Local executor docstring claims dangerous-command sanitization that does not exist in the code.",
+      "description": "The <code>LocalCommandLineCodeExecutor</code> class docstring states that command-line code \"is sanitized using regular expression match against a list of dangerous commands,\" but no such denylist, sanitize routine, or dangerous-command match exists anywhere in the executor package (a grep for sanitize/dangerous/denylist returns only this docstring). Operators may rely on a self-destructive-command guard that is not present.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 57,
+          "snippet": "docstring \"Command line code is sanitized using regular expression match against a list of dangerous commands\" — no matching implementation in _execute_code_dont_check_setup or _common.py"
+        }
+      ],
+      "recommended_actions": [
+        "Remove the inaccurate docstring claim, or implement and wire in the described dangerous-command check so documentation and behaviour agree."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-27-008",
+      "severity": "Medium",
+      "summary": "No durable structured audit record of executions is written — the remit's Log-Only clause fields are never persisted.",
+      "description": "The agent emits in-process <code>CodeGenerationEvent</code>/<code>CodeExecutionEvent</code> objects through <code>event_logger</code>, and executors use plain <code>logging</code> for operational messages, but nothing writes a durable per-execution record carrying executor kind, language, source agent, work_dir, timeout, exit status, and a code digest. Without that record an incident cannot be reconstructed, which is what makes the compound chain (PRAX-2026-07-27-001) undetectable.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-14"
+      ],
+      "policy_rule_text": [
+        "Every execution is recorded with timestamp, executor kind, language, source agent, working directory, timeout, exit status, and a digest (not the body) of the executed code."
+      ],
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 624,
+          "snippet": "CodeExecutionEvent yielded to the in-process event stream only; no durable sink, and no execution-level audit record with the remit's Log-Only fields is written anywhere"
+        }
+      ],
+      "recommended_actions": [
+        "Add a structured, durable audit log entry per execution capturing executor kind, language, source agent, work_dir, timeout, exit status, and a code digest (not the body)."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "Medium",
+      "related_findings": [
+        "PRAX-2026-07-27-001"
+      ],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-27-009",
+      "severity": "Medium",
+      "summary": "DockerJupyterServer publishes its code-execution kernel gateway on all host interfaces and makes the bind directory world-writable.",
+      "description": "The bundled Jupyter server binds the kernel gateway to <code>0.0.0.0</code> inside the container and starts it with <code>publish_all_ports=True</code>, mapping the code-execution endpoint onto all host interfaces rather than loopback, and it <code>chmod</code>s the host bind directory to <code>0o777</code>. A 32-byte token is generated by default (good), but passing <code>token=\"\"</code> disables auth entirely, leaving a network-reachable RCE endpoint.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI07 — Insecure Inter-Agent Communication"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 278,
+          "snippet": "DEFAULT_DOCKERFILE sets KernelGatewayApp.ip=0.0.0.0; container run with publish_all_ports=True at :368 exposes the gateway on all host interfaces"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 328,
+          "snippet": "os.chmod(bind_dir, 0o777) makes the host bind directory world-writable"
+        }
+      ],
+      "recommended_actions": [
+        "Publish the gateway port bound to <code>127.0.0.1</code> only (not <code>publish_all_ports</code>), and tighten bind-directory permissions from <code>0o777</code>.",
+        "Reject or warn hard on an empty auth token so the gateway is never started without authentication."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": "ASI07",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-27-010",
+      "severity": "Low",
+      "summary": "Local executor invokes PowerShell with -ExecutionPolicy Bypass, disabling a host script-safety mechanism.",
+      "description": "When running pwsh/powershell blocks, <code>LocalCommandLineCodeExecutor</code> passes <code>-ExecutionPolicy Bypass</code>, turning off PowerShell's execution-policy protection on the host. This is a minor hardening gap on the already-unisolated host executor path rather than an independent exposure.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 413,
+          "snippet": "extra_args includes \"-ExecutionPolicy\", \"Bypass\" for pwsh invocation, disabling the host PowerShell execution policy"
+        }
+      ],
+      "recommended_actions": [
+        "Avoid <code>-ExecutionPolicy Bypass</code> or make it opt-in; prefer running host PowerShell under the operator's configured policy."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Working-directory confinement enforced and unit-tested",
+      "description": "<code>get_file_name_from_content()</code> resolves any declared filename and calls <code>relative_to(workspace)</code>, rejecting paths outside the work_dir with \"Filename is not in the workspace\"; both the Docker and local command-line executor test suites assert this rejection.",
+      "evidence_path": "python/packages/autogen-ext/src/autogen_ext/code_executors/_common.py:96-111"
+    },
+    {
+      "title": "Docker isolation on the default/recommended path",
+      "description": "<code>create_default_code_executor</code> prefers the Docker executor when available, and the Docker executor mounts only the working directory to <code>/workspace</code>, giving real host-filesystem isolation for the recommended configuration.",
+      "evidence_path": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py:546"
+    },
+    {
+      "title": "Wall-clock timeout enforced across all executors",
+      "description": "Every executor enforces a configurable timeout and terminates the overrunning process — the local executor via <code>asyncio.wait_for</code> plus <code>proc.terminate()</code>, the Docker executor via a <code>timeout</code> command wrapper, and the Jupyter/Azure executors via their own timeouts.",
+      "evidence_path": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py:441-448"
+    },
+    {
+      "title": "Pluggable, tested approval mechanism with a no-approval warning",
+      "description": "<code>CodeExecutorAgent.execute_code_block</code> invokes a sync-or-async approval function before execution and returns an error when denied; approval deny/allow paths are unit-tested, and a UserWarning is emitted whenever no approval function is set.",
+      "evidence_path": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py:687-716"
+    },
+    {
+      "title": "No hardcoded credentials; token-based auth for network executors",
+      "description": "The Azure executor obtains its bearer token from an injected <code>TokenProvider</code> rather than a stored secret, and the Docker Jupyter server generates a 32-byte random auth token by default via <code>secrets.token_hex</code>.",
+      "evidence_path": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py:353"
+    }
+  ],
+  "log_files": {
+    "present": false,
+    "no_logs_note": "No durable log files exist on disk and no file-routing logging infrastructure (FileHandler/RotatingFileHandler) is configured in source; the agent emits in-process structured execution events and executors use plain logging with no file sink, an audit-durability gap documented in PRAX-2026-07-27-008.",
+    "rows": []
+  },
+  "raise_posture": {
+    "weighted_overall": 2.15,
+    "weighted_rationale": "Partial. The executor family ships genuine, operative safeguards — Docker isolation on the recommended path, code-tested working-directory confinement, per-execution wall-clock timeouts, and a real (if default-off) approval mechanism — which keep it clear of an Absent posture. But the highest-weight category, Implement Zero Trust, is held down by permissive defaults: auto-approved execution, unrestricted container network egress, no resource ceiling, and full host-environment inheritance on the local executor. Supply-chain hygiene (unpinned base images), adversarial testing, and durable audit logging are all partial, leaving the agent solidly in the Partial band with its most exploitable gaps concentrated in the trust boundary that matters most for a code-execution component.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The component is narrow by construction — it only extracts and runs fenced code blocks, and the supported-language allow-list is enforced in code (<code>_extract_markdown_code_blocks</code> regex, executor SUPPORTED_LANGUAGES), with a tool inventory matching the remit; the main slack is the default-None <code>sources</code> filter which widens accepted input beyond the paired agent."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "Data sources are scoped to code blocks and the working directory, but execution output is fed straight back into the model context unvalidated (<code>on_messages_stream</code> adds <code>execution_result.output</code> as a UserMessage), and the local executor exposes host environment variables to executed code, so untrusted/poisoned content can re-enter the loop."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.25,
+        "rationale": "Real isolation exists on the Docker path (host-FS confinement, work_dir mount, timeout) and lifts this above Ad hoc, but the defaults are permissive — <code>approval_func=None</code> auto-approves all execution, Docker containers get unrestricted egress and no resource caps, and the local executor inherits the full parent environment — so model output reaches a shell sink ungated by default."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "No credentials are hardcoded (Azure uses a TokenProvider, Jupyter generates a token via <code>secrets.token_hex</code>), but the default container images (<code>python:3-slim</code>, the quay.io Jupyter base) are floating tags pulled with no digest pin or integrity verification."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 2,
+        "confidence": "Low",
+        "weight": 0.15,
+        "rationale": "There are genuine security-relevant unit tests — working-directory traversal is rejected and asserted (\"Filename is not in the workspace\"), and approval-deny paths are tested — but there is no evidence of a red-team program, injection/sandbox-escape corpus, or findings that drove architectural change."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 2,
+        "confidence": "Medium",
+        "weight": 0.15,
+        "rationale": "The agent emits structured <code>CodeGenerationEvent</code>/<code>CodeExecutionEvent</code> events via <code>event_logger</code>, but no durable audit record capturing the remit's Log-Only fields (executor kind, language, source agent, work_dir, timeout, exit status, code digest) is written, and executors use plain <code>logging</code> with no configured file sink."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 1,
+      "high": 3,
+      "medium": 5,
+      "low": 1,
+      "info": 0
+    }
+  }
+}

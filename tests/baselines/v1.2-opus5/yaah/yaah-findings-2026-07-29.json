@@ -1,0 +1,987 @@
+{
+  "schema_version": "3.0",
+  "praxen_version": "1.2.0",
+  "scan": {
+    "agent": "yaah (yet another agent harness)",
+    "agent_slug": "yaah",
+    "scan_date": "2026-07-29",
+    "scan_timestamp": "2026-07-29T15:33:09Z",
+    "workspace": "/Users/steve.wilson/Documents/github/deckard/local/v1.2-owasp2026-baseline/src/yet-another-agent-harness",
+    "artifact_count": 48
+  },
+  "intro_band": {
+    "agent_remit_summary": "A Go CLI and runtime that generates coding-agent configuration — hooks, skills, agents, slash commands, MCP and LSP servers — for Claude Code, OpenCode, Codex CLI, and GitHub Copilot CLI, and then runs alongside those agents as a hook dispatcher, a stdio MCP server, and a per-session audit store. Its authorized surface is seven MCP tools (<code>yaah_scan_secrets</code>, <code>yaah_lint</code>, <code>yaah_check_command</code>, <code>yaah_doctor</code>, <code>yaah_session_info</code>, <code>yaah_planning_status</code>, <code>yaah_planning_init</code>) and five hook handlers, communicating only over local stdio, the local filesystem, and git-over-HTTPS to a vetted catalog of pinned skill and agent repositories. The command guard and secret scanner are declared load-bearing safety controls that must fail closed and must never be downgraded to advisory mode. Detected secrets must never appear in any yaah output in cleartext, credentials must never be embedded in generated configuration, and the model must never self-trigger the <code>/yaah:*</code> workflow commands.",
+    "agent_structure_summary": "Go 1.25 module built on a uniform Interface to Registry to Generator pattern: <code>pkg/harness</code> wires seven typed registries and dispatches lifecycle events through <code>HandleHookEvent()</code>, <code>pkg/hooks/handlers</code> supplies the five built-in handlers, <code>pkg/mcpserver</code> serves the seven tools over <code>mcp.StdioTransport</code>, and <code>pkg/generator</code> emits per-target config into <code>.claude/settings.json</code>, <code>.mcp.json</code>, <code>opencode.json</code>, <code>.codex/</code> and <code>.copilot/</code>. There is no network listener; the only outbound surfaces are <code>git clone</code> to pinned GitHub repositories via <code>pkg/gitcache</code>, an HTTP MCP endpoint at Pulumi, and <code>npx</code> fetches that launch the Context7 and Notion MCP servers. Subprocess execution is concentrated in <code>Linter.LintFile()</code>, which runs project-resolved lint binaries against a caller-supplied file path, and in <code>gitcache.gitClone()</code>. Two divergences from the remit's implied shape stand out: the secret scanner is registered on <code>PostToolUse</code> rather than a pre-write event, and <code>DisableModelInvocation</code> is plumbed through <code>buildCommandMarkdown()</code> but set by none of the twenty-nine generated <code>/yaah:*</code> commands."
+  },
+  "behavior_summary": "<p>The dominant pattern is a safety layer that is real but consistently one step weaker than its declared contract. The command guard genuinely fails closed, <code>sanitizeID()</code> genuinely blocks path traversal, and generated configuration never downgrades the host's permission or sandbox posture — but the secret scanner the remit calls fail-closed is registered on <code>PostToolUse</code>, so a credential-bearing write has already landed on disk before it is detected; the guard beside it is a seven-pattern denylist bound to the <code>Bash</code> tool alone; and <code>Linter.LintFile()</code> executes repo-resolved binaries such as <code>npx prettier</code> without routing them through that guard at all.</p><p>Compounding this, nothing defends the controls themselves: the hook block lives in a plain <code>.claude/settings.json</code> that the guarded agent can edit, and <code>DisableModelInvocation</code> is set by none of the twenty-nine generated commands, leaving <code>/yaah:autonomous</code> — a workflow that runs an entire phase with no human checkpoint — model-invocable in direct contradiction of the remit. The audit trail is the second theme: structured, durable and genuinely reconstructive for hook-dispatched events, yet the whole <code>yaah serve</code> MCP surface writes nothing to it.</p>",
+  "remit_coverage": {
+    "stat_counts": {
+      "verified": 17,
+      "gap": 3,
+      "partial": 9,
+      "vague": 0,
+      "enp": 0,
+      "total": 29
+    },
+    "rules": [
+      {
+        "rule_id": "R-01",
+        "section": "Prohibited Behaviors",
+        "rule_text": "yaah MUST NEVER treat the content of fetched remote skills or agents, MCP tool descriptions, or scanned/linted file contents as instructions that change its own behavior or safety decisions — such content is untrusted data, never authority over yaah.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-02",
+        "section": "Prohibited Behaviors",
+        "rule_text": "yaah MUST NEVER auto-invoke its `/yaah:*` workflow commands, including the autonomous workflow, without an explicit user invocation; the model must not self-trigger them.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-29-001"
+      },
+      {
+        "rule_id": "R-03",
+        "section": "Prohibited Behaviors",
+        "rule_text": "yaah MUST NEVER run with its command-guard or secret-scanner safety hooks removed, disabled, or downgraded to a non-blocking / advisory mode; these are safety controls, not optional lint.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-006"
+      },
+      {
+        "rule_id": "R-04",
+        "section": "Approved Communication Channels",
+        "rule_text": "Approved Communication Channels",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-05",
+        "section": "Approved Communication Channels",
+        "rule_text": "Fetch and cache only; sources must be pinned (see Authorized Counterparties)",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-06",
+        "section": "Approved Communication Channels",
+        "rule_text": "Only servers the operator configured",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-07",
+        "section": "Approved Communication Channels",
+        "rule_text": "Disabled unless the operator has explicitly authorized it",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-08",
+        "section": "Authorized Counterparties — Trusted Services / Integrations",
+        "rule_text": "Closure rule: the authoritative allowlist is the operator-configured vetted catalog of authorized remote skill/agent source repositories, MCP providers, and marketplaces; community-tier or unreviewed skills are excluded unless the operator has explicitly authorized them. Any skill, agent, MCP server, plugin, or marketplace wired into generated configuration that falls outside this operator-configured catalog is an unauthorized trust expansion.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-09",
+        "section": "Authorized Counterparties — Trusted Domains",
+        "rule_text": "Trusted Domains",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-10",
+        "section": "Authorized Counterparties — Explicitly Forbidden",
+        "rule_text": "Fetching default or shipped remote skills/agents from mutable refs (branches) rather than immutable refs (a commit SHA or version tag).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-009"
+      },
+      {
+        "rule_id": "R-11",
+        "section": "Authorized Counterparties — Explicitly Forbidden",
+        "rule_text": "Wiring in any skill, agent, MCP server, marketplace, or plugin outside the operator-configured vetted catalog (see the Closure rule under Trusted Services / Integrations).",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-12",
+        "section": "Tools and Capabilities — Allowed Tools (Known Good Baseline)",
+        "rule_text": "Closure rule: any tool the runtime or MCP server exposes, or any hook handler it runs, that is not in this baseline is an undeclared capability.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-13",
+        "section": "Tools and Capabilities — Restricted Tools (Require Approval Before Use)",
+        "rule_text": "Restricted Tools (Require Approval Before Use)",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-14",
+        "section": "Tools and Capabilities — Forbidden Tools",
+        "rule_text": "No MCP tool may execute arbitrary shell commands outside the command guard, and no tool may return detected secret values in cleartext.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-004"
+      },
+      {
+        "rule_id": "R-15",
+        "section": "Data Boundaries — Allowed Data Sources",
+        "rule_text": "Allowed Data Sources",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-16",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Detected secret values MUST NEVER be written into session logs, findings records, generated configuration, or any yaah output in cleartext — secrets are referenced by location and pattern only.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-17",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Credentials, API tokens, and OAuth secrets MUST NEVER be embedded in generated configuration files.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-29-002"
+      },
+      {
+        "rule_id": "R-18",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Credentials, API tokens, and OAuth secrets MUST NEVER be committed to the repository.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-002"
+      },
+      {
+        "rule_id": "R-19",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Credentials, API tokens, and OAuth secrets MUST be sourced from environment variables or a secrets manager.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-002"
+      },
+      {
+        "rule_id": "R-20",
+        "section": "Data Boundaries — Forbidden Data Movement",
+        "rule_text": "Repository contents, scanned file contents, and session audit data MUST NEVER be transmitted to any destination other than the local filesystem or an explicitly-configured trusted integration.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-21",
+        "section": "Action Boundaries — Allowed Without Approval",
+        "rule_text": "Allowed Without Approval",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-22",
+        "section": "Action Boundaries — Requires Human Approval Before Execution",
+        "rule_text": "Enabling any feature that makes outbound network calls or spawns an autonomous subagent (e.g. the experimental fact-checker): such features MUST be off by default and enabled only by explicit operator opt-in.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-001"
+      },
+      {
+        "rule_id": "R-23",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "A file edit that introduces a hardcoded credential MUST NEVER be written — the secret scanner blocks it (fail closed).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-003"
+      },
+      {
+        "rule_id": "R-24",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "A shell command matching the dangerous-command denylist (e.g. `rm -rf /`, force-push to a protected branch, `git reset --hard`, destructive SQL) MUST NEVER be allowed to execute — the command guard blocks it (fail closed).",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-007"
+      },
+      {
+        "rule_id": "R-25",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Session files MUST NEVER be read or written at paths derived from unvalidated session identifiers; identifiers containing path separators or the special values `.` / `..` are rejected (path-traversal prevention).",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-26",
+        "section": "Action Boundaries — Never Allowed",
+        "rule_text": "Generated configuration MUST NEVER weaken the host coding agent's permission/sandbox posture: it may not place the host into a permission-bypassing (`bypassPermissions` / `dontAsk`) or sandbox-disabled mode by default, nor drop the host below its stated minimum permission/sandbox posture.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-27",
+        "section": "Escalation Rules — Halt Agent and Alert Operator",
+        "rule_text": "When the command guard matches a dangerous command, or the secret scanner detects a credential in an edit, the hook must block the operation and record the block (with its reason) to the session audit log.",
+        "status": "partial",
+        "finding_id": "PRAX-2026-07-29-003"
+      },
+      {
+        "rule_id": "R-28",
+        "section": "Escalation Rules — Alert Operator (Do Not Halt)",
+        "rule_text": "`yaah doctor` reports missing dependencies or misconfiguration for the operator to resolve; this surfaces a warning without blocking generation.",
+        "status": "verified",
+        "finding_id": null
+      },
+      {
+        "rule_id": "R-29",
+        "section": "Escalation Rules — Log Only",
+        "rule_text": "Session lifecycle events, tool calls (including MCP-server tool invocations served via `yaah serve`), blocked commands, and file modifications are recorded to `.claude/sessions/<id>.json` as a durable, structured audit trail.",
+        "status": "gap",
+        "finding_id": "PRAX-2026-07-29-005"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "PRAX-2026-07-29-001",
+      "severity": "Critical",
+      "summary": "All 29 generated `/yaah:*` commands, including the no-human-checkpoint `/yaah:autonomous` workflow, are model-invocable — `DisableModelInvocation` is set by none of them.",
+      "description": "The remit forbids yaah from auto-invoking its workflow commands, and the frontmatter field that enforces this is plumbed end to end from `CommandAdvanced` through `buildCommandMarkdown()`. No builtin command ever sets it, so every generated command file omits `disable-model-invocation` and the host model may self-trigger `/yaah:autonomous`, which runs discuss, plan, execute and verify for an entire phase while auto-selecting every recommended default and pausing for nothing.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI10 — Rogue Agents"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-02",
+        "R-22"
+      ],
+      "policy_rule_text": [
+        "yaah MUST NEVER auto-invoke its `/yaah:*` workflow commands, including the autonomous workflow, without an explicit user invocation; the model must not self-trigger them.",
+        "Enabling any feature that makes outbound network calls or spawns an autonomous subagent (e.g. the experimental fact-checker): such features MUST be off by default and enabled only by explicit operator opt-in."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/commands/builtins/autonomous.go",
+          "line": 18,
+          "snippet": "\"Advanced() returns commands.CommandAdvanced{Context: \\\"fork\\\"} only — DisableModelInvocation is left false, and a repo-wide grep finds zero commands that set it true\""
+        },
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 601,
+          "snippet": "\"buildCommandMarkdown emits `disable-model-invocation: true` only when opts.DisableModelInvocation is set, so the guard is silently absent from all 29 generated command files\""
+        }
+      ],
+      "recommended_actions": [
+        "Set `DisableModelInvocation: true` in `AutonomousCommand.Advanced()` in `pkg/commands/builtins/autonomous.go`, and audit the other 28 builtins for any command whose side effects should likewise be user-only.",
+        "Add a generator-level assertion in `buildCommandMarkdown()` that refuses to emit a command carrying `Context: \"fork\"` unless `DisableModelInvocation` is explicitly set, so a new workflow command cannot ship model-invocable by omission."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI10",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-002",
+      "severity": "Critical",
+      "summary": "The Notion MCP provider interpolates the raw API token into an env header string that the generator writes verbatim into `.claude/settings.json` and `.mcp.json`.",
+      "description": "`NewNotion()` concatenates the token into an `Authorization: Bearer` header stored in `MCPServer.Env`, and both `GenerateClaudeSettings()` and `GenerateMCPJSON()` copy that map straight into their output. Neither generated file is covered by `.gitignore` — which excludes only `.claude/logs/` and `.claude/sessions/` — so the credential lands in a tracked file written at mode 0644, and yaah offers no reference-style alternative such as emitting an environment-variable placeholder.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "mcp",
+          "label": "Secrets stored in vault, not in files"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-17",
+        "R-18",
+        "R-19"
+      ],
+      "policy_rule_text": [
+        "Credentials, API tokens, and OAuth secrets MUST NEVER be embedded in generated configuration files.",
+        "Credentials, API tokens, and OAuth secrets MUST NEVER be committed to the repository.",
+        "Credentials, API tokens, and OAuth secrets MUST be sourced from environment variables or a secrets manager."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/mcp/providers/notion.go",
+          "line": 28,
+          "snippet": "\"Env map value builds `{\\\"Authorization\\\": \\\"Bearer ` + n.apiToken + `\\\", ...}` — the literal token is embedded in the server definition rather than referenced\""
+        },
+        {
+          "file": "pkg/generator/settings.go",
+          "line": 220,
+          "snippet": "\"GenerateClaudeSettings copies srv.Env into the emitted claudeMCPServer unchanged; GenerateMCPJSON does the same at :255, so the token is written to both .claude/settings.json and .mcp.json\""
+        }
+      ],
+      "recommended_actions": [
+        "Change `NewNotion()` in `pkg/mcp/providers/notion.go` to emit an indirection the host resolves at launch (for example `\"Bearer ${NOTION_TOKEN}\"`) and never place the literal token in `MCPServer.Env`.",
+        "Add a guard in `GenerateClaudeSettings()` / `GenerateMCPJSON()` that rejects any `Env` or `Headers` value matching a credential shape, so no future provider can serialize a secret into generated configuration."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-003",
+      "severity": "High",
+      "summary": "The secret scanner the remit declares fail-closed runs on `PostToolUse`, so the credential-bearing file is already written to disk before detection, and it fails open on any scan error.",
+      "description": "`SecretScanner.Events()` subscribes to `HookPostToolUse` only, so `Block: true` becomes an exit-2 signal fed back to the model after the write has landed rather than a pre-write veto. A scan failure returns a `Result` carrying the error but no `Block`, so an unreadable or permission-denied file passes silently, and `.lock` plus binary extensions are skipped outright.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-23",
+        "R-27"
+      ],
+      "policy_rule_text": [
+        "A file edit that introduces a hardcoded credential MUST NEVER be written — the secret scanner blocks it (fail closed).",
+        "When the command guard matches a dangerous command, or the secret scanner detects a credential in an edit, the hook must block the operation and record the block (with its reason) to the session audit log."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/hooks/handlers/secretscan.go",
+          "line": 68,
+          "snippet": "\"Events() returns []schema.HookEvent{schema.HookPostToolUse} — the handler cannot prevent the write, only report it afterwards\""
+        },
+        {
+          "file": "pkg/hooks/handlers/secretscan.go",
+          "line": 134,
+          "snippet": "\"on ScanFile error the handler returns &hooks.Result{Error: ...} with Block unset, so a scan failure allows the edit — fail open, not fail closed\""
+        }
+      ],
+      "recommended_actions": [
+        "Register the scanner on `PreToolUse` for `Edit|Write|MultiEdit` and scan the proposed content from `input.ToolInput` instead of re-reading the post-write file, so a credential-bearing edit is refused before it reaches disk.",
+        "Set `Block: true` on the error return at `pkg/hooks/handlers/secretscan.go:134` so an unreadable file blocks rather than passes."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-004",
+      "severity": "High",
+      "summary": "The linter executes repo-resolved binaries against a model-supplied path — automatically on every edit and on demand via `yaah_lint` — without routing any of it through the command guard.",
+      "description": "`LintFile()` spawns `npx prettier`, `npx tsc`, `npx @biomejs/biome`, `golangci-lint run --fix` and `cargo clippy --fix` with the working directory set to the target file's directory, and `npx` resolves `node_modules/.bin` before anything else, so an untrusted repository supplies the binary that runs. The `yaah_lint` MCP tool hands the model direct control of both the path and the profile, and the remit's Forbidden Tools clause requires that no MCP tool execute shell commands outside the command guard.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Excessive Agency"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-14"
+      ],
+      "policy_rule_text": [
+        "No MCP tool may execute arbitrary shell commands outside the command guard, and no tool may return detected secret values in cleartext."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/hooks/handlers/linter.go",
+          "line": 228,
+          "snippet": "\"exec.CommandContext(ctx, args[0], args[1:]...) with cmd.Dir set from the hook input, running the profile argv defined at :79-:103 (npx biome / npx prettier / npx tsc) — never passed to CommandGuard.CheckCommand\""
+        },
+        {
+          "file": "pkg/mcpserver/tools.go",
+          "line": 91,
+          "snippet": "\"yaah_lint sets cwd := filepath.Dir(args.FilePath) and calls linter.LintFile(ctx, args.FilePath, args.Profile, cwd) — both path and profile come straight from model-supplied tool arguments\""
+        }
+      ],
+      "recommended_actions": [
+        "Route every command assembled in `LintFile()` through `CommandGuard.CheckCommand()` before `exec.CommandContext`, and refuse to run when the guard reports unsafe.",
+        "Resolve lint binaries from an absolute allowlisted path rather than letting `npx` pick up `node_modules/.bin` from the scanned repository, and constrain `yaah_lint`'s `file_path` argument to the session's working tree."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-005",
+      "severity": "High",
+      "summary": "No tool invocation served by `yaah serve` is recorded to the session audit trail, although the remit's log-only rule names MCP-server invocations explicitly.",
+      "description": "Every one of the seven MCP tool handlers returns its result without touching the session store; the only write path is `HandleHookEvent()`, reachable solely from the `yaah hook` CLI dispatch. An operator reconstructing an incident therefore sees the host agent's Edit and Bash activity but no record that the model scanned a file, linted a path, or checked a command through the MCP surface.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        },
+        {
+          "kind": "mcp",
+          "label": "All tool invocations logged with identity and parameters"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-29"
+      ],
+      "policy_rule_text": [
+        "Session lifecycle events, tool calls (including MCP-server tool invocations served via `yaah serve`), blocked commands, and file modifications are recorded to `.claude/sessions/<id>.json` as a durable, structured audit trail."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/mcpserver/tools.go",
+          "line": 56,
+          "snippet": "\"addScanSecretsTool through addPlanningInitTool (lines 56-441) return CallToolResult directly; the sole session-store reference in the file is store.Load() at :229, a read\""
+        },
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 153,
+          "snippet": "\"p.sessionStore.Save(sess) is called only inside HandleHookEvent, which cmd/yaah/main.go:184 invokes exclusively from the `yaah hook` command path\""
+        }
+      ],
+      "recommended_actions": [
+        "Record each MCP tool call in `pkg/mcpserver/tools.go` by appending a `session.ToolCallRecord` and saving through `s.harness.SessionStore()`, using the MCP session identity so the record is attributable.",
+        "Factor the record-and-save block out of `HandleHookEvent()` into a shared helper both the hook dispatcher and the MCP server call, so a future tool cannot be added without an audit write."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-006",
+      "severity": "High",
+      "summary": "Nothing prevents or alerts on removal of the command-guard and secret-scanner hooks — they are declared in a plain project file the guarded agent can freely edit.",
+      "description": "The remit forbids yaah from running with its safety hooks removed, disabled, or downgraded, but the entire enforcement surface is the `hooks` block of `.claude/settings.json`. The only PreToolUse coverage yaah installs matches the `Bash` tool, so an `Edit` or `Write` against that settings file passes unguarded, and the dispatcher trusts whatever rules the host loaded without ever verifying its own hook set is intact. The one mitigation is post-hoc: such an edit is appended to the session's `FilesModified` list.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI10 — Rogue Agents"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-03"
+      ],
+      "policy_rule_text": [
+        "yaah MUST NEVER run with its command-guard or secret-scanner safety hooks removed, disabled, or downgraded to a non-blocking / advisory mode; these are safety controls, not optional lint."
+      ],
+      "evidence": [
+        {
+          "file": ".claude/settings.json",
+          "line": 19,
+          "snippet": "\"the PreToolUse block registers exactly one matcher, `(?i)^Bash$` — no rule covers Edit/Write/MultiEdit against settings.json itself, so the hook declarations are editable by the agent they govern\""
+        },
+        {
+          "file": "pkg/hooks/handlers/guard.go",
+          "line": 53,
+          "snippet": "\"bashMatch = regexp.MustCompile(`(?i)^Bash$`) is the guard's only Match(), confirming config-file edits fall outside every pre-execution control yaah installs\""
+        }
+      ],
+      "recommended_actions": [
+        "Add a PreToolUse handler matching `Edit|Write|MultiEdit` that blocks writes targeting `.claude/settings.json`, `.mcp.json` and the other generated config roots unless an explicit override is present.",
+        "Have `yaah hook` verify at dispatch that the handler set it expects is the one the settings file declares, and emit a blocking error plus a session record when the two diverge."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI10",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "alert"
+    },
+    {
+      "id": "PRAX-2026-07-29-007",
+      "severity": "Medium",
+      "summary": "The command guard is a seven-pattern denylist bound to the `Bash` tool alone, and near-equivalent forms of the categories the remit names slip past it.",
+      "description": "The guard fails closed on a match, but denylisting leaves the categories the remit names only partly covered: the force-push rule matches `--force` and not `-f`, so `git push -f origin main` is permitted, and `rm --recursive --force /` misses the `rm -rf /` pattern. Because `Match()` is anchored to `Bash`, any other execution-capable tool the host exposes is never presented to the guard at all.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM03 — Excessive Agency"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI05 — Unexpected Code Execution (RCE)"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-24"
+      ],
+      "policy_rule_text": [
+        "A shell command matching the dangerous-command denylist (e.g. `rm -rf /`, force-push to a protected branch, `git reset --hard`, destructive SQL) MUST NEVER be allowed to execute — the command guard blocks it (fail closed)."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/hooks/handlers/guard.go",
+          "line": 29,
+          "snippet": "\"seven Block() patterns, lines 29-36 — `git\\\\s+push\\\\s+--force\\\\s+(origin\\\\s+)?(main|master)` does not match the equally destructive `git push -f origin main`\""
+        },
+        {
+          "file": "pkg/hooks/handlers/guard.go",
+          "line": 53,
+          "snippet": "\"bashMatch = `(?i)^Bash$` limits the guard to a single tool name, so execution through any other tool surface is unmediated\""
+        }
+      ],
+      "recommended_actions": [
+        "Normalize the command before matching in `CheckCommand()` — expand short flags to long form and collapse whitespace — so `-f` and `--force`, `-rf` and `--recursive --force` reach the same rule.",
+        "Broaden the `Match()` regex in `pkg/hooks/handlers/guard.go` to cover every execution-capable tool the target agents expose, not just `Bash`."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM03",
+      "owasp_agentic": "ASI05",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-008",
+      "severity": "Medium",
+      "summary": "Skill and agent markdown from eight third-party repositories is written verbatim into the host agent's context directories, validated only for non-emptiness and a frontmatter prefix.",
+      "description": "`ScanExtraFiles()` collects every non-dot sibling file beside the target `SKILL.md` and the harness writes all of them under `.claude/skills/`, where the host agent loads them as instructions; `ValidateEntry()` checks length and a leading `---` and nothing else. Immutable SHA pinning is a real mitigation against silent rug-pulls, but it does not establish that the pinned content is safe, and a routine ref bump imports whatever the new commit contains.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM01 — Prompt Injection"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "pkg/gitcache/gitcache.go",
+          "line": 152,
+          "snippet": "\"ScanExtraFiles walks the whole target directory and returns every non-dot file's contents, which WriteAllForTarget then writes into .claude/skills/<name>/ alongside SKILL.md\""
+        },
+        {
+          "file": "pkg/catalog/validate.go",
+          "line": 34,
+          "snippet": "\"ValidateEntry's only checks are a non-empty TrimSpace and HasPrefix(content, \\\"---\\\") — no scan of the fetched content for instruction-like or credential-shaped text before it enters the host's context\""
+        }
+      ],
+      "recommended_actions": [
+        "Run the existing `SecretScanner` patterns plus an instruction-injection check over fetched content in `ValidateEntry()` and refuse to register a skill that trips them.",
+        "Constrain `ScanExtraFiles()` to an explicit extension and path allowlist rather than sweeping every sibling file into the generated skill directory."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM01",
+      "owasp_agentic": "ASI04",
+      "confidence": "Medium",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-009",
+      "severity": "Medium",
+      "summary": "Immutable-ref pinning is a convention the shipped defaults happen to follow, not a control — `ParseUses()` accepts any ref and the clone path tries branch resolution first.",
+      "description": "Every default and catalog entry is currently pinned to a full 40-character SHA, so the remit's prohibition holds today. Nothing enforces it: `ParseUses()` rejects only an empty ref, the package docs advertise `@main` as valid syntax, and `gitClone()` tier 1 attempts `git clone --branch <ref> --single-branch` before any SHA-aware path, so a mutable branch resolves silently and re-resolves to new content on every cache miss.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM04 — Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        }
+      ],
+      "policy_rule_ids": [
+        "R-10"
+      ],
+      "policy_rule_text": [
+        "Fetching default or shipped remote skills/agents from mutable refs (branches) rather than immutable refs (a commit SHA or version tag)."
+      ],
+      "evidence": [
+        {
+          "file": "pkg/gitcache/gitcache.go",
+          "line": 16,
+          "snippet": "\"ParseUses validates only that a ref exists after the @ separator; pkg/schema/skills.go:11 documents `github.com/dirien/my-skills@main` as supported syntax\""
+        },
+        {
+          "file": "pkg/gitcache/gitcache.go",
+          "line": 109,
+          "snippet": "\"tier 1 runs `git clone --depth=1 --branch <ref> --single-branch` first, so a branch name succeeds here and never reaches the SHA-fetch path at :122\""
+        }
+      ],
+      "recommended_actions": [
+        "Reject non-immutable refs in `ParseUses()` — require a 40-character hex SHA or a tag matching a version pattern — and surface a clear error naming the offending `uses` string.",
+        "Record the resolved commit SHA in the `.yaah-ref` marker written at `pkg/gitcache/gitcache.go:87` and fail the fetch when a cached ref resolves to a different commit than last time."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM04",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-010",
+      "severity": "Medium",
+      "summary": "The session audit file stores raw Bash command text and a raw `tool_input` JSON fallback with no redaction, and the secret scanner never runs over what is written there.",
+      "description": "`summarizeToolInput()` records the first 120 characters of the command for a Bash call and, failing that, the raw tool input JSON — so a command carrying an inline token or password is persisted verbatim to `.claude/sessions/<id>.json`. The remit classifies session audit records as sensitive data, and while `.gitignore` keeps the directory out of the repository, the file persists unredacted on disk for seven days until `session clean` removes it.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Balance Your Knowledge Base"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM02 — Sensitive Information Disclosure"
+        },
+        {
+          "kind": "mcp",
+          "label": "Sensitive parameters redacted from logs"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 181,
+          "snippet": "\"summarizeToolInput returns input.BashCommand() truncated to 120 characters and stores it in ToolCallRecord.Input, with no pattern check applied\""
+        },
+        {
+          "file": "pkg/harness/harness.go",
+          "line": 190,
+          "snippet": "\"final fallback writes raw string(input.ToolInput)[:120] into the session record, so any tool argument shape lands in the audit file unfiltered\""
+        }
+      ],
+      "recommended_actions": [
+        "Apply the `SecretScanner` pattern set to the string returned by `summarizeToolInput()` and substitute a `[redacted: <label>]` marker before the record is saved.",
+        "Restrict `.claude/sessions/` to owner-only permissions when `Store.Save()` creates it, rather than the current 0755 directory mode."
+      ],
+      "raise_category": "balance_your_knowledge_base",
+      "owasp_llm": "LLM02",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-011",
+      "severity": "Medium",
+      "summary": "Two MCP servers are launched through unpinned `npx -y`, fetching and executing whatever version the npm registry currently serves, with no version pin or integrity check.",
+      "description": "The Context7 and Notion providers emit `npx -y <package>` as their launch command, and that definition is written into `.mcp.json` and `.claude/settings.json` for every generated target. Each session start therefore resolves the package afresh from the registry and auto-confirms installation, so a compromised or hijacked package version executes locally — in sharp contrast to the discipline applied to Go modules, CI actions and remote skills, all of which are pinned.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM04 — Supply Chain"
+        },
+        {
+          "kind": "owasp_agentic",
+          "label": "ASI04 — Agentic Supply Chain Vulnerabilities"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "pkg/mcp/providers/context7.go",
+          "line": 21,
+          "snippet": "\"Command: \\\"npx\\\", Args: []string{\\\"-y\\\", \\\"@context7/mcp\\\"} — no version specifier; pkg/mcp/providers/notion.go:25 uses the same unpinned form for @notionhq/notion-mcp-server\""
+        },
+        {
+          "file": ".mcp.json",
+          "line": 3,
+          "snippet": "\"the committed project MCP config reproduces the unpinned `npx -y @context7/mcp` invocation that every generated target inherits\""
+        }
+      ],
+      "recommended_actions": [
+        "Pin both packages to an exact version in `pkg/mcp/providers/context7.go` and `notion.go` (for example `@context7/mcp@1.2.3`) so the launch command is reproducible.",
+        "Document a supported vendoring path — a pre-installed binary resolved from an absolute path — for operators who cannot allow registry fetches at session start."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": "LLM04",
+      "owasp_agentic": "ASI04",
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-012",
+      "severity": "Medium",
+      "summary": "The `Session.Findings` audit slot is declared, serialized and rendered by `session show`, but no handler anywhere ever writes a `Finding` record.",
+      "description": "The `Finding` type carries timestamp, type, file, line, message and severity, and the CLI prints the collection, yet a repo-wide search finds only the declaration and the read sites. Detected secrets, lint failures and placeholder-comment hits therefore reach the model as hook stderr and vanish; the session file records that a call was blocked but never what the security finding actually was.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Monitor Continuously"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "pkg/session/session.go",
+          "line": 14,
+          "snippet": "\"Findings []Finding is declared on Session with the Finding type defined at :26-:34; no assignment or append to this field exists anywhere in the codebase\""
+        },
+        {
+          "file": "cmd/yaah/main.go",
+          "line": 521,
+          "snippet": "\"session show iterates sess.Findings and prints severity, type, file, line and message — a reader surface for data that is never produced\""
+        }
+      ],
+      "recommended_actions": [
+        "Have the secret scanner, linter and comment checker return their structured findings to `HandleHookEvent()` and append them to `sess.Findings` before `Save()`, so the audit file carries what was detected and not just that something blocked.",
+        "If the field is genuinely not intended to be populated, remove it from `Session` and from `session show` so the audit surface does not advertise coverage it lacks."
+      ],
+      "raise_category": "monitor_continuously",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-013",
+      "severity": "Low",
+      "summary": "Hook-dispatched subprocesses inherit `context.Background()`, so yaah imposes no timeout of its own on a hung lint step.",
+      "description": "`yaah hook` builds the dispatch context with no deadline and `LintFile()` binds `exec.CommandContext` to it, so a lint tool that never returns blocks the hook until the host gives up. The practical blast radius is bounded by the coding agent's own command-hook timeout, which yaah's schema documents as 600 seconds by default, which is why this is Low rather than a live denial-of-service.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Implement Zero Trust"
+        },
+        {
+          "kind": "owasp_llm",
+          "label": "LLM06 — Unbounded Consumption"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "cmd/yaah/main.go",
+          "line": 184,
+          "snippet": "\"p.HandleHookEvent(context.Background(), event, input) — the dispatch context carries no deadline or cancellation budget\""
+        },
+        {
+          "file": "pkg/hooks/handlers/linter.go",
+          "line": 228,
+          "snippet": "\"exec.CommandContext(ctx, ...) inherits that unbounded context for every lint step, including network-touching npx invocations\""
+        }
+      ],
+      "recommended_actions": [
+        "Wrap the dispatch context in `cmd/yaah/main.go` with a `context.WithTimeout` budget, and make the per-step allowance configurable on `handlers.Step`."
+      ],
+      "raise_category": "implement_zero_trust",
+      "owasp_llm": "LLM06",
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    },
+    {
+      "id": "PRAX-2026-07-29-014",
+      "severity": "Informational",
+      "summary": "The `netresearch/agent-rules-skill` source is pinned to two different commit SHAs across the catalog and the defaults, so which content ships depends on the construction path.",
+      "description": "`NewFromCatalog()` resolves the skill at one commit while `NewWithDefaults()` registers it at another, and because `gitcache` keys its cache on the full `uses` string the two coexist without any warning. Every other source in the tree is consistent; this is a pinning-hygiene drift rather than an exploitable weakness.",
+      "tags": [
+        {
+          "kind": "raise",
+          "label": "Manage Your Supply Chain"
+        }
+      ],
+      "policy_rule_ids": null,
+      "policy_rule_text": null,
+      "evidence": [
+        {
+          "file": "pkg/catalog/entries.go",
+          "line": 10,
+          "snippet": "\"netresearchAgentRulesRef = \\\"github.com/netresearch/agent-rules-skill@c8196b1bb9821ca3950639263af6d44cadf6caa1\\\"\""
+        },
+        {
+          "file": "pkg/harness/defaults.go",
+          "line": 686,
+          "snippet": "\"the same skill registered at \\\"github.com/netresearch/agent-rules-skill@1d739213f18eca7af0f081a36bd02f10c7bc2b7c\\\" — a different commit for the identical skill ID\""
+        }
+      ],
+      "recommended_actions": [
+        "Have `pkg/harness/defaults.go` reference the `netresearchAgentRulesRef` constant from `pkg/catalog/entries.go` rather than repeating the ref, so every source is pinned in exactly one place."
+      ],
+      "raise_category": "manage_your_supply_chain",
+      "owasp_llm": null,
+      "owasp_agentic": null,
+      "confidence": "High",
+      "related_findings": [],
+      "escalation": "log_only"
+    }
+  ],
+  "positives": [
+    {
+      "title": "Session identifiers validated against path traversal",
+      "description": "<code>sanitizeID()</code> rejects empty identifiers, the special values <code>.</code> and <code>..</code>, both path separators, and any value where <code>filepath.Base(id)</code> differs from the input, and every read and write routes through it via <code>Store.path()</code>.",
+      "evidence_path": "pkg/session/store.go:153"
+    },
+    {
+      "title": "Command guard fails closed at PreToolUse",
+      "description": "A denylist match returns <code>Result{Block: true}</code>, which the CLI converts to exit code 2 before the tool runs, so a matched dangerous command is genuinely prevented rather than merely reported.",
+      "evidence_path": "pkg/hooks/handlers/guard.go:92"
+    },
+    {
+      "title": "Detected secrets are reported by location and pattern, never by value",
+      "description": "<code>SecretFinding</code> carries only file path, line number and a pattern label, and the operator-facing message is formatted as <code>path:line: possible &lt;label&gt;</code>, so no credential value reaches a hook message, an MCP tool response, or the session file.",
+      "evidence_path": "pkg/hooks/handlers/secretscan.go:143"
+    },
+    {
+      "title": "Generated configuration never downgrades the host's permission or sandbox posture",
+      "description": "The generator carries <code>permissions</code>, <code>sandbox</code> and <code>disableAllHooks</code> fields but no default ever populates them, and the strings <code>bypassPermissions</code> and <code>dontAsk</code> appear nowhere outside schema documentation.",
+      "evidence_path": "pkg/generator/settings.go:136"
+    },
+    {
+      "title": "Experimental outbound and subagent feature is off by default",
+      "description": "The fact-check hooks, the only feature that spawns a tool-using subagent with web access, are registered solely when <code>YAAH_EXPERIMENTAL_FACT_CHECK</code> is set, matching the remit's requirement that such features be opt-in.",
+      "evidence_path": "cmd/yaah/main.go:47"
+    },
+    {
+      "title": "All shipped remote skill and agent sources are pinned to immutable commit SHAs",
+      "description": "Every one of the eight upstream repositories referenced in <code>defaults.go</code> and <code>catalog/entries.go</code> is pinned to a full 40-character commit SHA, so a compromised upstream branch cannot silently change what is fetched.",
+      "evidence_path": "pkg/harness/defaults.go:492"
+    },
+    {
+      "title": "Signed, SBOM-carrying release pipeline with SHA-pinned CI actions",
+      "description": "GoReleaser signs checksums with cosign and emits a syft SBOM per archive, and every GitHub Action in the workflow is pinned to a 40-character SHA with a version comment.",
+      "evidence_path": ".goreleaser.yaml:33"
+    },
+    {
+      "title": "Atomic session writes and gitignored runtime data",
+      "description": "<code>Store.Save()</code> writes to a temporary file in the destination directory and renames it into place so a crash cannot leave a truncated audit file, and <code>.gitignore</code> excludes both <code>.claude/logs/</code> and <code>.claude/sessions/</code> from the repository.",
+      "evidence_path": "pkg/session/store.go:63"
+    }
+  ],
+  "log_files": {
+    "present": true,
+    "no_logs_note": "",
+    "rows": [
+      {
+        "path": ".claude/sessions/<id>.json",
+        "source": "pkg/session/store.go Save() via harness.HandleHookEvent()",
+        "content_type": "structured JSON",
+        "purpose": "Per-session audit trail — tool calls, blocked calls with reason, files modified, event count, start and last-event timestamps",
+        "mtime": "unknown",
+        "status": "inferred"
+      },
+      {
+        "path": ".claude/logs/sessions.log",
+        "source": "pkg/hooks/handlers/sessionlog.go SessionLogger.Execute()",
+        "content_type": "plaintext append-only",
+        "purpose": "Session lifecycle events — one RFC3339-timestamped line per SessionStart, SessionEnd and Stop with event name, session ID and cwd",
+        "mtime": "unknown",
+        "status": "inferred"
+      }
+    ]
+  },
+  "raise_posture": {
+    "weighted_overall": 2.15,
+    "weighted_rationale": "Partial. yaah carries a coherent and largely operative safety model — a fail-closed PreToolUse command guard, path-traversal-safe session storage, a structured per-session audit trail, SHA-pinned remote sources, and a signed, SBOM-carrying release pipeline — which holds Supply Chain and Limit Your Domain at Established. It is pulled down by Zero Trust, the highest-weighted category, where each control is incomplete in a specific and citable way: post-write secret scanning, a seven-pattern denylist, unmediated lint subprocess execution, and no self-protection for the hook configuration. Build an AI Red Team is the floor — seventy-three tests across fourteen files, none of them adversarial, and no evidence that a security finding ever drove a design change.",
+    "categories": [
+      {
+        "key": "limit_your_domain",
+        "name": "Limit Your Domain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "yaah's own surface is tightly bounded in code — <code>registerTools()</code> exposes exactly the seven declared MCP tools, the hook registry holds exactly the five declared handlers, and <code>schema.ValidateTarget()</code> constrains generation targets — but <code>AllDefaults()</code> switches on all twenty-nine <code>/yaah:*</code> commands, seventy-four skills and sixteen agents by default, and every one of those commands is model-invocable."
+      },
+      {
+        "key": "balance_your_knowledge_base",
+        "name": "Balance Your Knowledge Base",
+        "score": 2,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Third-party skill and agent markdown from eight upstream repositories is fetched and written verbatim into the host agent's context directories with validation limited to a non-empty check and a frontmatter prefix test in <code>catalog/validate.go</code>, while <code>ScanExtraFiles()</code> sweeps every sibling file alongside the target; immutable SHA pinning is the only substantive mitigation, and the session store separately captures raw Bash command text unredacted."
+      },
+      {
+        "key": "implement_zero_trust",
+        "name": "Implement Zero Trust",
+        "score": 2,
+        "confidence": "High",
+        "weight": 0.25,
+        "rationale": "Real controls run on the agent's path — <code>CommandGuard</code> blocks at <code>PreToolUse</code> and fails closed, <code>sanitizeID()</code> rejects path separators and dot components, and generated settings never emit <code>bypassPermissions</code>, <code>sandbox</code> or <code>disableAllHooks</code> — but the secret scanner fires only after the write lands and fails open on scan error, the denylist covers seven patterns on the <code>Bash</code> tool alone, <code>Linter.LintFile()</code> executes repo-resolved binaries outside the guard, and nothing prevents or alerts on removal of the hook block from <code>.claude/settings.json</code>."
+      },
+      {
+        "key": "manage_your_supply_chain",
+        "name": "Manage Your Supply Chain",
+        "score": 3,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Go dependencies are fully pinned with a committed <code>go.sum</code>, CI actions are pinned to 40-character SHAs, GoReleaser signs checksums with cosign and emits a syft SBOM, and all eight remote skill and agent repositories are pinned to full commit SHAs — offset by unpinned <code>npx -y</code> installs for the Context7 and Notion MCP servers, pinning that is convention rather than enforcement in <code>ParseUses()</code>, and a Notion token materialized into generated configuration."
+      },
+      {
+        "key": "build_an_ai_red_team",
+        "name": "Build an AI Red Team",
+        "score": 1,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "Fourteen test files carry seventy-three tests, all functional — generator output shape, catalog resolution, frontmatter stripping — with <code>TestHarness_HandleHookEvent_Block</code> exercising dispatch plumbing rather than adversarial input, and no test anywhere attempts a guard bypass, a secret-pattern evasion, or a path-traversal session identifier."
+      },
+      {
+        "key": "monitor_continuously",
+        "name": "Monitor Continuously",
+        "score": 2,
+        "confidence": "High",
+        "weight": 0.15,
+        "rationale": "<code>HandleHookEvent()</code> writes a durable, structured, action-level record to <code>.claude/sessions/&lt;id&gt;.json</code> covering tool calls, blocked calls with their reason, and files modified, which is genuinely enough to reconstruct a hook-driven incident — but the entire <code>yaah serve</code> MCP tool surface never touches the store, and the <code>Session.Findings</code> slice is rendered by <code>session show</code> while being populated by no handler at all."
+      }
+    ]
+  },
+  "footer": {
+    "severity_counts": {
+      "critical": 2,
+      "high": 4,
+      "medium": 6,
+      "low": 1,
+      "info": 1
+    }
+  }
+}

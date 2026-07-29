@@ -27,6 +27,28 @@ is the committed `tests/runs/v1.2-stage2.5/` characterization). It rides this
 release's existing re-freeze at no extra freeze cost. If 1.2 keeps it (the
 default), strike this section at re-triage.
 
+## Carried from the 1.2 Stage-1 gate — decomposition-independence generalization
+
+The 1.2 Stage-1 gate (`tests/runs/v1.2-stage1-gate/GATE.md`) fixed the
+**compound-contributor** decomposition variance (the fold/break-out decidability
+test — uAgents 9/10/13 → 9/8/8). It left one residual: helperbot's `8/6/8`
+spread, whose low outlier **merged two independently-material findings** (a
+config-disclosure behavior gap and a hardcoded-secret-in-prompt gap) into one.
+That is the *same* independence principle applied in the other direction — the
+current rule governs fold-vs-breakout for compound contributors but not
+merge-vs-separate for independent findings.
+
+**Work item (Stage 3, with #48):** promote the independence/decidability test to
+*the* single decomposition principle, stated once, governing **both** directions
+— *two things are separate findings iff each would still be a finding after the
+other is fixed*. This is squarely #48's axis (decomposition/materiality
+determinism) and belongs where (a) the **hand-score anchor** defines the *correct*
+decomposition, and (b) the **full re-baseline** measures the rule across all 12
+targets — not bolted onto Stage 1 under-validated (it's a core rule with
+suite-wide blast radius). The rest of helperbot's residual (`enp` on
+advertised-but-unwired tools; wildcard-CORS materiality on a training target) is
+genuine judgment, not rule-forceable — leave it to the hand-score calibration.
+
 ## Buckets
 
 ### A · Detection additions *(the re-baseline justification — land all before the freeze)*

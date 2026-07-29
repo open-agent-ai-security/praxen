@@ -5,6 +5,83 @@
 
 # Praxen 1.2 — Harness Reliability & Scoring Stability
 
+> ## ▶ STATUS: RESUMED (2026-07-28, Steve) — active plan
+>
+> Steve's direction (2026-07-28, quoted): core-3 infra is *"solid, but not
+> sufficient for a 1.2 release. It requires it for compatibility statements,
+> but is uninspired for marketing."* Approved sequence: **revert scoring to
+> shipped-state (regression-gated) → validate subject-declaration on that
+> stack (3 scans) → productize it (scan-instructions guidance, template
+> capability-clarity pass, docs paragraph, known-limits section)** — *"Yes to
+> this. But stop short of 'shipping'. I still want a headline. The 2026 OWASP
+> LLM list is about to ship. Once we get the infra stable again, we'll do a
+> pass over the OWASP KB and update it as the headline for 1.2."*
+>
+> Progress: scoring reverted to pre-#48 state (`9ebbe66` text) in `7b53ccb`,
+> N/A plumbing retained (inert, forward-compat); smoke suites 237/0 green.
+> Next: Full Suite Run vs `v1.1-claude48` (theme-coverage gate), then the
+> deepagents ×3 subject-declaration check, then productization. The v6.x
+> corpus remains parked research (see the parked record below).
+>
+> **Reference-model note (Steve, 2026-07-28):** Opus 5 has shipped; *"we may
+> need to eval updating that baseline"*. Verified the `opus` subagent alias
+> still resolves to `claude-opus-4-8` (probe, 2026-07-28) — the RC regression
+> run is uncontaminated. Standing rule holds: a reference-model change is its
+> own re-baseline, never folded into another. Default sequence: (a) infra
+> regression on 4.8, (b) OWASP-2026 KB refresh + freeze on 4.8, (c) separate
+> Opus-5 lean characterization (method: the 4.8-vs-4.7 comparison — suite on
+> the new model vs frozen exemplars, measure systematic lean, then decide
+> adoption/bands). Fold-into-one-freeze is Steve's call to make explicitly if
+> the two-freeze cost is unacceptable. Operational risk to watch: the alias
+> will eventually flip and the subagent API offers no version-pinned Opus;
+> re-verify the alias before every future suite run.
+>
+> ## ⏸ prior parked record (2026-07-18) — kept for context
+>
+> **Where we are.** The scoring-stability arc ran four corpus generations in
+> one day (v4 decidable procedure → v5 default-directions → **v6 fresh-cloth
+> rewrite** "Observe, then Look Up" → v6.1–v6.4 fix cycles) across ~150
+> validation scans. Verdict on the corpus: **structural transformation,
+> numeric parity.** Best state = **v6.3** (`local/v1.2-v6rewrite/
+> SCORING_MODEL_v6.3.md`, NOT integrated into the skill): 12-target gate mean
+> σ 0.114 vs pre-#48 S2.5's 0.105; matched pairs **5 improved / 1 flat / 6
+> regressed**; three trios cell-identical across all 18 category cells
+> (craftbot, finbot, helperbot — S2.5 had one weighted-σ=0 trio, hermes, so
+> "first ever" is NOT claimable); every residual classified into three
+> buckets: (1) input-underdetermined subject scope — solved by scan-time
+> subject declaration, validated 9/9 (`local/v1.2-v63scope/`), packaging =
+> scan-instructions file + remit capability-clarity, NOT remit scope blocks
+> (Steve architecture ruling); (2) six pending rubric one-liners (no-model
+> LYD, lockfile-governs, fixture/seed labeling, framework-credit,
+> prompt-guardrail class, BYK-2-without-context) — **patch EV judged
+> negative-to-coinflip on session base rates; do NOT drip-patch; the fresh
+> alternative is a "no-inference worker" subject profile (3/12 targets are
+> no-model tools)**; (3) discovery-variance floor (RT/MC), procedural
+> mitigation only. Key analyses: `local/v1.2-v63gate/V63GATE_ASSESSMENT.md`,
+> `local/v1.2-v63scope/SCOPE_EXPERIMENT_RESULTS.md`,
+> `local/v1.2-v6rewrite/ROLLBACK_MARKER.md` (v6.4 subject-clause experiment:
+> rejected, diagnosed).
+>
+> **Branch hazard.** This branch has the **v5 rubric committed in the skill
+> (`5fbaeb1`) — the worst-measured corpus state (7-target mean σ 0.174). Do
+> not ship the branch as-is.** Solidly validated on this branch: Stage-1
+> harness reliability (S2.5: 36 scans, 0 stalls; ~120 since) + compound
+> decidability (uAgents 4→1) + schema 3.0 N/A plumbing (166/42 tests, ~80
+> production renders clean).
+>
+> **The open decision (Steve, when un-parked):** (a) thin 1.2 — revert the
+> scoring-model commits to pre-#48, gate with a standard regression run vs
+> `v1.1-claude48`, ship reliability + decidability + schema plumbing with
+> zero stability claims; (b) integrate v6.3 + scan-instructions and ship the
+> "structural transformation" story; (c) no release — hold until the 1.3
+> corpus work (no-inference profile, framework-credit policy) matures.
+>
+> **Corrections of record (do not regress):** the product is a SINGLE scan
+> ("run, get a score") — median-of-3 is validation instrumentation only,
+> never product protocol (a prior claim it was a Steve decision was wrong);
+> HANDSCORE.md anchors are agent-computed under Steve-ratified rulings, not
+> human hand-scores — there is no human ground truth for target scores.
+
 > **Revised 2026-07-15** — supersedes the 2026-07-12 draft (see git history and
 > `RELEASE_1.2_PLAN_REVIEW.md` for what changed and why). Re-scoped around the
 > operator priority statement (Steve, 2026-07-15): *"our big problems are
@@ -181,7 +258,7 @@ Ordered by the clean run's evidence — severity anchoring first:
   salesforce** *(updated 2026-07-16 from the **Stage-0 baseline** — a
   dry-run of the Stage-2.5 mechanics on the current v1.1 stack executed
   before any 1.2 work, flip-check four + HelperBot control × 3 runs each,
-  committed as [`tests/runs/v1.2-stage0-baseline/`](tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
+  committed as [`tests/runs/v1.2-stage0-baseline/`](../tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
   uAgents replaced openai-cs because it now carries the largest anchor
   dispute — 3 Criticals in every fresh run vs the frozen 1)*. The recorded inclinations
   become the fixed reference points the rubric's *center* is validated
@@ -241,6 +318,18 @@ targets *before* touching the rest of the suite.
 - Median-of-3 × 12 targets on the final stack (new emission flow, new schema,
   new scoring guidance). **Reference model pinned: Opus 4.8** — a model change
   is its own future re-baseline, never folded into this one.
+- **CORRECTION (2026-07-18): a prior version of this bullet recorded
+  "median-of-3 is Praxen's score-certification protocol" as a Steve decision.
+  It was not one** — it was Claude's framing inside a bundled regroup option
+  ("Option C"), and Steve has explicitly repudiated it: **the product is a
+  single scan, and single-scan reproducibility is the goal. Median-of-3 is
+  measurement instrumentation only** (how validation runs and the frozen
+  baseline quantify σ — the baseline remains median-of-3 *by construction*,
+  which is about baseline quality, not a product run mode). The v4 gate-run
+  observation stands as data (single scans wobbled ±1 cell on judgment rungs;
+  medians were stable and near the hand anchors) — it motivates fixing the
+  rubric, not shipping a 3× protocol. Stability gates remain σ-based on
+  validation trios.
 - **Tagging pass riding the freeze** *(added 2026-07-16 — dispositions from
   the LLM08 diagnosis)*:
   - **#169 acceptance:** the craftbot vector-store finding carries LLM08 in

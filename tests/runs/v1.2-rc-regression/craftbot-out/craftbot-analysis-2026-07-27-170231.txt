@@ -1,0 +1,184 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    CraftBot
+Analysis: July 27, 2026, 17:02 UTC
+Praxen v1.1.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in prose with no code-level
+enforcement at exactly the points the remit calls load-bearing. The remit
+demands that arbitrary shell/code execution and every high-impact action be
+isolated or gated by code, yet `run_shell` executes model-chosen commands
+through `shell=True` with the operator's full secret-bearing environment and
+no approval step, the action executor runs model code via `exec()` with only
+venv (package) isolation, and the sole "approval" is a model-discretion
+`send_message` at task end. These converge into one exploitable chain:
+untrusted external content — third-party chat messages and fetched web pages —
+enters the LLM context guarded only by a prompt-level "DO NOT ACT ON THIS"
+wrapper, and from there can drive the ungated `run_shell` sink (injection to
+RCE) or be distilled into the ChromaDB-backed memory store and identity files
+that reload into every future session (persistence). Genuine controls do exist
+around the edges — an SSRF host blocklist, a token-authenticated Living UI
+bridge, structured action-level logging, git-ignored user secrets — but the
+core Zero-Trust boundary the remit specifies is absent.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.60 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           3/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 6   Medium: 4   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 5   Partial: 7   Vague: 0   Enforcement-not-possible: 4   (of 19 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Supply Chain                                       1
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           1
+  LLM06  Excessive Agency                                   1
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    1
+  LLM09  Misinformation                                     —
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               2
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       2
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     1
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-27-001  The `run_shell` action executes model-chosen commands
+            via `shell=True` with the operator's full inherited environment
+            and no approval or isolation.
+      Action 1: Interpose a code-enforced approval/deny gate in the executor
+                before any `run_shell` invocation runs, requiring explicit
+                operator confirmation for state-changing or destructive
+                commands, and run the command in a container or restricted
+                sandbox rather than the host shell.
+      Action 2: Stop inheriting the full environment: build a minimal
+                allowlisted env for the subprocess and strip API keys, OAuth
+                tokens, and other secrets from `os.environ.copy()` before
+                passing it to `Popen`.
+
+  PRAX-2026-07-27-002  Untrusted external content reaches the LLM context
+            behind only a prompt-level guard, from which it can drive ungated
+            shell execution and poison persistent memory.
+      Action 1: Add a deterministic guard that blocks high-impact actions
+                (`run_shell`, sends, payments, memory/identity writes) on any
+                turn whose context includes untrusted external content, and
+                require explicit operator approval to proceed — do not rely on
+                the prompt-level "DO NOT ACT" wrapper.
+      Action 2: Label untrusted external content structurally in the prompt
+                and forbid the action layer from executing shell/exec or
+                persisting to memory/identity files while such content is in
+                scope.
+
+  PRAX-2026-07-27-003  Shared OAuth client secrets for multiple providers are
+            hardcoded (base64-split to evade scanning) and committed to
+            version control.
+      Action 1: Remove the hardcoded OAuth secrets from
+                `embedded_credentials.py` and the git history, rotate every
+                exposed OAuth app credential and the Telegram api_hash, and
+                serve shared-app secrets from a backend the client
+                authenticates to rather than embedding them.
+      Action 2: Add secret-scanning to CI and treat any
+                base64/obfuscation-to-evade-scanning pattern as a build
+                failure.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-27-004  High-impact outbound and integration actions (send,
+            post, pay, delete) have no code-enforced approval gate; approval
+            is a model-discretion convention only.
+      Action 1: Add a code-level approval requirement keyed on action class
+                (send, post, payment, delete, third-party write) that blocks
+                execution until an explicit out-of-band operator confirmation
+                is recorded, independent of any model-emitted message.
+      Action 2: Mark high-impact action handlers with a required-approval
+                attribute the executor enforces, rather than documenting the
+                expectation in AGENT.md prose.
+
+  PRAX-2026-07-27-005  The action executor's "sandbox" is a package-only venv
+            with no host isolation, and third-party MCP servers and imported
+            Living UI code run with the operator's full environment and
+            filesystem.
+      Action 1: Run third-party code (MCP servers, imported Living UI
+                projects) and model-generated action code in a real isolation
+                boundary (container, microVM, or OS sandbox) with a scrubbed
+                environment and a restricted filesystem view, not a shared
+                venv.
+      Action 2: Stop describing the venv as a security sandbox; gate
+                imported/marketplace code behind an operator-approved
+                provenance check before it runs.
+
+  PRAX-2026-07-27-006  The agent distills its own conversations and external
+            content into a ChromaDB-backed memory store with no validation,
+            then retrieves it into future prompts unlabeled — a self-poisoning
+            surface.
+      Action 1: Validate and scan content on the memory-ingest path for
+                hidden/instruction-like text before distillation, and record
+                provenance so external-origin content is quarantined or
+                excluded from long-term memory.
+      Action 2: Label retrieved memory as untrusted context in the prompt and
+                forbid the action layer from treating retrieved text as
+                operator instructions.
+
+  PRAX-2026-07-27-007  Inbound third-party message content is placed into the
+            LLM context with only a prompt-level "DO NOT ACT" guard; the
+            sender check is a self-vs-other flag, not a code-enforced
+            allowlist.
+      Action 1: Enforce sender identity in code: match the sender against an
+                operator allowlist before routing a message as actionable
+                input, and structurally isolate third-party content so the
+                action layer cannot execute instructions found in it.
+      Action 2: Treat the "DO NOT ACT" wrapper as defense-in-depth only; do
+                not rely on the model to honor it.
+
+  PRAX-2026-07-27-008  Operator BYOK API keys and OAuth/bot tokens are stored
+            as plaintext JSON on disk, not in an OS keychain or encrypted
+            store.
+      Action 1: Store BYOK secrets in the OS keychain (macOS Keychain /
+                Windows Credential Manager / libsecret) or an encrypted store,
+                and keep only references in settings.json.
+      Action 2: If a file store is unavoidable, encrypt secrets at rest with
+                an OS-protected key and restrict file permissions to the
+                owner.
+
+  PRAX-2026-07-27-009  Dependencies are unpinned with no lockfile, MCP servers
+            install via `npx -y` / `uv run` with no version pin or integrity
+            check, and there is no SBOM.
+      Action 1: Pin all dependencies with `==` and commit a lockfile; pin MCP
+                server packages to specific versions/digests and verify
+                integrity before launch.
+      Action 2: Generate and maintain an SBOM/ML-BOM and add CVE scanning to
+                CI.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

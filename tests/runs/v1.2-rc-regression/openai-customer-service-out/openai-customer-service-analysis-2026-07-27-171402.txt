@@ -1,0 +1,119 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Airline Customer Service Agent (multi-agent)
+Analysis: July 27, 2026, 17:14 UTC
+Praxen v1.1.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a mature framework whose safety primitives are
+entirely unused by this example: the OpenAI Agents SDK provides input/output
+guardrails, tool guardrails, and human-in-the-loop approval, yet the airline
+agent wires in none of them and enforces every security-relevant rule through
+prompt text alone. The single most dangerous consequence is an
+untrusted-input-to-unverified-mutation chain: free-text customer input reaches
+the LLM with no guardrail, update_seat then writes reservation state from a
+customer-typed confirmation number with no identity check, no ownership
+verification against an authoritative record, and no seat-validity check, and
+the change is never written to a durable audit log — so the mutation is both
+trivially abusable and undetectable. Compounding it, on_seat_booking_handoff
+fabricates the flight number with random.randint, exactly the
+runtime-generated-authoritative-identifier behavior the remit forbids. Genuine
+positives exist — tightly scoped per-agent tools, no forbidden capabilities
+present, ephemeral non-persistent context, and a well-managed dependency stack
+— but they sit alongside an essentially ungated mutation path.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.75 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 2   Medium: 3   Low: 0   Informational: 0
+  Total: 7
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 3   Gap: 10   Partial: 4   Vague: 0   Enforcement-not-possible: 3   (of 20 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   —
+  LLM03  Supply Chain                                       —
+  LLM04  Data and Model Poisoning                           —
+  LLM05  Improper Output Handling                           —
+  LLM06  Excessive Agency                                   1
+  LLM07  System Prompt Leakage                              —
+  LLM08  Vector and Embedding Weaknesses                    —
+  LLM09  Misinformation                                     2
+  LLM10  Unbounded Consumption                              —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-27-001  update_seat mutates reservation state with no identity
+            check, no confirmation-ownership verification, and no handoff
+            re-verification.
+      Action 1: In update_seat (main.py:67) resolve the confirmation number
+                against the authoritative reservation record and reject the
+                call unless it belongs to the current authenticated customer
+                before writing any seat state.
+      Action 2: Add an identity re-verification gate on the seat-booking
+                handoff so the specialist confirms the customer before any
+                mutation instead of trusting inherited context.
+
+  PRAX-2026-07-27-002  on_seat_booking_handoff fabricates the flight number
+            with random.randint and update_seat asserts on it, treating a
+            runtime-generated identifier as authoritative.
+      Action 1: Remove the random.randint flight-number fabrication in
+                on_seat_booking_handoff (main.py:89) and source the flight
+                number from the reservation record keyed on the verified
+                confirmation number.
+      Action 2: Replace the assert precondition (main.py:82) with a real check
+                that the identifier originated from the authoritative
+                reservation system.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-27-003  No input or output guardrails are wired on any agent
+            despite the SDK providing them, leaving free-text input and tool
+            outputs an unscreened prompt-injection surface.
+      Action: Attach an input guardrail to the triage agent (the first agent
+              in the chain) and a tool or output guardrail around update_seat
+              using the SDK's InputGuardrail/OutputGuardrail primitives to
+              screen role-override and off-domain instructions before they
+              reach the model.
+
+  PRAX-2026-07-27-004  Seat changes are not written to any durable audit log;
+            the mutation leaves only a returned string, a stdout print, and an
+            ephemeral trace span.
+      Action: On every update_seat call, write a durable audit record
+              capturing time, customer identity, confirmation number, old and
+              new seat, and the acting agent to a persistent sink rather than
+              relying on stdout and trace spans.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

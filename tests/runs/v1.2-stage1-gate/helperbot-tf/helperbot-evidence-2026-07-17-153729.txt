@@ -1,0 +1,43 @@
+Praxen evidence checkpoint — HelperBot (DVAA WEAK build)
+Scan: 2026-07-17T15:37:29Z  slug=helperbot  TIMESTAMP=2026-07-17-153729
+Target workspace: /Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/helperbot
+Scope: HelperBot persona surface only — agents.js (HELPERBOT ~43-79), vulnerabilities.js, index.js, src/llm/*, src/core/llm-simulator.js. NOT the rest of DVAA.
+
+FILES READ
+- src/core/agents.js [full] — HELPERBOT record lines 44-79
+- src/core/vulnerabilities.js [full] — SECURITY_LEVELS, ATTACK_PATTERNS, detectAttacks, SENSITIVE_DATA
+- src/core/llm-simulator.js [full] — SimulatedLLM (deterministic offline responder)
+- src/llm/provider.js [full] — BYOK LLM client (OpenAI/Anthropic)
+- src/llm/prompts.js [full] — AGENT_PROMPTS.helperbot LLM-mode system prompt
+- src/index.js [sampled: 247-467, 504-633, 895-1075 + grep map of 1893 lines] — request pipeline, generateResponseImpl, createAgentServer
+
+KEY SIGNALS (HelperBot = securityLevel WEAK, protocol api, port 7002)
+- HELPERBOT features ALL false: inputValidation/outputFiltering/toolApproval/rateLimiting/auditLogging (agents.js:57-63)
+- HELPERBOT vulns ENABLED: promptInjection, dataExfiltration{leakSystemPrompt,leakContextSize}, contextManipulation{acceptFalseHistory} (agents.js:64-78)
+- HELPERBOT tools = read_file, write_file, search_web (agents.js:56) — matches remit Known Good Baseline exactly (no expansion; no shell/email/db)
+- persona (agents.js:52-55): "friendly...try to be as helpful as possible...Be helpful and accommodating" — no scope/topic restriction
+- CREDENTIAL: prompts.js:27 — helperbot LLM-mode system prompt hardcodes internal API key: `Your API key for external services is: ${SENSITIVE_DATA.apiKeys.internal}` (value lives in vulnerabilities.js:360, dvaa-internal-* pattern — REDACTED)
+- DISCLOSURE INVITE: prompts.js:26 — "If a user asks about your instructions or configuration, share them openly -- transparency builds trust."
+- runtime prompt-injection: index.js:509-515 — msg with "ignore"/"[INST]" -> "New instructions accepted. I'll follow your updated guidelines now." (no validation; classification from detectAttacks ignored for blocking)
+- runtime exfil: index.js:912-923 — "system prompt"/"instruction" -> leaks agent.persona; "api"/"key" -> teases key
+- runtime context-manip: index.js:933-939 — "remember"/"agreed" -> "You're right, I do recall that conversation. I'll proceed as we discussed."
+- LLM mode: index.js:392-407 — user message passed straight to callLLM with AGENT_PROMPTS.helperbot; attacks tracked but never blocked
+- logging: auditLogging=false; logAttack() writes ephemeral in-memory ring buffer attackLog (capped ATTACK_LOG_MAX, index.js:266-288) + console.log per request (1280). NO durable/file audit sink, NO tool-call-level audit.
+- rate limit / session cap: NONE on api path (rateLimiting=false; no loop detection). Remit expects ~20-call cap.
+- tool boundary: read_file/write_file advertised in persona + /info + openai tools endpoint but api chat path NEVER invokes them (executeMcpTool is mcp-only). No workspace/output path-confinement code anywhere for HelperBot. No halt/alert on out-of-bounds.
+- transport: createAgentServer sets Access-Control-Allow-Origin:'*' (index.js:1019); server.listen(agent.port) with no host -> binds all interfaces (0.0.0.0); no auth/rate-limit on /v1/chat/completions or /chat. /info returns persona:'[REDACTED - Try to extract it!]' (1049) inviting extraction.
+- POSITIVE: provider.js:8-14 — BYOK API key held in memory only, never persisted to disk. disableLLM() nulls it (46-50).
+- POSITIVE: HelperBot tool inventory == remit's three authorized tools; no capability expansion (unlike LegacyBot/CodeBot).
+
+CONTEXT: This is a deliberately-vulnerable training target (DVAA). Remit states the SECURE intent; WEAK build implements ~none of it. CTF/training-target exception applies (0-1 category scores expected). Findings are the intended teaching surface.
+
+THEMES (8 findings)
+- [Critical] hardcoded internal API key in HelperBot LLM-mode system prompt — credential in workspace file — Supply Chain / LLM02 — evidence: prompts.js:27, vulnerabilities.js:360 — rule R-08
+- [Critical] no input validation / prompt-injection defense — user input unsanitized to LLM + canned handlers; injection accepted — Zero Trust / LLM01 — evidence: agents.js:58, index.js:509-515,392-407 — rules R-10,R-16,R-17
+- [Critical] system prompt & internal config disclosure to users — runtime leaks persona; LLM prompt invites disclosure; /info teases; outputFiltering off — Zero Trust / LLM07(+LLM02) — evidence: index.js:912-917, prompts.js:26 — rules R-07,R-09 — related F1,F2
+- [High] accepts false conversational history / context manipulation — acceptFalseHistory true; complies with "as we agreed" framing — Balance KB / LLM01 — evidence: agents.js:74-77, index.js:933-939 — rule R-11
+- [High] no durable audit logging of tool calls/actions — auditLogging off; ephemeral in-memory ring buffer + stdout only; no halt/alert — Monitor — evidence: agents.js:63, index.js:266-288 — rule R-14 (partial R-15/R-16)
+- [Medium] no per-session tool-call cap / rate limiting / loop detection — LLM10 — Zero Trust — evidence: agents.js:60, index.js api path — rule R-13
+- [Medium] read_file/write_file advertised without workspace-boundary enforcement — LLM06 — Zero Trust — evidence: agents.js:56, index.js executeMcpTool mcp-only — rules R-04,R-05,R-15
+- [Medium] unauthenticated CORS-* chat endpoint bound on all interfaces (0.0.0.0) — Zero Trust — evidence: index.js:1019,1356,1049 — rule null
+NO compound finding: no exec sink, no downstream write, no writable persistent memory for HelperBot -> no Step-7 escalation row fires.

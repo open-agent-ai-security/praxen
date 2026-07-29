@@ -66,14 +66,15 @@ class ManifestError(ValueError):
 
 def _is_null_sentinel(v):
     """True if `v` is an LLM-written sentinel for "no value" — an empty
-    string, or the strings "null"/"none" in any case. The parser already
+    string, or the strings "null"/"none"/"n/a" in any case. The parser already
     converts the literal `null` (unquoted) to Python None at coercion time;
     this helper handles the cases where the LLM wrote the string `"null"`,
-    `"none"`, or left the value empty when a real id/list was expected."""
+    `"none"`, `"N/A"` (the KB's spelling for an excluded category score), or
+    left the value empty when a real id/list was expected."""
     if not isinstance(v, str):
         return False
     s = v.strip()
-    return s == "" or s.lower() in ("null", "none")
+    return s == "" or s.lower() in ("null", "none", "n/a")
 
 
 def _load_praxen_version():
@@ -132,8 +133,8 @@ _RAISE_POSTURE_FIELD_TYPES = {
 _RAISE_CATEGORY_FIELD_TYPES = {
     "key": "str",
     "name": "str",
-    "score": "int",
-    "confidence": "str",
+    "score": "int_or_none",   # null/N/A = category excluded (KB Step B3 all-N/A);
+    "confidence": "str",       # schema.py enforces which keys may be N/A
     "weight": "float",
     "rationale": "str",
 }
@@ -904,9 +905,10 @@ def _populate_derived(data):
         Trust, 0.15 for the other five)
       * ``findings[].escalation`` from ``severity`` (Critical/High → alert,
         else → log_only)
-      * ``findings[].policy_rule_text`` from ``findings[].policy_rule_ids``
-        by looking up the rule_id(s) in ``remit_coverage.rules[].rule_text``;
-        multi-rule joined with `" / "` (the renderer's display separator)
+      * ``findings[].policy_rule_ids`` split from the manifest's comma-separated
+        string into an array, and ``findings[].policy_rule_text`` looked up per
+        id in ``remit_coverage.rules[].rule_text`` into a parallel array
+        (schema 3.0, #7 — element i of one aligns with element i of the other)
     """
     rules = data.get("remit_coverage", {}).get("rules", [])
     findings = data.get("findings", [])
@@ -977,6 +979,9 @@ def _populate_derived(data):
         if pri is None:
             f["policy_rule_text"] = None
         else:
+            # Manifest authors write policy_rule_ids as a human-friendly
+            # comma-separated string ("R-03, R-04"); schema 3.0 emits it — and
+            # the looked-up texts — as parallel arrays (#7), element-aligned.
             ids = [s.strip() for s in pri.split(",") if s.strip()]
             texts = []
             missing_ids = []
@@ -989,7 +994,8 @@ def _populate_derived(data):
                 raise ManifestError(
                     f"finding {f.get('id', '?')!r}: policy_rule_ids references "
                     f"rule(s) {missing_ids} not present in remit_coverage.rules[]")
-            f["policy_rule_text"] = " / ".join(texts)
+            f["policy_rule_ids"] = ids
+            f["policy_rule_text"] = texts
 
     # Reorder each finding dict to canonical schema field order so that fields
     # the LLM didn't write (escalation, policy_rule_text) appear in the right
@@ -1118,6 +1124,76 @@ def parse_manifest(text):
     return canonical
 
 
+def validate_manifest(text):
+    """Structure-check a manifest, collecting every reportable problem.
+
+    Unlike ``parse_manifest`` (fail-fast, used on the finished manifest),
+    this walks the manifest section by section and **recovers at the next
+    `## section` heading after an error**, so one broken section doesn't
+    hide problems in the ones after it. Missing required sections are
+    reported separately from structural errors: a mid-composition skeleton
+    (Step 9.9 writes the skeleton first, then appends rules and findings)
+    legitimately lacks sections, and `--validate-manifest` is meant to be
+    runnable at exactly that point.
+
+    Returns ``(errors, missing)`` — both lists of strings.
+    """
+    lines = text.splitlines()
+    errors = []
+    seen_sections = set()
+
+    def _next_section(j):
+        while j < len(lines):
+            info = _heading_info(lines[j])
+            if info is not None and info[0] == 2:
+                return j
+            j += 1
+        return len(lines)
+
+    # Skip leading title and preamble (same rule as parse_manifest).
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("# ") and not line.startswith("## "):
+            i += 1
+            continue
+        if line.strip() == "" or line.startswith("---"):
+            i += 1
+            continue
+        break
+
+    while i < len(lines):
+        line = lines[i]
+        if line.strip() == "":
+            i += 1
+            continue
+        info = _heading_info(line)
+        if info is None or info[0] != 2:
+            errors.append(
+                f"line {i + 1}: expected `## section` heading, got {line!r}")
+            i = _next_section(i + 1)
+            continue
+        name = info[1].strip()
+        if name not in _SECTION_DISPATCH:
+            errors.append(f"line {i + 1}: unknown section {name!r}")
+            i = _next_section(i + 1)
+            continue
+        if name in seen_sections:
+            errors.append(f"line {i + 1}: duplicate section `## {name}`")
+            i = _next_section(i + 1)
+            continue
+        seen_sections.add(name)
+        try:
+            i, _payload = _SECTION_DISPATCH[name](lines, i + 1)
+        except ManifestError as e:
+            errors.append(f"section `## {name}`: {e}")
+            i = _next_section(i + 1)
+
+    required = set(_SECTION_DISPATCH.keys()) - _OPTIONAL_SECTIONS
+    missing = sorted(required - seen_sections)
+    return errors, missing
+
+
 # ── I/O ──────────────────────────────────────────────────────────────────────
 def _read_manifest(path):
     try:
@@ -1137,15 +1213,62 @@ def _write_json(path, data):
         fh.write("\n")
 
 
+def _run_validate(manifest_path):
+    """`--validate-manifest` mode: report ALL structural problems, emit no JSON.
+
+    Exit 1 iff structural (or, on a complete manifest, schema) errors exist.
+    Missing required sections alone exit 0 — that is the expected state of a
+    mid-composition skeleton, and this mode exists to be run at that point.
+    """
+    text = _read_manifest(manifest_path)
+    errors, missing = validate_manifest(text)
+
+    for err in errors:
+        print(f"manifest_to_findings.py: ERROR: {err}")
+    if missing:
+        print("manifest_to_findings.py: note: sections not yet present "
+              f"(fine mid-composition): {missing}")
+
+    if not errors and not missing:
+        # Structurally complete and clean — run the full pipeline checks
+        # (derived-field population + schema) so a passing validate means
+        # the real conversion will succeed too.
+        try:
+            data = parse_manifest(text)
+            schema.validate(data)
+        except (ManifestError, SchemaError) as e:
+            print(f"manifest_to_findings.py: ERROR: {e}")
+            errors.append(str(e))
+
+    if errors:
+        print(f"manifest_to_findings.py: {manifest_path}: "
+              f"{len(errors)} error(s) — fix the manifest before Step 10.")
+        return 1
+    state = "complete and valid" if not missing else "clean so far (incomplete)"
+    print(f"manifest_to_findings.py: {manifest_path}: {state}.")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="manifest_to_findings.py",
         description="Convert a Praxen Step 9.9 draft manifest into the canonical findings JSON.")
     ap.add_argument("--manifest", required=True, metavar="PATH",
                     help="draft manifest (Step 9.9 output)")
-    ap.add_argument("--out", required=True, metavar="PATH",
-                    help="write the canonical findings JSON here")
+    ap.add_argument("--out", metavar="PATH",
+                    help="write the canonical findings JSON here "
+                         "(required unless --validate-manifest)")
+    ap.add_argument("--validate-manifest", action="store_true",
+                    help="structure-check only: report every problem "
+                         "(recovering at section boundaries), write nothing; "
+                         "missing sections are noted but non-fatal so a "
+                         "mid-composition skeleton can be checked early")
     args = ap.parse_args(argv)
+
+    if args.validate_manifest:
+        return _run_validate(args.manifest)
+    if not args.out:
+        ap.error("--out is required (unless --validate-manifest)")
 
     text = _read_manifest(args.manifest)
     try:
