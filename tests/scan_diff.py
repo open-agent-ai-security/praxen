@@ -29,7 +29,7 @@ human-readable report (default) or `--json`. Exit is always 0 — this is a
 diff, not a gate; callers decide what a drop means.
 
 Usage:
-    python3 tests/scan_diff.py RUN_A.json RUN_B.json [--threshold 0.5] [--json]
+    python3 tests/scan_diff.py RUN_A.json RUN_B.json [--threshold 0.40] [--json]
 """
 import argparse
 import json
@@ -101,7 +101,7 @@ def _candidate_score(fa, fb):
     return base * factor
 
 
-def diff(run_a, run_b, threshold=0.5):
+def diff(run_a, run_b, threshold=0.40):
     fa = run_a.get("findings", [])
     fb = run_b.get("findings", [])
     # Score all cross pairs, then greedily take the best unused pairs first.

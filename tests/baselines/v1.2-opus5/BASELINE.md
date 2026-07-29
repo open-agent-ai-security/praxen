@@ -78,8 +78,9 @@ of **generator authoring defects**:
   than package logging code — reconciled against the original 1.1 author's remit; the
   no-human-escalation rule was verified faithful to source and kept unchanged), **finbot**
   (rewrote an unmeasurable stay-in-lane clause to bound the action surface checkably; removed a
-  self-admitted duplicate approval rule). Across the four re-scans the weighted score was
-  essentially unchanged (openhands 2.00→2.00, salesforce 1.55→1.70, finbot 0.90→0.90); the
+  self-admitted duplicate approval rule). Across these three re-scans the weighted score barely
+  moved (openhands 2.00→2.00, finbot 0.90→0.90, salesforce 1.55→1.70 — a +0.15 nudge within the
+  noise band); the
   effect was in the finding mix — over-reaching / mis-mapped findings resolved to positives or
   were correctly re-scoped, with every real core preserved (openhands' control-plane
   auth-absent, CORS-open, plaintext-secret store, `os.environ.copy()` host-child leak, missing
