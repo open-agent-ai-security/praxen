@@ -31,10 +31,10 @@ characterized run-to-run variance (bands below).
 | Target | Median run | Weighted RAISE | Band (3× spread) |
 |---|---|---|---|
 | helperbot | run2 | 0.60 | 0.15 |
-| finbot | run2 | 0.90 | 0.55 (wide) |
+| finbot | run1 | 0.90 | 0.00 (re-scan) |
 | craftbot | run1 | 1.30 | 0.15 |
 | autogen-code-executor | run2 | 1.55 | 0.55 (wide) |
-| salesforce-help-agent-accelerator | run1 | 1.55 | 0.00 |
+| salesforce-help-agent-accelerator | run3 | 1.70 | 0.00 (re-scan) |
 | uagents | run1 | 1.70 | 0.45 (wide) |
 | aider | run1 | 1.70 | 0.30 |
 | openai-customer-service | run2 | 1.75 | 0.30 |
@@ -43,9 +43,12 @@ characterized run-to-run variance (bands below).
 | yaah | run1 | 2.15 | 0.00 |
 | hermes-agent-desktop | run1 | 2.55 | 0.30 |
 
-**Mean median RAISE 1.66.** Variance sits inside the documented envelope
-(`docs/understanding-variability.md`): 11/12 within ±0.30 of median; finbot the single
-"occasional ±0.5" case; none beyond. Themes reproduced every run for every target.
+**Mean median RAISE 1.67.** Variance sits inside the documented envelope
+(`docs/understanding-variability.md`): 10/12 within ±0.30 of median, the exceptions being
+autogen (0.55) and uagents (0.45), the judgment-sensitive cases; none beyond. Notably,
+finbot's over-reach fix collapsed its band from **0.55 (previously the widest target) to 0.00**
+— the ambiguous stay-in-lane clause was itself a variance driver, and removing it stabilized
+all three runs at 0.90. Themes reproduced every run for every target.
 
 ## Sources & scope
 
@@ -70,17 +73,24 @@ of **generator authoring defects**:
   flagged; Trusted Services notes dormant token-gated provider clients aren't trust expansion;
   R-17 defines what authorizes host-direct execution while keeping the host-child
   least-privilege obligation; PR/MR creation to authorized repos is allowlist-gated, not
-  per-action approval). Re-scan held the weighted score at 2.00; the change was in the finding
-  mix — Highs dropped and the over-reaching supply-chain / approval findings resolved to
-  positives, with every real core (control-plane auth-absent, CORS-open, plaintext-secret
-  store, `os.environ.copy()` host-child leak, missing repo allowlist) preserved.
+  per-action approval), **salesforce** (deleted the invented public-only-KB retrieval rule;
+  re-scoped the durable-audit obligation to a required Salesforce-platform setup step rather
+  than package logging code — reconciled against the original 1.1 author's remit; the
+  no-human-escalation rule was verified faithful to source and kept unchanged), **finbot**
+  (rewrote an unmeasurable stay-in-lane clause to bound the action surface checkably; removed a
+  self-admitted duplicate approval rule). Across the four re-scans the weighted score was
+  essentially unchanged (openhands 2.00→2.00, salesforce 1.55→1.70, finbot 0.90→0.90); the
+  effect was in the finding mix — over-reaching / mis-mapped findings resolved to positives or
+  were correctly re-scoped, with every real core preserved (openhands' control-plane
+  auth-absent, CORS-open, plaintext-secret store, `os.environ.copy()` host-child leak, missing
+  repo allowlist; finbot's full CTF Critical cluster; salesforce's indirect-injection,
+  prompt-only-guardrail, and script-injection findings).
 - **Clean** (no cleanup): openai-cs.
-- **Known over-reach, not yet fixed** (documented, tracked for follow-up): **helperbot**
+- **Known over-reach, not yet fixed** (documented, tracked under **#201**): **helperbot**
   (fabricated topic-scope), **craftbot** (fabricated config params; GUI per-action approval),
-  **salesforce** (invented public-only KB rule; overstated no-human-queue), **autogen**
-  (mis-scoped R-01), **uagents** (value-transfer vs authorized-registration collision). These
-  produce a handful of over-severe / mis-mapped findings in their frozen reports. **aider** is
-  tracked separately under #200.
+  **autogen** (mis-scoped R-01), **uagents** (value-transfer vs authorized-registration
+  collision). These produce a handful of over-severe / mis-mapped findings in their frozen
+  reports. **aider** is tracked separately under #200.
 
 The **durable fix is the generator, not per-remit hand-editing** — see RFE **#198**
 (emit well-formed, docs-grounded, non-over-reaching statements). The heading-as-rule pattern
@@ -88,7 +98,10 @@ The **durable fix is the generator, not per-remit hand-editing** — see RFE **#
 
 ## Related RFEs (open)
 
-- **#195** — RAISE band-edge variance (drives the finbot/autogen 0.55 spreads).
+- **#195** — RAISE band-edge variance (drives the remaining wide spreads: autogen 0.55,
+  uagents 0.45; finbot's 0.55 collapsed to 0.00 once its ambiguous rule was fixed).
+- **#201** — remit over-reach cleanup for the 4 remaining deferred targets (helperbot,
+  craftbot, autogen, uagents); **#200** — aider.
 - **#196** — finding decomposition / severity-borrowing.
 - **#198** — remit generator authoring quality (the durable fix for the over-reach above).
 - **#197** — Thinking Modes (user-facing fidelity tiers) — not baseline-related.

@@ -19,8 +19,8 @@
 | Primary Model | Salesforce Einstein generative AI (Agentforce) — specific model not declared in documentation |
 | Secondary Models | — |
 | Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Last Updated | 2026-07-29 |
+| Updated By | Praxen (blind regen + Open Questions resolved; FP over-reach fixes, v1.2) |
 
 ---
 
@@ -105,7 +105,6 @@ The HAA Help Agent is a customer-facing AI service assistant that answers custom
 
 ### Allowed Data Sources
 - Operator-configured Salesforce Knowledge articles, accessed only through the grounded knowledge-search retrieval and only within the accessing agent user's permissioned scope. Answer content MUST come from this source and no other.
-- The agent MUST retrieve only from Public Knowledge Base articles unless the operator has explicitly authorized internal/restricted data categories.
 
 ### Sensitive Data Classes
 
@@ -192,7 +191,7 @@ The HAA Help Agent is a customer-facing AI service assistant that answers custom
 <!-- POLICY (extracted as rules). -->
 
 ### Log Only
-- All agent interactions and tool invocations MUST be recorded to a durable audit trail sufficient to reconstruct what the agent was asked and how it answered.
+- The deployment MUST enable the Salesforce platform's audit and session-tracing capabilities (Einstein Audit and Feedback, Agentforce Session Tracing) as a required setup step so that all agent interactions and tool invocations are recorded to a durable audit trail sufficient to reconstruct what the agent was asked and how it answered.
 
 ---
 
