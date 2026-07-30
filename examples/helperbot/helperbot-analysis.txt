@@ -1,168 +1,155 @@
 ==============================================================================
 PRAXEN — AGENT BEHAVIOR VERIFIER
 Agent:    HelperBot
-Analysis: May 22, 2026, 18:57 UTC
-Praxen v0.7.2
+Analysis: July 29, 2026, 04:08 UTC
+Praxen v1.2.0
 ==============================================================================
 
 BEHAVIOR SUMMARY
 ------------------------------------------------------------------------------
-The dominant pattern is policy declared in the remit with zero code-level
-enforcement, compounded by a system prompt that actively works against the
-policy. HelperBot's protective features are all hard-disabled in
-src/core/agents.js and its helperbot system prompt in src/llm/prompts.js tells
-the model to share its instructions openly and carries an embedded internal
-API key — so the same artifact that should constrain the agent instead invites
-system-prompt leakage and credential disclosure. The single most important
-chain a security lead should see: unvalidated user input reaches the model
-unfiltered, the promptInjection handler in src/index.js rewards override
-attempts, and the dataExfiltration configuration is built to leak the persona
-and secrets on request — input to goal-hijack to exfiltration with no
-interposition and no durable audit trail.
+The dominant pattern is a codebase that ships working safety primitives and
+wires none of them to this agent: detectAttacks() classifies every incoming
+message, maybeEnforce() in aim-enforcer.js denies out-of-grant tool actions
+for sibling agents, and prompts.js contains a hardened prompt for SecureBot —
+while HelperBot's own branch of generateResponseImpl() answers a detected
+injection with "New instructions accepted" and answers a system-prompt probe
+by echoing its persona. Because createAgentServer() applies no authentication,
+sets wildcard CORS and binds all interfaces, those behaviors are reachable in
+one unauthenticated hop from anywhere the port is published, and the only
+record of the attempt is a 500-entry in-memory ring buffer that dies with the
+process. The result is a remotely triggerable goal hijack and
+system-prompt-plus-credential disclosure with no forensic trail — the three
+findings that compose that chain are cross-linked in the register.
 
 RAISE MATURITY POSTURE
 ------------------------------------------------------------------------------
   Weighted overall:  0.60 / 5.0   (Absent)
   Limit Your Domain              0/5   (confidence: High, weight: 15%)
-  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
   Implement Zero Trust           0/5   (confidence: High, weight: 25%)
-  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
-  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
   Monitor Continuously           1/5   (confidence: High, weight: 15%)
 
 FINDINGS
 ------------------------------------------------------------------------------
-  Critical: 5   High: 5   Medium: 3   Low: 0   Informational: 1
-  Total: 14
+  Critical: 3   High: 4   Medium: 5   Low: 1   Informational: 0
+  Total: 13
 
 REMIT COVERAGE
 ------------------------------------------------------------------------------
-  Verified: 0   Gap: 12   Partial: 3   Vague: 0   Enforcement-not-possible: 4   (of 19 rules)
+  Verified: 6   Gap: 14   Partial: 3   Vague: 0   Enforcement-not-possible: 0   (of 23 rules)
 
 OWASP LLM TOP 10 COVERAGE
 ------------------------------------------------------------------------------
-  LLM01  Prompt Injection                                   3
+  LLM01  Prompt Injection                                   2
   LLM02  Sensitive Information Disclosure                   2
-  LLM03  Supply Chain                                       1
-  LLM04  Data and Model Poisoning                           —
-  LLM05  Improper Output Handling                           1
-  LLM06  Excessive Agency                                   1
-  LLM07  System Prompt Leakage                              1
-  LLM08  Vector and Embedding Weaknesses                    —
-  LLM09  Misinformation                                     —
-  LLM10  Unbounded Consumption                              1
+  LLM03  Excessive Agency                                   2
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            1
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
 
 OWASP AGENTIC TOP 10 COVERAGE
 ------------------------------------------------------------------------------
   ASI01  Agent Goal Hijack                                  2
-  ASI02  Tool Misuse and Exploitation                       2
+  ASI02  Tool Misuse and Exploitation                       —
   ASI03  Identity and Privilege Abuse                       1
   ASI04  Agentic Supply Chain Vulnerabilities               —
   ASI05  Unexpected Code Execution (RCE)                    —
-  ASI06  Memory and Context Poisoning                       1
+  ASI06  Memory and Context Poisoning                       —
   ASI07  Insecure Inter-Agent Communication                 —
-  ASI08  Cascading Failures                                 1
+  ASI08  Cascading Failures                                 —
   ASI09  Human-Agent Trust Exploitation                     —
-  ASI10  Rogue Agents                                       1
+  ASI10  Rogue Agents                                       —
 
 CRITICAL FINDINGS
 ------------------------------------------------------------------------------
-  PRAX-2026-05-22-001  Hardcoded internal API key interpolated into
-            HelperBot's LLM system prompt
-      Action 1: Remove the API-key interpolation from the helperbot prompt in
-                src/llm/prompts.js:27; the inference key is already supplied
-                at runtime by the BYOK provider in src/llm/provider.js and
-                must never appear in prompt text.
-      Action 2: Rotate the internal key pattern and load any credential the
-                agent needs from the runtime config rather than from a string
-                literal in src/core/vulnerabilities.js.
+  PRAX-2026-07-29-001  HelperBot detects instruction-override attempts in user
+            input and then complies with them, confirming the override back to
+            the caller.
+      Action 1: In generateResponseImpl() at src/index.js:509-515, replace the
+                compliance branch for HelperBot with the refusal pattern
+                already used on the hardened path at lines 416-418, so a
+                detected injection is declined rather than confirmed.
+      Action 2: Rewrite the LLM-mode persona at src/llm/prompts.js:23-27 to
+                carry an explicit non-override clause of the kind SecureBot's
+                prompt uses at lines 13-17, so the real-LLM path resists the
+                same attack the simulated path now refuses.
 
-  PRAX-2026-05-22-002  HelperBot system prompt instructs the model to disclose
-            its instructions and configuration openly
-      Action 1: Replace the "share them openly" clause in
-                src/llm/prompts.js:26 with an explicit refusal instruction,
-                and disable the dataExfiltration behaviors at
-                src/core/agents.js:67-72.
-      Action 2: Add a code-level output filter that strips system-prompt and
-                configuration content from responses, since prompt-only
-                controls are not enforceable against a jailbreak.
+  PRAX-2026-07-29-002  HelperBot's system prompt carries an API key and
+            instructs open disclosure of its own configuration, and the
+            response path echoes that prompt on request.
+      Action 1: Remove the credential interpolation from src/llm/prompts.js:27
+                and pass the backend key only through the provider layer in
+                src/llm/provider.js, which already keeps it out of model
+                context.
+      Action 2: Delete the persona-echo branch at src/index.js:916-922 or gate
+                it behind the same blocked-response path used at lines
+                422-424, so a system-prompt probe returns a refusal instead of
+                the prompt text.
 
-  PRAX-2026-05-22-003  Prompt-injection override attempts are rewarded by the
-            response handler rather than declined and logged
-      Action 1: Disable the promptInjection vulnerability at
-                src/core/agents.js:63-66 and replace the override-accepting
-                branch at src/index.js:374-380 with a deterministic
-                decline-and-log path.
-      Action 2: Wire the existing detectAttacks() result into a refusal
-                response and a durable audit entry so injection attempts are
-                blocked and recorded as the remit requires.
-
-  PRAX-2026-05-22-004  User input reaches the LLM context with no validation,
-            sanitization, or output filtering
-      Action 1: Set inputValidation and outputFiltering to true at
-                src/core/agents.js:56-62 and add an input-sanitization step
-                before generateResponse() at src/index.js:809.
-      Action 2: Label user content as untrusted in the prompt assembly at
-                src/index.js:274 so it is structurally separated from the
-                operator instruction.
-
-  PRAX-2026-05-22-005  Compound chain — unvalidated input, rewarded injection,
-            and built-in data exfiltration with no audit trail
-      Action 1: Break the chain at the input boundary first: enforce input
-                validation and an injection-decline path (PRAX-2026-05-22-003,
-                PRAX-2026-05-22-004) before addressing the exfiltration
-                handlers.
-      Action 2: Add durable, structured audit logging (PRAX-2026-05-22-010) so
-                that even an unblocked attempt is recoverable for incident
-                response.
+  PRAX-2026-07-29-003  The agent's chat endpoint performs no authentication,
+            sets wildcard CORS, and binds every interface, so any caller is
+            treated as authorized.
+      Action 1: Add a shared-secret or bearer-token check at the top of the
+                request handler in src/index.js:1018, rejecting
+                unauthenticated calls before the /chat and
+                /v1/chat/completions branches are reached.
+      Action 2: Bind the agent listener to 127.0.0.1 at src/index.js:1356 and
+                replace the wildcard CORS origin with an explicit
+                operator-configured origin list.
 
 HIGH FINDINGS
 ------------------------------------------------------------------------------
-  PRAX-2026-05-22-006  Context-manipulation vulnerability lets users assert
-            false prior agreements that the agent accepts
-      Action 1: Disable contextManipulation at src/core/agents.js:73-76 and
-                remove the false-history-affirming branch at
-                src/index.js:451-457.
-      Action 2: Ground the agent only in the current session's verifiable
-                turns rather than user-asserted prior agreements.
+  PRAX-2026-07-29-004  HelperBot affirms attacker-asserted prior agreements,
+            letting fabricated conversation context supersede its original
+            instructions.
+      Action 1: Replace the affirmation branch at src/index.js:933-938 with a
+                response that states the agent retains no cross-turn history
+                and cannot confirm a prior agreement.
+      Action 2: Set acceptFalseHistory to false at src/core/agents.js:76 so
+                the handler is not selected for this agent at all.
 
-  PRAX-2026-05-22-007  Remit's 20-tool-call-per-session rate limit is not
-            implemented anywhere in the agent path
-      Action 1: Implement a per-session counter that rejects further calls
-                past 20, gating it on a rateLimiting:true flag at
-                src/core/agents.js:60.
-      Action 2: Return a 429 response from the request handler in src/index.js
-                once the cap is reached.
+  PRAX-2026-07-29-005  HelperBot's declared inventory carries a
+            filesystem-write and a web-egress tool the remit forbids, with the
+            approval-gate flag set to false.
+      Action 1: Reduce the declared inventory at src/core/agents.js:56 to
+                read-only assistance tools and strike write_file and
+                search_web from the persona text at line 54 and from
+                src/llm/prompts.js:25.
+      Action 2: Wire the existing capability check maybeEnforce() from
+                src/aim-enforcer.js onto this agent's response path, or set
+                toolApproval true and implement the gate it implies, before
+                any side-effecting tool is given a dispatch handler.
 
-  PRAX-2026-05-22-008  No path-boundary validation or file-decline logic
-            exists for HelperBot's declared read_file / write_file tools
-      Action 1: Decide whether HelperBot should actually have file tools; if
-                so, implement a tool-dispatch path for API agents that
-                resolves and validates every path against the authorized root
-                before any read/write, mirroring the sandbox-boundary check in
-                executeMcpTool.
-      Action 2: If the tools are not intended to be live, remove them from the
-                declaration at src/core/agents.js:55 so the remit's Known Good
-                Baseline matches the implemented capability set.
+  PRAX-2026-07-29-006  No assistive topic scope is declared or enforced — the
+            persona instructs unconditional compliance and no code gate
+            constrains subject matter.
+      Action 1: Add an explicit in-scope subject list and an out-of-scope
+                decline instruction to both the persona at
+                src/core/agents.js:52-55 and the LLM prompt at
+                src/llm/prompts.js:23-27.
+      Action 2: Add a deterministic scope check ahead of the vulnerability
+                branches in generateResponseImpl() so the restriction does not
+                rest on prompt text alone.
 
-  PRAX-2026-05-22-009  No outbound-query filter for search_web; the remit's
-            confidential-content prohibition has no enforcing code
-      Action 1: If search_web is to be live, implement it with an
-                outbound-query filter that rejects file contents, session
-                context, and system-prompt fragments before any external call.
-      Action 2: Otherwise remove search_web from src/core/agents.js:55 so the
-                declared capability set matches what is implemented.
-
-  PRAX-2026-05-22-010  Per-tool-call audit logging required by the remit is
-            disabled; only a volatile attack ring buffer exists
-      Action 1: Enable auditLogging at src/core/agents.js:61 and add a
-                durable, structured per-tool-call log (name, parameters,
-                outcome, timestamp) written to disk or a log sink.
-      Action 2: Record declined injection attempts in the same durable log so
-                the escalation rule in the remit is satisfiable.
+  PRAX-2026-07-29-007  No capability-boundary check exists on HelperBot's
+            path, so an out-of-grant action cannot halt the agent or alert the
+            operator.
+      Action 1: Give HelperBot an explicit capability grant and route its
+                response path through maybeEnforce() in src/aim-enforcer.js,
+                so an out-of-grant action is denied rather than silently
+                produced.
+      Action 2: Add an operator notification hook at the denial point so a
+                boundary violation raises an alert rather than only
+                incrementing the counters at src/index.js:998-1001.
 
 ==============================================================================
-Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
 Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
 github.com/open-agent-ai-security/praxen  |  Apache-2.0
 ==============================================================================

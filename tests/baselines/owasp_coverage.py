@@ -520,7 +520,7 @@ def build_report(base: Path, compare: Path, out_path: Path) -> str:
 
   <section>
     <h2>OWASP LLM Top 10 — coverage by category</h2>
-    <p class="intro">How the <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications 2025</a> categories apply across these agents. Solid = the finding's primary category; hatched = a category it also touches. Empty rows are categories these apps don't exercise.</p>
+    <p class="intro">How the <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications 2026</a> categories apply across these agents. Solid = the finding's primary category; hatched = a category it also touches. Empty rows are categories these apps don't exercise.</p>
     {legend}
     {v2_chart(LLM_TITLES, cat, max_llm, "var(--orange)", froz)}
   </section>

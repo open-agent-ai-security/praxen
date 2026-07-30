@@ -633,6 +633,10 @@ def _global_ctx(data):
         "SCAN_TIMESTAMP": esc(_format_timestamp(scan["scan_timestamp"])),
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
+        # OWASP LLM list year for the section heading — version-gated the same way
+        # as the category titles (2026 for Praxen >= 1.2, 2025 for archival docs),
+        # so the heading can never disagree with the numbering shown in the cards.
+        "OWASP_LLM_YEAR": "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025",
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
         "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
