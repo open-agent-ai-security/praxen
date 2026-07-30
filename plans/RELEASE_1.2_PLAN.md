@@ -51,11 +51,17 @@
 > class) and the **remit-cleanup + re-baseline** on the targets it still affects
 > (**#201** helperbot/craftbot/autogen/uagents, **#200** aider); **#195** band-edge
 > variance; **#196** decomposition rule; **#197** Thinking Modes; **#65 items 4–8**;
-> **#169/#173/#174** tagging dispositions; **#176** full-scale `suite_health`.
+> **#173/#174** tagging calibration; **#176** full-scale `suite_health` (0–5 scale).
 >
-> **Issues to close on the main promotion** (delivered, not auto-closed because 1.2
-> merged to `dev`): #5, #7, #29, #33, #65 (items 1–2; remainder → 1.3). #120 already
-> closed. #169/#173/#174/#176 stay open — partially addressed, carried to 1.3.
+> **Issue tracker reconciled at close-out (2026-07-30):**
+> - **Closed** (delivered in 1.2, on `dev`; reach `main` at the promotion): #5, #7,
+>   #29, #33, #120, **#169** (2026 KB refresh resolved the LLM08 under-tag class),
+>   #171 (1.2 tracker).
+> - **Open, partial** — commented with what 1.2 delivered + what's carried: **#65**
+>   (items 1–2 done → items 4–8 in 1.3), **#176** (baseline-dir consistency done →
+>   full 0–5 scale in 1.3).
+> - **Open, carried to 1.3:** everything under *Deferred → 1.3* above (#173/#174 are
+>   the remaining tagging-calibration pair).
 >
 > The staged plan below is retained as the historical record.
 
@@ -455,5 +461,6 @@ gate above** — in one line each:
       model **Opus 5**, not the planned Opus 4.8 `v1.2-claude48`); `CURRENT`
       updated; coverage + suite-health pages regenerated. #176 full-scale +
       LLM06 discrimination check → 1.3.
-- [~] **Closes on main promotion:** #5, #7, #29, #33, #65 (items 1–2).
-      **→ 1.3:** #48 (PUSH), #65 (items 4–8), #169/#173/#174, #176. #120 closed.
+- [x] **Issue tracker reconciled (2026-07-30):** closed #5, #7, #29, #33, #120,
+      #169, #171; #65 + #176 commented (partial). **→ 1.3:** #48 (PUSH), #65
+      (items 4–8), #173/#174, #176 (full scale), and the RFE set (#195–#201, #106).
