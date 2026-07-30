@@ -9,21 +9,27 @@
 >
 > **The release pivoted from its original frame.** This plan was written as
 > "harness reliability + scoring stability on Opus 4.8." What shipped is **OWASP
-> 2026 + a fresh Opus-5 baseline**: the reliability and schema work landed as
-> planned, the **scoring rework (#48) was reverted to shipped-state and pushed to
-> 1.3** (the Stage-2.5 PUSH case — Steve, 2026-07-28: *"revert scoring to
+> 2026 + a fresh Opus-5 baseline**. The two halves of the original headline split:
+> the **harness-reliability engine landed and shipped** (the plan's #1 problem —
+> delivered), while only the **scoring rework (#48) was reverted to shipped-state
+> and pushed to 1.3** (the Stage-2.5 PUSH case — Steve, 2026-07-28: *"revert scoring to
 > shipped-state … I still want a headline. The 2026 OWASP LLM list is about to
 > ship … update it as the headline for 1.2"*), and the **reference model moved to
 > Opus 5** (its own re-baseline, folded into the single 1.2 freeze), so the frozen
 > set is **`v1.2-opus5`**, not `v1.2-claude48`.
 >
 > **Delivered:**
+> - **Harness-reliability engine** *(the plan's original #1 problem — delivered
+>   and shipped; only the scoring half was pushed)* — Step-8.5 finding-themes
+>   decomposition (#29), interleaved finding emission + emission-discipline
+>   hardening (#33), Step-4 evidence checkpoint + evidence-completeness invariant +
+>   `--validate-manifest` (#65 items 1–2), compound-contributor fold/break-out
+>   rule. Stage-1 reliability gate passed and committed. **Survived the #48 revert**
+>   (that reverted scoring guidance only).
 > - **OWASP LLM/Agentic Top 10 2026 KB refresh** — the headline; version-gated
 >   renderer, new categories firing (Hidden Context Exposure, Vector & Embedding).
 > - **Schema 3.0** — `policy_rule_ids`/`policy_rule_text` as arrays (#7), validator
 >   cross-check (#5), N/A-category support. Activates the remit-verbatim invariant.
-> - **Reliability engine** — Step-8.5 decomposition (#29), interleaved emission
->   (#33), Step-4 evidence checkpoint + `--validate-manifest` (#65 items 1–2).
 > - **Scan-vs-scan diff tool** (`tests/scan_diff.py`); **scan-time subject
 >   declaration** (`SCAN_INSTRUCTIONS.md`).
 > - **Remit template + all 12 remits re-authored** — POLICY/CONTEXT split,

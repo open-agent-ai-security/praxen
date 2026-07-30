@@ -124,6 +124,9 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
   confidence calibration in `KB_RAISE_SCANNING.md`. *(Item 6–8 wording changes
   what remit authors write, not what the scanner scores against committed
   remits — safe outside the freeze.)*
+- **#106** — clarify Out-of-Scope remit coverage as boundary-rule checks (remit
+  coverage semantics; authoring-side, no scan-behavior change). Sits with the
+  remit-authoring guidance above and the #198 generator work.
 - **#117** — challenging-findings.md additions (gated on #118; collapses to a
   one-paragraph note if #118 isn't adopted) · **#118** operator override +
   finding-revision records (schema-contract change — if adopted, it must ride
