@@ -5,11 +5,12 @@
 
 # Praxen 1.3 — Detection Coverage, Output Quality & Reach
 
-> Drafted 2026-07-15 alongside the revised `RELEASE_1.2_PLAN.md`. This holds
-> everything deliberately cut from 1.2 when it was re-scoped to harness
-> reliability + scoring stability. Deliberately lower-fidelity than the 1.2
-> plan — it will be re-triaged when 1.2 freezes, against whatever 1.2's
-> stage gates actually showed. Branches from `1.2` once frozen.
+> Drafted 2026-07-15 alongside the revised `RELEASE_1.2_PLAN.md`; **re-triaged at
+> the 1.2 close-out (2026-07-30)** now that 1.2 has frozen (shipped to `dev`).
+> Holds everything cut from 1.2, plus what 1.2 pushed (#48) or newly surfaced (the
+> remit-generator / over-reach class below). **Reference model is now Opus 5** —
+> 1.3 grades vs **`v1.2-opus5`**, not `v1.2-claude48`. Branches from `dev` after
+> the 1.2 → main promotion.
 
 ## Objective
 
@@ -18,14 +19,40 @@ polish what it *emits*. Detection additions move numbers → 1.3 re-freezes
 `v1.3-claude48`, graded vs `v1.2-claude48`. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
-## Contingent arrival from 1.2 — #48 (Stage-2.5 PUSH case)
+## Arrived from 1.2 — #48 (Stage-2.5 PUSH — confirmed 2026-07-30)
 
-If 1.2's **Stage 2.5 STOP·LOOK·TEST gate** decides to push the scoring work,
-**#48 lands here — sequenced before bucket A's detection additions**, so its
-before/after grading window isn't contaminated by new findings (the "before"
-is the committed `tests/runs/v1.2-stage2.5/` characterization). It rides this
-release's existing re-freeze at no extra freeze cost. If 1.2 keeps it (the
-default), strike this section at re-triage.
+1.2's Stage-2.5 decision was **PUSH**: the scoring rework was reverted to
+shipped-state (Steve, 2026-07-28 — the headline pivoted to OWASP 2026), so **#48
+lands here**, sequenced **before** bucket A's detection additions so its
+before/after grading window isn't contaminated by new findings. It rides this
+release's re-freeze at no extra freeze cost. The clean "before" is the frozen
+**`v1.2-opus5`** baseline (single-scan reproducibility is the target, on the
+Opus-5 stack); the earlier `tests/runs/v1.2-stage2.5/` characterization was on
+Opus 4.8 and is now historical only.
+
+## New from the 1.2 baseline experience — remit-generator quality & over-reach cleanup
+
+The 1.2 post-freeze FP sweep (one independent cross-model reviewer per target)
+found **zero detector false positives** but a recurring **remit-authoring
+over-reach** class — fabricated obligations, heading-as-rule extraction, and
+MUST-NOTs that contradict documented features. Fixed + re-frozen on 6 targets
+during 1.2; deferred on the rest. The durable fix is generation-side — do it
+**before** re-scanning the deferred targets, not by hand-editing each remit.
+
+- **#198** — remit generator authors well-formed, docs-grounded, non-over-reaching
+  statements (heading-as-rule + fabrication/over-scope). **The durable fix — first.**
+- **#201** (helperbot, craftbot, autogen, uagents) + **#200** (aider) — remit
+  over-reach cleanup on the targets still carrying it; regenerate on the
+  #198-improved generator, then re-scan + re-freeze. (The helperbot showcase
+  example carries this over-reach too — it refreshes with the re-freeze.)
+- **#195** — sharpen RAISE category band anchors (band-edge variance on
+  mid-maturity targets; drove the autogen/uagents wide bands).
+- **#196** — tighten the Step-8.5 fold-vs-break-out decomposition rule
+  (finding-count variance). Same axis as #48 and the decomposition-independence
+  generalization below — land them together.
+- **#197** — Thinking Modes: opt-in high-fidelity accuracy tiers (High = post-scan
+  FP review; X-High = 3-scan consensus). User-facing; no baseline impact — may
+  ship as a satellite ahead of the freeze.
 
 ## Carried from the 1.2 Stage-1 gate — decomposition-independence generalization
 
