@@ -247,15 +247,15 @@ def _render_table(rows):
 
 
 def _split_sections(lines):
-    """Yield (heading, comment_line_or_None, body_lines) per `## ` section."""
+    """Yield (heading, body_lines) per `## ` section."""
     sections, cur = [], None
     for line in lines:
         if line.startswith("## "):
             if cur:
                 sections.append(cur)
-            cur = [line[3:].strip(), None, []]
+            cur = [line[3:].strip(), []]
         elif cur is not None:
-            cur[2].append(line)
+            cur[1].append(line)
         # lines before the first `## ` (title/subtitle) are handled by caller
     if cur:
         sections.append(cur)
@@ -290,7 +290,10 @@ def _identity_meta(body_lines):
     meta = {}
     for line in body_lines:
         s = line.strip()
-        if s.startswith("|") and s.count("|") >= 3:
+        # >= 2 pipes: GFM makes the trailing pipe optional, so a two-column row
+        # written `| Field | Value` (2 pipes) is valid and must still feed the
+        # masthead (#210) — _render_table already accepts it in the body.
+        if s.startswith("|") and s.count("|") >= 2:
             parts = [c.strip() for c in s.strip("|").split("|")]
             if len(parts) >= 2 and parts[0] not in ("Field", "") and set(parts[0]) != {"-"}:
                 meta[parts[0]] = parts[1]
@@ -309,7 +312,7 @@ def render_remit(md, template_html, praxen_version):
         if s.startswith("# ") and not s.startswith("## "):
             title = s[2:].strip()
         elif (s.startswith("*") and not s.startswith("**") and s.endswith("*")
-              and len(s) > 2 and title):
+              and len(s) > 2):
             subtitle = s.strip("*").strip()
             break
         elif s.startswith("## "):
@@ -319,7 +322,7 @@ def render_remit(md, template_html, praxen_version):
 
     agent_name, remit_version, last_updated = "", "", ""
     body_html = []
-    for heading, _c, body in sections:
+    for heading, body in sections:
         kind, desc, rest = _badge(body)
         if heading == "Identity":
             meta = _identity_meta(rest)

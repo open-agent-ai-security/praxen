@@ -9,13 +9,32 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [Unreleased]
+## [1.2.0] — 2026-08-04
 
-**Post-1.1 cleanup (docs/process batch — no version bump, no analysis change).** The frozen `v1.1-claude48` baseline is byte-untouched.
+**OWASP 2026 + a fresh Opus 5 baseline.** Praxen's risk mapping moves to the newly published OWASP Top 10 for LLM Applications **2026** and the companion Agentic AI Top 10 2026 (both maintained by the [OWASP GenAI Security Project](https://genai.owasp.org/)), on a re-baselined engine: `schema_version` **3.0**, reference model **Claude Opus 5**, frozen set **`v1.2-opus5/`**. Not score-comparable to `v1.1-claude48` — model, knowledge bases, and remits all changed.
 
-- **Paper trail** (from the 1.1 retrospective, `plans/RELEASE_1.1_REVIEW.md`): the #48 descope recorded in `plans/RELEASE_1.1_PLAN.md`; the tagging-checkpoint report marked superseded; the LLM08 anchor gap documented (#169 — fix lands via the v1.2 re-scan freeze); the 1.1/1.2/1.3 plan set committed.
-- **Process**: `guide/` docs-freshness now checked on every PR (#178); theme-coverage formalized as the regression gate with the weighted RAISE score advisory (#48 item 4); re-tag transforms scoped to prose-decidable corrections (`tests/baselines/README.md`); published tags are never re-pointed; the interim per-PR review convention codified (#120).
-- **1.2 planning**: the Stage 2.5 STOP·LOOK·TEST go/no-go gate; the hand-score questionnaire protocol (the human-anchor instrument for #48); the Stage-0 baseline run record (`tests/runs/v1.2-stage0-baseline/` — 15 scans on the v1.1 stack establishing the pre-1.2 severity-stability baseline).
+### Knowledge bases (the headline)
+- **OWASP LLM Top 10 2026** + restructured **Agentic Top 10 2026** KBs; full renumber sweep. New 2026 categories detect on real targets (LLM08 *Hidden Context Exposure*, LLM09 *Vector & Embedding Weaknesses*) — resolving the LLM08 under-tag class (#169).
+- Rendering is **version-gated**: a document renders with the vocabulary its findings were tagged under (heading year included), so a 2025-tagged code is never shown with its 2026 name.
+
+### Schema 3.0
+- `policy_rule_ids` / `policy_rule_text` are **parallel arrays** (#7), validator round 2 cross-checks rule references against the remit (#5), and N/A category scores are supported (nullable score + renormalized overall). Activates the remit-verbatim render invariant.
+
+### Harness reliability
+- Step-8.5 finding-themes outline (decomposition primer, #29); **interleaved finding emission** kills the Step-9.9 synthesis burst (#33); Step-4 evidence checkpoint survives compaction + `--validate-manifest` catches manifest errors early (#65 items 1–2); decidable compound-contributor fold/break-out rule.
+
+### Scan workflow
+- **Scan-time subject declaration** (`SCAN_INSTRUCTIONS.md`) — declare which component of a monorepo / multi-agent tree is the subject.
+- **Scan-vs-scan diff tool** (`tests/scan_diff.py`) — join two runs mechanically on remit-anchored rule references.
+- **Pretty-remit renderer** (`render_remit.py`) — deterministic Markdown→HTML rendering of a Worker Remit in the report's visual language, on request; all example + baseline remits ship rendered, freshness-gated in CI.
+
+### Baseline
+- Fresh **`v1.2-opus5/`** freeze — 12 targets, median-of-3 on identical inputs, mean median RAISE **1.67**. `CURRENT` → `v1.2-opus5`. A post-freeze FP sweep (one independent cross-model reviewer per target) found **zero detector false positives** across ~130 findings; remit-authoring over-reach was fixed and re-frozen on 6 targets, with the remainder tracked (#198/#200/#201). All 12 remits re-authored (POLICY/CONTEXT split, Prohibited Behaviors, state-once rule).
+
+### Carried process batch (post-1.1 cleanup — shipped unversioned ahead of this release)
+- **Paper trail**: the #48 descope recorded; tagging-checkpoint report superseded; LLM08 anchor gap documented; the 1.1/1.2/1.3 plan set committed.
+- **Process**: `guide/` docs-freshness checked per PR (#178); theme-coverage formalized as the regression gate with weighted RAISE advisory; re-tag transforms scoped to prose-decidable corrections; published tags never re-pointed; per-PR review convention codified (#120 — Gemini retired, replaced by Claude Code reviews).
+- **1.2 planning**: Stage-2.5 STOP·LOOK·TEST gate; hand-score questionnaire protocol; Stage-0 baseline run record. Outcome: the scoring rework (#48) was reverted to shipped-state and pushed to 1.3 (`plans/RELEASE_1.2_PLAN.md`).
 
 ## [1.1.0] — 2026-07-12
 

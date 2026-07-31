@@ -91,12 +91,22 @@ def main(argv=None):
             wrote += 1
 
     if args.check:
+        # Orphan sweep: a committed remit HTML whose SOURCE dropped out of
+        # discovery (remit md deleted/renamed, findings file renamed off the
+        # glob) would otherwise ship stale forever while --check stays green
+        # (#208). Any on-disk remit HTML must be a discovered dest.
+        dests = {dest.resolve() for _md, dest in targets}
+        on_disk = list((REPO / "examples").glob("*/WORKER_REMIT.html")) + \
+                  list((REPO / "tests" / "baselines" / _current_baseline()).glob("*/*-remit.html"))
+        orphans = [p for p in on_disk if p.resolve() not in dests]
+        for p in orphans:
+            drift.append((None, p, "orphaned (no discovered source)"))
         if drift:
             print("render_all_remits.py: pretty-remit HTML is out of sync with its remit:",
                   file=sys.stderr)
             for md, dest, why in drift:
-                print(f"  {why}: {dest.relative_to(REPO)}  (source: {md.relative_to(REPO)})",
-                      file=sys.stderr)
+                src = f"  (source: {md.relative_to(REPO)})" if md else ""
+                print(f"  {why}: {dest.relative_to(REPO)}{src}", file=sys.stderr)
             print("  fix: python3 tests/render/render_all_remits.py", file=sys.stderr)
             return 1
         print(f"render_all_remits.py: all {len(targets)} pretty-remit HTMLs in sync")

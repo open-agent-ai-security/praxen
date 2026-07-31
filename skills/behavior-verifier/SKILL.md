@@ -125,7 +125,7 @@ A request that is only authoring — **do not enter Step 1 or run an analysis af
 **Rendering a remit for display or sharing (on request only).** A Worker Remit is authored as Markdown — ideal for editing, poor for sharing or review. When the operator asks to *render*, *pretty-print*, *display*, or *share* a remit as HTML, run the bundled deterministic renderer:
 
 ```bash
-python3 render_remit.py path/to/WORKER_REMIT.md      # writes WORKER_REMIT.html alongside it
+python3 "<SKILL_DIR>/render_remit.py" path/to/WORKER_REMIT.md   # writes WORKER_REMIT.html alongside it
 ```
 
 It is a mechanical Markdown→HTML translation — it reads no code and makes no judgments — that matches the analysis report's look (same brand chrome, with each section badged **POLICY** or **CONTEXT**). It carries the remit's own `Remit Version` / `Last Updated`, never a generation timestamp, so it re-renders byte-identically. This is **not** part of the scan flow — run it only when asked.

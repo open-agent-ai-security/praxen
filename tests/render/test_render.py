@@ -369,6 +369,20 @@ def main():
           and nh.count('class="policy-ref"') == len(data["findings"]) - 1,
           r.stderr.strip())
 
+    # 4d-ter. KEY-ABSENT is different from null and must be REJECTED by the
+    #         validator (findings.schema.json lists both fields as required) —
+    #         previously it slipped through .get() and crashed the renderer
+    #         with a raw KeyError (#205).
+    absent = json.loads(json.dumps(data))
+    del absent["findings"][0]["policy_rule_ids"]
+    del absent["findings"][0]["policy_rule_text"]
+    try:
+        schema.validate(absent)
+        check("absent policy_rule_ids/policy_rule_text keys are rejected (not silently passed)",
+              False, "validated but should have failed")
+    except schema.SchemaError:
+        check("absent policy_rule_ids/policy_rule_text keys are rejected (not silently passed)", True)
+
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
     js = load_json(sch_path)
@@ -573,6 +587,17 @@ def main():
     baselines_root = os.path.join(REPO_ROOT, "tests", "baselines")
     baseline_jsons = sorted(glob.glob(os.path.join(baselines_root, "*", "*", "*-findings-*.json")))
     check("found committed regression baselines under tests/baselines/", len(baseline_jsons) > 0)
+    # The legacy-skip below exempts non-current schema_versions from every gate.
+    # Guard the guard: every file in the CURRENT set must be AT the current
+    # schema version, or a stale-stamped file would silently lose its entire
+    # regression net while printing green (#208).
+    current_set = [bj for bj in baseline_jsons
+                   if os.sep + CURRENT_BASELINE + os.sep in bj]
+    stale_current = [os.path.relpath(bj, REPO_ROOT) for bj in current_set
+                     if str(load_json(bj).get("schema_version", "")) != schema.SCHEMA_VERSION]
+    check(f"every {CURRENT_BASELINE} findings file is at schema {schema.SCHEMA_VERSION} (none legacy-skipped)",
+          len(current_set) > 0 and not stale_current,
+          f"stale: {stale_current}" if stale_current else "no CURRENT-set files found")
     remit_cache: dict[str, str] = {}                 # slug -> remit text (one remit per target, but cache anyway)
     for bj in baseline_jsons:
         rel = os.path.relpath(bj, REPO_ROOT)

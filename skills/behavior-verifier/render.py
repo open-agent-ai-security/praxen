@@ -81,9 +81,13 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # copied verbatim from the published OWASP entries (kept in sync with the
 # `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
 # The LLM list was renumbered in its 2026 revision; a document is rendered with
-# the vocabulary its findings were tagged under (see _llm_titles_for), so frozen
-# pre-1.2 reports re-render byte-identically and a 2025-tagged code is never
-# shown with its 2026 name.
+# the vocabulary its findings were tagged under (see _llm_titles_for), so a
+# 2025-tagged code is never shown with its 2026 name. Scope of that promise:
+# it applies to schema-3.0 documents carrying a pre-1.2 praxen_version (e.g.
+# the retro-fitted finbot fixture golden, praxen 0.3.0). Documents at
+# schema_version 2.0 — every actually-frozen pre-1.2 report — do NOT render
+# here at all: validate() rejects them ("renderer understands schema 3.0
+# exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
 _OWASP_LLM_TITLES_2025 = {
