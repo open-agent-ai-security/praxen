@@ -5,6 +5,15 @@
 
 # Phase 1 — Open Issues (needs human input, not blocking)
 
+> **ARCHIVED (2026-07-31, 1.2 close-out).** Moved from the repo root into
+> `plans/` as the historical record of the 1.0.2 baseline-refresh phase. All
+> items are resolved or overtaken by events (O4's salesforce-remit confirm was
+> mooted by the full 1.2 remit re-authoring; O6/O7 scope questions are answered
+> by `tests/scan_instructions/` and the `v1.2-opus5` freeze) — **except O5**
+> (uAgents framework-vs-deployed framing), whose question is ported verbatim
+> into `RELEASE_1.3_PLAN.md` (bucket B, `scan_type: framework`). This file is
+> no longer maintained.
+
 > Companion to `plans/RELEASE_1.0.2_BASELINE_REFRESH.md`. Tracks decisions/confirmations that require a human but do **not** block getting the expanded baseline in front of you to review. Phase 1 = **add the new targets (CraftBot, uAgents, Agentforce), run them clean, freeze provisional exemplars**.
 
 ## Status — Phase 1 scans complete ✅

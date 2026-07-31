@@ -99,9 +99,12 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
   live candidate appears.
 - **`scan_type: framework` (#65 item 5)** — `deployed_agent | framework | sdk`
   in the remit identity table; report framing + scoring guidance acknowledge
-  operator-configurable defaults. **Gated on the O5 decision**
-  (`PHASE1_OPEN_ISSUES.md`): confirm the uAgents framework-posture framing
-  first — one operator paragraph, needed regardless.
+  operator-configurable defaults. **Gated on the O5 decision** (ported here from
+  the archived `plans/PHASE1_OPEN_ISSUES.md` — the question, verbatim: *uAgents
+  is a framework/library, not a single deployed agent; Phase 1 analyzed the
+  framework's own runtime posture/defaults. Confirm this framing is what we want
+  (vs. scanning a specific example agent built on it)* — one operator paragraph,
+  needed regardless.
 - **Directional-lean correction** — only if 1.2's anchored check dispositioned
   it as structural-but-uncorrected; otherwise strike.
 

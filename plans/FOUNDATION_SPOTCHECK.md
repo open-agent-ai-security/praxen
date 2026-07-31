@@ -5,6 +5,12 @@
 
 # Foundation spot-check — retained targets on the 1.0.x skill
 
+> **ARCHIVED (2026-07-31, 1.2 close-out).** Moved from the repo root into
+> `plans/` — a one-shot 1.0.x-era validation record against `v0.7.7-claude48`
+> scores, including since-retired targets (devika, sweep, langchain-sql).
+> Superseded by the `v1.0.2-claude48` → `v1.1-claude48` → `v1.2-opus5`
+> baseline lineage. Historical record only; no longer maintained.
+
 Single **1.0.x re-run** of each of the 12 retained targets (their committed remits, held constant), sanity-checked against the `v0.7.7-claude48` weighted score. Goal: confirm the retained suite still reproduces before the full median-of-3 Foundation re-freeze. In-bounds ≈ within the target's band / ±0.3–0.5 gross tolerance **and** same maturity bucket + dominant themes.
 
 ## Results (weighted RAISE)
