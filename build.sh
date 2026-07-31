@@ -69,13 +69,13 @@ fi
 # Freshness backstop: the pretty-remit HTMLs (examples/ + the current baseline set)
 # are deterministic renders of their Markdown sources. Verify none has drifted.
 # The renderer is stdlib-only, so unlike the docs check this always runs.
-if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Checking pretty-remit HTML freshness…"
-  if ! python3 tests/render/render_all_remits.py --check; then
-    echo "error: a pretty-remit HTML is out of sync with its remit." >&2
-    echo "       run 'python3 tests/render/render_all_remits.py' and commit the result." >&2
-    exit 1
-  fi
+# No git guard: the check compares rendered bytes to on-disk files, so it works
+# in a source export/tarball too — run it unconditionally (#208).
+echo "Checking pretty-remit HTML freshness…"
+if ! python3 tests/render/render_all_remits.py --check; then
+  echo "error: a pretty-remit HTML is out of sync with its remit." >&2
+  echo "       run 'python3 tests/render/render_all_remits.py' and commit the result." >&2
+  exit 1
 fi
 
 DIST_DIR="dist"

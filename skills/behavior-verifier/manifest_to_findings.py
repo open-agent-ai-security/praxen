@@ -977,6 +977,11 @@ def _populate_derived(data):
             f["policy_rule_ids"] = None
         pri = f.get("policy_rule_ids")
         if pri is None:
+            # Set BOTH keys explicitly: a manifest whose finding omits the
+            # `- policy_rule_ids:` bullet entirely must still emit the key
+            # (as null) — schema 3.0 requires presence, and the renderer
+            # indexes the key unconditionally (#205).
+            f["policy_rule_ids"] = None
             f["policy_rule_text"] = None
         else:
             # Manifest authors write policy_rule_ids as a human-friendly

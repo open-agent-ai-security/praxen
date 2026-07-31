@@ -5,6 +5,66 @@
 
 # Praxen 1.2 — Harness Reliability & Scoring Stability
 
+> ## ▶ STATUS: CLOSED — shipped to `dev` 2026-07-30 (main promotion pending, planned 2026-08-04)
+>
+> **The release pivoted from its original frame.** This plan was written as
+> "harness reliability + scoring stability on Opus 4.8." What shipped is **OWASP
+> 2026 + a fresh Opus-5 baseline**. The two halves of the original headline split:
+> the **harness-reliability engine landed and shipped** (the plan's #1 problem —
+> delivered), while only the **scoring rework (#48) was reverted to shipped-state
+> and pushed to 1.3** (the Stage-2.5 PUSH case — Steve, 2026-07-28: *"revert scoring to
+> shipped-state … I still want a headline. The 2026 OWASP LLM list is about to
+> ship … update it as the headline for 1.2"*), and the **reference model moved to
+> Opus 5** (its own re-baseline, folded into the single 1.2 freeze), so the frozen
+> set is **`v1.2-opus5`**, not `v1.2-claude48`.
+>
+> **Delivered:**
+> - **Harness-reliability engine** *(the plan's original #1 problem — delivered
+>   and shipped; only the scoring half was pushed)* — Step-8.5 finding-themes
+>   decomposition (#29), interleaved finding emission + emission-discipline
+>   hardening (#33), Step-4 evidence checkpoint + evidence-completeness invariant +
+>   `--validate-manifest` (#65 items 1–2), compound-contributor fold/break-out
+>   rule. Stage-1 reliability gate passed and committed. **Survived the #48 revert**
+>   (that reverted scoring guidance only).
+> - **OWASP LLM/Agentic Top 10 2026 KB refresh** — the headline; version-gated
+>   renderer, new categories firing (Hidden Context Exposure, Vector & Embedding).
+> - **Schema 3.0** — `policy_rule_ids`/`policy_rule_text` as arrays (#7), validator
+>   cross-check (#5), N/A-category support. Activates the remit-verbatim invariant.
+> - **Scan-vs-scan diff tool** (`tests/scan_diff.py`); **scan-time subject
+>   declaration** (`SCAN_INSTRUCTIONS.md`).
+> - **Remit template + all 12 remits re-authored** — POLICY/CONTEXT split,
+>   state-once rule, sub-entry rule extraction, Non-Goals → Prohibited Behaviors.
+> - **Fresh `v1.2-opus5` baseline** — Opus 5, 2026 KB, median-of-3 freeze; mean
+>   median RAISE 1.67; zero classifier switches across the baseline runs.
+> - **Post-freeze FP sweep** (independent cross-model reviewer per target): **zero
+>   detector false positives** across ~130 findings; remit over-reach **fixed +
+>   re-frozen on 6 targets** (deepagents, yaah, hermes, openhands, salesforce, finbot).
+> - **Pretty-remit HTML renderer** (`render_remit.py`) + examples/suite-health
+>   wiring + freshness gate — *not in the original plan; added late at Steve's request.*
+> - **OWASP-2026 label migration** (coverage report, landing page, README, NOTICE,
+>   llms.txt, and the version-gated shipping report heading); **suite_health
+>   CURRENT-baseline fix**; **news page** reframed + 1.2 release announcement;
+>   **Gemini review gate retired** (#120 closed).
+>
+> **Deferred → 1.3** (see `RELEASE_1.3_PLAN.md`): **#48 scoring rework** (the PUSH);
+> **#198 remit-generator authoring quality** (the durable fix for the over-reach
+> class) and the **remit-cleanup + re-baseline** on the targets it still affects
+> (**#201** helperbot/craftbot/autogen/uagents, **#200** aider); **#195** band-edge
+> variance; **#196** decomposition rule; **#197** Thinking Modes; **#65 items 4–8**;
+> **#173/#174** tagging calibration; **#176** full-scale `suite_health` (0–5 scale).
+>
+> **Issue tracker reconciled at close-out (2026-07-30):**
+> - **Closed** (delivered in 1.2, on `dev`; reach `main` at the promotion): #5, #7,
+>   #29, #33, #120, **#169** (2026 KB refresh resolved the LLM08 under-tag class),
+>   #171 (1.2 tracker).
+> - **Open, partial** — commented with what 1.2 delivered + what's carried: **#65**
+>   (items 1–2 done → items 4–8 in 1.3), **#176** (baseline-dir consistency done →
+>   full 0–5 scale in 1.3).
+> - **Open, carried to 1.3:** everything under *Deferred → 1.3* above (#173/#174 are
+>   the remaining tagging-calibration pair).
+>
+> The staged plan below is retained as the historical record.
+
 > ## ▶ STATUS: RESUMED (2026-07-28, Steve) — active plan
 >
 > Steve's direction (2026-07-28, quoted): core-3 infra is *"solid, but not
@@ -388,23 +448,19 @@ gate above** — in one line each:
 
 ## Deliverables checklist
 
-- [ ] Stage 1: #33 + #29 + #65(1,2) landed; reliability gate passed and
-      recorded (shakedown + full-suite run committed under `tests/runs/`)
-- [ ] Stage 2: #7 arrays + `schema_version` bump; #5 cross-check; scan-diff
-      tool in `tests/`; comparability gate passed
-- [ ] Stage 2.5: STOP·LOOK·TEST review written; flip-check + HelperBot-control
-      median-of-3 on the Stage-2 stack committed (`tests/runs/v1.2-stage2.5/`);
-      GO/PUSH decision recorded by dated amendment here (and in
-      `RELEASE_1.3_PLAN.md` if PUSH)
-- [ ] Stage 3: hand-score questionnaire prepped (corner cases w/ pros/cons)
-      → joint session → inclinations marked and committed as
-      `tests/runs/v1.2-stage2.5/HANDSCORE.md`; #48 severity anchors +
-      control-ledger + boundary rules in SKILL/KB (anchor text seeded from
-      the marked inclinations); scoring gate passed (post-rubric runs land
-      on the marked side of every decided entry); lean check run and
-      dispositioned
-- [ ] Stage 4: `v1.2-claude48` frozen median-of-3; `CURRENT` updated; #176
-      batched; coverage + LLM06 checks recorded
-- [ ] Closes: #5, #7, #29, #33, #169, #173, #174, #176; #48 *(contingent on
-      the Stage-2.5 GO — moves to 1.3's list on a PUSH)*; #65 partially
-      (items 1–2; comment scoping the remainder to 1.3)
+*(Reconciled at close-out 2026-07-30 — see the CLOSED status block up top.)*
+
+- [x] **Stage 1** — #33 + #29 + #65(1,2) landed; reliability gate passed.
+- [x] **Stage 2** — #7 arrays + `schema_version` 3.0; #5 cross-check; scan-diff
+      tool (`tests/scan_diff.py`); comparability gate passed.
+- [x] **Stage 2.5** — decision was **PUSH**: scoring rework reverted to
+      shipped-state (Steve, 2026-07-28); #48 → 1.3.
+- [→ 1.3] **Stage 3** — #48 severity anchors / control-ledger / boundary rules +
+      hand-score anchors: **reverted, not shipped in 1.2**; moved to 1.3 (PUSH).
+- [x] **Stage 4** — baseline frozen median-of-3 as **`v1.2-opus5`** (reference
+      model **Opus 5**, not the planned Opus 4.8 `v1.2-claude48`); `CURRENT`
+      updated; coverage + suite-health pages regenerated. #176 full-scale +
+      LLM06 discrimination check → 1.3.
+- [x] **Issue tracker reconciled (2026-07-30):** closed #5, #7, #29, #33, #120,
+      #169, #171; #65 + #176 commented (partial). **→ 1.3:** #48 (PUSH), #65
+      (items 4–8), #173/#174, #176 (full scale), and the RFE set (#195–#201, #106).

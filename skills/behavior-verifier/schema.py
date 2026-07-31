@@ -286,6 +286,14 @@ def _validate_findings(data):
         # rule (a RAISE-category or detection-pattern finding), and non-empty
         # arrays of equal length together when it does — element i of
         # policy_rule_ids is the id whose text is element i of policy_rule_text.
+        # Both keys must be PRESENT (findings.schema.json lists them as required)
+        # — explicitly null when the finding cites no remit rule, never absent.
+        # An absent key would pass a .get() comparison and then crash the
+        # renderer with a raw KeyError instead of a clean diagnostic (#205).
+        for _rk in ("policy_rule_ids", "policy_rule_text"):
+            if _rk not in f:
+                _err(p, f"{_rk}: required field is missing (use null when the "
+                        "finding cites no remit rule)")
         pri = f.get("policy_rule_ids")
         prt = f.get("policy_rule_text")
         if (pri is None) != (prt is None):
