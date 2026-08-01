@@ -261,7 +261,7 @@ Closes #69, #70, #116, #64.
 ### Unchanged on purpose
 
 - **Historical baselines** (`tests/baselines/v0.7.0-sequential/**`, `tests/runs/v0.7.3-prerelease*/**`) keep their old-URL footers. Those are point-in-time snapshots and rewriting them would falsify what was actually shipped at that version. The byte-identity check in `tests/render/test_render.py` already filters on the current template-era URL marker, so frozen baselines validate schema and re-render only, not byte-identity.
-- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving.
+- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving. **Do not run install commands from those entries** — that org name is no longer ours, and nothing published under it in future is us. The only current install path is the community marketplace (`open-agent-ai-security/plugins`); see [docs/installation.md](docs/installation.md).
 - **Schema, scoring, renderer logic, SKILL.** No behavior change. `test_render.py` is **176 / 0**, `test_manifest_to_findings.py` is **28 / 0**.
 
 ### Notes
