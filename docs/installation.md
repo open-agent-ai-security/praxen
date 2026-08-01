@@ -87,7 +87,7 @@ Auto-update is **per-marketplace and off by default** for third-party marketplac
 {
   "extraKnownMarketplaces": {
     "open-agent-ai-security": {
-      "source": { "source": "github", "repo": "open-agent-ai-security/praxen" },
+      "source": { "source": "github", "repo": "open-agent-ai-security/plugins" },
       "autoUpdate": true
     }
   }
