@@ -232,17 +232,29 @@ def render_rich(text, allow=("code",)) -> str:
     return re.sub(r"\x00(\d+)\x00", lambda m: saved[int(m.group(1))], escaped)
 
 
+_STRIPPABLE_TAGS = sorted({t for tags in _RICH_FIELDS.values() for t in tags})
+
+
 def strip_tags(text) -> str:
     """Flatten a rich-text field to plain text for the TXT summary: a ``</p>``
     paragraph break becomes a single space (so sentences don't run together),
-    every other HTML-ish tag (``<p>``, ``<code>``, ``<strong>``, a stray
-    ``<a ...>``, …) is dropped, and HTML entities (``&mdash;``, ``&amp;``,
-    ``&lt;project&gt;`` …) are decoded to their characters — the prose fields
-    legitimately carry entities for the HTML report, and the plain-text summary
-    should show ``—`` / ``&`` / ``<project>`` rather than the raw entity text.
-    A lone ``<`` that is not a tag is left alone."""
+    the other markup tags the prose fields may legitimately carry (``<code>``,
+    ``<strong>``, ``<em>``, ``<p>``) are dropped, and HTML entities
+    (``&mdash;``, ``&amp;``, ``&lt;project&gt;`` …) are decoded to their
+    characters — the prose fields legitimately carry entities for the HTML
+    report, and the plain-text summary should show ``—`` / ``&`` / ``<project>``
+    rather than the raw entity text.
+
+    Only the tags in ``_RICH_FIELDS`` are stripped, deliberately: anything else
+    in angle brackets is content, not markup. Route placeholders are the common
+    case — ``POST /api/vendors/<id>/invoices`` must survive intact, where a
+    generic ``</?[a-zA-Z][^>]*>`` sweep silently ate ``<id>`` and produced
+    ``/api/vendors//invoices``. This also keeps TXT consistent with the HTML
+    report, where ``render_rich`` escapes any tag outside the allow-list into
+    visible text rather than dropping it."""
     t = re.sub(r"\s*</p\s*>\s*", " ", str(text), flags=re.IGNORECASE)
-    t = re.sub(r"</?[a-zA-Z][^>]*>", "", t)
+    tag_alt = "|".join(re.escape(tag) for tag in _STRIPPABLE_TAGS)
+    t = re.sub(rf"</?(?:{tag_alt})\s*>", "", t, flags=re.IGNORECASE)
     return html.unescape(t)
 
 
