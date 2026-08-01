@@ -28,6 +28,7 @@ Exit 0 in sync, 1 on drift, 2 on fetch/parse/structure failure.
 """
 import json
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -45,11 +46,31 @@ EXPECTED_CANONICAL_PRAXEN_SOURCE = {
 }
 
 
-def load_canonical(ref: str):
-    if ref.startswith(("http://", "https://")):
-        with urllib.request.urlopen(ref, timeout=30) as resp:
-            return json.load(resp)
-    return json.loads(Path(ref).read_text())
+def load_canonical(ref: str, attempts: int = 3, backoff: float = 2.0):
+    """Fetch the canonical index (or read a local path).
+
+    Network fetches are retried: a transient raw.githubusercontent.com blip
+    would otherwise red every PR touching .claude-plugin/**. Retries only
+    widen the transient-failure window — a genuine fetch failure still exits
+    2, and drift detection is unaffected.
+    """
+    if not ref.startswith(("http://", "https://")):
+        return json.loads(Path(ref).read_text())
+    last = None
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(ref, timeout=30) as resp:
+                return json.load(resp)
+        except Exception as e:  # network flake, 5xx, truncated body
+            last = e
+            if attempt < attempts - 1:
+                print(
+                    f"canonical fetch failed ({e}); retrying "
+                    f"{attempt + 2}/{attempts}…",
+                    file=sys.stderr,
+                )
+                time.sleep(backoff * (attempt + 1))
+    raise last
 
 
 def entries_by_name(manifest, label: str):

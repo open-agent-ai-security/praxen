@@ -32,7 +32,17 @@ if [[ "$VERSION" != "$PLUGIN_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, plugin.json says $PLUGIN_VERSION" >&2
   exit 1
 fi
-MARKET_VERSION="$(python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); print(m['plugins'][0]['version'])")"
+# Look the praxen entry up BY NAME: the mirror lists other plugins too (which
+# deliberately carry no version, mirroring the canonical index), so a positional
+# read would crash on a reordering rather than checking what it means to check.
+MARKET_VERSION="$(python3 -c "import json, sys
+m = json.load(open('.claude-plugin/marketplace.json'))
+e = next((p for p in m['plugins'] if p.get('name') == 'praxen'), None)
+if e is None:
+    sys.exit('error: marketplace.json has no praxen entry')
+if 'version' not in e:
+    sys.exit('error: marketplace.json praxen entry has no version')
+print(e['version'])")"
 if [[ "$VERSION" != "$MARKET_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, marketplace.json praxen entry says $MARKET_VERSION" >&2
   exit 1
