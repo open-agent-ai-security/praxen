@@ -4,7 +4,7 @@
 # Enforces the Developer Certificate of Origin (see CONTRIBUTING.md): every
 # non-merge, non-bot commit in a pull request must carry a `Signed-off-by:`
 # trailer whose name/email matches the commit's author or committer. GitHub
-# bot accounts (Dependabot, gemini-code-assist, …) are exempt.
+# bot accounts (e.g. Dependabot) are exempt.
 #
 # Runs on `pull_request_target` (not `pull_request`) on purpose:
 #   - it fires IMMEDIATELY, even for first-time fork contributors (whose
@@ -81,15 +81,41 @@ jobs:
             const bad = [];
             for (const c of commits) {
               if (c.parents.length > 1) continue;                       // merge commit — exempt
+              // Bot exemption keys ONLY on the GitHub-resolved account type —
+              // never on the commit's author name, which is contributor-
+              // controlled (`git -c user.name="x[bot]"` must not skip DCO, #209).
               const ghIsBot = c.author && c.author.type === 'Bot';
-              const nameIsBot = /\[bot\]$/.test(c.commit.author.name);
-              if (ghIsBot || nameIsBot) continue;                       // bot account — exempt
+              if (ghIsBot) continue;                                    // bot account — exempt
 
               const author    = `${c.commit.author.name} <${c.commit.author.email}>`;
               const committer = `${c.commit.committer.name} <${c.commit.committer.email}>`;
               const lines = c.commit.message.split('\n').map(l => l.trim());
-              const signed = lines.includes(`Signed-off-by: ${author}`)
-                          || lines.includes(`Signed-off-by: ${committer}`);
+              let signed = lines.includes(`Signed-off-by: ${author}`)
+                        || lines.includes(`Signed-off-by: ${committer}`);
+
+              // GitHub privacy-alias allowance. When a contributor has email
+              // privacy enabled, GitHub rewrites the AUTHOR email to
+              // `<user>@users.noreply.github.com` — notably when squash-merging
+              // a fork PR — while their own `Signed-off-by` carries the real
+              // address they committed with. The certification is present and
+              // by the same person; only the email FORM differs, and the
+              // contributor cannot fix it after the merge without rewriting
+              // shared history. Accept a name match in exactly that case.
+              // Deliberately narrow: a sign-off trailer must still exist, the
+              // name must match, and this only applies when the author email is
+              // a GitHub noreply alias — never as a general name-only fallback.
+              if (!signed) {
+                const noreply = /@users\.noreply\.github\.com$/i;
+                const eq = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+                for (const id of [c.commit.author, c.commit.committer]) {
+                  if (!noreply.test(id.email || '')) continue;
+                  const match = lines.some(l => {
+                    const m = l.match(/^Signed-off-by:\s*(.+?)\s*<([^>]+)>$/i);
+                    return m && eq(m[1], id.name);
+                  });
+                  if (match) { signed = true; break; }
+                }
+              }
               if (!signed) {
                 bad.push({ sha: c.sha.slice(0, 12), subject: c.commit.message.split('\n')[0], author });
               }
