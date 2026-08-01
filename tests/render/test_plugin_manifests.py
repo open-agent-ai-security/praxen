@@ -87,9 +87,14 @@ def main():
     iface = xp.get("interface") or {}
     check("codex plugin.json has interface.displayName + shortDescription",
           bool(iface.get("displayName") and iface.get("shortDescription")))
+    # The praxen entry must carry a version (build.sh's 4-way guard reads it);
+    # other entries mirror the canonical community index
+    # (open-agent-ai-security/plugins), where version is deliberately absent —
+    # each plugin repo's plugin.json is its version authority.
     for e in (plugins if isinstance(plugins, list) else []):
-        check(f"marketplace plugin {e.get('name')!r} has name + source + version",
-              bool(e.get("name") and e.get("source") and e.get("version")))
+        required = ("name", "source", "version") if e.get("name") == "praxen" else ("name", "source")
+        check(f"marketplace plugin {e.get('name')!r} has " + " + ".join(required),
+              all(e.get(k) for k in required))
 
     # Name consistency across the three manifests.
     check("plugin name 'praxen' is consistent across the three manifests",

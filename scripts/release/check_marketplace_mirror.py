@@ -6,19 +6,21 @@
 The canonical Claude Code marketplace for the org lives in
 https://github.com/open-agent-ai-security/plugins; this repo keeps an in-repo
 mirror so installs added from the legacy path (open-agent-ai-security/praxen)
-keep updating. The two files differ by design in exactly two ways:
+keep updating. The two files may differ in exactly three places:
 
-  - the praxen entry's ``source`` ("./" here vs a pinned git URL there) and
-    ``version`` (required here by build.sh's version guard; absent there,
-    where each plugin repo's plugin.json is the version authority);
+  - the praxen entry's ``source`` ("./" here vs a pinned git URL there);
+  - the praxen entry's ``version`` (required here by build.sh's version guard;
+    absent there, where each plugin repo's plugin.json is the version
+    authority);
   - ``metadata`` prose (the mirror says it is a mirror).
 
-Everything users actually see must match: the marketplace name, the set of
-plugin names, and each entry's description, license, keywords, and category.
-Non-praxen entries must also match on source, so a drifted pin is caught.
+Everything else fails closed: entries are compared by FULL equality after
+excluding only those exemptions, so a field the canonical index grows later
+(a version, a homepage, anything) surfaces as drift instead of slipping
+through an allow-list. The marketplace ``name`` and ``owner`` must match too.
 
 Usage: check_marketplace_mirror.py [--canonical PATH_OR_URL]
-Exit 0 in sync, 1 on drift, 2 on fetch/parse failure.
+Exit 0 in sync, 1 on drift, 2 on fetch/parse/structure failure.
 """
 import json
 import sys
@@ -30,7 +32,6 @@ CANONICAL_URL = (
     "main/.claude-plugin/marketplace.json"
 )
 MIRROR_PATH = Path(__file__).resolve().parents[2] / ".claude-plugin" / "marketplace.json"
-COMPARED_FIELDS = ("description", "license", "keywords", "category")
 
 
 def load_canonical(ref: str):
@@ -38,6 +39,31 @@ def load_canonical(ref: str):
         with urllib.request.urlopen(ref, timeout=30) as resp:
             return json.load(resp)
     return json.loads(Path(ref).read_text())
+
+
+def entries_by_name(manifest, label: str):
+    """Index plugins by name, or raise ValueError on structural problems."""
+    plugins = manifest.get("plugins")
+    if not isinstance(plugins, list):
+        raise ValueError(f"{label}: 'plugins' is not a list")
+    by_name = {}
+    for i, e in enumerate(plugins):
+        if not isinstance(e, dict) or not isinstance(e.get("name"), str) or not e["name"]:
+            raise ValueError(f"{label}: plugins[{i}] lacks a non-empty string 'name'")
+        if e["name"] in by_name:
+            raise ValueError(f"{label}: duplicate plugin name {e['name']!r}")
+        by_name[e["name"]] = e
+    return by_name
+
+
+def normalized(name: str, entry: dict, is_mirror: bool) -> dict:
+    """Strip exactly the documented mirror exemptions before comparing."""
+    e = dict(entry)
+    if name == "praxen":
+        e.pop("source", None)  # './' here vs pinned git URL there — by design
+        if is_mirror:
+            e.pop("version", None)  # required here (build.sh guard), absent there
+    return e
 
 
 def main() -> int:
@@ -51,35 +77,35 @@ def main() -> int:
     try:
         canonical = load_canonical(ref)
         mirror = json.loads(MIRROR_PATH.read_text())
-    except Exception as e:  # fetch/parse problems are not "drift"
+        c_by_name = entries_by_name(canonical, "canonical")
+        m_by_name = entries_by_name(mirror, "mirror")
+    except Exception as e:  # fetch/parse/structure problems are not "drift"
         print(f"error: could not load manifests: {e}", file=sys.stderr)
         return 2
 
     drift = []
-    if canonical.get("name") != mirror.get("name"):
-        drift.append(
-            f"marketplace name: canonical {canonical.get('name')!r} "
-            f"vs mirror {mirror.get('name')!r}"
-        )
+    for field in ("name", "owner"):
+        if canonical.get(field) != mirror.get(field):
+            drift.append(
+                f"marketplace {field}: canonical {canonical.get(field)!r} "
+                f"vs mirror {mirror.get(field)!r}"
+            )
 
-    c_by_name = {p["name"]: p for p in canonical.get("plugins", [])}
-    m_by_name = {p["name"]: p for p in mirror.get("plugins", [])}
     if set(c_by_name) != set(m_by_name):
         drift.append(
             f"plugin sets differ: canonical {sorted(c_by_name)} vs mirror {sorted(m_by_name)}"
         )
 
     for name in sorted(set(c_by_name) & set(m_by_name)):
-        c, m = c_by_name[name], m_by_name[name]
-        for field in COMPARED_FIELDS:
+        c = normalized(name, c_by_name[name], is_mirror=False)
+        m = normalized(name, m_by_name[name], is_mirror=True)
+        if c == m:
+            continue
+        for field in sorted(set(c) | set(m)):
             if c.get(field) != m.get(field):
                 drift.append(
                     f"{name}.{field}: canonical {c.get(field)!r} vs mirror {m.get(field)!r}"
                 )
-        if name != "praxen" and c.get("source") != m.get("source"):
-            drift.append(
-                f"{name}.source: canonical {c.get('source')!r} vs mirror {m.get('source')!r}"
-            )
 
     if drift:
         print("marketplace mirror has drifted from the canonical index:")
