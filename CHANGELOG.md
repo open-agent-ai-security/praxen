@@ -33,7 +33,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Distribution — community marketplace
 - **Praxen now installs from the canonical community marketplace** [`open-agent-ai-security/plugins`](https://github.com/open-agent-ai-security/plugins): `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`. One marketplace serves every Open Agent AI Security plugin (praxen, socxen, …); entries pin each repo's `main` over anonymous HTTPS. The marketplace **name and plugin key are unchanged**, so existing installs are unaffected.
-- The in-repo `.claude-plugin/marketplace.json` is now a **legacy mirror** of that index — the old `marketplace add open-agent-ai-security/praxen` path keeps working — with drift guarded by CI (`.github/workflows/marketplace-sync.yml` → `scripts/release/check_marketplace_mirror.py`, on PR + weekly). Install docs, the landing page, and `scripts/release/plugin-smoke.sh` journey 1 now target the canonical index; the Codex path is unchanged (per-repo) pending a Codex smoke test against the community marketplace.
+- The in-repo `.claude-plugin/marketplace.json` is now a **legacy mirror** of that index — the old `marketplace add open-agent-ai-security/praxen` path keeps working — with drift guarded by CI (`.github/workflows/marketplace-sync.yml` → `scripts/release/check_marketplace_mirror.py`, on PR + weekly). Install docs, the landing page, and `scripts/release/plugin-smoke.sh` journey 1 now target the canonical index. The **Codex path uses the same catalog** — smoke-verified on Codex CLI 0.146.0 (reads the same manifest, honors the `url`+`ref: main` pins, installs the full payload with the `behavior-verifier` skill); the in-repo mirror still serves any legacy per-repo Codex adds.
 
 ### Carried process batch (post-1.1 cleanup — shipped unversioned ahead of this release)
 - **Paper trail**: the #48 descope recorded; tagging-checkpoint report superseded; LLM08 anchor gap documented; the 1.1/1.2/1.3 plan set committed.
@@ -261,7 +261,7 @@ Closes #69, #70, #116, #64.
 ### Unchanged on purpose
 
 - **Historical baselines** (`tests/baselines/v0.7.0-sequential/**`, `tests/runs/v0.7.3-prerelease*/**`) keep their old-URL footers. Those are point-in-time snapshots and rewriting them would falsify what was actually shipped at that version. The byte-identity check in `tests/render/test_render.py` already filters on the current template-era URL marker, so frozen baselines validate schema and re-render only, not byte-identity.
-- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving.
+- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving. **Do not run install commands from those entries** — that org name is no longer ours, and nothing published under it in future is us. The only current install path is the community marketplace (`open-agent-ai-security/plugins`); see [docs/installation.md](docs/installation.md).
 - **Schema, scoring, renderer logic, SKILL.** No behavior change. `test_render.py` is **176 / 0**, `test_manifest_to_findings.py` is **28 / 0**.
 
 ### Notes

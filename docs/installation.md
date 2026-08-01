@@ -37,15 +37,17 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 
 ## OpenAI Codex
 
-Codex has its own plugin marketplace, and Praxen installs from the **same repo** as the Claude Code path. From your terminal:
+Codex has its own plugin marketplace, and Praxen installs from the **same community marketplace** as the Claude Code path (Codex reads the same catalog manifest and honors its `main`-branch pins). From your terminal:
 
 ```bash
-codex plugin marketplace add open-agent-ai-security/praxen
+codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen@open-agent-ai-security
 codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.0.0+
 ```
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).
+
+> **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, so your `praxen@open-agent-ai-security` plugin key is unchanged. Then `codex plugin marketplace upgrade open-agent-ai-security` and re-run `codex plugin add praxen@open-agent-ai-security` to pick up the catalog's copy. The legacy per-repo path keeps working via the in-repo mirror, so this is optional.
 
 ## Any other agent
 
@@ -87,7 +89,7 @@ Auto-update is **per-marketplace and off by default** for third-party marketplac
 {
   "extraKnownMarketplaces": {
     "open-agent-ai-security": {
-      "source": { "source": "github", "repo": "open-agent-ai-security/praxen" },
+      "source": { "source": "github", "repo": "open-agent-ai-security/plugins" },
       "autoUpdate": true
     }
   }

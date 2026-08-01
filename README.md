@@ -25,7 +25,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 **📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
 - **Claude Code:** one command — `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`
-- **OpenAI Codex:** one command — `codex plugin marketplace add open-agent-ai-security/praxen && codex plugin add praxen@open-agent-ai-security`
+- **OpenAI Codex:** one command — `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen@open-agent-ai-security`
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 

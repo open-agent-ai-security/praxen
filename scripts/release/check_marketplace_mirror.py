@@ -15,9 +15,13 @@ keep updating. The two files may differ in exactly three places:
   - ``metadata`` prose (the mirror says it is a mirror).
 
 Everything else fails closed: entries are compared by FULL equality after
-excluding only those exemptions, so a field the canonical index grows later
-(a version, a homepage, anything) surfaces as drift instead of slipping
-through an allow-list. The marketplace ``name`` and ``owner`` must match too.
+excluding only those exemptions, and the top level likewise (full equality
+minus ``metadata`` and the per-entry-compared ``plugins``), so a field the
+canonical index grows later (a version, a homepage, a new top-level key)
+surfaces as drift instead of slipping through an allow-list. The praxen
+``source`` exemption is asymmetric: the mirror's ``./`` is ignored, but the
+CANONICAL praxen source — where users' installs actually clone from — must
+equal the expected pin exactly.
 
 Usage: check_marketplace_mirror.py [--canonical PATH_OR_URL]
 Exit 0 in sync, 1 on drift, 2 on fetch/parse/structure failure.
@@ -32,6 +36,13 @@ CANONICAL_URL = (
     "main/.claude-plugin/marketplace.json"
 )
 MIRROR_PATH = Path(__file__).resolve().parents[2] / ".claude-plugin" / "marketplace.json"
+# The one canonical field exempted from mirror comparison is also the most
+# security-relevant one for this repo's own plugin — pin it explicitly.
+EXPECTED_CANONICAL_PRAXEN_SOURCE = {
+    "source": "url",
+    "url": "https://github.com/open-agent-ai-security/praxen.git",
+    "ref": "main",
+}
 
 
 def load_canonical(ref: str):
@@ -84,11 +95,23 @@ def main() -> int:
         return 2
 
     drift = []
-    for field in ("name", "owner"):
-        if canonical.get(field) != mirror.get(field):
+    c_top = {k: v for k, v in canonical.items() if k not in ("metadata", "plugins")}
+    m_top = {k: v for k, v in mirror.items() if k not in ("metadata", "plugins")}
+    for field in sorted(set(c_top) | set(m_top)):
+        if c_top.get(field) != m_top.get(field):
             drift.append(
-                f"marketplace {field}: canonical {canonical.get(field)!r} "
-                f"vs mirror {mirror.get(field)!r}"
+                f"marketplace {field}: canonical {c_top.get(field)!r} "
+                f"vs mirror {m_top.get(field)!r}"
+            )
+
+    # Fails CLOSED: a missing or null canonical praxen source is drift, not a pass.
+    # (It is exempt from the entry comparison below, so nothing else would catch it.)
+    if "praxen" in c_by_name:
+        c_praxen_src = c_by_name["praxen"].get("source")
+        if c_praxen_src != EXPECTED_CANONICAL_PRAXEN_SOURCE:
+            drift.append(
+                f"canonical praxen source deviates from the expected pin: "
+                f"{c_praxen_src!r} != {EXPECTED_CANONICAL_PRAXEN_SOURCE!r}"
             )
 
     if set(c_by_name) != set(m_by_name):
