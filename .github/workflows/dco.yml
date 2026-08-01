@@ -90,8 +90,32 @@ jobs:
               const author    = `${c.commit.author.name} <${c.commit.author.email}>`;
               const committer = `${c.commit.committer.name} <${c.commit.committer.email}>`;
               const lines = c.commit.message.split('\n').map(l => l.trim());
-              const signed = lines.includes(`Signed-off-by: ${author}`)
-                          || lines.includes(`Signed-off-by: ${committer}`);
+              let signed = lines.includes(`Signed-off-by: ${author}`)
+                        || lines.includes(`Signed-off-by: ${committer}`);
+
+              // GitHub privacy-alias allowance. When a contributor has email
+              // privacy enabled, GitHub rewrites the AUTHOR email to
+              // `<user>@users.noreply.github.com` — notably when squash-merging
+              // a fork PR — while their own `Signed-off-by` carries the real
+              // address they committed with. The certification is present and
+              // by the same person; only the email FORM differs, and the
+              // contributor cannot fix it after the merge without rewriting
+              // shared history. Accept a name match in exactly that case.
+              // Deliberately narrow: a sign-off trailer must still exist, the
+              // name must match, and this only applies when the author email is
+              // a GitHub noreply alias — never as a general name-only fallback.
+              if (!signed) {
+                const noreply = /@users\.noreply\.github\.com$/i;
+                const eq = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+                for (const id of [c.commit.author, c.commit.committer]) {
+                  if (!noreply.test(id.email || '')) continue;
+                  const match = lines.some(l => {
+                    const m = l.match(/^Signed-off-by:\s*(.+?)\s*<([^>]+)>$/i);
+                    return m && eq(m[1], id.name);
+                  });
+                  if (match) { signed = true; break; }
+                }
+              }
               if (!signed) {
                 bad.push({ sha: c.sha.slice(0, 12), subject: c.commit.message.split('\n')[0], author });
               }
