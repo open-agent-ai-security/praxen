@@ -37,10 +37,10 @@ The skill registers as `behavior-verifier`. The in-session equivalents — `/plu
 
 ## OpenAI Codex
 
-Codex has its own plugin marketplace, and Praxen installs from the **same repo** as the Claude Code path. From your terminal:
+Codex has its own plugin marketplace, and Praxen installs from the **same community marketplace** as the Claude Code path (Codex reads the same catalog manifest and honors its `main`-branch pins). From your terminal:
 
 ```bash
-codex plugin marketplace add open-agent-ai-security/praxen
+codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen@open-agent-ai-security
 codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.0.0+
 ```

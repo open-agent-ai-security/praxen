@@ -191,7 +191,7 @@ a tag.
      tag first, then `claude plugin marketplace update … && claude plugin update …`.
    - **Codex (always manual):** the script drives only the `claude` CLI, so
      confirm the Codex marketplace leg by hand — in a scratch config,
-     `codex plugin marketplace add open-agent-ai-security/praxen && codex plugin add praxen@open-agent-ai-security && codex plugin list`
+     `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen@open-agent-ai-security && codex plugin list`
      (expect the new version). For the upgrade leg, refresh the snapshot then
      re-install:
      `codex plugin marketplace upgrade open-agent-ai-security && codex plugin add praxen@open-agent-ai-security`.
