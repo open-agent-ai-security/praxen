@@ -186,7 +186,7 @@ a tag.
      with `scripts/release/plugin-smoke.sh v<target> v<prior>`.
    - **Fallback — the manual commands it automates** (use if the script can't
      run): in a scratch config,
-     `claude plugin marketplace add open-agent-ai-security/praxen && claude plugin install praxen@open-agent-ai-security && claude plugin list`
+     `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security && claude plugin list`
      (expect the new version, enabled); for the upgrade leg, install the prior
      tag first, then `claude plugin marketplace update … && claude plugin update …`.
    - **Codex (always manual):** the script drives only the `claude` CLI, so

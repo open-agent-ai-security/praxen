@@ -18,13 +18,20 @@ That's the entire dependency surface.
 
 ## Claude Code
 
-Install from the plugin marketplace. From your terminal:
+Install from the community plugin marketplace ([open-agent-ai-security/plugins](https://github.com/open-agent-ai-security/plugins) — one `marketplace add` covers every Open Agent AI Security plugin). From your terminal:
 
 ```bash
-claude plugin marketplace add open-agent-ai-security/praxen
+claude plugin marketplace add open-agent-ai-security/plugins
 claude plugin install praxen@open-agent-ai-security
 claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.0.0+
 ```
+
+> **Added the marketplace from `open-agent-ai-security/praxen` previously?** That path still
+> works — this repo carries a synced mirror of the community index — but the community
+> marketplace is the canonical source. To migrate: `claude plugin marketplace remove
+> open-agent-ai-security` (note: this also uninstalls the plugins that came from it), then run
+> the add + install commands above. Your plugin key (`praxen@open-agent-ai-security`) and
+> settings are unchanged.
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
 
