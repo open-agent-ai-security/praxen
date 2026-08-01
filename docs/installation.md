@@ -47,6 +47,8 @@ codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enab
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).
 
+> **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, so your `praxen@open-agent-ai-security` plugin key is unchanged. Then `codex plugin marketplace upgrade open-agent-ai-security` and re-run `codex plugin add praxen@open-agent-ai-security` to pick up the catalog's copy. The legacy per-repo path keeps working via the in-repo mirror, so this is optional.
+
 ## Any other agent
 
 No marketplace, no download step — Praxen is just a skill folder in a public repo, so any capable coding agent can fetch and run it from a plain-English instruction. (This also works on Claude Code or Codex if you'd rather skip the marketplace.) In your agent session, say something like:

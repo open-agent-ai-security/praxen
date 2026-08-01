@@ -104,12 +104,15 @@ def main() -> int:
                 f"vs mirror {m_top.get(field)!r}"
             )
 
-    c_praxen_src = (c_by_name.get("praxen") or {}).get("source")
-    if c_praxen_src is not None and c_praxen_src != EXPECTED_CANONICAL_PRAXEN_SOURCE:
-        drift.append(
-            f"canonical praxen source deviates from the expected pin: "
-            f"{c_praxen_src!r} != {EXPECTED_CANONICAL_PRAXEN_SOURCE!r}"
-        )
+    # Fails CLOSED: a missing or null canonical praxen source is drift, not a pass.
+    # (It is exempt from the entry comparison below, so nothing else would catch it.)
+    if "praxen" in c_by_name:
+        c_praxen_src = c_by_name["praxen"].get("source")
+        if c_praxen_src != EXPECTED_CANONICAL_PRAXEN_SOURCE:
+            drift.append(
+                f"canonical praxen source deviates from the expected pin: "
+                f"{c_praxen_src!r} != {EXPECTED_CANONICAL_PRAXEN_SOURCE!r}"
+            )
 
     if set(c_by_name) != set(m_by_name):
         drift.append(
