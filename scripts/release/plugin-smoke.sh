@@ -29,9 +29,10 @@
 # Exits non-zero on the first failed assertion.
 set -euo pipefail
 
-MARKET="open-agent-ai-security"        # marketplace name (from .claude-plugin/marketplace.json)
+MARKET="open-agent-ai-security"        # marketplace name (canonical index and in-repo mirror agree)
 PLUGIN="praxen@${MARKET}"
-REPO_SLUG="open-agent-ai-security/praxen"
+REPO_SLUG="open-agent-ai-security/plugins"   # canonical community index; its praxen entry pins this repo's main.
+                                             # Journey 2's local-worktree add exercises the in-repo mirror path.
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
