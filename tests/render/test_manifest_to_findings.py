@@ -346,6 +346,92 @@ check("top-level keys are in canonical order", keys == expected_keys,
       f"got {keys}")
 
 
+# ── 8. --validate-manifest mode (#65 item 2) ────────────────────────────────
+print("\n8. --validate-manifest mode")
+
+
+def run_validate(manifest_path):
+    return subprocess.run(
+        [sys.executable, CONVERTER, "--manifest", manifest_path,
+         "--validate-manifest"],
+        capture_output=True, text=True)
+
+
+with tempfile.TemporaryDirectory() as td:
+    # 8a. Complete, clean manifest → exit 0, "complete and valid", no JSON out.
+    res = run_validate(MANIFEST)
+    check("validate: clean manifest exits 0", res.returncode == 0,
+          res.stdout + res.stderr)
+    check("validate: clean manifest reported complete",
+          "complete and valid" in res.stdout, res.stdout)
+
+    # 8b. Mid-composition skeleton (sections missing, present ones clean)
+    # → exit 0 with a non-fatal note; this is the run-after-skeleton use case.
+    skel = os.path.join(td, "skeleton.md")
+    Path(skel).write_text(
+        "\n".join(manifest_text.splitlines()[:30]) + "\n", encoding="utf-8")
+    res = run_validate(skel)
+    check("validate: skeleton exits 0", res.returncode == 0,
+          res.stdout + res.stderr)
+    check("validate: skeleton notes missing sections",
+          "not yet present" in res.stdout, res.stdout)
+
+    # 8c. Two errors in two different sections → BOTH reported (the fail-fast
+    # parser would stop at the first), exit 1.
+    broken = os.path.join(td, "broken.md")
+    b = manifest_text.replace(
+        "## intro_band", "bogus_field: broken\n\n## intro_band", 1)
+    b = b.replace("severity: Critical", "severity: Catastrophic", 1)
+    Path(broken).write_text(b, encoding="utf-8")
+    res = run_validate(broken)
+    check("validate: broken manifest exits 1", res.returncode == 1,
+          res.stdout + res.stderr)
+    check("validate: reports the first section's error",
+          "bogus_field" in res.stdout, res.stdout)
+    check("validate: ALSO reports the later section's error (recovery)",
+          "Catastrophic" in res.stdout, res.stdout)
+    check("validate: error count is 2", "2 error(s)" in res.stdout, res.stdout)
+
+    # 8d. Validate mode writes nothing.
+    check("validate: no JSON emitted",
+          not [f for f in os.listdir(td) if f.endswith(".json")])
+
+    # 8e. --out still required in convert mode.
+    res = subprocess.run(
+        [sys.executable, CONVERTER, "--manifest", MANIFEST],
+        capture_output=True, text=True)
+    check("convert mode without --out errors", res.returncode != 0,
+          str(res.returncode))
+
+
+# ── N/A category score: `score: N/A` sentinel → null + renormalized overall ──
+print("N/A category score")
+with tempfile.TemporaryDirectory() as td:
+    gj = json.loads(read_text(GOLDEN_JSON))
+    cats = gj["raise_posture"]["categories"]
+    lyd_score = next(c["score"] for c in cats if c["key"] == "limit_your_domain")
+    scored = [c for c in cats if c["key"] != "limit_your_domain"]
+    renorm = round(sum(c["score"] * c["weight"] for c in scored)
+                   / sum(c["weight"] for c in scored), 2)
+    text = read_text(MANIFEST)
+    text = text.replace(f"  score: {lyd_score}", "  score: N/A", 1)
+    text = text.replace(f"- weighted_overall: {gj['raise_posture']['weighted_overall']:.2f}",
+                        f"- weighted_overall: {renorm:.2f}", 1)
+    mpath = os.path.join(td, "na.manifest.md")
+    with open(mpath, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    out = os.path.join(td, "na.json")
+    res = run_converter(mpath, out)
+    check("N/A manifest converts (exit 0)", res.returncode == 0, res.stderr.strip())
+    if res.returncode == 0:
+        data = json.loads(read_text(out))
+        lyd = next(c for c in data["raise_posture"]["categories"]
+                   if c["key"] == "limit_your_domain")
+        check("score: N/A emits JSON null", lyd["score"] is None, repr(lyd["score"]))
+        check("emitted weighted_overall is the renormalized value",
+              abs(data["raise_posture"]["weighted_overall"] - renorm) < 0.011,
+              str(data["raise_posture"]["weighted_overall"]))
+
 print(f"\n{_passed} passed, {_failed} failed")
 # Guard the exit so `pytest <this-file>` doesn't fail collection with
 # `INTERNALERROR: SystemExit`. The test is a standalone script (see header);

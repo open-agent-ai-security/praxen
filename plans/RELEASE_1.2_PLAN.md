@@ -1,0 +1,466 @@
+<!--
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# Praxen 1.2 — Harness Reliability & Scoring Stability
+
+> ## ▶ STATUS: CLOSED — shipped to `dev` 2026-07-30 (main promotion pending, planned 2026-08-04)
+>
+> **The release pivoted from its original frame.** This plan was written as
+> "harness reliability + scoring stability on Opus 4.8." What shipped is **OWASP
+> 2026 + a fresh Opus-5 baseline**. The two halves of the original headline split:
+> the **harness-reliability engine landed and shipped** (the plan's #1 problem —
+> delivered), while only the **scoring rework (#48) was reverted to shipped-state
+> and pushed to 1.3** (the Stage-2.5 PUSH case — Steve, 2026-07-28: *"revert scoring to
+> shipped-state … I still want a headline. The 2026 OWASP LLM list is about to
+> ship … update it as the headline for 1.2"*), and the **reference model moved to
+> Opus 5** (its own re-baseline, folded into the single 1.2 freeze), so the frozen
+> set is **`v1.2-opus5`**, not `v1.2-claude48`.
+>
+> **Delivered:**
+> - **Harness-reliability engine** *(the plan's original #1 problem — delivered
+>   and shipped; only the scoring half was pushed)* — Step-8.5 finding-themes
+>   decomposition (#29), interleaved finding emission + emission-discipline
+>   hardening (#33), Step-4 evidence checkpoint + evidence-completeness invariant +
+>   `--validate-manifest` (#65 items 1–2), compound-contributor fold/break-out
+>   rule. Stage-1 reliability gate passed and committed. **Survived the #48 revert**
+>   (that reverted scoring guidance only).
+> - **OWASP LLM/Agentic Top 10 2026 KB refresh** — the headline; version-gated
+>   renderer, new categories firing (Hidden Context Exposure, Vector & Embedding).
+> - **Schema 3.0** — `policy_rule_ids`/`policy_rule_text` as arrays (#7), validator
+>   cross-check (#5), N/A-category support. Activates the remit-verbatim invariant.
+> - **Scan-vs-scan diff tool** (`tests/scan_diff.py`); **scan-time subject
+>   declaration** (`SCAN_INSTRUCTIONS.md`).
+> - **Remit template + all 12 remits re-authored** — POLICY/CONTEXT split,
+>   state-once rule, sub-entry rule extraction, Non-Goals → Prohibited Behaviors.
+> - **Fresh `v1.2-opus5` baseline** — Opus 5, 2026 KB, median-of-3 freeze; mean
+>   median RAISE 1.67; zero classifier switches across the baseline runs.
+> - **Post-freeze FP sweep** (independent cross-model reviewer per target): **zero
+>   detector false positives** across ~130 findings; remit over-reach **fixed +
+>   re-frozen on 6 targets** (deepagents, yaah, hermes, openhands, salesforce, finbot).
+> - **Pretty-remit HTML renderer** (`render_remit.py`) + examples/suite-health
+>   wiring + freshness gate — *not in the original plan; added late at Steve's request.*
+> - **OWASP-2026 label migration** (coverage report, landing page, README, NOTICE,
+>   llms.txt, and the version-gated shipping report heading); **suite_health
+>   CURRENT-baseline fix**; **news page** reframed + 1.2 release announcement;
+>   **Gemini review gate retired** (#120 closed).
+>
+> **Deferred → 1.3** (see `RELEASE_1.3_PLAN.md`): **#48 scoring rework** (the PUSH);
+> **#198 remit-generator authoring quality** (the durable fix for the over-reach
+> class) and the **remit-cleanup + re-baseline** on the targets it still affects
+> (**#201** helperbot/craftbot/autogen/uagents, **#200** aider); **#195** band-edge
+> variance; **#196** decomposition rule; **#197** Thinking Modes; **#65 items 4–8**;
+> **#173/#174** tagging calibration; **#176** full-scale `suite_health` (0–5 scale).
+>
+> **Issue tracker reconciled at close-out (2026-07-30):**
+> - **Closed** (delivered in 1.2, on `dev`; reach `main` at the promotion): #5, #7,
+>   #29, #33, #120, **#169** (2026 KB refresh resolved the LLM08 under-tag class),
+>   #171 (1.2 tracker).
+> - **Open, partial** — commented with what 1.2 delivered + what's carried: **#65**
+>   (items 1–2 done → items 4–8 in 1.3), **#176** (baseline-dir consistency done →
+>   full 0–5 scale in 1.3).
+> - **Open, carried to 1.3:** everything under *Deferred → 1.3* above (#173/#174 are
+>   the remaining tagging-calibration pair).
+>
+> The staged plan below is retained as the historical record.
+
+> ## ▶ STATUS: RESUMED (2026-07-28, Steve) — active plan
+>
+> Steve's direction (2026-07-28, quoted): core-3 infra is *"solid, but not
+> sufficient for a 1.2 release. It requires it for compatibility statements,
+> but is uninspired for marketing."* Approved sequence: **revert scoring to
+> shipped-state (regression-gated) → validate subject-declaration on that
+> stack (3 scans) → productize it (scan-instructions guidance, template
+> capability-clarity pass, docs paragraph, known-limits section)** — *"Yes to
+> this. But stop short of 'shipping'. I still want a headline. The 2026 OWASP
+> LLM list is about to ship. Once we get the infra stable again, we'll do a
+> pass over the OWASP KB and update it as the headline for 1.2."*
+>
+> Progress: scoring reverted to pre-#48 state (`9ebbe66` text) in `7b53ccb`,
+> N/A plumbing retained (inert, forward-compat); smoke suites 237/0 green.
+> Next: Full Suite Run vs `v1.1-claude48` (theme-coverage gate), then the
+> deepagents ×3 subject-declaration check, then productization. The v6.x
+> corpus remains parked research (see the parked record below).
+>
+> **Reference-model note (Steve, 2026-07-28):** Opus 5 has shipped; *"we may
+> need to eval updating that baseline"*. Verified the `opus` subagent alias
+> still resolves to `claude-opus-4-8` (probe, 2026-07-28) — the RC regression
+> run is uncontaminated. Standing rule holds: a reference-model change is its
+> own re-baseline, never folded into another. Default sequence: (a) infra
+> regression on 4.8, (b) OWASP-2026 KB refresh + freeze on 4.8, (c) separate
+> Opus-5 lean characterization (method: the 4.8-vs-4.7 comparison — suite on
+> the new model vs frozen exemplars, measure systematic lean, then decide
+> adoption/bands). Fold-into-one-freeze is Steve's call to make explicitly if
+> the two-freeze cost is unacceptable. Operational risk to watch: the alias
+> will eventually flip and the subagent API offers no version-pinned Opus;
+> re-verify the alias before every future suite run.
+>
+> ## ⏸ prior parked record (2026-07-18) — kept for context
+>
+> **Where we are.** The scoring-stability arc ran four corpus generations in
+> one day (v4 decidable procedure → v5 default-directions → **v6 fresh-cloth
+> rewrite** "Observe, then Look Up" → v6.1–v6.4 fix cycles) across ~150
+> validation scans. Verdict on the corpus: **structural transformation,
+> numeric parity.** Best state = **v6.3** (`local/v1.2-v6rewrite/
+> SCORING_MODEL_v6.3.md`, NOT integrated into the skill): 12-target gate mean
+> σ 0.114 vs pre-#48 S2.5's 0.105; matched pairs **5 improved / 1 flat / 6
+> regressed**; three trios cell-identical across all 18 category cells
+> (craftbot, finbot, helperbot — S2.5 had one weighted-σ=0 trio, hermes, so
+> "first ever" is NOT claimable); every residual classified into three
+> buckets: (1) input-underdetermined subject scope — solved by scan-time
+> subject declaration, validated 9/9 (`local/v1.2-v63scope/`), packaging =
+> scan-instructions file + remit capability-clarity, NOT remit scope blocks
+> (Steve architecture ruling); (2) six pending rubric one-liners (no-model
+> LYD, lockfile-governs, fixture/seed labeling, framework-credit,
+> prompt-guardrail class, BYK-2-without-context) — **patch EV judged
+> negative-to-coinflip on session base rates; do NOT drip-patch; the fresh
+> alternative is a "no-inference worker" subject profile (3/12 targets are
+> no-model tools)**; (3) discovery-variance floor (RT/MC), procedural
+> mitigation only. Key analyses: `local/v1.2-v63gate/V63GATE_ASSESSMENT.md`,
+> `local/v1.2-v63scope/SCOPE_EXPERIMENT_RESULTS.md`,
+> `local/v1.2-v6rewrite/ROLLBACK_MARKER.md` (v6.4 subject-clause experiment:
+> rejected, diagnosed).
+>
+> **Branch hazard.** This branch has the **v5 rubric committed in the skill
+> (`5fbaeb1`) — the worst-measured corpus state (7-target mean σ 0.174). Do
+> not ship the branch as-is.** Solidly validated on this branch: Stage-1
+> harness reliability (S2.5: 36 scans, 0 stalls; ~120 since) + compound
+> decidability (uAgents 4→1) + schema 3.0 N/A plumbing (166/42 tests, ~80
+> production renders clean).
+>
+> **The open decision (Steve, when un-parked):** (a) thin 1.2 — revert the
+> scoring-model commits to pre-#48, gate with a standard regression run vs
+> `v1.1-claude48`, ship reliability + decidability + schema plumbing with
+> zero stability claims; (b) integrate v6.3 + scan-instructions and ship the
+> "structural transformation" story; (c) no release — hold until the 1.3
+> corpus work (no-inference profile, framework-credit policy) matures.
+>
+> **Corrections of record (do not regress):** the product is a SINGLE scan
+> ("run, get a score") — median-of-3 is validation instrumentation only,
+> never product protocol (a prior claim it was a Steve decision was wrong);
+> HANDSCORE.md anchors are agent-computed under Steve-ratified rulings, not
+> human hand-scores — there is no human ground truth for target scores.
+
+> **Revised 2026-07-15** — supersedes the 2026-07-12 draft (see git history and
+> `RELEASE_1.2_PLAN_REVIEW.md` for what changed and why). Re-scoped around the
+> operator priority statement (Steve, 2026-07-15): *"our big problems are
+> harness reliability, and scoring stability (Critical vs. High, etc., and
+> RAISE)."* Everything else moved to `RELEASE_1.3_PLAN.md` or the 1.1.1 patch
+> (`RELEASE_1.1.1_PLAN.md`).
+
+## Objective
+
+1.2 attacks the two problems that matter most in production, and nothing else:
+
+1. **Harness reliability** — scans must not stall or die. The 2026-07-12
+   clean run had zero watchdog deaths but several scans at 13–14 min, right at
+   the watchdog edge; historical full-suite mortality has hit ~30%. The stall
+   mechanism is known (the Step-9.9 synthesis burst) and so is the fix shape
+   (interleaved emission + decomposition primer + recovery checkpoints).
+2. **Scoring stability** — the same target with the same remit must score the
+   same way twice. The clean run pinpointed the lever: RAISE drift was
+   **entirely severity calibration on borderline findings** (5/12 exact, mean
+   |drift| 0.17, max 0.55; deepagents +0.55 and salesforce +0.45 were each a
+   **Critical scored as High**). This is also the project's most-cited external
+   criticism (July Deep Research assessment, quoted on #48).
+
+The schema work (#7/#5) stays in 1.2 **as the enabler, not a co-headline**:
+stable, joinable rule IDs are what make scoring stability *measurable
+mechanically* (the clean run needed hand-matching to compare scans), and since
+#7 forces the re-baseline anyway, it shares the one freeze this release pays
+for.
+
+**Scope rule:** in 1.2, everything that serves reliability or scoring
+stability, plus the schema enabler; **out**, everything that doesn't —
+detection additions, coverage backfill, output polish, harness reach, and docs
+are 1.3 (`RELEASE_1.3_PLAN.md`).
+
+## Prerequisite
+
+**The post-1.1 cleanup batch folds in first** (`RELEASE_1.1.1_PLAN.md` —
+shipped as a **docs/process batch, no version bump**, per Steve 2026-07-16):
+paper-trail reconciliation and process items only — **no re-tag, no
+re-freeze** (the LLM08 fix was diagnosed as unfixable by re-tagging and moved
+into this release: authoring invariant in stage 1, re-scan acceptance in
+stage 4). `v1.1-claude48` therefore remains the anchor, and it is still the
+pristine, scoring-unchanged "before" this release is graded against. 1.2
+branches from `main` after the cleanup batch lands.
+
+## Staged scope — order is load-bearing
+
+The release ends in one expensive re-freeze (median-of-3 × 12). Every stage
+that changes scan output must land **before** it; the freeze comes last, once.
+
+### Stage 1 · Harness reliability *(the #1 problem)*
+
+- **#33** — interleave finding emission with analysis; kill the Step-9.9
+  synthesis burst at its mechanism.
+- **#29** — Step-8.5 finding-themes outline before drafting (decomposition
+  primer). Also expected to shrink the finding-count scatter the clean run saw
+  (hermes 11-vs-5, aider 11-vs-6 at equal substance), which currently muddies
+  every scan-to-scan comparison.
+- **#65 items 1–2** — Step-4 evidence checkpoint written to disk (survives
+  compaction on large codebases); `--validate-manifest` flag on
+  `manifest_to_findings.py` (manifest format errors caught early, not at
+  parse time).
+- **Evidence-completeness authoring invariant** *(added 2026-07-16 from the
+  LLM08 diagnosis — see #169 and `RELEASE_1.1.1_PLAN.md`)* — SKILL.md evidence
+  step: **evidence must cite every mechanism in the finding's causal chain** —
+  if the chain runs through a store, queue, scheduler, or subsystem, that
+  surface gets an evidence line even when another frame dominates the summary.
+  Test: the record must be **closed under classification** — a competent
+  reader reaches the right taxonomy from the record alone (craftbot-005 is
+  the failing case study: its frozen record dropped the ChromaDB link, so no
+  prose pass could ever tag LLM08). Lands here because it shares #29's
+  carving/emission surface and it changes finding content → must precede the
+  freeze.
+
+**Stage gate (measured, 3× single-target shakedown then one full-suite run):**
+zero watchdog deaths; no scan within 20% of the watchdog limit; finding-count
+spread on 3× same-target runs ≤ ±2.
+
+### Stage 2 · Schema enabler — mechanical comparability
+
+- **#7** — `policy_rule_text` / `policy_rule_ids` as arrays; `schema_version`
+  bump; render-pipeline migration. The largest mechanical change — the reason
+  this release re-baselines.
+- **#5** — validator round 2: `policy_rule_ids` ↔ remit-rule cross-check, so
+  rule references are verifiably real.
+- **Named deliverable: a scan-vs-scan diff tool** (promote
+  `compare_checkpoint.py` or successor into `tests/`): joins two runs of the
+  same target on remit-anchored rule references + finding content. The clean
+  run proved the need — regression detection currently requires hand-matching.
+
+**Stage gate:** two independent runs of the same target join ≥90% of findings
+mechanically; `test_render.py` migrated and green on the new shape.
+
+### Stage 2.5 · STOP · LOOK AROUND · TEST — the Stage-3 go/no-go gate
+*(Formalized 2026-07-16 at Steve's direction — replaces the informal
+"mid-release checkpoint". This is a real stage with work products, not a
+schedule vibe-check, because its TEST output is instrumentation Stage 3
+needs regardless of the decision.)*
+
+**STOP.** No Stage-3 (#48) work begins — not "started in parallel," not
+"just drafting the rubric" — until this gate's review is written down.
+Rubric text drafted before the TEST data exists is how over-steer happens.
+
+**LOOK AROUND.**
+- Re-read the Stage-1 and Stage-2 gate results as written: watchdog margins,
+  finding-count spread, diff-tool join rate. Any gate passed on a waiver
+  counts as not-passed for this review.
+- Survey the world: reference model still Opus 4.8; upstream targets not
+  drifted in ways that would contaminate a re-characterization (the Hermes
+  O8 lesson — `PHASE1_OPEN_ISSUES.md` §O8, the Hermes remit/upstream-drift
+  investigation, not an OWASP code); no new external findings/issues that
+  re-rank the remaining
+  work; the hand-score questionnaire prepped and the joint scoring session
+  done or scheduled (see the Stage-3 protocol — it is a Stage-3
+  entry dependency — schedule it during Stages 1–2, not now).
+- Schedule and appetite check, honestly stated.
+
+**TEST.** Characterize the four flip-check targets (deepagents, salesforce,
+uAgents, craftbot) **median-of-3 on the Stage-2 stack** (new emission flow,
+new schema, authoring invariant — scoring guidance untouched), plus
+HelperBot as the stability control. Commit the results under
+`tests/runs/v1.2-stage2.5/`. This one run yields three things:
+1. **Verification** that Stages 1–2 didn't destabilize scoring (they touch
+   flow and shape, not judgment — confirm it).
+2. **The clean intra-release "before" for #48.** Stage 1 legitimately moves
+   decomposition, so v1.1-claude48 is no longer the right before for the
+   rubric work — these runs are. Without this, #48's effect can't be
+   isolated from the flow changes.
+3. **A fresh variance measurement** to sanity-check whether the Stage-3
+   gate's numbers (zero Critical↔High flips, |drift| ≤ 0.2) are realistic
+   or need honest revision *before* the rubric work starts chasing them.
+
+**DECIDE — with these pre-agreed criteria, recorded here by dated amendment:**
+- **GO (Stage 3 stays in 1.2):** Stage-1/2 gates passed clean; TEST shows
+  scores stable or movement explained-and-accepted; the hand-score
+  questionnaire session done (inclinations marked, `HANDSCORE.md` committed);
+  schedule healthy. **All four must hold — failing any GO criterion
+  is itself a PUSH** (no undecidable middle: a clean-gates-but-stressed-
+  schedule outcome pushes).
+- **PUSH (Stage 3 → 1.3):** any GO criterion failed — typically: a stage
+  gate failed; TEST shows score movement that is large (outside the Stage-3
+  gate numbers — a Critical↔High flip or |drift| > 0.2 on a flip-check
+  target) and unexplained (a rubric must never be calibrated on an engine
+  that just destabilized); the questionnaire session isn't done; or the schedule/
+  appetite check fails. **A push is cheap by design:** 1.3 already pays for a re-freeze, so
+  #48 rides it at zero extra freeze cost — with one hard constraint carried
+  along: inside 1.3, #48 lands **before** the detection additions, so its
+  grading window isn't contaminated by new findings.
+- Either way, 1.2 still ships and **Stage 4's freeze still happens** —
+  Stages 1–2 change bytes and flow, so `v1.2-claude48` is required
+  regardless of where #48 lives.
+
+### Stage 3 · Scoring stability (#48 items 1–3) — *entered only via a Stage-2.5 GO*
+
+Ordered by the clean run's evidence — severity anchoring first:
+
+- **Severity anchoring (Critical vs. High, High vs. Medium)** — decidable
+  criteria + 1–2 concrete evidence→severity→because anchors per boundary,
+  calibrated against the two named lenient flips (deepagents, salesforce).
+  This is the single largest measured drift source; it moves the weighted
+  score through the severity weights, so it is *the* Critical-vs-High fix.
+- **Control-ledger (per RAISE category, authored before the score)** —
+  enumerate controls → on the default path? → off-by-default/bypassable? →
+  therefore score N. Anchors the 1-vs-2 credit call to stated control-facts
+  instead of gestalt.
+- **0↔1 / 2↔3 boundary decision rules** — the operative-but-imperfect-control
+  case (Partial = executes on the default path unmodified; Ad hoc = exists but
+  off-by-default/bypassed/not on the agent's path; Absent = never invoked).
+- **Directional-lean check (carried from 1.1, now with an anchor).** The
+  non-gating check: does the Zero-Trust / Limit-Your-Domain category-mean
+  drift the same direction again vs. v1.0.2? Measuring *bias* (vs. scatter)
+  needs a human-anchored reference — produced by the **hand-score
+  questionnaire protocol** below. **Anchor set: deepagents, uAgents,
+  salesforce** *(updated 2026-07-16 from the **Stage-0 baseline** — a
+  dry-run of the Stage-2.5 mechanics on the current v1.1 stack executed
+  before any 1.2 work, flip-check four + HelperBot control × 3 runs each,
+  committed as [`tests/runs/v1.2-stage0-baseline/`](../tests/runs/v1.2-stage0-baseline/STAGE0_BASELINE.md):
+  uAgents replaced openai-cs because it now carries the largest anchor
+  dispute — 3 Criticals in every fresh run vs the frozen 1)*. The recorded inclinations
+  become the fixed reference points the rubric's *center* is validated
+  against. (Distinct from the stage gate's *flip-check set* below — the four
+  targets whose Critical↔High reproducibility is measured; the sets overlap
+  but serve different measurements.) If the lean is structural, correct it
+  here; if unclear, document and carry to 1.3.
+
+- **Hand-score questionnaire protocol** *(added 2026-07-16 at Steve's
+  direction — this is HOW the human anchor gets produced; it is a joint
+  instrument, not homework)*:
+  1. **Prep (Claude, due at the Stage-2.5 gate):** author a questionnaire of
+     the exact corner cases — one entry per disputed judgment. Each entry
+     carries: the finding (file:line evidence, quoted); the boundary it sits
+     on (Critical↔High, High↔Medium, or a RAISE 0↔1 / 2↔3 credit call); the
+     **case for each side, argued honestly** (2–4 pros/cons per side — no
+     thumb on the scale); what each ruling would *generalize to* (the anchor
+     sentence #48 would adopt if that side wins); and a blank
+     **Inclination** field.
+  2. **Session (Steve + Claude):** walk the entries together, decide the
+     inclination on each, Claude marks it with a one-line rationale. Undecided
+     entries are marked *deferred*, not guessed. **Intra-gate order:** LOOK
+     (session may be merely scheduled) → TEST → finalize the questionnaire
+     with anything TEST surfaced → session → DECIDE — the session sits
+     between TEST and DECIDE. **Deferred entries** are re-examined at the
+     Stage-4 freeze review against the fresh median-of-3 evidence; any still
+     undecided carry to 1.3 alongside the lean disposition (and #48's anchor
+     text simply doesn't anchor those boundaries yet — no guessed anchors).
+  3. **Record:** the marked questionnaire is committed under
+     `tests/runs/v1.2-stage2.5/HANDSCORE.md` and serves three roles —
+     (a) the human-anchored reference for the lean check, (b) the seed text
+     for #48's severity/credit anchors, (c) the replay cases the Stage-3
+     gate re-tests (post-rubric runs must land on the marked side).
+  **Seed corner cases** (from the 2026-07-16 Stage-0 baseline — the
+  questionnaire starts from these five and adds whatever the Stage-2.5
+  TEST surfaces): deepagents MCP-TLS-scheme gap (frozen Critical vs
+  3-of-3 fresh High — bounded-blast-radius argument); uAgents plaintext
+  private-key persistence (High vs Critical); uAgents spoofable-loopback
+  admin exposure (High vs Critical); salesforce Knowledge-article-injection
+  compound (flipped C/H/C across its own three runs); craftbot
+  ungated-shell/approval cluster (Critical-count churn 4/3/4 at constant
+  weighted score).
+
+**Stage gate (median-of-3 on both sides — the "before" side is the
+Stage-2.5 TEST runs, so #48's effect is isolated from the Stage-1 flow
+changes; `v1.1-claude48` remains the outer, release-level reference):**
+zero Critical↔High flips across 3× runs on the four **flip-check targets**
+(deepagents, salesforce, uAgents, craftbot — the two worst severity-drift
+offenders from the clean run plus the two widest-band targets); median-of-3
+|weighted drift| ≤ 0.2 on those targets; posture bucket stable everywhere. Same
+over-steer/contamination discipline the 1.1 tagging work hard-won — scoring is
+even more seductive to steer than tagging; validate on the calibration
+targets *before* touching the rest of the suite.
+
+### Stage 4 · Re-freeze `v1.2-claude48` — once, last
+
+- Median-of-3 × 12 targets on the final stack (new emission flow, new schema,
+  new scoring guidance). **Reference model pinned: Opus 4.8** — a model change
+  is its own future re-baseline, never folded into this one.
+- **CORRECTION (2026-07-18): a prior version of this bullet recorded
+  "median-of-3 is Praxen's score-certification protocol" as a Steve decision.
+  It was not one** — it was Claude's framing inside a bundled regroup option
+  ("Option C"), and Steve has explicitly repudiated it: **the product is a
+  single scan, and single-scan reproducibility is the goal. Median-of-3 is
+  measurement instrumentation only** (how validation runs and the frozen
+  baseline quantify σ — the baseline remains median-of-3 *by construction*,
+  which is about baseline quality, not a product run mode). The v4 gate-run
+  observation stands as data (single scans wobbled ±1 cell on judgment rungs;
+  medians were stable and near the hand anchors) — it motivates fixing the
+  rubric, not shipping a 3× protocol. Stability gates remain σ-based on
+  validation trios.
+- **Tagging pass riding the freeze** *(added 2026-07-16 — dispositions from
+  the LLM08 diagnosis)*:
+  - **#169 acceptance:** the craftbot vector-store finding carries LLM08 in
+    the **majority of the median-of-3 runs** — these are fresh code-reading
+    scans under the LLM08-aware KB + the stage-1 authoring invariant, which is
+    the only method that can fix it (re-tagging was proven unable to; see
+    #169's diagnosis comment). #169 closes here or the KB/authoring guidance
+    gets another look.
+  - **Secondary chips anchored majority-of-3**, same spirit as median-of-3
+    scores — single-pass secondaries are demonstrably churn-prone (the
+    hermes/salesforce LLM08 flips across the three 1.1 passes). A secondary
+    appears in the frozen exemplar iff ≥2 of 3 runs emit it.
+  - **#173 / #174** — make the two KB clauses decidable (LLM06
+    phantom-control; ASI10 default-off vs structurally-absent), then let this
+    pass classify under them. Close both here.
+  - **KB validity-domain sentence** — state in the LLM08 entry (and any other
+    code-dependent guidance) that detect-then-audit steps assume source
+    access; prose-only contexts must not guess them.
+- Batch here (their issues say "next re-baseline"): **#176** (suite_health
+  full RAISE scale + baseline-dir consistency); coverage pages regenerated;
+  **LLM06 discrimination check** — LLM06 is now ~25% of the tagged corpus
+  (23P+6S), the most steerable rule in the KB, and structurally positioned to
+  become the new dumping ground the way `untagged` was pre-1.1: sample its
+  findings and confirm a non-LLM06 counterfactual exists for each.
+- Coverage gate carried from 1.1, restated so it's passable: **no zero columns
+  counting primary+secondary**, with the documented structural exception for
+  outcome categories (ASI08 may not attach at finding level; ASI10 rides
+  secondary) — LLM08 becomes non-zero at this freeze (the #169 acceptance
+  above), not before.
+
+## Explicit non-goals (→ 1.3 or later)
+
+Detection additions **#104 / #41 / #65-item-4 (IaC discovery)** — real, wanted,
+and deliberately *not* here: each adds findings, and findings added after the
+freeze cost a second freeze. They headline 1.3, whose re-freeze they justify.
+Also out: `scan_type: framework` (#65 item 5 — needs the O5 framing decision),
+the DB/NL-to-SQL roster replacement (#70), LLM05 specialist target, output
+quality (#27/#25/#6/#113), harness reach (#151), docs (#117/#118/#135/#4/#90/#2).
+
+## Regression discipline & success metric
+
+1.2 intentionally moves numbers (#7 shape; #48 scoring, contingent on the
+Stage-2.5 GO) → re-freeze
+`v1.2-claude48`, graded vs `v1.1-claude48`. Success is **measured, per stage
+gate above** — in one line each:
+
+- **Reliability:** two consecutive full-suite runs, zero deaths, nothing at
+  the watchdog edge.
+- **Comparability:** mechanical scan-vs-scan join ≥90%, no hand-matching.
+- **Scoring** *(contingent on the Stage-2.5 GO)*: zero Critical↔High flips and |drift| ≤ 0.2 median-of-3 on the
+  calibration targets; **theme-coverage is the gate, weighted score advisory**
+  (per #48 item 4, landed in 1.1.1).
+- Version bump 1.2.0 (6 guarded locations + `PRAXEN_SPEC` §sync + CHANGELOG);
+  `test_render.py` + `build.sh` green; CI 3.9/3.12/3.13; docs-freshness now
+  checked per-PR (#178, landed in 1.1.1).
+
+## Deliverables checklist
+
+*(Reconciled at close-out 2026-07-30 — see the CLOSED status block up top.)*
+
+- [x] **Stage 1** — #33 + #29 + #65(1,2) landed; reliability gate passed.
+- [x] **Stage 2** — #7 arrays + `schema_version` 3.0; #5 cross-check; scan-diff
+      tool (`tests/scan_diff.py`); comparability gate passed.
+- [x] **Stage 2.5** — decision was **PUSH**: scoring rework reverted to
+      shipped-state (Steve, 2026-07-28); #48 → 1.3.
+- [→ 1.3] **Stage 3** — #48 severity anchors / control-ledger / boundary rules +
+      hand-score anchors: **reverted, not shipped in 1.2**; moved to 1.3 (PUSH).
+- [x] **Stage 4** — baseline frozen median-of-3 as **`v1.2-opus5`** (reference
+      model **Opus 5**, not the planned Opus 4.8 `v1.2-claude48`); `CURRENT`
+      updated; coverage + suite-health pages regenerated. #176 full-scale +
+      LLM06 discrimination check → 1.3.
+- [x] **Issue tracker reconciled (2026-07-30):** closed #5, #7, #29, #33, #120,
+      #169, #171; #65 + #176 commented (partial). **→ 1.3:** #48 (PUSH), #65
+      (items 4–8), #173/#174, #176 (full scale), and the RFE set (#195–#201, #106).

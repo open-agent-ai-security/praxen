@@ -9,9 +9,36 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [Unreleased]
+## [1.2.0] — 2026-08-04
 
-**Post-1.1 cleanup (docs/process batch — no version bump, no analysis change).** Paper-trail reconciliation from the 1.1 retrospective (`RELEASE_1.1_REVIEW.md`): the #48 descope recorded in `RELEASE_1.1_PLAN.md`; the tagging-checkpoint report marked superseded; the LLM08 anchor gap documented (#169 — fix lands via the v1.2 re-scan freeze); the 1.1/1.2/1.3 plan set committed. Process: `guide/` docs-freshness now checked on every PR (#178); theme-coverage formalized as the regression gate with the weighted RAISE score advisory (#48 item 4); re-tag transforms scoped to prose-decidable corrections (`tests/baselines/README.md`); published tags are never re-pointed; the interim per-PR review convention codified (#120). The frozen `v1.1-claude48` baseline is byte-untouched.
+**OWASP 2026 + a fresh Opus 5 baseline.** Praxen's risk mapping moves to the newly published OWASP Top 10 for LLM Applications **2026** and the companion Agentic AI Top 10 2026 (both maintained by the [OWASP GenAI Security Project](https://genai.owasp.org/)), on a re-baselined engine: `schema_version` **3.0**, reference model **Claude Opus 5**, frozen set **`v1.2-opus5/`**. Not score-comparable to `v1.1-claude48` — model, knowledge bases, and remits all changed.
+
+### Knowledge bases (the headline)
+- **OWASP LLM Top 10 2026** + restructured **Agentic Top 10 2026** KBs; full renumber sweep. New 2026 categories detect on real targets (LLM08 *Hidden Context Exposure*, LLM09 *Vector & Embedding Weaknesses*) — resolving the LLM08 under-tag class (#169).
+- Rendering is **version-gated**: a document renders with the vocabulary its findings were tagged under (heading year included), so a 2025-tagged code is never shown with its 2026 name.
+
+### Schema 3.0
+- `policy_rule_ids` / `policy_rule_text` are **parallel arrays** (#7), validator round 2 cross-checks rule references against the remit (#5), and N/A category scores are supported (nullable score + renormalized overall). Activates the remit-verbatim render invariant.
+
+### Harness reliability
+- Step-8.5 finding-themes outline (decomposition primer, #29); **interleaved finding emission** kills the Step-9.9 synthesis burst (#33); Step-4 evidence checkpoint survives compaction + `--validate-manifest` catches manifest errors early (#65 items 1–2); decidable compound-contributor fold/break-out rule.
+
+### Scan workflow
+- **Scan-time subject declaration** (`SCAN_INSTRUCTIONS.md`) — declare which component of a monorepo / multi-agent tree is the subject.
+- **Scan-vs-scan diff tool** (`tests/scan_diff.py`) — join two runs mechanically on remit-anchored rule references.
+- **Pretty-remit renderer** (`render_remit.py`) — deterministic Markdown→HTML rendering of a Worker Remit in the report's visual language, on request; all example + baseline remits ship rendered, freshness-gated in CI.
+
+### Baseline
+- Fresh **`v1.2-opus5/`** freeze — 12 targets, median-of-3 on identical inputs, mean median RAISE **1.67**. `CURRENT` → `v1.2-opus5`. A post-freeze FP sweep (one independent cross-model reviewer per target) found **zero detector false positives** across ~130 findings; remit-authoring over-reach was fixed and re-frozen on 6 targets, with the remainder tracked (#198/#200/#201). All 12 remits re-authored (POLICY/CONTEXT split, Prohibited Behaviors, state-once rule).
+
+### Distribution — community marketplace
+- **Praxen now installs from the canonical community marketplace** [`open-agent-ai-security/plugins`](https://github.com/open-agent-ai-security/plugins): `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`. One marketplace serves every Open Agent AI Security plugin (praxen, socxen, …); entries pin each repo's `main` over anonymous HTTPS. The marketplace **name and plugin key are unchanged**, so existing installs are unaffected.
+- The in-repo `.claude-plugin/marketplace.json` is now a **legacy mirror** of that index — the old `marketplace add open-agent-ai-security/praxen` path keeps working — with drift guarded by CI (`.github/workflows/marketplace-sync.yml` → `scripts/release/check_marketplace_mirror.py`, on PR + weekly). Install docs, the landing page, and `scripts/release/plugin-smoke.sh` journey 1 now target the canonical index. The **Codex path uses the same catalog** — smoke-verified on Codex CLI 0.146.0 (reads the same manifest, honors the `url`+`ref: main` pins, installs the full payload with the `behavior-verifier` skill); the in-repo mirror still serves any legacy per-repo Codex adds.
+
+### Carried process batch (post-1.1 cleanup — shipped unversioned ahead of this release)
+- **Paper trail**: the #48 descope recorded; tagging-checkpoint report superseded; LLM08 anchor gap documented; the 1.1/1.2/1.3 plan set committed.
+- **Process**: `guide/` docs-freshness checked per PR (#178); theme-coverage formalized as the regression gate with weighted RAISE advisory; re-tag transforms scoped to prose-decidable corrections; published tags never re-pointed; per-PR review convention codified (#120 — Gemini retired, replaced by Claude Code reviews).
+- **1.2 planning**: Stage-2.5 STOP·LOOK·TEST gate; hand-score questionnaire protocol; Stage-0 baseline run record. Outcome: the scoring rework (#48) was reverted to shipped-state and pushed to 1.3 (`plans/RELEASE_1.2_PLAN.md`).
 
 ## [1.1.0] — 2026-07-12
 
@@ -234,7 +261,7 @@ Closes #69, #70, #116, #64.
 ### Unchanged on purpose
 
 - **Historical baselines** (`tests/baselines/v0.7.0-sequential/**`, `tests/runs/v0.7.3-prerelease*/**`) keep their old-URL footers. Those are point-in-time snapshots and rewriting them would falsify what was actually shipped at that version. The byte-identity check in `tests/render/test_render.py` already filters on the current template-era URL marker, so frozen baselines validate schema and re-render only, not byte-identity.
-- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving.
+- **CHANGELOG historical entries** ([0.7.0] through [0.7.4]) retain references to `open-ai-security` URLs as point-in-time references; the GitHub redirect keeps them resolving. **Do not run install commands from those entries** — that org name is no longer ours, and nothing published under it in future is us. The only current install path is the community marketplace (`open-agent-ai-security/plugins`); see [docs/installation.md](docs/installation.md).
 - **Schema, scoring, renderer logic, SKILL.** No behavior change. `test_render.py` is **176 / 0**, `test_manifest_to_findings.py` is **28 / 0**.
 
 ### Notes

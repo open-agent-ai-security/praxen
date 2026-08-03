@@ -19,13 +19,13 @@ As LLM-based systems moved into production, OWASP spun up a dedicated effort: th
 
 | Document | What it covers | Praxen tag prefix |
 |---|---|---|
-| [OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/) | Risks in applications built on large language models | `LLM01`–`LLM10` |
+| [OWASP Top 10 for LLM Applications 2026](https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final) | Risks in applications built on large language models | `LLM01`–`LLM10` |
 | [OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/) | Risks specific to autonomous, tool-using agents | `ASI01`–`ASI10` |
 | [A Practical Guide for Secure MCP Server Development 2026](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/) | Securing Model Context Protocol servers and the tools they expose | `mcp` (checklist items) |
 
 Praxen carries distilled extracts of all three in its knowledge base (`skills/behavior-verifier/knowledge/`), but the canonical, full-length versions live at the links above — go there for the complete write-ups, examples, and references.
 
-## OWASP Top 10 for LLM Applications 2025
+## OWASP Top 10 for LLM Applications 2026
 
 The risk landscape for any system that puts an LLM in the loop. Each finding Praxen tags with one of these traces to a behavior or code pattern in the agent's evidence.
 
@@ -33,16 +33,33 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 |---|---|---|
 | <a id="llm01"></a>**LLM01** | Prompt Injection | Untrusted input (direct or smuggled in via external content) overrides the model's instructions. |
 | <a id="llm02"></a>**LLM02** | Sensitive Information Disclosure | The model leaks PII, secrets, or proprietary data through its outputs. |
-| <a id="llm03"></a>**LLM03** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
-| <a id="llm04"></a>**LLM04** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
-| <a id="llm05"></a>**LLM05** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
-| <a id="llm06"></a>**LLM06** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
-| <a id="llm07"></a>**LLM07** | System Prompt Leakage | The system prompt — and any secrets or logic baked into it — is exposed. |
-| <a id="llm08"></a>**LLM08** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
-| <a id="llm09"></a>**LLM09** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
-| <a id="llm10"></a>**LLM10** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
+| <a id="llm03"></a>**LLM03** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
+| <a id="llm04"></a>**LLM04** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
+| <a id="llm05"></a>**LLM05** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
+| <a id="llm06"></a>**LLM06** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
+| <a id="llm07"></a>**LLM07** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
+| <a id="llm08"></a>**LLM08** | Hidden Context Exposure | Hidden, non-user-facing context — system prompt, tool schemas, control logic, roles — is extracted or reconstructed. |
+| <a id="llm09"></a>**LLM09** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
+| <a id="llm10"></a>**LLM10** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
 
-→ Full document: **[OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/)**
+→ Full document: **[OWASP Top 10 for LLM Applications 2026](https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final)**
+
+### 2025 → 2026: what changed
+
+The 2026 revision kept the same ten risk concepts but **reordered them and renamed one**. Praxen reports and frozen baselines produced before v1.2 carry 2025 numbering — when comparing across that boundary, match categories by **name**, never by number:
+
+| 2026 | Name | Was (2025) |
+|---|---|---|
+| LLM01 | Prompt Injection | LLM01 |
+| LLM02 | Sensitive Information Disclosure | LLM02 |
+| LLM03 | Excessive Agency | LLM06 |
+| LLM04 | Supply Chain | LLM03 |
+| LLM05 | Data and Model Poisoning | LLM04 |
+| LLM06 | Unbounded Consumption | LLM10 |
+| LLM07 | Misinformation | LLM09 |
+| LLM08 | Hidden Context Exposure | LLM07 (*System Prompt Leakage*, broadened) |
+| LLM09 | Vector and Embedding Weaknesses | LLM08 |
+| LLM10 | Improper Output Handling | LLM05 |
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 

@@ -32,7 +32,17 @@ if [[ "$VERSION" != "$PLUGIN_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, plugin.json says $PLUGIN_VERSION" >&2
   exit 1
 fi
-MARKET_VERSION="$(python3 -c "import json; m=json.load(open('.claude-plugin/marketplace.json')); print(m['plugins'][0]['version'])")"
+# Look the praxen entry up BY NAME: the mirror lists other plugins too (which
+# deliberately carry no version, mirroring the canonical index), so a positional
+# read would crash on a reordering rather than checking what it means to check.
+MARKET_VERSION="$(python3 -c "import json, sys
+m = json.load(open('.claude-plugin/marketplace.json'))
+e = next((p for p in m['plugins'] if p.get('name') == 'praxen'), None)
+if e is None:
+    sys.exit('error: marketplace.json has no praxen entry')
+if 'version' not in e:
+    sys.exit('error: marketplace.json praxen entry has no version')
+print(e['version'])")"
 if [[ "$VERSION" != "$MARKET_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, marketplace.json praxen entry says $MARKET_VERSION" >&2
   exit 1
@@ -64,6 +74,18 @@ if python3 -c "import markdown" >/dev/null 2>&1; then
 else
   echo "note: 'markdown' not installed — skipping docs (guide/) rebuild + freshness check." >&2
   echo "      run 'pip install -r requirements-dev.txt' to enable (the release workflow does this)." >&2
+fi
+
+# Freshness backstop: the pretty-remit HTMLs (examples/ + the current baseline set)
+# are deterministic renders of their Markdown sources. Verify none has drifted.
+# The renderer is stdlib-only, so unlike the docs check this always runs.
+# No git guard: the check compares rendered bytes to on-disk files, so it works
+# in a source export/tarball too — run it unconditionally (#208).
+echo "Checking pretty-remit HTML freshness…"
+if ! python3 tests/render/render_all_remits.py --check; then
+  echo "error: a pretty-remit HTML is out of sync with its remit." >&2
+  echo "       run 'python3 tests/render/render_all_remits.py' and commit the result." >&2
+  exit 1
 fi
 
 DIST_DIR="dist"

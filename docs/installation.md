@@ -18,27 +18,36 @@ That's the entire dependency surface.
 
 ## Claude Code
 
-Install from the plugin marketplace. From your terminal:
+Install from the community plugin marketplace ([open-agent-ai-security/plugins](https://github.com/open-agent-ai-security/plugins) — one `marketplace add` covers every Open Agent AI Security plugin). From your terminal:
 
 ```bash
-claude plugin marketplace add open-agent-ai-security/praxen
+claude plugin marketplace add open-agent-ai-security/plugins
 claude plugin install praxen@open-agent-ai-security
 claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.0.0+
 ```
+
+> **Added the marketplace from `open-agent-ai-security/praxen` previously?** That path still
+> works — this repo carries a synced mirror of the community index — but the community
+> marketplace is the canonical source. To migrate: `claude plugin marketplace remove
+> open-agent-ai-security` (note: this also uninstalls the plugins that came from it), then run
+> the add + install commands above. Your plugin key (`praxen@open-agent-ai-security`) and
+> settings are unchanged.
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
 
 ## OpenAI Codex
 
-Codex has its own plugin marketplace, and Praxen installs from the **same repo** as the Claude Code path. From your terminal:
+Codex has its own plugin marketplace, and Praxen installs from the **same community marketplace** as the Claude Code path (Codex reads the same catalog manifest and honors its `main`-branch pins). From your terminal:
 
 ```bash
-codex plugin marketplace add open-agent-ai-security/praxen
+codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen@open-agent-ai-security
 codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.0.0+
 ```
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).
+
+> **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, so your `praxen@open-agent-ai-security` plugin key is unchanged. Then `codex plugin marketplace upgrade open-agent-ai-security` and re-run `codex plugin add praxen@open-agent-ai-security` to pick up the catalog's copy. The legacy per-repo path keeps working via the in-repo mirror, so this is optional.
 
 ## Any other agent
 
@@ -80,7 +89,7 @@ Auto-update is **per-marketplace and off by default** for third-party marketplac
 {
   "extraKnownMarketplaces": {
     "open-agent-ai-security": {
-      "source": { "source": "github", "repo": "open-agent-ai-security/praxen" },
+      "source": { "source": "github", "repo": "open-agent-ai-security/plugins" },
       "autoUpdate": true
     }
   }

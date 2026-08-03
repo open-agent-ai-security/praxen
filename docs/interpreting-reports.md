@@ -97,7 +97,7 @@ Log files Praxen found in the input, plus log files it could *infer* from the so
 - **`active`** — file was observed on disk with a real mtime. This is the strongest evidence: the agent has actually been writing to this log.
 - **`inferred`** — file path was derived from source code (a `setup_logging()` call, a `RotatingFileHandler`/`FileHandler` definition, a `winston`/`pino`/`zap` configuration, etc.) but the file was not present on disk at scan time. Typical for source-only scans where the agent hasn't run yet; the row tells the operator where logs *will* appear on a deployed instance and supports Monitor Continuously scoring without filing a false "no logging" finding.
 
-### 9. OWASP LLM Top 10 (2025) Coverage
+### 9. OWASP LLM Top 10 (2026) Coverage
 
 A full-bleed **5×2 grid of cards** — one per LLM01–LLM10. Each populated card shows up to **three most-severe findings** that classify against that category as clickable severity-dot chips (anchored to the matching entry in the Findings Register). Empty cells render a muted **"No findings"** placeholder so the grid reads as a *coverage map*, not just a hit list — at a glance you see both where the agent has problems and which categories the analysis did not surface.
 

@@ -69,7 +69,7 @@ The methodology adapts. Categories the input doesn't cover are scored at lower c
 
 Every finding Praxen produces is classified against four industry-standard frameworks simultaneously:
 
-- **OWASP Top 10 for LLM Applications 2025** — `LLM01`–`LLM10` tags
+- **OWASP Top 10 for LLM Applications 2026** — `LLM01`–`LLM10` tags
 - **OWASP Top 10 for Agentic AI Applications 2026** — `ASI01`–`ASI10` tags
 - OWASP's **A Practical Guide for Secure MCP Server Development 2026** — applied when MCP configuration is found
 - **RAISE Framework** — six-category 0–5 maturity score; see [RAISE](RAISE.md)
@@ -78,7 +78,7 @@ For an overview of the OWASP Gen AI Security Project and a one-line gloss on eac
 
 ## Quick reference
 
-- Install: `claude plugin marketplace add open-agent-ai-security/praxen` then `claude plugin install praxen@open-agent-ai-security` (or the in-session `/plugin ...` equivalents — see [Installation](installation.md))
+- Install: `claude plugin marketplace add open-agent-ai-security/plugins` then `claude plugin install praxen@open-agent-ai-security` (or the in-session `/plugin ...` equivalents — see [Installation](installation.md))
 - Skill name: `behavior-verifier`
 - Output directory: `./reports/` relative to where you run the analysis
 - Output files: `<agent-slug>-analysis-<timestamp>.html`, `<agent-slug>-findings-<date>.json`, `<agent-slug>-analysis-<timestamp>.txt`

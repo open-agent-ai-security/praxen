@@ -33,7 +33,7 @@ The stable signal is the **finding set**; the noisy signal is the **exact number
 | **Rendered HTML / TXT** | Exact | Byte-identical for a given JSON. No variability. |
 | **`R-NN` rule IDs** | Run-local | The rule numbering is re-derived each run; the *same* remit clause can get a different `R-NN` in two runs. Compare by rule **text**, not ID. |
 
-**Judgement-sensitive targets vary more.** Where a target has *operative-but-imperfect controls* — a framework that ships guardrails the example doesn't wire up, a sandbox with permissive defaults, a partial mitigation — the "how much credit does this earn?" call is genuinely ambiguous, and that's where the weighted score moves most between runs. Deliberately-insecure agents (everything missing) and well-engineered agents (controls clearly present and operative) are the *most* reproducible, because there's little to debate. Targets in the messy middle are the least.
+**Judgement-sensitive targets vary more.** Where a target has *operative-but-imperfect controls* — a framework that ships guardrails the example doesn't wire up, a sandbox with permissive defaults, a partial mitigation — the "how much credit does this earn?" call is genuinely ambiguous, and that's where the weighted score moves most between runs. Well-engineered agents (controls clearly present and operative) are the *most* reproducible, because there's little to debate. Targets in the messy middle are the least.
 
 **Read the themes, not the decimal.** A weighted score of 1.3 on one run and 1.5 on the next is the *same posture* described with normal judgment scatter. A maturity **label** that changes (e.g. *Ad hoc* ↔ *Partial*) right at a band boundary is the same story — the boundary is a round number, not a cliff. What should *not* change between runs is the set of material findings and the Critical themes; if those move, that's signal, not noise.
 
@@ -63,6 +63,19 @@ To be clear about the guarantees:
 - **Rendering is deterministic** — same JSON → byte-identical HTML/TXT, every time.
 - **The schema is fixed** — every report has the same sections, the same six RAISE categories, the same OWASP tag vocabulary.
 - **Real findings reproduce** — a genuine Critical does not vanish on the next run. Disappearing material findings or dropped Critical themes are *not* normal variance; treat them as something to investigate.
+
+### One extra source of variance: an ambiguous subject
+
+If the workspace holds more than one agent's worth of code — a monorepo, an
+example inside a framework, a two-repository agent — and you *don't* declare
+which part is the subject, two runs can legitimately disagree about **what they
+scanned** (one grades the whole tree, another just your package), and that moves
+the score far more than the per-category judgment wobble above. This is
+avoidable, not inherent: declare the subject with a `SCAN_INSTRUCTIONS.md`
+(see [Writing Remits → Declaring what to scan](writing-remits.md#declaring-what-to-scan-monorepos-and-multi-agent-trees)).
+With the subject declared, the *scope* is stable run-to-run; the residual is
+just the ordinary category variance. Declaring the subject fixes *which agent
+gets scanned* — it does not make the score itself deterministic.
 
 ## Next steps
 

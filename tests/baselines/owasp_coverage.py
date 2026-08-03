@@ -91,17 +91,20 @@ TARGETS = [
      "Salesforce Agentforce customer-service agent (Knowledge-article RAG)"),
 ]
 
+# OWASP LLM Top 10 2026 numbering. Baseline JSONs frozen before v1.2 carry the
+# 2025 numbering — when reading those, compare categories by NAME, never by code
+# (see docs/owasp.md "2025 → 2026: what changed" for the map).
 LLM_TITLES = [
     ("LLM01", "Prompt Injection"),
     ("LLM02", "Sensitive Information Disclosure"),
-    ("LLM03", "Supply Chain"),
-    ("LLM04", "Data and Model Poisoning"),
-    ("LLM05", "Improper Output Handling"),
-    ("LLM06", "Excessive Agency"),
-    ("LLM07", "System Prompt Leakage"),
-    ("LLM08", "Vector and Embedding Weaknesses"),
-    ("LLM09", "Misinformation"),
-    ("LLM10", "Unbounded Consumption"),
+    ("LLM03", "Excessive Agency"),
+    ("LLM04", "Supply Chain"),
+    ("LLM05", "Data and Model Poisoning"),
+    ("LLM06", "Unbounded Consumption"),
+    ("LLM07", "Misinformation"),
+    ("LLM08", "Hidden Context Exposure"),
+    ("LLM09", "Vector and Embedding Weaknesses"),
+    ("LLM10", "Improper Output Handling"),
 ]
 ASI_TITLES = [
     ("ASI01", "Agent Goal Hijack"),
@@ -517,7 +520,7 @@ def build_report(base: Path, compare: Path, out_path: Path) -> str:
 
   <section>
     <h2>OWASP LLM Top 10 — coverage by category</h2>
-    <p class="intro">How the <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications 2025</a> categories apply across these agents. Solid = the finding's primary category; hatched = a category it also touches. Empty rows are categories these apps don't exercise.</p>
+    <p class="intro">How the <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications 2026</a> categories apply across these agents. Solid = the finding's primary category; hatched = a category it also touches. Empty rows are categories these apps don't exercise.</p>
     {legend}
     {v2_chart(LLM_TITLES, cat, max_llm, "var(--orange)", froz)}
   </section>

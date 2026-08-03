@@ -83,7 +83,7 @@ Match the existing docs — the cheapest way is to skim a sibling page before wr
 - **Terminology** — capitalize the proper nouns consistently: `Praxen`, `Worker Remit` (lowercase
   bare "remit" is fine once introduced), `Agent Behavior Verification` / `ABV`, `Agent Behavior
   Analytics` / `ABA`, `RAISE`, the `behavior-verifier` skill. Use the **official** framework
-  titles: `OWASP Top 10 for LLM Applications 2025`, `OWASP Top 10 for Agentic AI Applications
+  titles: `OWASP Top 10 for LLM Applications 2026`, `OWASP Top 10 for Agentic AI Applications
   2026`, and OWASP's `A Practical Guide for Secure MCP Server Development 2026` (not a paraphrase).
 - **Voice & numbers** — address the reader as "you" (the operator) on procedural pages; spell out
   small numbers in prose ("five minutes", not "5 minutes"). Keep these consistent with siblings.

@@ -9,24 +9,14 @@ open source project hosted on a Salesforce [public Github repository](https://gi
 
 ## Worker Remit Generation
 
-The `WORKER_REMIT.md` for this agent was created using:
-
-* the skill
-* `Claude Sonnet 4.6` with medium effort, and
-* the following prompt:
-  ```text
-  draft a worker remit for the agent source code at ../../github/help-agent-accelerator
-  ```
+The `WORKER_REMIT.md` for this agent was authored by the Praxen behavior-verifier
+skill as a **blind, documentation-only draft** — generated from the agent's public
+docs without reading its implementation — and then refined to remove authoring
+over-reach. It is the remit frozen in the Praxen v1.2 baseline.
 
 ## Report Generation
 
-The report was created using:
-
-* the skill
-* `Claude Sonnet 4.6` with medium effort, and
-* the following prompt:
-  ```text
-  Please run the behavior-verifier skill against ../../github/help-agent-accelerator
-  Use the Worker Remit at examples/salesforce-help-agent-accelerator/WORKER_REMIT.md. Write outputs
-  to ./reports/salesforce-help-agent-accelerator/.
-  ```
+The report was produced by the Praxen behavior-verifier skill (v1.2) running on
+`Claude Opus 5`, scanning the source repository **as-is** at pinned commit
+`304de841`. It is the frozen v1.2 baseline run for this target (weighted RAISE
+1.70; the median of three identical-input runs).

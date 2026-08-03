@@ -5,7 +5,7 @@
 
 # Test-suite baselines
 
-Frozen runs of the test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v1.1-claude48/`** — the same **12 targets** as `v1.0.2-claude48` with OWASP classification **re-tagged** under the corrected 1.1 knowledge bases; detection, evidence, and every RAISE score are byte-identical, so the **median-of-3** freeze carries over unchanged (see its [`BASELINE.md`](v1.1-claude48/BASELINE.md)). It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The prior **`v1.0.2-claude48/`** and **`v0.7.7-claude48/`** sets (and the older `v0.7.x-sequential/` sets) are retained on disk as **archival diff-history** — schema + byte-render still checked, but the remit-verbatim check is scoped to the current set only (`test_render.py:CURRENT_BASELINE`), since archival findings quote the remits as they were at freeze time.
+Frozen runs of the test targets in [`../README.md`](../README.md), kept in the repo so a release run can be diffed against them. The current set is **`v1.2-opus5/`** — a **fresh median-of-3 freeze** of the same **12 targets** on Claude Opus 5 with the OWASP-2026 knowledge bases, schema 3.0, and fully re-authored Worker Remits (see its [`BASELINE.md`](v1.2-opus5/BASELINE.md)); it is not score-comparable to the prior sets. It is the comparison point for the pre-release regression review (see [`../README.md`](../README.md), "What a release review looks like"). The prior **`v1.0.2-claude48/`** and **`v0.7.7-claude48/`** sets (and the older `v0.7.x-sequential/` sets) are retained on disk as **archival diff-history** — schema + byte-render still checked, but the remit-verbatim check is scoped to the current set only (`test_render.py:CURRENT_BASELINE`), since archival findings quote the remits as they were at freeze time.
 
 ## Layout
 
@@ -14,7 +14,8 @@ baselines/
   README.md                       ← this file
   owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
   owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
-  v1.1-claude48/                   ← CURRENT — v1.0.2 findings, OWASP re-tagged under the 1.1 KBs (scoring identical)
+  v1.2-opus5/                      ← CURRENT — fresh Opus-5 freeze, OWASP-2026 KBs, schema 3.0, re-authored remits
+  v1.1-claude48/                   ← archival (superseded; v1.0.2 findings OWASP re-tagged under the 1.1 KBs)
   v1.0.2-claude48/                 ← archival (superseded; 12 targets, median-of-3, schema 2.0)
   v0.7.7-claude48/                 ← archival (superseded; remit-verbatim not re-checked)
   suite-health-report.html         ← committed snapshot; popularity + freshness companion
@@ -31,7 +32,7 @@ baselines/
     GATE-NOTES.md            ← the A/B record and the "drop the parallel path" verdict
 ```
 
-When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.1-claude48/`** set is the reference — see its [`BASELINE.md`](v1.1-claude48/BASELINE.md). The prior **`v0.7.7-claude48/`** set (Opus 4.8, Praxen 0.7.7) is retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
+When a Praxen release legitimately moves the calibration, the findings schema changes, **or the reference model changes**, the suite is re-run and re-frozen under a new `vX.Y-<variant>/` directory, the previous set is retired, and the pointer in `../README.md` is updated. The current **`v1.2-opus5/`** set is the reference — see its [`BASELINE.md`](v1.2-opus5/BASELINE.md); 1.2 changed all three at once (schema 3.0, OWASP-2026 KBs, Opus 5), which is why it is a fresh freeze rather than a re-tag. The prior **`v1.1-claude48/`** and **`v0.7.7-claude48/`** sets are retained as archival diff-history alongside the `v0.7.x-sequential/` sets; the remit-verbatim gate is scoped to the current set so evolving remits don't retroactively break archived findings. The retired **`v0.7.7-sequential/`** set is the same skill on Opus 4.7 — the eleven cold runs that validated the SKILL Pre-flight Step 5 + multi-component remit guidance (PR #42) and Step 4 source-inferred log files (PR #43) shipped in `[0.7.7]`; it is kept on disk for diff archaeology (see [`v0.7.7-sequential/BASELINE.md`](v0.7.7-sequential/BASELINE.md)). Earlier sets — `v0.7.4-sequential/` (the 0.7.4-skill cold runs, kept on disk for diff archaeology — validated the deterministic-Step-10 + Step-9.9-emission-discipline changes), `v0.7.0-sequential/`, `v0.3-sequential/`, `v0.2-sequential/`, the partial `v0.6-sequential/`, and the same-content `v0.6.3-sequential/` — were retired in successive re-baselines.
 
 ## Re-tag transforms — validity domain
 
@@ -49,11 +50,17 @@ re-introducing detection variance. That method has a hard limit:
 > produced them; when new guidance needs evidence the original scan was never
 > told to record, re-tagging cannot add it.
 
-Case study: the 1.1 re-tag could not apply the sharpened LLM08 guidance to
+Case study: the 1.1 re-tag could not apply the sharpened vector-and-embedding
+guidance (LLM08 in the 2025 numbering these baselines use; LLM09 in 2026) to
 craftbot's agent-writable vector store, because the frozen record never captured
-the ChromaDB evidence — the LLM08 column reads zero in `v1.1-claude48/` for that
+the ChromaDB evidence — that LLM08 column reads zero in `v1.1-claude48/` for that
 reason, and the fix lands via the v1.2 re-scan freeze. See
 [#169](https://github.com/open-agent-ai-security/praxen/issues/169).
+
+**Numbering note:** baselines frozen before v1.2 tag findings with OWASP LLM
+Top 10 **2025** numbering; v1.2 and later use **2026** numbering, which reordered
+the list and renamed one entry. Diff across that boundary by category **name**,
+never by code — the map is in [docs/owasp.md](../../docs/owasp.md#2025--2026-what-changed).
 
 `v0.4-parallel/` is not a baseline set — it is the record of the Phase-2 parallel-analysis gate (`design/V2_HARVEST_PLAN.md` §5), whose verdict was to drop the parallel path. It is kept as a historical decision record.
 

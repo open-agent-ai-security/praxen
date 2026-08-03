@@ -111,8 +111,12 @@ def _remit_quote_violations(bdata, remit_text: str):
     quoted = [("rule_text", rule["rule_id"], rule["rule_text"])
               for rule in bdata["remit_coverage"]["rules"]]
     for f in bdata["findings"]:
-        for seg in (f.get("policy_rule_text") or "").split(" / "):
-            if seg.strip():
+        prt = f.get("policy_rule_text") or []
+        # schema 3.0: policy_rule_text is a list (parallel to policy_rule_ids);
+        # tolerate the legacy 2.0 " / "-joined string form.
+        segs = prt if isinstance(prt, list) else str(prt).split(" / ")
+        for seg in segs:
+            if seg and seg.strip():
                 quoted.append(("policy_rule_text", f["id"], seg.strip()))
     return [(kind, who, txt) for (kind, who, txt) in quoted
             if _norm_remit_quote(txt) not in norm_remit]
@@ -202,7 +206,7 @@ def main():
     check("#111 padded em-dash collapses to single spaces",
           _canon("ASI05  —  Unexpected Code Execution (RCE)") == "ASI05 — Unexpected Code Execution (RCE)")
     check("#111 already-canonical label is unchanged (goldens stay byte-stable)",
-          _canon("LLM06 — Excessive Agency") == "LLM06 — Excessive Agency")
+          _canon("LLM03 — Excessive Agency") == "LLM03 — Excessive Agency")
     check("#111 lowercase code canonicalises (case-insensitive) and uppercases the code",
           _canon("llm01 - Prompt Injection") == "LLM01 — Prompt Injection")
     check("#111 name-internal hyphen preserved (only the separator is rewritten)",
@@ -273,6 +277,13 @@ def main():
     out_txt_only = os.path.join(tmp, "only.txt")
     r = run_render(["--findings", FIXTURE, "--out-txt", out_txt_only])
     check("--out-txt without --out-html works", r.returncode == 0 and os.path.exists(out_txt_only))
+    atomic_path = os.path.join(tmp, "atomic.txt")
+    render._write(atomic_path, "first\n")
+    render._write(atomic_path, "second\n")
+    leftovers = [name for name in os.listdir(tmp) if name.startswith(".praxen-render-")]
+    check("report writes replace atomically and clean temporary files",
+          read_text(atomic_path) == "second\n" and not leftovers,
+          f"leftover temp files: {leftovers}")
 
     # 4b. cited code that *looks* like a template placeholder must not corrupt the
     #     render or trip the "unsubstituted placeholder" check.
@@ -364,6 +375,20 @@ def main():
           r.returncode == 0
           and nh.count('class="policy-ref"') == len(data["findings"]) - 1,
           r.stderr.strip())
+
+    # 4d-ter. KEY-ABSENT is different from null and must be REJECTED by the
+    #         validator (findings.schema.json lists both fields as required) —
+    #         previously it slipped through .get() and crashed the renderer
+    #         with a raw KeyError (#205).
+    absent = json.loads(json.dumps(data))
+    del absent["findings"][0]["policy_rule_ids"]
+    del absent["findings"][0]["policy_rule_text"]
+    try:
+        schema.validate(absent)
+        check("absent policy_rule_ids/policy_rule_text keys are rejected (not silently passed)",
+              False, "validated but should have failed")
+    except schema.SchemaError:
+        check("absent policy_rule_ids/policy_rule_text keys are rejected (not silently passed)", True)
 
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
@@ -501,6 +526,14 @@ def main():
           f"stderr: {rc.stderr!r}")
 
     # 5. negative cases — each must exit non-zero with a useful message
+    def _first_ruled(d):
+        """Index of the first finding that cites remit rules (policy_rule_ids
+        non-null) — the mutation target for the policy_rule array checks."""
+        for i, f in enumerate(d["findings"]):
+            if f.get("policy_rule_ids"):
+                return i
+        raise AssertionError("fixture has no finding with policy_rule_ids")
+
     def negative(name, mutate):
         bad = json.loads(json.dumps(data))
         path = os.path.join(tmp, "bad.json")
@@ -516,6 +549,12 @@ def main():
     negative("rejects a legacy bare-list findings file", None)
     negative("rejects a missing required field (behavior_summary)",
              lambda d: d.pop("behavior_summary"))
+    negative("rejects an impossible scan_date even when it matches YYYY-MM-DD",
+             lambda d: d["scan"].__setitem__("scan_date", "2026-02-31"))
+    negative("rejects scan_timestamp without an explicit timezone",
+             lambda d: d["scan"].__setitem__("scan_timestamp", "2026-05-03T04:39:06"))
+    negative("rejects an impossible scan_timestamp even when it matches the ISO shape",
+             lambda d: d["scan"].__setitem__("scan_timestamp", "2026-02-31T04:39:06Z"))
     negative("rejects a footer/severity count mismatch",
              lambda d: d["footer"]["severity_counts"].__setitem__("critical", 99))
     negative("rejects a bad severity enum",
@@ -536,8 +575,16 @@ def main():
              lambda d: d["findings"][0].__setitem__("related_findings", [d["findings"][0]["id"]]))
     negative("rejects policy_rule_ids null while policy_rule_text is set",
              lambda d: d["findings"][0].__setitem__("policy_rule_ids", None))
-    negative("rejects an empty-string policy_rule_ids",
-             lambda d: d["findings"][0].__setitem__("policy_rule_ids", "  "))
+    negative("rejects a scalar-string policy_rule_ids (must be an array in 3.0)",
+             lambda d: d["findings"][0].__setitem__("policy_rule_ids", "R-01"))
+    negative("rejects policy_rule_ids / policy_rule_text of unequal length",
+             lambda d: d["findings"][_first_ruled(d)].__setitem__(
+                 "policy_rule_text",
+                 d["findings"][_first_ruled(d)]["policy_rule_text"] + ["extra"]))
+    negative("rejects policy_rule_ids referencing a nonexistent remit rule (#5)",
+             lambda d: d["findings"][_first_ruled(d)].__setitem__(
+                 "policy_rule_ids",
+                 d["findings"][_first_ruled(d)]["policy_rule_ids"][:-1] + ["R-9999"]))
 
     # 6. committed regression baselines under tests/baselines/. The canonical
     #    JSON is the source of truth; the committed HTML/TXT are derived. For the
@@ -553,13 +600,28 @@ def main():
     baselines_root = os.path.join(REPO_ROOT, "tests", "baselines")
     baseline_jsons = sorted(glob.glob(os.path.join(baselines_root, "*", "*", "*-findings-*.json")))
     check("found committed regression baselines under tests/baselines/", len(baseline_jsons) > 0)
+    # The legacy-skip below exempts non-current schema_versions from every gate.
+    # Guard the guard: every file in the CURRENT set must be AT the current
+    # schema version, or a stale-stamped file would silently lose its entire
+    # regression net while printing green (#208).
+    current_set = [bj for bj in baseline_jsons
+                   if os.sep + CURRENT_BASELINE + os.sep in bj]
+    stale_current = [os.path.relpath(bj, REPO_ROOT) for bj in current_set
+                     if str(load_json(bj).get("schema_version", "")) != schema.SCHEMA_VERSION]
+    check(f"every {CURRENT_BASELINE} findings file is at schema {schema.SCHEMA_VERSION} (none legacy-skipped)",
+          len(current_set) > 0 and not stale_current,
+          f"stale: {stale_current}" if stale_current else "no CURRENT-set files found")
     remit_cache: dict[str, str] = {}                 # slug -> remit text (one remit per target, but cache anyway)
     for bj in baseline_jsons:
         rel = os.path.relpath(bj, REPO_ROOT)
         bdata = load_json(bj)
         sv = str(bdata.get("schema_version", ""))
-        if not sv.startswith("2."):
-            check(f"baseline {rel}: schema_version {sv!r} — frozen pre-2.0 artifact, schema/render checks skipped", True)
+        # Only the CURRENT schema version is schema/render-checked. Older frozen
+        # sets (e.g. 2.0 before the #7 array migration) are kept for diff-history
+        # but exempt — they are re-frozen under the current schema at the next
+        # re-baseline (Stage 4 → v1.2-claude48 at 3.0).
+        if sv != schema.SCHEMA_VERSION:
+            check(f"baseline {rel}: schema_version {sv!r} != current {schema.SCHEMA_VERSION!r} — frozen legacy artifact, schema/render checks skipped", True)
             continue
         try:
             schema.validate(bdata)
@@ -636,8 +698,8 @@ def main():
         rel = os.path.relpath(ej, REPO_ROOT)
         edata = load_json(ej)
         sv = str(edata.get("schema_version", ""))
-        if not sv.startswith("2."):
-            check(f"example {rel}: schema_version {sv!r} — pre-2.0 artifact, checks skipped", True)
+        if sv != schema.SCHEMA_VERSION:
+            check(f"example {rel}: schema_version {sv!r} != current {schema.SCHEMA_VERSION!r} — legacy artifact, checks skipped", True)
             continue
         try:
             schema.validate(edata)
@@ -656,6 +718,69 @@ def main():
             check(f"example {rel}: TXT re-renders byte-identical from its JSON",
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
+
+    # 8. N/A (null-score) categories — KB Step B3 all-N/A exclusion.
+    #    A vector-scored category may be null (excluded, weights renormalized);
+    #    presence-scored categories (Red Team, Monitor) may not; the declared
+    #    weighted_overall must use the renormalized formula.
+    na_doc = load_json(FIXTURE)
+    for c in na_doc["raise_posture"]["categories"]:
+        if c["key"] == "limit_your_domain":
+            c["score"] = None
+    scored = [c for c in na_doc["raise_posture"]["categories"] if c["score"] is not None]
+    renorm = sum(c["score"] * c["weight"] for c in scored) / sum(c["weight"] for c in scored)
+    na_doc["raise_posture"]["weighted_overall"] = round(renorm, 2)
+    try:
+        schema.validate(na_doc)
+        check("N/A: null score on a vector-scored category + renormalized weighted_overall validates", True)
+    except schema.SchemaError as e:
+        check("N/A: null score on a vector-scored category + renormalized weighted_overall validates", False, str(e))
+    na_path = os.path.join(tmp, "na.json")
+    with open(na_path, "w", encoding="utf-8") as fh:
+        json.dump(na_doc, fh)
+    r = run_render(["--findings", na_path, "--template", TEMPLATE,
+                    "--out-html", os.path.join(tmp, "na.html"),
+                    "--out-txt", os.path.join(tmp, "na.txt")])
+    check("N/A: render exits 0 on an N/A-category document", r.returncode == 0, r.stderr.strip())
+    if r.returncode == 0:
+        na_txt = read_bytes(os.path.join(tmp, "na.txt")).decode("utf-8")
+        check("N/A: TXT shows N/A for the excluded category",
+              any("Limit Your Domain" in ln and "N/A" in ln for ln in na_txt.splitlines()))
+        na_html = read_bytes(os.path.join(tmp, "na.html")).decode("utf-8")
+        check("N/A: HTML shows N/A and the excluded contribution", "N/A" in na_html and "excluded" in na_html)
+
+    bad_mc = load_json(FIXTURE)
+    for c in bad_mc["raise_posture"]["categories"]:
+        if c["key"] == "monitor_continuously":
+            c["score"] = None
+    try:
+        schema.validate(bad_mc)
+        check("N/A: null score on monitor_continuously (presence-scored) is rejected", False,
+              "validated but should have failed")
+    except schema.SchemaError:
+        check("N/A: null score on monitor_continuously (presence-scored) is rejected", True)
+
+    bad_wo = load_json(FIXTURE)
+    for c in bad_wo["raise_posture"]["categories"]:
+        if c["key"] == "limit_your_domain":
+            c["score"] = None
+    bad_wo["raise_posture"]["weighted_overall"] = round(min(5.0, renorm + 0.3), 2)
+    try:
+        schema.validate(bad_wo)
+        check("N/A: non-renormalized weighted_overall with an N/A category is rejected", False,
+              "validated but should have failed")
+    except schema.SchemaError:
+        check("N/A: non-renormalized weighted_overall with an N/A category is rejected", True)
+
+    # ── pretty-remit freshness ────────────────────────────────────────────────
+    # Every WORKER_REMIT.html (examples) and <slug>-remit.html (current baseline)
+    # is a deterministic render of its source Markdown. render_all_remits.py --check
+    # re-renders each and fails on any drift, so an edited remit whose HTML wasn't
+    # regenerated is caught here. Delegating keeps the source→dest map in one place.
+    rar = os.path.join(REPO_ROOT, "tests", "render", "render_all_remits.py")
+    r = subprocess.run([sys.executable, rar, "--check"], capture_output=True, text=True)
+    check("pretty-remit HTML is in sync with its remit (render_all_remits.py --check)",
+          r.returncode == 0, (r.stdout + r.stderr).strip())
 
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0

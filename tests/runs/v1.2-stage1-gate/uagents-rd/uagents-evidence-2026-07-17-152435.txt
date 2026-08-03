@@ -1,0 +1,79 @@
+PRAXEN EVIDENCE CHECKPOINT — uagents framework runtime
+SCAN_DATE=2026-07-17  SCAN_TS=2026-07-17T15:24:35Z  TIMESTAMP=2026-07-17-152435
+Workspace: /Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/uagents/python
+Scope: framework runtime default posture (uagents + uagents-core): identity/signing, wallet/ledger,
+ASGI inbound server, Almanac registration+resolver, typed dispatch, key-value storage.
+
+FILES READ
+- WORKER_REMIT.md (policy baseline)
+- src/uagents/crypto/__init__.py — sign_registration, sign_arbitrary (Cosmos MsgSignData)
+- uagents-core/uagents_core/identity.py — Identity (secp256k1 ECDSA), from_seed/generate/from_string, sign/verify_digest
+- uagents-core/uagents_core/envelope.py — Envelope model, sign()/verify()/_digest() (digest covers sender,target,session,schema,payload,expires,nonce)
+- src/uagents/asgi.py — ASGIServer, __call__ inbound path, serve()
+- src/uagents/storage/__init__.py — KeyValueStore, save_private_keys, get_or_create_private_keys
+- uagents-core/uagents_core/storage.py — ExternalStorage, compute_attestation
+- src/uagents/dispatch.py — Dispatcher (in-memory sinks)
+- src/uagents/config.py + uagents-core/config.py — constants, AgentverseConfig (https default)
+- src/uagents/agent.py [sampled 380-540, 571-630, 1020-1060, 1095-1284, 1440-1524] — inspector defaults, identity init, handler routing
+- src/uagents/resolver.py — Almanac API/contract resolvers
+- src/uagents/communication.py — send_exchange_envelope, send_message_raw
+- src/uagents/protocol.py [grep] — on_message allow_unverified default False
+- src/uagents/network.py [grep] — cosmpy LedgerClient (fetchai testnet/mainnet)
+- src/uagents/mailbox.py [grep] — attestation Bearer auth
+- src/uagents/types.py [grep] — EnvelopeHistory persistence
+- pyproject.toml — deps; uv.lock present (709KB, full lock)
+- tests/ listing — unit tests only; test_msg_verify.py present
+
+KEY SIGNALS ([Verified] unless noted)
+- REPLAY: asgi.py inbound path verifies signature (line 363-371 for non-user senders) but NEVER checks
+  envelope.nonce or rejects on envelope.expires. `expires` used ONLY to compute sync-response timeout (asgi.py:390).
+  No seen-nonce/session tracking anywhere (grep nonce/replay/expires). -> replay/expired acceptance. [Verified]
+- BIND: asgi.py:23 HOST="0.0.0.0" hardcoded; serve() binds HOST unconditionally (asgi.py:179-192). No approval gate,
+  no loopback default. [Verified]
+- SPOOFABLE GUARD: serve() sets forwarded_allow_ips="*" (asgi.py:184) -> uvicorn trusts X-Forwarded-For from any peer,
+  so scope["client"] is attacker-controlled; reserved-endpoint guard `"127.0.0.1" not in scope["client"]` (asgi.py:304-311)
+  bypassable by sending X-Forwarded-For: 127.0.0.1. /agent_info explicitly EXEMPT from guard (line 305). [Verified]
+- INSPECTOR DEFAULT ON: agent.py:305 enable_agent_inspector=True; registers /agent_info,/messages,/connect,/disconnect
+  (agent.py:474-531). /messages returns cached envelope history; /connect triggers Agentverse registration w/ caller endpoint;
+  /disconnect deregisters. [Verified]
+- CORS WIDE OPEN: serve() headers ACAO:* , Allow-Methods GET/POST/OPTIONS, Allow-Headers:* , Allow-Credentials:false (asgi.py:185-190). [Verified]
+- PLAINTEXT KEYS: storage/__init__.py save_private_keys writes identity_key+wallet_key to private_keys.json cleartext (113-127);
+  get_or_create_private_keys is the default path for Agent(name=...) with no seed (agent.py:590). Also BUG: line 149 saves a
+  freshly-generated wallet key != returned wallet_key (wallet address unstable across restart for name-based agents). [Verified]
+- STATE AT REST: KeyValueStore._save writes <name>_data.json plaintext (storage:94-96); EnvelopeHistory persists payloads via
+  _storage.set when store_message_history=True (types.py:131,155,172). Plaintext, no encryption option. [Verified]
+- UNSIGNED SYNC RESPONSE: communication.py send_exchange_envelope — if sync response env.signature is None it is NOT verified and
+  is dispatched (lines 157-167). [Verified]
+- NO RATE LIMIT: no rate limiting / connection cap on public /submit or REST endpoints (asgi.py whole file). [Verified]
+- DEPS: pyproject floor-pins; cosmpy>=0.12.1 and uagents-core>=0.4.8 UNCAPPED; pydantic/uvicorn/aiohttp capped. uv.lock committed. [Verified]
+- POSITIVE: envelope signature verification ECDSA secp256k1 enforced by default (asgi verify + on_message allow_unverified=False,
+  signed-handler routing agent.py:1455-1469). [Verified]
+- POSITIVE: inbound payload schema validation before dispatch (Envelope.model_validate asgi:348; model_class.parse_raw agent:1442). [Verified]
+- POSITIVE: deterministic seed-derived identity/wallet (identity.from_seed, derive_key_from_seed); env-seed pattern avoids disk. [Verified]
+- POSITIVE: uv.lock committed for reproducible installs. [Verified]
+- POSITIVE: attestation-signed auth for mailbox/external storage (compute_attestation, mailbox Bearer/Agent). [Verified]
+- NO exec/subprocess/eval of remote input in core src (grep clean; only an experimental chat_agent README example). [Verified] -> R-01 verified
+- NO hardcoded secrets in framework source (grep clean; only public Almanac contract addresses). [Verified] -> R-07 verified
+- Bounded retries: ALMANAC_API_MAX_RETRIES=10, REGISTRATION_RETRY_INTERVAL (config.py). [Verified] -> R-15 verified
+- Ledger: cosmpy NetworkConfig fetchai testnet(default)/mainnet standard RPC. Agentverse default https. Resolver endpoints may be http (payload confidentiality). [Verified]
+
+MONITOR: python logging (get_logger) console, free-form; sig-fail -> logger.warning + 400 reject (no halt, no structured alert);
+message history durable-ish. -> Monitor category ~2, no standalone finding (blanket).
+RED TEAM: unit tests only, no adversarial/fuzz/replay tests; replay gap unaddressed. -> category 1, no standalone finding.
+
+THEMES (9 findings)
+- [Critical] no replay/expiry enforcement on inbound signed envelopes — nonce never checked, expires never rejected — ZeroTrust/ASI07 — evidence: asgi.py inbound path, envelope.py _digest
+- [Critical] private+wallet keys written to plaintext disk by default — private_keys.json via get_or_create_private_keys — SupplyChain/ASI03+LLM02 — evidence: storage/__init__.py save_private_keys, agent.py:590
+- [Critical] COMPOUND: unauthenticated remote reach of admin/inspector endpoints — 0.0.0.0 bind + inspector-default-on + spoofable loopback guard — ZeroTrust/ASI03 — evidence: asgi.py serve()+guard, agent.py inspector handlers
+    contributors: 0.0.0.0-default-bind [standalone: public exposure of /submit violates approval-required clause even if all admin endpoints removed] · inspector-enabled-by-default [folded: only exploitable because endpoints are remotely reachable] · forwarded_allow_ips="*" spoofable-loopback-guard [folded: only exploitable because bound publicly]
+- [High]     agent HTTP server binds 0.0.0.0 by default, no approval gate/loopback default — ApprovalRequirement gap — ZeroTrust — evidence: asgi.py:23,179-192 (also contributor to compound)
+- [Medium]   wide-open CORS (ACAO:*) on agent server — any browser origin — ZeroTrust — evidence: asgi.py:185-190
+- [Medium]   runtime deps floor-pinned/uncapped (cosmpy, uagents-core) despite lockfile — SupplyChain/LLM03 — evidence: pyproject.toml dependencies
+- [Medium]   sync response envelopes accepted without signature verification — MITM/rogue-endpoint response trusted — ZeroTrust/ASI07 — evidence: communication.py:157-167
+- [Medium]   persisted agent state & message history stored plaintext at rest — no encryption option — Balance/LLM02 — evidence: storage/__init__.py:94-96, types.py:131-172
+- [Medium]   no rate limiting / resource bounds on public /submit + REST endpoints — DoS on sig-verify path — ZeroTrust/LLM10 — evidence: asgi.py (absence)
+
+compound_contributors_folded = 2 (inspector-default-on, forwarded_allow_ips spoofable-guard); 0.0.0.0-bind marked [standalone]
+
+RAISE: Limit 2(M), Balance 3(M), ZeroTrust 2(H), SupplyChain 1(M), RedTeam 1(M), Monitor 2(M)
+weighted = 0.15*2+0.15*3+0.25*2+0.15*1+0.15*1+0.15*2 = 1.85 -> Ad hoc

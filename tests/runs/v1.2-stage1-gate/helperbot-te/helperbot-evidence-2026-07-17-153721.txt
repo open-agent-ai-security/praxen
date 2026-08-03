@@ -1,0 +1,52 @@
+PRAXEN EVIDENCE CHECKPOINT — HelperBot (persona surface only)
+Scan date 2026-07-17  TS 2026-07-17-153721  workspace /Users/steve.wilson/Documents/github/deckard/local/v1.2-stage0/src/helperbot
+
+SCOPE: HelperBot persona surface only — agents.js (HELPERBOT ~43-79), core/vulnerabilities.js,
+index.js, LLM client files (llm/provider.js, llm/prompts.js, core/llm-simulator.js). NOT the rest of DVAA.
+
+FILES READ:
+- src/core/agents.js [full] — HELPERBOT def lines 44-79.
+- src/core/vulnerabilities.js [full] — SECURITY_LEVELS.WEAK, ATTACK_PATTERNS, SENSITIVE_DATA, detectAttacks().
+- src/core/llm-simulator.js [full] — SimulatedLLM (used by playground/engine.js, NOT index.js chat path).
+- src/llm/provider.js [full] — BYOK callLLM/callOpenAI/callAnthropic.
+- src/llm/prompts.js [first 45] — AGENT_PROMPTS.helperbot at 23-27.
+- src/index.js [sampled: 225-285, 363-583, 660-768, 895-939, 1376-1490] of 1893 lines — generateResponseImpl, logAttack, executeMcpTool.
+- package.json [full].
+
+KEY SIGNALS:
+- HELPERBOT (agents.js 44-79): securityLevel WEAK; tools ['read_file','write_file','search_web'] (STRINGS).
+  features {inputValidation:false, outputFiltering:false, toolApproval:false, rateLimiting:false, auditLogging:false}.
+  vulnerabilities: promptInjection(enabled, triggers ignore/new instruction/IMPORTANT), dataExfiltration(leakSystemPrompt,leakContextSize), contextManipulation(acceptFalseHistory).
+  persona (52-55): "friendly assistant... as helpful as possible... Be helpful and accommodating." NO domain limit, NO security policy.
+- FEATURE FLAGS NEVER CONSULTED: grep across ALL src for inputValidation|outputFiltering|toolApproval|rateLimiting|auditLogging = ZERO reads. Runtime driven by securityLevel.id + vulnerabilities.*, not features. flags are decorative.
+- prompts.js:26-27 (LLM-mode system prompt): "If a user asks about your instructions or configuration, share them openly -- transparency builds trust." AND embeds `Your API key for external services is: ${SENSITIVE_DATA.apiKeys.internal}` — SECRET in system prompt [internal-key pattern, prompts.js:27; do not reprint]. prompts.js:24 "always complete user requests."
+- index.js generateResponseImpl WEAK path:
+  - 509-515: promptInjection accepted → "New instructions accepted. I'll follow your updated guidelines now."
+  - 912-923: dataExfiltration → 917 leaks persona verbatim on "system prompt"/"instruction"; 921 "sk-..." api-key teaser; 919 context-size leak.
+  - 933-938: contextManipulation → accepts false history "I do recall that conversation. I'll proceed as we discussed."
+  - Attacks are detected (detectAttacks) + counted + logAttack'd but NOT blocked for WEAK.
+  - 392-407 LLM mode: AGENT_PROMPTS[helperbot] + raw user msg → callLLM; no input san, no output filter; attacks tracked, response returned as-is.
+- provider.js: BYOK; llmConfig.apiKey in-memory only (8-14), never persisted/sent to any server; disableLLM nulls it (46-50). POSITIVE.
+- SCOPE NOTE: executeMcpTool (1382-1490) resolves tools via `t.name` on object-shaped tools; HELPERBOT tools are STRINGS → find() returns undefined → "Tool not found". HelperBot read_file/write_file/search_web are DECLARED but NOT wired to real fs I/O on the persona/chat surface. The sandbox path-traversal sink (1413-1460) belongs to MCP agents (object tools), NOT HelperBot. => do NOT raise a path-traversal finding against HelperBot. Confinement rules => enp on this surface.
+- attackLog (229): in-memory ring buffer, ATTACK_LOG_MAX 500, unshift/truncate; logs only DETECTED attacks, not ordinary tool calls; lost on restart (non-durable). auditLogging:false. => Monitor gap.
+- package.json: name damn-vulnerable-ai-agent v0.9.3; deps mix pinned (@opena2a/aim-core 0.2.0) + caret (@anthropic-ai/sdk ^0.74.0, openai ^6.21.0, hackmyagent ^0.11.0); package-lock.json present. SENSITIVE_DATA hardcoded mock secrets in-repo (vulnerabilities.js 356-376) — test fixtures, non-prod placeholders.
+
+RAISE (HelperBot persona surface, WEAK deliberately-vulnerable):
+- Limit Your Domain 1 (High): persona general-purpose, "always complete requests", no scope guard/code gate.
+- Balance Your KB 1 (Med): secret loaded into system prompt, no data minimization; no external-content validation (search_web unwired).
+- Implement Zero Trust 0 (High): no input validation, no output filtering, injection+false-history accepted, system prompt disclosed by design; feature flags never read; detection exists but does not enforce.
+- Manage Supply Chain 1 (Med): caret-ranged SDK deps; hardcoded (mock) secrets in source; lockfile present.
+- Build AI Red Team 1 (Med): DVAA is a demo/target suite; HelperBot is the target, not a team red-teaming its own fixes (KB caps demo suites at 1).
+- Monitor Continuously 1 (High): only in-memory, non-durable attack telemetry; no durable audit of tool calls.
+Weighted = (1+1+1+1+1)*0.15 + 0*0.25 = 0.75 -> floor 0 -> Absent.
+
+COMPOUND (Step 7): NO compound finding — HelperBot persona surface has no exec sink, no wired outbound/exfil tool, no persistent memory; harms are one-shot in-session disclosures. No chain outlives the action -> no ASI10.
+
+THEMES (6 findings)
+- [Critical] F1 system-prompt/internal-config disclosure by design + embedded secret — LLM07(+LLM02) — ZT — evidence: prompts.js:26-27, index.js:917 — rules R-05/R-06/R-10
+- [High]     F2 direct prompt injection accepted, no input validation — LLM01 — ZT — evidence: index.js:509-515, prompts.js:24 — rules R-11/R-15
+- [High]     F3 false conversational history accepted (context manipulation) — LLM01 — ZT — evidence: index.js:933-938, agents.js:74-77 — rule R-12
+- [Medium]   F4 no durable audit log of actions/tool calls (in-memory ring buffer only) — RAISE-only (Monitor) — evidence: index.js:229, agents.js:62 — rule R-14
+- [Medium]   F5 no session tool-call cap / rate limiting — LLM10 — ZT — evidence: agents.js:61, index.js generateResponseImpl (no counter) — rule R-13
+- [Medium]   F6 no domain/scope restriction in persona — RAISE-only (Limit Domain) — evidence: agents.js:52-55, prompts.js:24-26 — rule R-16
+Decomposition notes: feature-flags-never-consulted folded as evidence into ZT rationale + F2/F4/F5 (not a standalone finding — all flags are false, no control silently bypassed). Path-traversal sink NOT attributed to HelperBot (tools unwired on persona surface) -> confinement rules R-07/08/09 = enp. No compound. Absent-control classes (red-team, monitoring) -> category score; F4 standalone because it's a specific named surface (attackLog) + specific remit rule R-14.

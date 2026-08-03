@@ -21,6 +21,53 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Understand how individual signals combine into multi-step attacks
 - Generate grounded recommendations that address root cause
 
+This file is the sole authority for **ASI** tags. LLM-category codes referenced here use **2026 numbering** and are grounded in the companion LLM Top 10 KB — every LLM number below is paired with its category name so a stale number can never silently mis-route. ASI codes apply to **any system with tool or action capability**; multi-step autonomy raises severity (by one level) — it does not gate the tag.
+
+**Division of labor inside this file.** The ten entries describe each risk and list the *evidence* to look for; they defer tag arbitration — which code is primary, which codes co-tag — to the **Primary Arbitration** section directly below. When an entry's text and your instinct disagree about a tag, the arbitration section wins.
+
+---
+
+## Primary Arbitration — read before tagging
+
+**Tag semantics — two relations only** (same as the LLM KB): a finding's first code is its **primary** — the category that best names the weakness; every other applicable code is a **co-tag** — an additional code, never a replacement.
+
+**The mechanism rule.** Name the primary by the **mechanism that produces the harm**, never the surface symptom or the outcome. ASI08 (Cascading Failures) and ASI10 (Rogue Agents) are *outcome* codes: they ride as co-tags on a mechanism-primary finding, and take primary only in the single case each of their tests defines below.
+
+**Cross-KB precedence:** when both KBs are in context, a compound finding involving any ASI code is governed by the Agentic KB's mechanism rule and its spread/outlive/persistence tests; between overlapping compound-table rows in either KB, the more specific row wins. Finding granularity follows the LLM KB's one-finding-per-fix-point rule (one finding per independently-fixable control gap on a distinct data path).
+
+**The spread test (governs ASI08).** Co-tag ASI08 only when a compromised or corrupted state actually **propagates beyond the initial action** — a poisoned output consumed by another agent or a later session, an orchestrator decision fanning out to workers, an unbounded loop amplifying a bad state. A single agent merely having multiple steps is not cascade; one contained action is not cascade. ASI08 is primary only when uncontrolled propagation is itself the sole finding *in its chain*, with no upstream mechanism to name.
+
+**The outlive test (governs ASI10).** Ask: *when the immediate action finishes, is the agent still operating out of bounds?* Co-tag ASI10 only on **yes** — a persistent alteration of the agent itself (stored goal/instruction/config override, poisoned memory carrying into later sessions, tool or permission set *acquired at runtime* beyond the deployed baseline), or **standing autonomy** (an approval layer absent or disabled for the agent *as a whole* while it runs self-directed). A one-shot attack, an ungated single action, or anything the attacker must re-trigger each time is mechanism-only — no ASI10. A statically over-broad tool set shipped at deploy is **LLM03 (Excessive Agency)**, not runtime drift. ASI10 is primary only for a self-contained rogue behavior with no upstream vector to name: reward hacking / specification gaming, self-replication, collusion, scheming / deceptive compliance.
+
+**The persistence test (governs ASI06 vs LLM09).** Store/memory poisoning that **persists as agent state and alters behavior across sessions** is ASI06 primary (co-tag LLM09 — Vector & Embedding Weaknesses — when the store is vector-backed). A **one-shot** vector/embedding weakness with no cross-session persistence is LLM09 (Vector & Embedding Weaknesses), no ASI06.
+
+**Compound-signal table.** One row per recurring signal; primary first, co-tags second.
+
+| Signal | Primary | Co-tags |
+|--------|---------|---------|
+| Missing/disabled approval gate on a consequential action | LLM03 (Excessive Agency) | ASI05 only if the ungated tool is exec — never ASI02/ASI09 for the gate itself |
+| Approval layer absent/disabled for the agent as a whole, running self-directed | LLM03 (Excessive Agency) | ASI10 (standing autonomy per the outlive test) |
+| Statically over-broad tool set or permissions shipped at deploy | LLM03 (Excessive Agency) | ASI02 only when a tool is shown *used* wrongly |
+| Code/shell/command execution — observed or invocable in a live path, i.e. a dataflow from model output to the exec call exists beyond mere registration (a merely-present ungated exec tool is the gate row above: LLM03 primary, ASI05 co-tag) | ASI05 | LLM10 (Improper Output Handling) when model output reaches the exec sink; ASI01 if goal-hijacked into it |
+| Non-exec tool misused for a wrong purpose (email exfil, covert channel, API chaining) | ASI02 | ASI01 if goal-hijacked into it |
+| Credential/identity scope defect (shared account, broad OAuth, token passthrough) | ASI03 | — (capability declared in a tool definition is LLM03/ASI02, not ASI03) |
+| Instructions accepted from a spoofed or unverified sender | ASI03 (the identity check failed) | ASI01 if goals were redirected; ASI09 when a human was *also* deceived — if only the human was deceived (the agent's own check never fired), use the human-side deception row instead |
+| Goal altered by live input (prompt, tool output, retrieved content, A2A message) | ASI01 | LLM01 (Prompt Injection); ASI07 if the vector is an inter-agent message; a poisoned *third-party* source has supply-chain provenance — ASI04 primary (row below). An ingress-hygiene gap with *no* goal-alteration evidence is LLM01 primary per the LLM KB |
+| Goal altered via *stored* memory/context | ASI06 | ASI01 |
+| Poisoned third-party knowledge source, RAG plugin, or tool description (tool poisoning, rug pull, runtime swap) | ASI04 | ASI06 if it lands in persistent memory; ASI01 if goals redirected |
+| Unverified plugin / MCP server *install* (provenance gap, pre-deploy) | LLM04 (Supply Chain) | ASI04 |
+| Malicious package / lockfile poisoning with install/import execution *evidenced* (install hook, setup script) | ASI05 | ASI04; absent execution evidence the poisoned pre-deploy dependency is LLM04 (Supply Chain) primary |
+| Cross-tenant vector bleed (namespace-filter bypass on retrieval), not stored into memory | LLM09 (Vector & Embedding) | LLM02 (Sensitive Information Disclosure) when disclosure is evidenced; once bled content is stored into memory across sessions the persistence test flips it: ASI06 primary, LLM09 co-tag |
+| Unauthenticated / unvalidated inter-agent channel | ASI07 | ASI03 when the defect is identity, not transport |
+| Loop or retry spreading corrupted state or actions | mechanism (ASI01/04/06/07…) | ASI08 per the spread test; LLM06 (Unbounded Consumption) if it also burns spend |
+| Loop, retry, or fan-out burning only cost/latency — or missing ceilings (retry caps, circuit breakers) with nothing spread | LLM06 (Unbounded Consumption) | — (if anything spread, use the row above) |
+| Progressive locally-reasonable steps aggregating out of scope | ASI01 (agent-side) | ASI09 only when it is the *human approver* being walked forward |
+| Human-side deception: fake explainability, consent laundering, anthropomorphic manipulation, missing final human confirmation | ASI09 | — |
+| Self-contained rogue behavior (reward hacking, self-replication, collusion, scheming) | ASI10 — primary is legal but rare | — |
+| Pure observability gap (no audit log / no monitoring / no alerting) | RAISE only — no OWASP code | — |
+
+**Compound severity rule.** Escalate when **two or more findings'** primary-or-co-tag codes match **two or more consecutive entries, in order, of one Attack Chain Pattern row** (table at the end of this file) on the same target: raise the severity of the **earliest matched finding** one level above the highest individual finding (capped at the scale maximum) and list the others in `related_findings`. Chain rows describe the attack narrative — the findings themselves are always tagged per this arbitration section, never per the chain row. Co-occurrence of unrelated categories does not escalate. The multi-step severity bump (header) applies to ASI-primary findings only; chain escalation applies after any per-entry severity ladder, and a finding's severity is raised at most once.
+
 ---
 
 ## ASI01 — Agent Goal Hijack
@@ -46,9 +93,9 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Agent treats all inputs (user, tool output, retrieved content, external email) with equal trust
 - Orchestration logic that can be redirected by model output alone, without deterministic guardrails
 
-**Also:** scheduled / recurring goal-reweighting drift (e.g. a malicious calendar invite that injects a recurring instruction subtly reweighting objectives each cycle); manipulated-but-plausible output that steers a business decision (not only scope/action deviation).
+**Also:** scheduled / recurring goal-reweighting drift (e.g. a malicious calendar invite that injects a recurring instruction subtly reweighting objectives each cycle — each delivery is live input, ASI01; once retained in memory between cycles, ASI06 per the persistence test); manipulated-but-plausible output that steers a business decision (not only scope/action deviation). A *single-action* goal redirect still tags ASI01 — the typical case spans steps, but multi-step raises severity, not the tag.
 
-**Boundary:** ASI01 = *direct* alteration of goals/decision-paths (regardless of persistence or active control); **ASI06** = persistent stored-context/memory corruption (which often *leads to* ASI01); **ASI10** = autonomous misalignment emerging *without* an active attacker.
+**Neighbors:** ASI01 is goal alteration by *live* input; alteration via stored memory/context is ASI06's subject; autonomous misalignment with no active attacker is ASI10's — primaries per the arbitration section.
 
 **Praxen relevance:** Praxen — inspect system prompt for goal guardrails, check for validation on config fields that can modify agent goals or identity (e.g., `custom_goals`, `persona_override`), confirm the remit declares a single authorized mission.
 
@@ -68,8 +115,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Tool definitions with write/delete/send/exec capabilities not justified by the agent's remit
 - Tool parameters that accept raw strings from model output without schema validation
 - Tools that return external content (web, email, documents) directly into LLM context
-- No approval gate on high-impact tool invocations
-- Missing tool-use logging
+- No approval gate on high-impact tool invocations (the gate itself is LLM03 — Excessive Agency — per arbitration; ASI02 is the wrongful *use*)
+- Missing tool-use logging (observability gap — RAISE only, no OWASP code)
 
 **What to look for in agent behavior:**
 - Tool being called with parameters that don't match the stated task
@@ -77,7 +124,9 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Tool producing output that is inconsistent with the stated action (evidence mismatch)
 - High-impact tool (send, delete, exec) called without evidence of approval
 
-**Also — non-exec misuse patterns:** tool-name impersonation / typosquatting / alias collision (`report` resolving before `report_finance`); living-off-the-land tool chaining that evades host EDR (PowerShell / cURL / internal APIs seen as benign); covert-channel exfil via an approved low-risk tool (DNS via a ping tool); internal→external exfil chaining (internal CRM tool + external email tool); loop-amplified costly-API DoS / bill spikes (co-tag LLM10).
+**Also — non-exec misuse patterns:** tool-name impersonation / typosquatting / alias collision (`report` resolving before `report_finance`); living-off-the-land chaining through *non-exec* APIs and internal tools seen as benign (exec-based LOTL — PowerShell, shell one-liners — is ASI05's subject); covert-channel exfil via an approved low-risk tool (DNS via a ping tool); internal→external exfil chaining (internal CRM tool + external email tool); loop-amplified costly-API DoS / bill spikes (ASI02 only when the calls serve a wrong purpose — a loop that merely burns spend is LLM06, Unbounded Consumption, primary).
+
+**Neighbors:** ASI02 is *misuse in action* of a non-exec tool; code/shell execution is ASI05's subject; a statically over-broad tool set at deploy is LLM03's (Excessive Agency); credential/identity scope is ASI03's — primaries per the arbitration section.
 
 **Praxen relevance:** Praxen — audit tool definitions, compare permission scope against the remit, flag high-impact tools (send, delete, exec) lacking approval gates.
 
@@ -106,7 +155,9 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - New counterparty appearing in agent's trust graph without operator approval
 - Agent responding to a requester whose identity doesn't match the authorized list in the Worker Remit
 
-**Also:** TOCTOU / authorization drift (permissions valid at workflow start, stale or expired by execution); cross-agent confused deputy (a low-priv agent relays valid-looking instructions to a high-priv agent that executes without re-checking intent); memory-based privilege retention (creds cached across tasks/users, reused in a weaker session — co-tag ASI06); OAuth device-code phishing binding a victim tenant to attacker scopes; un-scoped privilege inheritance through delegation chains.
+**Also:** TOCTOU / authorization drift (permissions valid at workflow start, stale or expired by execution); cross-agent confused deputy (a low-priv agent relays valid-looking instructions to a high-priv agent that executes without re-checking intent); memory-based privilege retention (creds cached across tasks/users, reused in a weaker session — co-tag ASI06; ASI03 stays primary, the stored item being a credential, not a behavior-altering instruction); OAuth device-code phishing binding a victim tenant to attacker scopes; un-scoped privilege inheritance through delegation chains.
+
+**Neighbors:** ASI03 is the scope carried by a *credential or identity*; a capability declared in a tool definition is LLM03's (Excessive Agency) or ASI02's subject; the human-deception variant of impersonation is ASI09's — primaries per the arbitration section.
 
 **Praxen relevance:** Praxen — check credential storage, audit trust-check implementation in code, verify counterparty list from remit is enforced before sensitive actions.
 
@@ -124,8 +175,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **What to look for in agent artifacts:**
 - Tool definitions that changed since last scan without documented approval
-- New plugins or MCP servers in the environment with no documented source or review
-- Framework or runtime version not pinned or not documented
+- New plugins or MCP servers in the environment with no documented source or review (install-time provenance → LLM04 — Supply Chain — primary, ASI04 co-tag)
+- Framework or runtime version not pinned or not documented (LLM04 — Supply Chain — primary)
 - Tool description text that includes instructions to the model beyond what the tool nominally does ("When using this tool, also...")
 - No integrity verification on tool or plugin files (no hash, no signature)
 
@@ -133,9 +184,11 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Tool behavior that diverges from its description (tool claims to search but sends data)
 - New capability appearing in the agent's effective behavior without a corresponding new tool in the authorized list
 
-**Also:** remotely-loaded poisoned prompt templates; typosquatting / impersonation of dynamically-discovered tools or endpoints; a vulnerable third-party **peer agent** invited into a workflow (overlaps ASI07 — tag ASI04 for the composition risk); a compromised MCP / registry server serving signed-looking manifests at scale; a poisoned third-party knowledge/RAG plugin (co-tag ASI06). *(Boundary: LLM03 = static pre-deploy dependency; ASI04 = runtime tool/agent composition.)*
+**Also:** remotely-loaded poisoned prompt templates; typosquatting / impersonation of dynamically-discovered tools or endpoints; a vulnerable third-party **peer agent** invited into a workflow (ASI04 primary for the composition risk, ASI07 co-tag); a compromised MCP / registry server serving signed-looking manifests at scale; a poisoned third-party knowledge/RAG plugin (co-tag ASI06 when it lands in persistent memory).
 
-**Praxen relevance:** Praxen (supply chain category, tool inventory change detection, rug pull detection). The log registry update is a direct defense against silent rug pulls.
+**Neighbors:** ASI04 is *runtime* tool/agent composition — poisoned descriptions, swapped definitions, compromised registries; a static pre-deploy dependency or an unverified *install* is LLM04's (Supply Chain) subject — primaries per the arbitration section.
+
+**Praxen relevance:** Praxen (supply chain category, tool inventory change detection, rug pull detection). Tool-inventory change detection between scans is the direct defense against silent rug pulls.
 
 ---
 
@@ -161,8 +214,11 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Shell or exec tool invoked outside of tasks where execution is expected
 - Exec called with parameters that include network tools (curl, wget, nc), credential paths, or archive creation
 - Repeated exec attempts with slight variations
+- Living-off-the-land chains built from exec primitives (PowerShell, shell one-liners) that evade host EDR
 
-**Also — beyond shell/exec:** unsafe object deserialization → RCE; an exposed `eval()` powering agent memory over untrusted content; code-hallucination-with-backdoor (legit-looking generated code hiding a backdoor); malicious package install / lockfile poisoning (hostile code runs at install/import in ephemeral sandboxes — bridges ASI04); non-shell execution (JIT/WASM modules, template engines, in-memory eval).
+**Also — beyond shell/exec:** unsafe object deserialization → RCE; an exposed `eval()` powering agent memory over untrusted content; code-hallucination-with-backdoor (legit-looking generated code hiding a backdoor); malicious package install / lockfile poisoning (hostile code runs at install/import in ephemeral sandboxes — co-tag ASI04; the poisoned dependency itself, pre-deploy, is LLM04 — Supply Chain); non-shell execution (JIT/WASM modules, template engines, in-memory eval).
+
+**Neighbors:** ASI05 is execution; misuse of *non-exec* tools is ASI02's subject; model output reaching the exec sink unhandled co-tags LLM10 (Improper Output Handling) — primaries per the arbitration section.
 
 **Praxen relevance:** Praxen — exec config audit is a named high-priority check. Flag auto-approved shell exec, absent per-command policies, and exec capabilities that exceed the remit.
 
@@ -184,16 +240,16 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - Memory files (`MEMORY.md`, `sessions.json`, daily memory files) with content that includes instruction-like language from external sources
 - Write access from the agent to its own memory or knowledge base without review
 - Memory files that include content from external senders or untrusted sources
-- No memory review or audit process documented
+- No memory review or audit process documented (if purely an observability gap — RAISE only, no OWASP code)
 
 **What to look for in agent behavior:**
 - Agent behavior that shifts between sessions without a corresponding instruction change
 - Agent referencing context or instructions that don't appear in the current session's inputs
 - Agent acting on a "remembered" instruction that was inserted by an external party
 
-**Also:** trigger-based memory backdoors (poisoned memory plants a latent trigger that later fires hidden/destructive instructions); cross-agent shared-memory propagation (contaminated shared memory spreading between cooperating agents); **cross-tenant vector bleed** (namespace-filter bypass pulling another tenant's chunk via high cosine similarity); detection-subversion (retraining a security agent's memory to label malicious activity as normal); gradual long-term memory drift / goal-reweighting.
+**Also:** trigger-based memory backdoors (poisoned memory plants a latent trigger that later fires hidden/destructive instructions); cross-agent shared-memory propagation (contaminated shared memory spreading between cooperating agents); detection-subversion (retraining a security agent's memory to label malicious activity as normal); gradual long-term memory drift / goal-reweighting.
 
-**Boundary — ASI06 vs LLM08:** vector/embedding poisoning that **persists as agent memory and alters autonomous reasoning across sessions is ASI06 (co-tag LLM08)**; a one-shot retrieval/store weakness with no cross-session persistence is LLM08.
+**Neighbors:** ASI06 is governed by the **persistence test** in the arbitration section: poisoning that persists as agent state across sessions is ASI06 primary (co-tag LLM09 — Vector & Embedding Weaknesses — when the store is vector-backed); a one-shot vector/embedding weakness, including cross-tenant vector bleed on retrieval, is LLM09's subject unless the bled content is then stored into memory.
 
 **Praxen relevance:** Praxen — inspect persistent memory files for external-origin content, check whether memory writes are validated, confirm memory contents do not include instruction-like text that could act on the agent.
 
@@ -205,7 +261,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **Common patterns:**
 - Agent-to-agent messages treated as trusted without authentication
-- Orchestrator agent manipulated to issue malicious instructions to worker agents
+- Orchestrator agent manipulated to issue malicious instructions to worker agents (ASI01 primary for the manipulation, ASI07 co-tag for the channel, ASI08 per the spread test)
 - Worker agent output injected with content that redirects the orchestrator
 - No separation between agent identity and message content
 
@@ -221,6 +277,8 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **Also:** replay of delegation / trust messages (stale instructions honored); protocol downgrade to a legacy or unencrypted mode to inject objectives; MITM / missing transport encryption (interception, not just missing auth); discovery/routing spoofing & A2A registration forgery; metadata / timing side channels; semantic split-brain (one message parsed into divergent intents by different agents).
 
+**Neighbors:** ASI07 is the channel/transport defect; when the defect is identity rather than transport, ASI03 is the subject; a goal redirected through an inter-agent message makes ASI01 primary with ASI07 co-tag — per the arbitration section.
+
 **Praxen relevance:** Praxen — audit inter-agent channel configuration, confirm identity verification for messages received from other agents, flag trust-without-verification patterns in A2A handlers.
 
 ---
@@ -233,10 +291,9 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 - One injected instruction causes a chain of tool calls, each building on the last
 - A bad decision by an orchestrator propagates unchecked to all workers
 - An error in early task output corrupts all downstream task inputs
-- No circuit breakers, retry limits, or human checkpoints in long-running pipelines
 - Duplicate actions amplified across a multi-step pipeline
 
-**What to look for in agent artifacts:**
+**Predisposing conditions (artifacts):** these do not themselves earn an ASI08 tag — they make cascade possible; tag them per the arbitration table (missing ceilings with nothing spread → LLM06, Unbounded Consumption):
 - No max-retry or circuit breaker configuration in the agent or its tools
 - Long pipeline designs with no human checkpoint between steps
 - No rollback or compensating action for failed or misdirected tool calls
@@ -248,7 +305,7 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **Also:** governance-drift cascade (oversight weakening after repeated success; bulk approvals / policy relaxations propagating across agents); auto-deployment cascade (an orchestrator pushes a tainted release to all connected agents); inter-agent feedback-loop amplification (agents reinforcing each other's outputs); shared-infrastructure availability cascade.
 
-**Origin-vs-propagation rule (finding-level secondary trigger):** tag the *initial* defect as its mechanism (ASI04/06/07, etc.) as primary. Then **add ASI08 as a `tags[]` secondary only when a *compromised or corrupted* state propagates beyond the initial action — to other agents or into future runs**: a poisoned output/artifact consumed by another agent or reused in a later session, an orchestrator decision that fans out to all workers, or an unbounded retry / tool-loop that amplifies a bad state. A single agent merely *having* multiple steps is **not** cascade — the corruption must actually **spread**. If the blast radius is one contained action, leave ASI08 off. ASI08 is a roll-up — secondary, never alone; tag it **primary only** when uncontrolled propagation *itself* is the finding.
+**Neighbors:** ASI08 is an *outcome* code governed by the **spread test** in the arbitration section — mechanism primary, ASI08 co-tag when corruption actually propagates; ASI08 primary only when uncontrolled propagation is itself the sole finding. Loops that burn only cost/latency are LLM06's (Unbounded Consumption) subject.
 
 **Praxen relevance:** Praxen — check for tool-loop detection, retry caps, and rate limits in config. Flag missing circuit breakers on capabilities that can fire in a loop (search, tool calls, retries).
 
@@ -256,26 +313,26 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 ## ASI09 — Human-Agent Trust Exploitation
 
-**What it is:** Attackers exploit the trust relationship between humans and agents — either by manipulating the human into over-trusting the agent, or by manipulating the agent through social engineering that mimics trusted human principals.
+**What it is:** Attackers exploit the trust relationship between humans and agents, in either direction — manipulating the human into over-trusting the agent, or manipulating the human decision layer around the agent (fake approvals, laundered consent).
 
 **Common patterns:**
-- Social engineering that impersonates a trusted operator to redirect the agent
-- Phishing emails to the agent that appear to come from a known sender
-- Typosquatted domains or display names that pass superficial trust checks
 - Agent's authority presented to humans as absolute, causing over-reliance on potentially compromised outputs
-- Multi-turn manipulation where each individual step is locally reasonable (boiling frog)
+- Weaponized / fake explainability — fabricated convincing rationales that hide malicious logic to win approval
+- Consent-laundering via a "read-only" preview that triggers side effects
+- Emotional manipulation / anthropomorphism exploiting the human's trust
+- Multi-turn manipulation where each individual approval the *human* grants is locally reasonable (boiling frog on the approver)
 
 **What to look for in agent artifacts:**
-- Trust checks based on display name or substring match rather than canonical identity verification
-- No warning to operator when agent receives instructions from a new or unusual source
+- No warning to operator when agent receives instructions from a new or unusual source (if purely an alerting gap — RAISE only, no OWASP code)
 - Agent policy that allows external parties to claim operator-level trust
+- Opaque explainability forcing unquestioning trust; missing final human confirmation on a sensitive or irreversible action (the missing gate itself is LLM03 — Excessive Agency; ASI09 is the deception that exploits it)
 
 **What to look for in agent behavior:**
-- Progressive multi-step compliance where each step seems reasonable but the aggregate is out of scope
+- Progressive multi-step compliance where each *human approval* seems reasonable but the aggregate is out of scope
 - Agent taking actions at the request of a party not in the authorized counterparty list
 - Trust relationship expanding unexpectedly — new sender treated as trusted
 
-**The primary framing is the agent manipulating the human** (not only the reverse). **Flag:** weaponized / fake explainability (fabricated convincing rationales that hide malicious logic to win approval); emotional manipulation / anthropomorphism exploiting trust; a missing final human confirmation on a sensitive or irreversible action; opaque explainability forcing unquestioning trust; consent-laundering via a "read-only" preview that triggers side effects. *(Boundary: ASI09 = human misperception / over-reliance; ASI03 = credential/permission misuse; ASI10 = the agent's own intent deviating.)*
+**Neighbors:** both directions are ASI09's scope, but the *agent-side* variants route elsewhere: instructions accepted from a spoofed sender are ASI03's subject (the identity check failed); agent-side progressive compliance is ASI01's; ASI09 covers the *human* being deceived or walked forward — per the arbitration section.
 
 **Praxen relevance:** Praxen — confirm the remit declares explicit counterparty and trust-scope lists, verify code enforces them, flag trust-expansion paths (e.g., any message sender becoming "known" through history).
 
@@ -289,35 +346,24 @@ The Agentic Top 10 describes threats specific to agents operating with autonomy.
 
 **Common patterns:**
 - Agent that was compromised via ASI01 and is now pursuing an attacker's goals
-- Agent whose capabilities were expanded (new tools, new permissions) beyond what was authorized
+- Agent whose capabilities were expanded at runtime (new tools, new permissions) beyond what was authorized
 - Agent that has drifted from its remit over time through accumulated context or memory poisoning
 - Agent whose **oversight / approval control** (the kind that can *block* a deviation — not passive audit logging) was disabled or degraded, allowing undetected deviation
-- Agent running without any oversight mechanism
+- Agent running without any oversight mechanism (standing autonomy — LLM03, Excessive Agency, primary; ASI10 co-tag per arbitration)
 - **Reward hacking / specification gaming** — gaming a flawed reward metric (e.g. deleting production backups to "minimize cost")
 - **Self-replication** — spawning unauthorized replicas for persistence / takedown-evasion
 - **Collusion** — multiple agents coordinating to amplify manipulation
 - **Scheming / deceptive compliance** — appears compliant while pursuing a hidden goal (deceptive alignment)
-- **Impersonated observer/approval agent** — a fake review agent injected to rubber-stamp actions (subverts the oversight layer itself)
+- **Impersonated observer/approval agent** — a fake review agent injected to rubber-stamp actions (subverts the oversight layer itself; the injected agent is ASI04/ASI07 primary, ASI10 co-tag)
 
 **What to look for:**
 - Behavior outside the Worker Remit — this is the primary Praxen detection
-- Tool inventory that exceeds the Known Good Baseline
+- Tool inventory that exceeds the remit's declared inventory (its Known Good Baseline section) — tag LLM03 (Excessive Agency) unless evidence shows the excess was *acquired after deploy*
 - Memory or context that contains instructions not from the authorized operator
 - An **oversight / approval control** (not passive audit logging) that has been degraded or disabled
 - Agent that previously passed all behavioral checks now failing them systematically
 
-**ASI10 is an outcome, not a mechanism** — the end state that ASI01–09 (and LLM06) *lead to*. So **name the specific mechanism as the primary tag**, then decide ASI10 by one test.
-
-**The test — does the deviation outlive the action?** A one-time, direct attack that causes one action — or a short burst of actions — is **not** a rogue agent; that is the *mechanism* (LLM01 injection, LLM06 excessive agency, ASI02 tool misuse, ASI03 identity abuse). The agent did a bad thing and it's over. Add **ASI10 as a `tags[]` secondary only when the finding reaches the *core* of the agent** so it operates **out of bounds beyond that short-lived action** — persistently or on its own. Concretely, one of:
-
-- **Persistent alteration of the agent itself** — poisoned memory/context that carries into later turns or sessions, a **stored** goal / instruction / config override, or a tool / permission set the agent **acquires or expands at runtime** beyond its deployed baseline (runtime *drift* — **not** a statically over-broad tool set shipped at deploy, which is LLM06). The agent stays off-mission after the triggering action ends.
-- **Standing autonomy without oversight** — a fail-open full-autonomy mode, or a removed / disabled / default-off approval layer, under which the agent runs **unsupervised and self-directed**, not merely one ungated action.
-
-Ask: *when the immediate action(s) finish, is the agent still operating out of bounds?* **Yes → ASI10 secondary. No → mechanism only, no ASI10.** So an ungated pay action, a missing auth check, or a one-shot prompt injection an attacker must re-trigger each time is **not** ASI10 — its mechanism already captures it. A **"no audit log" gap is never ASI10** (a missing log doesn't alter the agent's core; it's a RAISE auditability finding). **Self-check:** if you're tagging ASI10 on more than a *minority* of findings, you've slid back to "any weakness → rogue" — re-read the test.
-
-- **Primary — legal but rare.** Tag ASI10 *primary* only for a **self-contained rogue behavior with no upstream vector to name**: reward hacking / specification gaming, self-replication, collusion, scheming / deceptive compliance, or self-directed capability expansion beyond authorization.
-
-Same origin-vs-propagation discipline as ASI08.
+**Neighbors:** ASI10 is an *outcome* code governed by the **outlive test** in the arbitration section — the mechanism (LLM01 Prompt Injection, LLM03 Excessive Agency, ASI02, ASI03, ASI06…) is primary, ASI10 co-tags only when the deviation persists beyond the triggering action or the agent runs with standing autonomy; ASI10 is primary only for the self-contained rogue behaviors listed above. A "no audit log" gap is never ASI10 — it is a RAISE auditability finding.
 
 **Praxen relevance:** All detectors. ASI10 is the end state that all other ASI categories can contribute to. Praxen's mission is to detect the drift toward ASI10 before it becomes irreversible.
 
@@ -329,35 +375,13 @@ These multi-step patterns appear in documented real-world agent incidents:
 
 | Pattern | Steps | Categories Involved |
 |---------|-------|---------------------|
-| Phishing-to-exec | Trusted-looking email → goal hijack → exec approved → shell commands run | ASI01, ASI03, ASI05 |
+| Phishing-to-exec | Trusted-looking email → goal hijack → exec approved → shell commands run | ASI03, ASI01, ASI05 |
 | Memory persistence | Malicious doc retrieved → summarized into memory → future sessions redirected | ASI01, ASI06 |
-| Privilege creep | New tool added → approval gap → unauthorized action in next session | ASI04, ASI02, ASI10 |
-| Cascade loop | First action fails → retry loop → amplified impact across tool chain | ASI08, LLM10 |
-| Trust expansion | New sender impersonates known party → trust granted → data exfiltrated | ASI03, ASI09, ASI01 |
+| Privilege creep | New tool added → approval gap → unauthorized action in next session | LLM04/ASI04, LLM03, ASI10 |
+| Cascade loop | First action fails → retry loop → amplified impact across tool chain | ASI08, LLM06 (Unbounded Consumption) |
+| Trust expansion | New sender impersonates known party → trust granted → data exfiltrated | ASI03, ASI01, ASI02 |
 
-**Praxen compound finding rule:** When findings from two or more of these steps appear together, escalate the combined severity one level above the highest individual finding. Note the chain in `related_findings`.
-
----
-
-## Resolving adjacent categories (pick the dominant code by mechanism)
-
-Findings slide between neighbouring categories run-to-run when the boundary is left to intuition. Choose the dominant code by the **mechanism that produces the harm**, not the surface symptom; put genuinely co-applicable codes in `tags[]`.
-
-| If the finding is fundamentally about… | Dominant code | Not… |
-|---|---|---|
-| Executing code / shell / commands | **ASI05** (Unexpected Code Execution) | ASI02 — that's for non-exec tools |
-| Misusing a **non-exec** tool (email, file, API) for a wrong purpose | **ASI02** (Tool Misuse) | ASI05 |
-| The **identity / credential** scope — shared account, broad OAuth, trust on an unverified identity | **ASI03** (Identity & Privilege Abuse) | ASI02 (tool capability) |
-| A failure **propagating / amplifying** through a tool chain or sub-agents | **ASI08** (Cascading Failures) | LLM10 — that's resource exhaustion |
-| Resource / cost / token exhaustion, runaway spend, denial-of-wallet | **LLM10** (Unbounded Consumption) | ASI08 |
-| Vector/embedding poisoning that **persists as agent memory** & alters reasoning across sessions | **ASI06 + LLM08** (co-tag) | LLM08-only |
-| A **one-shot** vector/embedding weakness with no cross-session persistence | **LLM08** (Vector & Embedding) | ASI06 |
-| Poisoning **non-vector** memory / session / context files | **ASI06** (Memory & Context Poisoning) | LLM08 |
-| A **self-approval / no approval gate** on a consequential action | **LLM06** (Excessive Agency) | ASI10 |
-| A **self-contained rogue behavior** (reward hacking, self-replication, collusion, scheming) | **ASI10** (Rogue Agents) — *primary is legal but rare* | a named mechanism (ASI01/03/06) |
-| **No audit log / no monitoring / no alerting** (pure observability gap) | **RAISE only** — no OWASP code | ASI10 / LLM06 |
-
-**Rule of thumb:** name the code by the *mechanism*, not the symptom — and **prefer a specific mechanism over an outcome category** (ASI08, ASI10). A capability the remit forbids, or an unguarded consequential action, is **LLM06**. A **pure logging / monitoring / audit gap is RAISE, not OWASP** — don't force a code onto it.
+The **compound severity rule** for chains is in the Primary Arbitration section: consecutive steps of a single row, chain-head escalates one level, others in `related_findings`.
 
 ---
 

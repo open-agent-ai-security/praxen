@@ -1,0 +1,153 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    yaah (yet another agent harness)
+Analysis: July 29, 2026, 15:33 UTC
+Praxen v1.2.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a safety layer that is real but consistently one step
+weaker than its declared contract. The command guard genuinely fails closed,
+sanitizeID() genuinely blocks path traversal, and generated configuration
+never downgrades the host's permission or sandbox posture — but the secret
+scanner the remit calls fail-closed is registered on PostToolUse, so a
+credential-bearing write has already landed on disk before it is detected; the
+guard beside it is a seven-pattern denylist bound to the Bash tool alone; and
+Linter.LintFile() executes repo-resolved binaries such as npx prettier without
+routing them through that guard at all. Compounding this, nothing defends the
+controls themselves: the hook block lives in a plain .claude/settings.json
+that the guarded agent can edit, and DisableModelInvocation is set by none of
+the twenty-nine generated commands, leaving /yaah:autonomous — a workflow that
+runs an entire phase with no human checkpoint — model-invocable in direct
+contradiction of the remit. The audit trail is the second theme: structured,
+durable and genuinely reconstructive for hook-dispatched events, yet the whole
+yaah serve MCP surface writes nothing to it.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.15 / 5.0   (Partial)
+  Limit Your Domain              3/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 4   Medium: 6   Low: 1   Informational: 1
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 17   Gap: 3   Partial: 9   Vague: 0   Enforcement-not-possible: 0   (of 29 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       2
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       —
+  ASI04  Agentic Supply Chain Vulnerabilities               3
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       2
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-001  All 29 generated `/yaah:*` commands, including the
+            no-human-checkpoint `/yaah:autonomous` workflow, are
+            model-invocable — `DisableModelInvocation` is set by none of them.
+      Action 1: Set `DisableModelInvocation: true` in
+                `AutonomousCommand.Advanced()` in
+                `pkg/commands/builtins/autonomous.go`, and audit the other 28
+                builtins for any command whose side effects should likewise be
+                user-only.
+      Action 2: Add a generator-level assertion in `buildCommandMarkdown()`
+                that refuses to emit a command carrying `Context: "fork"`
+                unless `DisableModelInvocation` is explicitly set, so a new
+                workflow command cannot ship model-invocable by omission.
+
+  PRAX-2026-07-29-002  The Notion MCP provider interpolates the raw API token
+            into an env header string that the generator writes verbatim into
+            `.claude/settings.json` and `.mcp.json`.
+      Action 1: Change `NewNotion()` in `pkg/mcp/providers/notion.go` to emit
+                an indirection the host resolves at launch (for example
+                `"Bearer ${NOTION_TOKEN}"`) and never place the literal token
+                in `MCPServer.Env`.
+      Action 2: Add a guard in `GenerateClaudeSettings()` /
+                `GenerateMCPJSON()` that rejects any `Env` or `Headers` value
+                matching a credential shape, so no future provider can
+                serialize a secret into generated configuration.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-07-29-003  The secret scanner the remit declares fail-closed runs
+            on `PostToolUse`, so the credential-bearing file is already
+            written to disk before detection, and it fails open on any scan
+            error.
+      Action 1: Register the scanner on `PreToolUse` for
+                `Edit|Write|MultiEdit` and scan the proposed content from
+                `input.ToolInput` instead of re-reading the post-write file,
+                so a credential-bearing edit is refused before it reaches
+                disk.
+      Action 2: Set `Block: true` on the error return at
+                `pkg/hooks/handlers/secretscan.go:134` so an unreadable file
+                blocks rather than passes.
+
+  PRAX-2026-07-29-004  The linter executes repo-resolved binaries against a
+            model-supplied path — automatically on every edit and on demand
+            via `yaah_lint` — without routing any of it through the command
+            guard.
+      Action 1: Route every command assembled in `LintFile()` through
+                `CommandGuard.CheckCommand()` before `exec.CommandContext`,
+                and refuse to run when the guard reports unsafe.
+      Action 2: Resolve lint binaries from an absolute allowlisted path rather
+                than letting `npx` pick up `node_modules/.bin` from the
+                scanned repository, and constrain `yaah_lint`'s `file_path`
+                argument to the session's working tree.
+
+  PRAX-2026-07-29-005  No tool invocation served by `yaah serve` is recorded
+            to the session audit trail, although the remit's log-only rule
+            names MCP-server invocations explicitly.
+      Action 1: Record each MCP tool call in `pkg/mcpserver/tools.go` by
+                appending a `session.ToolCallRecord` and saving through
+                `s.harness.SessionStore()`, using the MCP session identity so
+                the record is attributable.
+      Action 2: Factor the record-and-save block out of `HandleHookEvent()`
+                into a shared helper both the hook dispatcher and the MCP
+                server call, so a future tool cannot be added without an audit
+                write.
+
+  PRAX-2026-07-29-006  Nothing prevents or alerts on removal of the
+            command-guard and secret-scanner hooks — they are declared in a
+            plain project file the guarded agent can freely edit.
+      Action 1: Add a PreToolUse handler matching `Edit|Write|MultiEdit` that
+                blocks writes targeting `.claude/settings.json`, `.mcp.json`
+                and the other generated config roots unless an explicit
+                override is present.
+      Action 2: Have `yaah hook` verify at dispatch that the handler set it
+                expects is the one the settings file declares, and emit a
+                blocking error plus a session record when the two diverge.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

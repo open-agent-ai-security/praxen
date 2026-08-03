@@ -5,7 +5,7 @@
 
 # Praxen — Specification
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** Public release (1.0 GA)
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -53,6 +53,8 @@ Every claim is tagged:
 - **Verified** — directly observed in an artifact that was read
 - **Inferred** — reasonable conclusion from indirect evidence
 - **Unknown** — no evidence available (absence of a control in a production system is itself a finding)
+
+A finding's evidence must cite **every mechanism in its causal chain**, not only the entry point and the outcome — the record is **closed under classification**, meaning a reader with the finding's evidence alone (not the codebase) can reach the correct taxonomy. A chain that runs through a store, scheduler, index, or subprocess cites that surface even when a different frame dominates the summary; otherwise the record silently loses any classification that depends on the omitted mechanism.
 
 ### 2.3 Never reprint secrets
 
@@ -269,8 +271,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 ```json
 {
-  "schema_version": "2.0",
-  "praxen_version": "1.0.1",
+  "schema_version": "3.0",
+  "praxen_version": "1.2.0",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -302,8 +304,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
         { "kind": "owasp_llm",     "label": "LLM01 — Prompt Injection" },
         { "kind": "owasp_agentic", "label": "ASI01 — Agent Goal Hijack" }
       ],
-      "policy_rule_ids": "<the R-NN id(s) violated, e.g. \"R-03\" or \"R-03, R-04\">",
-      "policy_rule_text": "<the exact quoted remit text; multiple rules joined with \" / \">",
+      "policy_rule_ids": ["<R-NN id(s) violated, e.g. [\"R-03\"] or [\"R-03\", \"R-04\"]>"],
+      "policy_rule_text": ["<the exact quoted remit text, one element per id, element-aligned with policy_rule_ids>"],
       "evidence": [
         { "file": "<workspace-relative path>", "line": "<int or null>", "snippet": "<exact observation; never reprint secrets>" }
       ],
@@ -330,13 +332,13 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     ]
   },
   "raise_posture": {
-    "weighted_overall": "<float 0.0–5.0 = Σ(score × weight)>",
+    "weighted_overall": "<float 0.0–5.0 = Σ(score × weight) over scored categories ÷ Σ(their weights)>",
     "weighted_rationale": "<2–4 sentences>",
     "categories": [
-      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": "<0–5>", "confidence": "High|Medium|Low", "weight": 0.15, "rationale": "<1–2 sentences>" },
-      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
-      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": "<0–5>", "confidence": "...",            "weight": 0.25, "rationale": "..." },
-      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "limit_your_domain",          "name": "Limit Your Domain",          "score": "<0–5|null>", "confidence": "High|Medium|Low", "weight": 0.15, "rationale": "<1–2 sentences>" },
+      { "key": "balance_your_knowledge_base", "name": "Balance Your Knowledge Base", "score": "<0–5|null>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
+      { "key": "implement_zero_trust",        "name": "Implement Zero Trust",        "score": "<0–5|null>", "confidence": "...",            "weight": 0.25, "rationale": "..." },
+      { "key": "manage_your_supply_chain",    "name": "Manage Your Supply Chain",    "score": "<0–5|null>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
       { "key": "build_an_ai_red_team",        "name": "Build an AI Red Team",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." },
       { "key": "monitor_continuously",        "name": "Monitor Continuously",        "score": "<0–5>", "confidence": "...",            "weight": 0.15, "rationale": "..." }
     ]
@@ -351,7 +353,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 - `footer.severity_counts` matches the actual severities in `findings[]`; `remit_coverage.stat_counts` matches the actual statuses in `rules[]`, and `total` equals the number of rules.
 - Every non-null `rule.finding_id` exists in the `findings[]` id set; finding ids are unique.
-- `raise_posture.categories` is exactly the six RAISE keys, each with its standard weight (Zero Trust 0.25, the other five 0.15); `weighted_overall` equals Σ(score × weight) within rounding.
+- `raise_posture.categories` is exactly the six RAISE keys, each with its standard weight (Zero Trust 0.25, the other five 0.15); `weighted_overall` equals Σ(score × weight) over the scored categories, divided by the sum of their weights, within rounding. A `null` score marks an N/A category (no applicable risk surface — permitted only for the four vector-scored categories, never Build an AI Red Team or Monitor Continuously): it is excluded from the weighted overall rather than counted as 0.
 - Severity, confidence, status, tag-kind, and log-status values are from their fixed enumerations.
 
 **Notes:**
@@ -361,7 +363,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 - `escalation` is `alert` for Critical/High, `log_only` for Medium/Low/Informational. `related_findings` lists the ids of findings that combine with this one (compound signal). Every finding that maps to a remit rule carries the exact quoted text in `policy_rule_text`, not just a section name.
 - `findings` may be empty (a genuinely clean agent); `positives` may be empty; `log_files.rows` is empty exactly when `present` is false.
 - **`evidence` is structured.** Each item is `{ file, line, snippet }`: `file` is a workspace-relative path (or workspace-relative identifier); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context. The renderer formats each item as `file:line — snippet` (or `file — snippet` when `line` is `null`). **`recommended_actions` is an array** of one or more concrete actions — the renderer renders single-item arrays as inline text and multi-item arrays as a bulleted list.
-- This is the **v2.0** schema, introduced with Praxen 0.3.0. Differences from v1.0: structured `evidence: [{file, line, snippet}]` (was `[string]`); `recommended_actions: [string]` (was a single `recommended_action` string); new optional `description` field. The v1.0 schema (Praxen 0.2.0) and the pre-0.2 bare-list-of-findings format (with a trailing `-POSTURE` summary entry) are both legacy — neither is read by the renderer.
+- This is the **v3.0** schema, introduced with Praxen 1.2. Difference from v2.0: `policy_rule_ids` and `policy_rule_text` are now **parallel arrays** (element i of one is the id whose text is element i of the other), where 2.0 carried them as scalar strings (a single id string, and multiple rule texts joined with `" / "`). The array shape lets a finding's rule references be joined mechanically for scan-to-scan regression diffing and cross-checked against `remit_coverage.rules[]`, instead of parsed out of a delimiter-joined string. v2.0 (introduced at Praxen 0.3.0: structured `evidence`, array `recommended_actions`, optional `description`), v1.0, and the pre-0.2 bare-list format are all legacy — none is read by the current renderer, which validates `schema_version` `"3.0"` exactly.
 
 ### Severity model
 
@@ -393,7 +395,7 @@ Each analysis produces a self-contained HTML report from a canonical template (`
 6. **Findings Register** — findings ordered Critical → High → Medium → Low → Informational; each card shows severity badge, ID, summary, RAISE/OWASP-LLM/OWASP-Agentic/MCP tags (each a link to that entry in the framework docs), quoted policy rule, evidence block, and recommended action
 7. **What's Working Well** — verified positive controls
 8. **Discovered Log Files** — log files found during the analysis, annotated with source / content type / purpose / modification time
-9. **OWASP LLM Top 10 (2025) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
+9. **OWASP LLM Top 10 (2026) Coverage** — full-bleed 5×2 grid, one card per LLM01–LLM10. Each populated card shows up to three most-severe findings as clickable chips (severity dot + summary, anchored to the matching Findings Register entry); empty cells render a muted "No findings" placeholder so the grid reads as a coverage map, not just a hit list. Driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, deterministic and capped at three (the full set still appears in §6's Findings Register).
 10. **OWASP Agentic Top 10 (2026) Coverage** — mirror of #9, driven by `owasp_agentic` (ASI01–ASI10).
 11. **RAISE Maturity Posture** — the wrap-up: a weighted-overall hero band with the maturity label, a 3×2 grid of the six category cards (score, confidence, weight, rationale), and the fixed 0–5 rubric table. Placed at the end on purpose, so the maturity score lands as a synthesis verdict rather than a headline that biases interpretation.
 12. **Footer** — navy band mirroring the masthead: brand lockup, repository link, project sponsor (Exabeam), and a legal line (Praxen version, license, copyright)
@@ -436,8 +438,9 @@ Praxen does not ship a scheduler. If recurring scans are desired, wrap the agent
 
 An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the coding agent's session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
 
-- At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived.
-- The same Step 9.9 prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout — before any file is written — so the operator sees the synthesis even if the session later truncates.
+- At the end of Step 4, Praxen writes a flat **evidence checkpoint** at `./reports/<agent-slug>-evidence-<timestamp>.txt` — the files read and the first-pass signals (credential patterns by location, binding addresses, dependency pins, stub controls, MCP configs, log files) — so a compaction during the long read-and-analyze span (Steps 4–8, dozens of reads before any manifest exists) can be resumed without re-discovering the workspace from scratch.
+- At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived. Its `--validate-manifest` mode structure-checks the manifest (reporting every problem, recovering at section boundaries) and is safe to run against a mid-composition skeleton.
+- Findings are **appended to the draft manifest as each is drafted** (Step 9), not composed in one terminal burst at 9.9 — a decomposition committed up front in a Step 8.5 themes outline makes the per-finding drafting mechanical. This interleaving is what keeps a long scan off the watchdog (no minutes-long silent compose) and ensures a compaction finds most findings already on disk. The 9.9 gate then prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout, so the operator sees the synthesis even if the session later truncates.
 - Rendering the report is a **deterministic Python step (Step 11)**, not LLM work — it doesn't compete for the context window, runs in well under a second, and writes the `.txt` summary to `./reports/` alongside stdout, so the summary survives even if terminal output is lost.
 
 The draft manifest makes a compacted run recoverable; it does not prevent compaction. The most reliable way to minimize context pressure is still to scope the input to the agent's own surface (not the enclosing repo) and run in the largest available context window — see `docs/usage.md`, "Large workspaces and context sizing". For a genuinely large archive, analyze one subdirectory at a time and diff the findings JSON files afterward.
@@ -451,7 +454,7 @@ Praxen's judgments are calibrated by a curated knowledge base in `knowledge/`. T
 | File | Contents |
 |------|----------|
 | `KB_RAISE_SCANNING.md` | RAISE framework scanning methodology — scoring model, artifact intake patterns, signal-to-risk heuristics, inference rules, compound patterns, positive posture signals. Primary calibration file. |
-| `KB_LLM_TOP10.md` | OWASP Top 10 for LLM Applications 2025 — distilled to code patterns, behavioral indicators, and cross-category compound risks. |
+| `KB_LLM_TOP10.md` | OWASP Top 10 for LLM Applications 2026 — distilled to code patterns, behavioral indicators, and cross-category compound risks, with a centralized primary-arbitration section. |
 | `KB_AGENTIC_TOP10.md` | OWASP Top 10 for Agentic Applications 2026 — agentic-specific attack patterns and the ASI taxonomy for classifying findings. |
 | `KB_MCP_SECURITY.md` | OWASP's *A Practical Guide for Secure MCP Server Development 2026* — MCP-specific vulnerability landscape and minimum-bar checklist. Loaded only when MCP configuration is discovered in the workspace. |
 

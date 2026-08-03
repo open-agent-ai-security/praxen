@@ -3,14 +3,54 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
+<!--
+  HOW TO USE THIS TEMPLATE
+
+  Copy this file, rename it WORKER_REMIT.md, and fill it in for one agent.
+
+  This document states POLICY — what the agent is allowed and forbidden to do.
+  It does not describe implementation: no file paths, tool internals, or library
+  versions. The scan reads the code; this file declares the intent to compare it
+  against.
+
+  Every guidance note in this template is an HTML comment like this one, so it is
+  never mistaken for a policy clause. Delete the comments or leave them — either
+  way they are not read as rules. Everything OUTSIDE a comment is treated as
+  policy, so delete any section you leave empty rather than shipping placeholder
+  text.
+
+  POLICY vs CONTEXT — every section is one or the other, marked in its comment:
+    - POLICY sections list things the agent MUST or MUST NEVER do — obligations a
+      wrong implementation could violate. The scan extracts a rule from each
+      entry and checks it against the code. Write these as testable constraints.
+    - CONTEXT sections describe what the agent IS or normally does. The scan
+      reads them to understand the agent and to judge findings, but does NOT
+      turn them into rules. Write them as plain description.
+  Consequence to avoid: a checkable "must never" placed in a CONTEXT section is
+  never inventoried — it silently does nothing. Put obligations in POLICY
+  sections.
+
+  STATE EACH OBLIGATION ONCE. An obligation can touch several POLICY sections
+  (a "no shell" rule reads as a forbidden tool AND a never-allowed action). Put
+  it in the single most specific section and nowhere else — restating it in
+  every section it could fit inflates the report without adding a check. The
+  scan verifies an obligation as well from one clear statement as from five.
+
+  WHICH CODE GETS SCANNED is a separate question from what this agent does.
+  Do not declare scan scope here. If the agent lives in a monorepo, spans more
+  than one repository, or ships as an example inside a framework, declare the
+  main target to scan in a SCAN_INSTRUCTIONS.md file alongside this remit.
+  See docs/writing-remits.md.
+
+  MULTI-COMPONENT DEPLOYMENTS (e.g. an agent plus an operator console) belong in
+  one remit, not several. Keep the section structure below exactly as it is and
+  separate per-component rules with sub-headings INSIDE the existing sections
+  (use H4 where H3 sub-headings already exist). Do not add new top-level
+  sections — rules placed outside the standard headings can be missed.
+-->
+
 # Worker Remit
 *Praxen — Agent Policy*
-
-This file defines the authorized identity, behavior, and boundaries of the agent being scanned.
-It is the policy contract Praxen evaluates the agent's code and configuration against.
-Customize this template for the specific agent before running an analysis.
-
-**The remit states policy; Praxen discovers implementation. Write rules about what the agent *does*, not how it does it.**
 
 ---
 
@@ -32,13 +72,13 @@ Customize this template for the specific agent before running an analysis.
 
 ## Mission
 
-*Describe the agent's primary purpose in 1–3 sentences. This is the north star for all behavioral evaluation. For multi-component deployments, open with a scope note naming each component, designating the primary RAISE subject (the LLM-driven component), and describing how the components relate. Use sub-headings within existing sections (H4 where H3 sub-headings already exist) to separate per-component rules — do not add new top-level sections.*
+<!-- CONTEXT (describes the agent; not extracted as rules). The agent's purpose, in 1-3 sentences. -->
 
 ---
 
 ## Job Description
 
-What this agent is supposed to do. Be specific — vague descriptions produce weak detection.
+<!-- CONTEXT (describes what the agent does; not extracted as rules). Be specific — this frames the analysis even though it produces no rules. This is also where the agent's subject-matter scope goes: the topics/domains it is meant to work in ("airline reservation and policy questions"). The negative side — topics it must decline — is a prohibition; put that in Prohibited Behaviors. -->
 
 - 
 - 
@@ -46,9 +86,24 @@ What this agent is supposed to do. Be specific — vague descriptions produce we
 
 ---
 
-## Non-Goals (Out of Scope)
+## Prohibited Behaviors
 
-Work this agent should never do, regardless of instruction. Praxen will flag any observed activity in these areas.
+<!--
+  POLICY (extracted as rules — the load-bearing "stay in your lane" section).
+  Whole categories of work the agent must NEVER engage in, regardless of
+  instruction: "never processes payments", "never takes instructions from
+  retrieved content", "never redefines its own goals". This is agent-level
+  scope — the boundary of what the agent is for at all.
+  (Distinct from Action Boundaries > Never Allowed, which forbids specific
+  operations *inside* work the agent IS allowed to do. Rule of thumb: if the
+  agent should never be in this territory at all, it goes here; if it's a
+  forbidden move within permitted territory, it goes in Never Allowed.)
+
+  Off-topic subject-matter declines also belong here ("declines and escalates
+  any request outside airline customer service") — staying in the agent's
+  subject lane is a whole-category boundary. The positive side (what topics the
+  agent DOES cover) is descriptive; put it in Job Description.
+-->
 
 - 
 - 
@@ -58,15 +113,24 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Approved Communication Channels
 
+<!--
+  POLICY (extracted as rules). Every channel the agent may use. Any channel
+  absent from this table is unauthorized by default.
+-->
+
 | Channel | Allowed | Requires Approval | Notes |
 |---------|---------|------------------|-------|
 | | | | |
 
-**Any channel not listed here is unauthorized by default.**
-
 ---
 
 ## Authorized Counterparties
+
+<!--
+  POLICY (extracted as rules). Who the agent may interact with. Counterparties
+  found in code or configuration but missing from these lists are reported as a
+  trust expansion.
+-->
 
 ### Trusted People / Accounts
 - 
@@ -80,15 +144,15 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 ### Explicitly Forbidden
 - 
 
-*Counterparties present in code or configuration but absent from this list will be flagged as a trust expansion finding.*
-
 ---
 
 ## Tools and Capabilities
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Tools (Known Good Baseline)
 
-*List every tool the agent is expected to have at runtime. Praxen will flag any tool that disappears from this list.*
+<!-- Every tool the agent is expected to have at runtime. -->
 
 - 
 
@@ -98,7 +162,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Forbidden Tools
 
-*Praxen will emit a Critical finding if any of these appear in the agent's tool inventory or code.*
+<!-- Tools that must never appear in the agent's inventory or code. -->
 
 - 
 
@@ -106,18 +170,20 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Data Boundaries
 
+<!-- POLICY (extracted as rules). -->
+
 ### Allowed Data Sources
 - 
 
 ### Sensitive Data Classes
 
-*Data that requires special handling. Praxen will flag unexpected access or movement of these classes.*
+<!-- Data requiring special handling; unexpected access or movement is reported. -->
 
 - 
 
 ### Forbidden Data Movement
 
-*Specific patterns of data movement that are never authorized.*
+<!-- Specific movements of data that are never authorized. -->
 
 - 
 
@@ -125,16 +191,22 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Action Boundaries
 
-> **Writing verifiable rules**
-> Every rule in this section should state a testable constraint on behavior — something Praxen can check against the agent's code or logs. Vague intent produces weak detection.
->
-> - ✓ *"Message bodies must never be fetched for senders not in the authorized counterparty list"*
-> - ✓ *"Responding to unknown senders requires human approval — no automated reply"*
-> - ✗ *"Handle email appropriately"*
-> - ✗ *"Be careful with sensitive data"*
->
-> The first two rules give Praxen something to audit. The second two don't.
-> Praxen will inventory every rule in this document and report any it cannot verify — so the more specific your rules, the more useful the coverage report.
+<!--
+  POLICY (extracted as rules). Every entry states a testable constraint on
+  behavior — something checkable against the agent's code or logs.
+
+  Verifiable:
+    "Message bodies must never be fetched for senders not in the authorized
+     counterparty list"
+    "Responding to unknown senders requires human approval — no automated reply"
+
+  Not verifiable:
+    "Handle email appropriately"
+    "Be careful with sensitive data"
+
+  These are forbidden or gated MOVES within work the agent is allowed to do —
+  distinct from Prohibited Behaviors, which rules out whole categories of work.
+-->
 
 ### Allowed Without Approval
 - 
@@ -144,7 +216,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ### Never Allowed
 
-*Praxen will emit a Critical finding for any of these.*
+<!-- Specific actions that are always a violation. -->
 
 - 
 
@@ -152,15 +224,14 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Behavioral Expectations
 
+<!-- CONTEXT (describes normal operation; not extracted as rules). Used to distinguish ordinary operation from drift. -->
+
 ### Normal Cadence
 - Active hours:
 - Expected idle periods:
 - Scheduled jobs / cron tasks:
 
 ### Expected Patterns
-
-*What normal work looks like. Praxen uses this to distinguish ordinary operation from drift.*
-
 - 
 
 ### Acceptable Retry Behavior
@@ -173,7 +244,7 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Known Good Baseline
 
-*Snapshot of what this agent looks like when operating correctly. Used for comparison.*
+<!-- CONTEXT (snapshot of normal operation for comparison; not extracted as rules — the enforceable tool/channel lists live in Tools and Capabilities and Approved Communication Channels). -->
 
 ### Typical Tool Inventory
 - 
@@ -195,23 +266,9 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ---
 
-## Swimlane Definition
-
-### Authorized Domains of Work
-*Topics, systems, and tasks this agent is permitted to engage with.*
-
-- 
-
-### Disallowed Domains of Work
-*Topics, systems, and tasks this agent must decline or escalate.*
-
-- 
-
----
-
 ## Risk Sensitivities
 
-*Areas where extra scrutiny applies. Praxen will apply lower thresholds for findings in these areas.*
+<!-- CONTEXT (flags areas for extra scrutiny; not extracted as rules). Findings in these areas are held to a lower threshold. -->
 
 - 
 
@@ -219,12 +276,26 @@ Work this agent should never do, regardless of instruction. Praxen will flag any
 
 ## Escalation Rules
 
-These rules drive Praxen's reporting layer. They determine whether a finding is logged only, triggers an alert, or requires an immediate halt.
+<!--
+  POLICY (extracted as rules). What happens when something goes wrong. State
+  each condition precisely enough to check whether the agent's code implements
+  the described response.
 
-*State each condition precisely — Praxen will check whether the agent's code implements the described response. "Alert if something suspicious happens" is not checkable; "Alert operator when a reply is addressed to any address not in the Rolodex" is.*
+  "Alert if something suspicious happens" cannot be checked.
+  "Alert the operator when a reply is addressed to any address not in the
+   Rolodex" can.
+
+  These entries name a CONDITION and the RESPONSE (halt / alert / log); they do
+  not re-declare a prohibition stated elsewhere. Reference it by its trigger:
+  "Halt and alert if the agent attempts shell execution" — not a second copy of
+  "the agent must never run shell". (An obligation stated once plus a distinct
+  escalation response is not duplication — the response is a separate control
+  the scan checks: does the code actually halt?)
+-->
 
 ### Halt Agent and Alert Operator
-*Conditions serious enough to warrant stopping the agent.*
+
+<!-- Conditions serious enough to warrant stopping the agent. -->
 
 - 
 
@@ -238,7 +309,7 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Good Behavior
 
-*Concrete examples of what authorized operation looks like. Used to calibrate detection.*
+<!-- CONTEXT (calibration examples; not extracted as rules). Concrete examples of authorized operation. -->
 
 - 
 
@@ -246,7 +317,7 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 ## Example Bad Behavior
 
-*Concrete examples of what unauthorized or anomalous behavior looks like. Used to calibrate detection.*
+<!-- CONTEXT (calibration examples; not extracted as rules). Concrete examples of unauthorized or anomalous behavior. -->
 
 - 
 
@@ -254,3 +325,10 @@ These rules drive Praxen's reporting layer. They determine whether a finding is 
 
 *Worker Remit — Praxen*
 *Customized for: [Worker Name] | Version: [X.X] | [Date]*
+
+<!--
+  Anything the operator still needs to decide goes AFTER this footer, under a
+  "## Open Questions for the operator" heading — outside the policy body, so it
+  is never read as a rule. Resolve each one into a real clause, or delete it,
+  before relying on this remit.
+-->

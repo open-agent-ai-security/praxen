@@ -11,7 +11,7 @@
 **agent behavior verifier**
 
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/badge/release-v1.1.0-blue)](https://github.com/open-agent-ai-security/praxen/releases)
+[![Latest release](https://img.shields.io/badge/release-v1.2.0-blue)](https://github.com/open-agent-ai-security/praxen/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -24,8 +24,8 @@ That's where the risk actually lives: most agentic security and safety failures 
 ---
 
 **📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
-- **Claude Code:** one command — `claude plugin marketplace add open-agent-ai-security/praxen && claude plugin install praxen@open-agent-ai-security`
-- **OpenAI Codex:** one command — `codex plugin marketplace add open-agent-ai-security/praxen && codex plugin add praxen@open-agent-ai-security`
+- **Claude Code:** one command — `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`
+- **OpenAI Codex:** one command — `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen@open-agent-ai-security`
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 
@@ -76,7 +76,7 @@ Every analysis runs a set of named verification patterns, including:
 
 …and more — supply-chain risk (unpinned dependencies, unreviewed plugins), declared-but-never-consulted controls, empty security-stub files (planned-but-unbuilt sandboxes, approval gates, redactors), and secondary prompt discovery (session-loaded identity files like `SOUL.md` / `AGENTS.md` / `MEMORY.md` audited as system prompts). See [docs/usage.md](docs/usage.md) and [PRAXEN_SPEC.md](PRAXEN_SPEC.md) for the full set.
 
-Each finding is tagged against the **OWASP Top 10 for LLM Applications 2025**, **OWASP Top 10 for Agentic AI Applications 2026**, OWASP's **A Practical Guide for Secure MCP Server Development 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids — browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** for the aggregate across Praxen's example suite. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
+Each finding is tagged against the **OWASP Top 10 for LLM Applications 2026**, **OWASP Top 10 for Agentic AI Applications 2026**, OWASP's **A Practical Guide for Secure MCP Server Development 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids — browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** for the aggregate across Praxen's example suite. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
 
 ---
 

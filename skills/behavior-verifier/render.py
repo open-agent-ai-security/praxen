@@ -40,6 +40,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 import textwrap
 from datetime import datetime
 
@@ -80,9 +81,17 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # OWASP Top 10 coverage grid — canonical code order and titles. Titles are
 # copied verbatim from the published OWASP entries (kept in sync with the
 # `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
+# The LLM list was renumbered in its 2026 revision; a document is rendered with
+# the vocabulary its findings were tagged under (see _llm_titles_for), so a
+# 2025-tagged code is never shown with its 2026 name. Scope of that promise:
+# it applies to schema-3.0 documents carrying a pre-1.2 praxen_version (e.g.
+# the retro-fitted finbot fixture golden, praxen 0.3.0). Documents at
+# schema_version 2.0 — every actually-frozen pre-1.2 report — do NOT render
+# here at all: validate() rejects them ("renderer understands schema 3.0
+# exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
-_OWASP_LLM_TITLES = {
+_OWASP_LLM_TITLES_2025 = {
     "LLM01": "Prompt Injection",
     "LLM02": "Sensitive Information Disclosure",
     "LLM03": "Supply Chain",
@@ -94,6 +103,31 @@ _OWASP_LLM_TITLES = {
     "LLM09": "Misinformation",
     "LLM10": "Unbounded Consumption",
 }
+_OWASP_LLM_TITLES_2026 = {
+    "LLM01": "Prompt Injection",
+    "LLM02": "Sensitive Information Disclosure",
+    "LLM03": "Excessive Agency",
+    "LLM04": "Supply Chain",
+    "LLM05": "Data and Model Poisoning",
+    "LLM06": "Unbounded Consumption",
+    "LLM07": "Misinformation",
+    "LLM08": "Hidden Context Exposure",
+    "LLM09": "Vector and Embedding Weaknesses",
+    "LLM10": "Improper Output Handling",
+}
+
+
+def _llm_titles_for(data):
+    """Pick the OWASP LLM title vocabulary for this document by the Praxen
+    version that produced it: findings tagged by Praxen >= 1.2 use the 2026
+    numbering; earlier documents keep the 2025 numbering they were tagged
+    under."""
+    try:
+        parts = str(data.get("praxen_version", "0")).split(".")
+        major, minor = int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        major, minor = 0, 0
+    return _OWASP_LLM_TITLES_2026 if (major, minor) >= (1, 2) else _OWASP_LLM_TITLES_2025
 _OWASP_AGENTIC_CODES = ("ASI01", "ASI02", "ASI03", "ASI04", "ASI05",
                         "ASI06", "ASI07", "ASI08", "ASI09", "ASI10")
 _OWASP_AGENTIC_TITLES = {
@@ -198,17 +232,29 @@ def render_rich(text, allow=("code",)) -> str:
     return re.sub(r"\x00(\d+)\x00", lambda m: saved[int(m.group(1))], escaped)
 
 
+_STRIPPABLE_TAGS = sorted({t for tags in _RICH_FIELDS.values() for t in tags})
+
+
 def strip_tags(text) -> str:
     """Flatten a rich-text field to plain text for the TXT summary: a ``</p>``
     paragraph break becomes a single space (so sentences don't run together),
-    every other HTML-ish tag (``<p>``, ``<code>``, ``<strong>``, a stray
-    ``<a ...>``, …) is dropped, and HTML entities (``&mdash;``, ``&amp;``,
-    ``&lt;project&gt;`` …) are decoded to their characters — the prose fields
-    legitimately carry entities for the HTML report, and the plain-text summary
-    should show ``—`` / ``&`` / ``<project>`` rather than the raw entity text.
-    A lone ``<`` that is not a tag is left alone."""
+    the other markup tags the prose fields may legitimately carry (``<code>``,
+    ``<strong>``, ``<em>``, ``<p>``) are dropped, and HTML entities
+    (``&mdash;``, ``&amp;``, ``&lt;project&gt;`` …) are decoded to their
+    characters — the prose fields legitimately carry entities for the HTML
+    report, and the plain-text summary should show ``—`` / ``&`` / ``<project>``
+    rather than the raw entity text.
+
+    Only the tags in ``_RICH_FIELDS`` are stripped, deliberately: anything else
+    in angle brackets is content, not markup. Route placeholders are the common
+    case — ``POST /api/vendors/<id>/invoices`` must survive intact, where a
+    generic ``</?[a-zA-Z][^>]*>`` sweep silently ate ``<id>`` and produced
+    ``/api/vendors//invoices``. This also keeps TXT consistent with the HTML
+    report, where ``render_rich`` escapes any tag outside the allow-list into
+    visible text rather than dropping it."""
     t = re.sub(r"\s*</p\s*>\s*", " ", str(text), flags=re.IGNORECASE)
-    t = re.sub(r"</?[a-zA-Z][^>]*>", "", t)
+    tag_alt = "|".join(re.escape(tag) for tag in _STRIPPABLE_TAGS)
+    t = re.sub(rf"</?(?:{tag_alt})\s*>", "", t, flags=re.IGNORECASE)
     return html.unescape(t)
 
 
@@ -388,9 +434,12 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
 
 
 def _policy_ctx(finding, _idx):
+    # schema 3.0: policy_rule_ids / policy_rule_text are parallel arrays (#7).
+    # Join for display with the historical separators (", " for ids, " / " for
+    # the quoted texts) so the rendered card is unchanged by the shape change.
     return {
-        "RULE_IDS": esc(finding["policy_rule_ids"]),
-        "QUOTED_RULE_TEXT": esc(finding["policy_rule_text"]),
+        "RULE_IDS": esc(", ".join(finding["policy_rule_ids"])),
+        "QUOTED_RULE_TEXT": esc(" / ".join(finding["policy_rule_text"])),
     }
 
 
@@ -468,6 +517,19 @@ def _log_row_ctx(row, _idx):
 
 def _raise_card_ctx(cat, _idx):
     score, weight = cat["score"], cat["weight"]
+    if score is None:
+        # N/A category (KB Step B3 all-N/A): excluded from the weighted overall.
+        # Reuses the mid-tone score class so no template change is needed.
+        return {
+            "SCORE_CLASS": _SCORE_CLASS[2],
+            "CATEGORY_NAME": esc(cat["name"]),
+            "SCORE": "N/A",
+            "SCORE_PCT": "0",
+            "CONFIDENCE": esc(cat["confidence"]),
+            "WEIGHT_PCT": str(round(weight * 100)),
+            "WEIGHTED_CONTRIBUTION": "excluded",
+            "RATIONALE": render_rich(cat["rationale"], allow=_RICH_FIELDS["raise_rationale"]),
+        }
     return {
         "SCORE_CLASS": _SCORE_CLASS[score],
         "CATEGORY_NAME": esc(cat["name"]),
@@ -588,6 +650,10 @@ def _global_ctx(data):
         "SCAN_TIMESTAMP": esc(_format_timestamp(scan["scan_timestamp"])),
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
+        # OWASP LLM list year for the section heading — version-gated the same way
+        # as the category titles (2026 for Praxen >= 1.2, 2025 for archival docs),
+        # so the heading can never disagree with the numbering shown in the cards.
+        "OWASP_LLM_YEAR": "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025",
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
         "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
@@ -643,7 +709,7 @@ def render_html(template: str, data: dict) -> str:
     # three most-severe chips (or a "No findings" note). Driven by each
     # finding's scalar `owasp_llm` / `owasp_agentic`, not the tags[] array.
     llm_cards = _owasp_cards(data["findings"], "owasp_llm",
-                             _OWASP_LLM_CODES, _OWASP_LLM_TITLES)
+                             _OWASP_LLM_CODES, _llm_titles_for(data))
     tpl = expand_repeat(tpl, "owasp_llm_card", llm_cards, _owasp_card_ctx,
                         inner=_owasp_card_inner("owasp_llm_chip"))
     agentic_cards = _owasp_cards(data["findings"], "owasp_agentic",
@@ -701,7 +767,8 @@ def render_txt(data: dict) -> str:
     out.append(f"  Weighted overall:  {posture['weighted_overall']:.2f} / 5.0"
                f"   ({maturity_label(posture['weighted_overall'])})")
     for c in sorted(posture["categories"], key=lambda c: RAISE_KEYS.index(c["key"])):
-        out.append(f"  {c['name']:<30} {c['score']}/5"
+        score_txt = "N/A" if c["score"] is None else f"{c['score']}/5"
+        out.append(f"  {c['name']:<30} {score_txt}"
                    f"   (confidence: {c['confidence']}, weight: {round(c['weight'] * 100)}%)")
     out.append("")
 
@@ -725,7 +792,7 @@ def render_txt(data: dict) -> str:
     # the summary, so the number reflects all findings in each category.
     for heading, key, codes, titles in (
         ("OWASP LLM TOP 10 COVERAGE", "owasp_llm",
-         _OWASP_LLM_CODES, _OWASP_LLM_TITLES),
+         _OWASP_LLM_CODES, _llm_titles_for(data)),
         ("OWASP AGENTIC TOP 10 COVERAGE", "owasp_agentic",
          _OWASP_AGENTIC_CODES, _OWASP_AGENTIC_TITLES),
     ):
@@ -761,7 +828,8 @@ def render_txt(data: dict) -> str:
             out.append("")
 
     out.append(bar)
-    out.append("Built on OWASP Top 10 for LLM Applications 2025  |  OWASP Top 10 for Agentic Applications 2026"
+    llm_year = "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025"
+    out.append(f"Built on OWASP Top 10 for LLM Applications {llm_year}  |  OWASP Top 10 for Agentic Applications 2026"
                "  |  RAISE Framework")
     out.append("Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)")
     out.append("github.com/open-agent-ai-security/praxen  |  Apache-2.0")
@@ -771,8 +839,20 @@ def render_txt(data: dict) -> str:
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
 def _write(path: str, content: str) -> None:
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(content)
+    out_dir = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".praxen-render-", suffix=".tmp", dir=out_dir, text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _load_json(path: str):
@@ -864,7 +944,7 @@ def _canon_owasp_tag_label(label):
     if not m:
         return label
     code = m.group(1).upper()
-    if code not in _OWASP_LLM_TITLES and code not in _OWASP_AGENTIC_TITLES:
+    if code not in _OWASP_LLM_CODES and code not in _OWASP_AGENTIC_CODES:
         return label
     return f"{code} — {m.group(2)}"
 
@@ -920,11 +1000,17 @@ def main(argv=None) -> int:
             html_out = render_html(_read_template(args.template), data)
         except RenderError as e:
             sys.exit(f"render.py: HTML render error — {e}")
-        _write(args.out_html, html_out)
+        try:
+            _write(args.out_html, html_out)
+        except OSError as e:
+            sys.exit(f"render.py: cannot write HTML report {args.out_html}: {e}")
         print(f"render.py: wrote {args.out_html} ({summary})")
 
     if args.out_txt:
-        _write(args.out_txt, render_txt(data))
+        try:
+            _write(args.out_txt, render_txt(data))
+        except OSError as e:
+            sys.exit(f"render.py: cannot write TXT report {args.out_txt}: {e}")
         print(f"render.py: wrote {args.out_txt} ({summary})")
 
     return 0
