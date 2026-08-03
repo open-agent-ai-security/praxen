@@ -5,7 +5,20 @@
 
 # Praxen 1.2 — Harness Reliability & Scoring Stability
 
-> ## ▶ STATUS: CLOSED — shipped to `dev` 2026-07-30 (main promotion pending, planned 2026-08-04)
+> ## ▶ STATUS: SHIPPED — `v1.2.0` released 2026-08-03
+>
+> **Released a day ahead of the planned 2026-08-04 window**, once the branch was
+> verified clean. Promotion `784203d` (merge commit, `dev` fast-forwarded); a
+> docs-correction promotion followed (`ea8f00b`); tag **`v1.2.0`** cut from `main`
+> with `praxen-1.2.0.zip` (8.19 MB) published; announcement live at
+> [the community blog](https://open-agent-ai-security.github.io/blog/praxen-1-2-release/).
+>
+> **Post-release verification (2026-08-03).** A clean install from the public
+> marketplace scanned **three randomly chosen baseline targets**: uagents **1.70**
+> and autogen-code-executor **1.55** hit their frozen medians exactly, helperbot
+> **0.45** landed at its band edge (median 0.60, band 0.15). `schema_version` 3.0
+> and `praxen_version` 1.2.0 confirmed from the JSON; 2026 OWASP naming
+> throughout; spot-checked findings grounded in real code. No red flags.
 >
 > **The release pivoted from its original frame.** This plan was written as
 > "harness reliability + scoring stability on Opus 4.8." What shipped is **OWASP
@@ -46,6 +59,39 @@
 >   CURRENT-baseline fix**; **news page** reframed + 1.2 release announcement;
 >   **Gemini review gate retired** (#120 closed).
 >
+> **Delivered after this plan was closed (2026-07-31 → 08-03), not in the staged
+> plan below** — all docs/packaging/CI; no findings JSON touched, no score moved:
+> - **Community-marketplace cutover** (#211, #212) — install moves to the canonical
+>   catalog [`open-agent-ai-security/plugins`](https://github.com/open-agent-ai-security/plugins)
+>   for **both Claude Code and OpenAI Codex** (Codex path smoke-verified on CLI
+>   0.146.0). The in-repo `.claude-plugin/marketplace.json` becomes a **legacy
+>   mirror** so existing installs keep updating, with CI drift guarding it
+>   (`marketplace-sync.yml` → `check_marketplace_mirror.py`; fails closed, and
+>   pins the canonical praxen source). Sister repo **socxen** hard-cut to the same
+>   catalog (0.6.5 → 0.6.6) and aligned to praxen's branch model.
+> - **Renderer fix (#215)** — the TXT summary silently deleted route placeholders
+>   (`POST /api/vendors/<id>/invoices` → `/api/vendors//invoices`). Present in
+>   1.1.0 too; the committed golden had the corruption baked in, so no test could
+>   have caught it. **Found by an end-to-end acceptance run** from a marketplace
+>   install, not by the suite.
+> - **DCO privacy-alias fix (#221)** — GitHub rewrites a fork contributor's author
+>   email to `@users.noreply.github.com` on squash-merge, so the sign-off email no
+>   longer matched and the promotion PR failed its own DCO gate on Christopher
+>   Deck's #194 contribution. Would recur for any contributor with email privacy
+>   enabled. Landed on `main` directly — `pull_request_target` runs the workflow
+>   from the **base** branch, so a dev-only fix could not have unblocked it.
+> - **Dependabot retargeted to `dev`** (#218) — it defaulted to the default branch
+>   (`main`, the release channel), which breaks the *main is an ancestor of dev*
+>   invariant.
+> - **Post-release doc corrections** — `STABILITY.md` and
+>   `docs/interpreting-reports.md` still published `schema_version` **2.0** after
+>   3.0 shipped (a downstream consumer following the contract would pin the wrong
+>   major); `SECURITY.md` still declared Praxen pre-`1.0`; `docs/owasp.md` linked a
+>   404'd OWASP Agentic Top 10 URL. All live.
+> - **News-page community-commentary card** for the *When a Security Scan Earns Its
+>   Keep* post; **blog announcement published** with real install commands for both
+>   platforms and links to the project home page.
+>
 > **Deferred → 1.3** (see `RELEASE_1.3_PLAN.md`): **#48 scoring rework** (the PUSH);
 > **#198 remit-generator authoring quality** (the durable fix for the over-reach
 > class) and the **remit-cleanup + re-baseline** on the targets it still affects
@@ -62,6 +108,17 @@
 >   full 0–5 scale in 1.3).
 > - **Open, carried to 1.3:** everything under *Deferred → 1.3* above (#173/#174 are
 >   the remaining tagging-calibration pair).
+>
+> **Filed during the promotion and post-release reviews (2026-07-31 → 08-03)** —
+> none blocked the release; triaged into `RELEASE_1.2.1_PLAN.md` (docs/CI, no
+> score movement) or 1.3: **#216** (SKILL §9.2 example describes FinBot verbatim),
+> **#217** (manifest authoring is the pipeline's fragile step), **#222** (DCO bot
+> exemption should use a login allowlist), **#224** (SKILL Step 9.9
+> `--validate-manifest` example is unrunnable), **#225** / **#226** (docs-review
+> findings), **#227** (report tag chips point at the unstyled Jekyll `/docs/`
+> render — *do not* fix with `.nojekyll`, which would 404 reports already in
+> users' hands). **#209** items 2–3 remain open (dependabot auto-merge gating,
+> SHA-pinned actions); item 1 shipped.
 >
 > The staged plan below is retained as the historical record.
 
