@@ -11,6 +11,11 @@
 > remit-generator / over-reach class below). **Reference model is now Opus 5** —
 > 1.3 grades vs **`v1.2-opus5`**, not `v1.2-claude48`. Branches from `dev` after
 > the 1.2 → main promotion.
+>
+> **`v1.2.0` shipped 2026-08-03.** A score-inert patch, **`RELEASE_1.2.1_PLAN.md`**,
+> is drafted ahead of this release for the docs/CI tail from the promotion reviews
+> — anything that moves a number stayed here. If 1.2.1 ships first, 1.3 branches
+> from `dev` after it.
 
 ## Objective
 
