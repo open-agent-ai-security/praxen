@@ -55,10 +55,11 @@ If you do not hear back from us within the windows above, please nudge the threa
 
 ## Supported versions
 
-Security fixes ship in the **latest** released `0.x` line. Praxen is pre-`1.0` and there is no LTS branch; please upgrade to the latest tagged release before reporting.
+Security fixes ship in the **latest** released `1.x` line. There is no LTS branch and no back-porting to earlier minors; please upgrade to the latest tagged release before reporting.
 
 | Version | Receiving security fixes |
 |---|---|
 | **Latest tagged release** | ✓ Yes — always upgrade to the newest release before reporting |
-| Anything older than the latest release | No — no back-porting while pre-`1.0`; no LTS branch yet |
+| Anything older than the latest release | No — no back-porting to earlier minors; no LTS branch |
+| `0.x` (pre-`1.0`) | No — superseded, not maintained |
 | `0.6.x` and earlier (under the former name `Praxa`, at `Exabeam/deckard`) | No — superseded by the rename, not maintained |
