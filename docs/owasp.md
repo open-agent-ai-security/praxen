@@ -20,7 +20,7 @@ As LLM-based systems moved into production, OWASP spun up a dedicated effort: th
 | Document | What it covers | Praxen tag prefix |
 |---|---|---|
 | [OWASP Top 10 for LLM Applications 2026](https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final) | Risks in applications built on large language models | `LLM01`–`LLM10` |
-| [OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/) | Risks specific to autonomous, tool-using agents | `ASI01`–`ASI10` |
+| [OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/) | Risks specific to autonomous, tool-using agents | `ASI01`–`ASI10` |
 | [A Practical Guide for Secure MCP Server Development 2026](https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/) | Securing Model Context Protocol servers and the tools they expose | `mcp` (checklist items) |
 
 Praxen carries distilled extracts of all three in its knowledge base (`skills/behavior-verifier/knowledge/`), but the canonical, full-length versions live at the links above — go there for the complete write-ups, examples, and references.
@@ -78,7 +78,7 @@ Risks that emerge once an LLM is wired to tools, memory, other agents, and the a
 | <a id="asi09"></a>**ASI09** | Human-Agent Trust Exploitation | The agent's perceived authority is used to manipulate the humans who rely on it (or vice versa). |
 | <a id="asi10"></a>**ASI10** | Rogue Agents | An agent operates outside its remit — compromised, misconfigured, or deliberately planted. |
 
-→ Full document: **[OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-ai-applications/)**
+→ Full document: **[OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)**
 
 ## A Practical Guide for Secure MCP Server Development 2026
 

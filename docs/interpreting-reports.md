@@ -153,7 +153,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 
 | Key | What's in it |
 |---|---|
-| `schema_version`, `praxen_version` | `"2.0"` and the Praxen version that produced the file |
+| `schema_version`, `praxen_version` | `"3.0"` and the Praxen version that produced the file |
 | `scan` | agent name and slug, scan date and timestamp, the analyzed workspace path, artifact count |
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |

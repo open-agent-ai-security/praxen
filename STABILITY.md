@@ -5,7 +5,7 @@
 
 # Praxen Stability Contract
 
-From **1.0**, Praxen follows semantic versioning across two independently-versioned surfaces — the **product version** (`praxen_version`, e.g. `1.0.0`) and the **findings-schema version** (`schema_version`, currently `2.0`). This document defines what each major line guarantees. **Anything not listed as Stable is explicitly Evolving and may change in a minor release.**
+From **1.0**, Praxen follows semantic versioning across two independently-versioned surfaces — the **product version** (`praxen_version`, e.g. `1.0.0`) and the **findings-schema version** (`schema_version`, currently `3.0`). This document defines what each major line guarantees. **Anything not listed as Stable is explicitly Evolving and may change in a minor release.**
 
 ## Semver / compatibility policy
 
@@ -23,7 +23,7 @@ Within a given `schema_version` MAJOR, the published JSON is a stable contract f
 - The **required sections**: `scan`, `intro_band`, `behavior_summary`, `remit_coverage`, `findings`, `positives`, `log_files`, `raise_posture`, `footer`.
 - The **fixed enumerations**: `SEVERITIES`, `REMIT_STATUSES`, `CONFIDENCES`, `TAG_KINDS`, `ESCALATIONS`, and the finding-ID grammar `PRAX-YYYY-MM-DD-NNN`.
 
-**Strict today; additive by policy.** The published schema and the bundled validator (`schema.py`) are **strict** to the current `schema_version` (`2.0`): objects are closed (`additionalProperties: false`) and enums are fixed, so they validate Praxen's own output exactly and reject anything they don't recognize. The **compatibility policy** for future minors is additive — a new *optional* field or enum *value* may ship in a schema MINOR (e.g. `2.1`), and when one does, the published schema and validator are updated in lockstep to accept it. Removing a field, removing/renaming an enum value, or changing a type or required-ness is a schema-MAJOR (`3.0`) change. **Downstream consumers** should pin to the schema MAJOR and tolerate fields/values they don't recognize *in their own parsing*; Praxen's strict validator exists to check Praxen's output, not to read a future minor.
+**Strict today; additive by policy.** The published schema and the bundled validator (`schema.py`) are **strict** to the current `schema_version` (`3.0`): objects are closed (`additionalProperties: false`) and enums are fixed, so they validate Praxen's own output exactly and reject anything they don't recognize. The **compatibility policy** for future minors is additive — a new *optional* field or enum *value* may ship in a schema MINOR (e.g. `3.1`), and when one does, the published schema and validator are updated in lockstep to accept it. Removing a field, removing/renaming an enum value, or changing a type or required-ness is a schema-MAJOR (`4.0`) change — as `3.0` itself was, in Praxen 1.2, when `policy_rule_ids` / `policy_rule_text` became required arrays. **Downstream consumers** should pin to the schema MAJOR and tolerate fields/values they don't recognize *in their own parsing*; Praxen's strict validator exists to check Praxen's output, not to read a future minor.
 
 ### 2. The RAISE six-category set and weights
 
