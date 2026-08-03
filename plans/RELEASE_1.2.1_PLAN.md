@@ -98,33 +98,63 @@ large, and it is optional for this release.
   praxen's derived step is `guide/` via `docs_build.py` only if a bumped version
   appears in `docs/`, which today it does not.
 
-### C · Optional / needs a call
+### C · Report and authoring clean-ups *(approved for scope — Steve, 2026-08-03)*
 
 - **#227 — report tag chips link the unstyled Jekyll `/docs/` render** instead of
   the styled `/guide/` pages. Score-inert, but fixing it regenerates **85
   committed HTML renders** (baselines, examples, the golden fixture) because the
   byte-render gate requires committed renders to reproduce exactly. Every diff
-  should be *only* the URL substitution — mechanically verifiable.
+  must be *only* the URL substitution — mechanically verifiable, and worth
+  verifying rather than trusting.
   **Do not "fix" this with `.nojekyll`**: that turns `/praxen/docs/` into a 404
   and breaks every report users have already generated and shared at 1.0/1.1/1.2,
-  which we cannot reach. Include only if the 85-file diff is acceptable in a
-  patch; otherwise 1.3.
+  which we cannot reach. Keep Jekyll serving `/docs/` as a fallback.
 - **#216 — `SKILL.md` §9.2's worked example describes FinBot verbatim**, including
-  a real finding on a roster/demo target. The fix is prose-only, but it is prose
-  the scanning model reads while authoring `agent_structure_summary`, so it is
-  the one item here with a non-zero (small) chance of nudging output style.
-  If included, pair it with a single spot-check scan before merge.
-- **#151 — Google Antigravity (`agy`) harness**: packaging and docs only, engine
-  unchanged; an external contact is waiting and the 1.3 plan already notes there
-  is no engineering reason to hold it. Additive, but it does open a new support
-  surface — a scope call, not a technical risk.
+  a real finding on a roster/demo target. Prose-only, but it is prose *the
+  scanning model reads* while authoring `agent_structure_summary` — the one item
+  in this release with a non-zero (small) chance of nudging output style.
+  **Gate it with a spot-check scan** of one baseline target before merge; if the
+  result lands outside band, drop the item rather than debug it in a patch.
 - **#106 — clarify Out-of-Scope remit coverage** as boundary-rule checks.
   Authoring-side guidance; no scan-behavior change against committed remits.
+- **#27 — finding default-state (collapsed/expanded) + expand/collapse-all.**
+  A report-UX change, so ordinarily 1.3 — but it lands in `render.py` /
+  `report_template.html` and therefore regenerates exactly the same 85 renders
+  #227 already forces. **If #227 is in, doing #27 in the same pass is nearly
+  free**; doing them in separate releases means paying the regeneration twice.
+  Score-inert either way. Include only if the UX decision (which state is
+  default) is settled — otherwise it is a design question wearing a cleanup's
+  clothes.
+- **#6 — `render.py` / template polish** (finding-card confidence, Medium/Low
+  badge, TXT High findings). The issue itself flags that it re-renders the
+  byte-frozen baselines — which is precisely why it belongs *with* #227/#27
+  rather than after them. Same argument: **the regeneration is a fixed cost, so
+  pay it once.** Score-inert; presentation only.
+- **#135 — docs simplicity pass (Tier 3).** Prose only, no generated-output or
+  scan surface. Scope it to a bounded pass rather than an open-ended rewrite.
+- **#4 — `SKILL.md` authoring aids & clarity leftovers.** Small prose items from
+  an old field review, explicitly "not bugs". Same risk class as #216 — prose the
+  model reads — so **fold it under #216's spot-check gate** and let one scan
+  cover both rather than running two.
+- **#65 items 6–7 — remit-authoring guidance**: the code-first warning block and
+  the mechanism-vs-property note in the remit template. Author-side only; the
+  committed remits 1.2.1 scores against are unchanged, so this is inert for the
+  frozen set.
+
+  ⚠️ **#65 item 8 is NOT in scope, contra the 1.3 plan's note.** That item puts
+  absence-of-evidence confidence calibration into `KB_RAISE_SCANNING.md` — which
+  `SKILL.md:202` loads as the *primary scoring calibration* at Step 3 and uses at
+  Step 8 to score. `RELEASE_1.3_PLAN.md` groups items 6–8 as "safe outside the
+  freeze"; that holds for 6–7 and over-reaches for 8. Editing a scanner-read KB
+  can move scores and belongs with the 1.3 re-freeze.
 
 ## Explicitly NOT in 1.2.1
 
 Each of these moves a number, changes the schema contract, or is a feature —
 all belong to 1.3 (`RELEASE_1.3_PLAN.md`):
+
+Swept the full open-issue list (34 as of 2026-08-03); everything not in scope
+above is here with its reason.
 
 | Item | Why not |
 |---|---|
@@ -132,15 +162,18 @@ all belong to 1.3 (`RELEASE_1.3_PLAN.md`):
 | #198 / #200 / #201 remit work | Remit changes move scores; needs a re-freeze |
 | #195 band anchors · #196 decomposition rule | Scoring/variance surface |
 | #173 / #174 tagging calibration | Changes frozen tags |
-| #41 · #104 detection additions | New findings |
+| #41 detection pattern · #65 items 4–5 (IaC discovery) | New discovery surfaces = new findings |
+| #104 entropy secret detection | Changes what reports redact — alters output content, and it is a detection change |
+| #65 item 8 (KB confidence calibration) | `KB_RAISE_SCANNING.md` is scanner-read primary calibration — **can move scores** (see C) |
 | #70 roster gap | New target = re-baseline |
-| #176 suite_health full 0–5 scale | Explicitly gated on the next re-baseline |
-| #113 `<code>` wrapping in prose fields | **Model-output change** — moves every committed render and is a prose-behavior change |
-| #27 finding collapse/expand | Report UX feature, not a patch fix |
-| #197 Thinking Modes | User-facing feature |
+| #113 `<code>` wrapping in prose fields | **Model-output change** — prose behavior, not presentation |
+| #197 Thinking Modes | User-facing feature, not a cleanup |
 | #117 / #118 operator override + revision records | Schema-contract change |
 | #217 manifest-authoring fragility | Architectural; needs design |
-| #90 design system · #135 docs simplicity pass | Larger efforts |
+| #25 SKILL.md rendering/MVC split | Restructures the file the model reads — too structural for a patch, even as a pure refactor |
+| #176 suite_health full 0–5 scale | Gated on the next re-baseline by its own title. *Worth re-examining* — it looks like presentation over frozen data, so the gate may be conservative; decide deliberately rather than by inheritance |
+| #151 Antigravity harness | **Held (Steve, 2026-08-03)** — additive packaging, but it opens a new supported harness. New surface, not a cleanup |
+| #90 org design system · #2 standing config | Larger efforts; #2 explicitly deferred long-standing |
 
 ## Success criteria
 
@@ -153,9 +186,23 @@ all belong to 1.3 (`RELEASE_1.3_PLAN.md`):
 
 ## Sequencing
 
-A and B are independent and can land in one PR each. Decide C before starting:
-if #227 is in, land it **last and alone**, so the 85-file regeneration is
-reviewable on its own rather than mixed with prose edits.
+Four PRs, in this order:
+
+1. **A (docs)** and **B (CI + bump script)** — independent, one PR each. Land the
+   bump script first and use it to cut this release's own version bump.
+2. **The SKILL prose pair — #216 + #4 — together**, gated by a single spot-check
+   scan of one baseline target. One scan covers both; if it lands outside band,
+   drop the pair rather than debugging prose in a patch.
+3. **The render regeneration — #227 + #27 + #6 — last, and alone.** All three
+   touch `render.py` / `report_template.html` and force the same 85-file
+   regeneration, so they cost one regeneration together and three separately.
+   Landing them alone keeps that large diff reviewable instead of buried under
+   prose edits.
+
+**Verify the regeneration rather than trusting it:** for #227 every changed file's
+diff must be *only* the URL substitution. #27 and #6 legitimately change more, so
+review those diffs on their merits — and confirm no findings JSON moved, which is
+the actual invariant.
 
 Version bump is `1.2.0 → 1.2.1` across the five surfaces listed in **B**.
 `build.sh`'s four-way guard enforces agreement on all but the README badge (it
