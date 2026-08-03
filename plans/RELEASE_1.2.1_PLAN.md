@@ -68,6 +68,35 @@ large, and it is optional for this release.
   branch has no required checks. Gate it.
 - **#209 item 3 — SHA-pin GitHub Actions** rather than floating major tags.
   Dependabot (now correctly targeting `dev`) keeps them current.
+- **`scripts/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
+  version in **five** places and edits every one of them by hand:
+
+  | Surface | Guarded by |
+  |---|---|
+  | `PRAXEN_SPEC.md` (`**Version:**`) | `build.sh` (the authority the tag is checked against) |
+  | `.claude-plugin/plugin.json` | `build.sh` + `test_plugin_manifests.py` |
+  | `.claude-plugin/marketplace.json` (praxen entry, **by name**) | as above |
+  | `.codex-plugin/plugin.json` | as above |
+  | `README.md` release badge | `test_plugin_manifests.py` only — **not** `build.sh` |
+
+  The guards catch drift, but only *after* someone has already shipped a
+  half-edited bump into a PR — and the release cadence means a bump is usually
+  cut under time pressure. A script makes the bump one command and the guards a
+  backstop rather than the discovery mechanism.
+
+  **socxen already has one** (`scripts/bump_version.py`) and it is good prior
+  art — same shape: edit, regenerate derived artifacts, verify all surfaces
+  agree, print the diff, do **not** commit. Port it rather than reinvent, with
+  two lessons from socxen's own history: (a) it must look the marketplace entry
+  up **by name**, never positionally — praxen's mirror carries a socxen entry
+  too, and the positional read was a live latent bug fixed in #214; (b) when a
+  surface is removed, the *verify* block must be updated with the edit block —
+  socxen's crashed after writing its edits because a stale reference survived in
+  verification only.
+
+  Scope note: praxen has no AI-BOM to regenerate (socxen's script does that);
+  praxen's derived step is `guide/` via `docs_build.py` only if a bumped version
+  appears in `docs/`, which today it does not.
 
 ### C · Optional / needs a call
 
@@ -128,12 +157,14 @@ A and B are independent and can land in one PR each. Decide C before starting:
 if #227 is in, land it **last and alone**, so the 85-file regeneration is
 reviewable on its own rather than mixed with prose edits.
 
-Version bump is `1.2.0 → 1.2.1` by hand across `PRAXEN_SPEC.md`,
-`.claude-plugin/plugin.json`, the praxen entry in
-`.claude-plugin/marketplace.json`, and `.codex-plugin/plugin.json` — praxen has
-no bump script; `build.sh`'s four-way guard is what enforces agreement (it now
-looks the marketplace entry up **by name**, so the mirror's extra entries are
-safe). Then the CHANGELOG entry, the usual `dev` → `main` merge-commit
+Version bump is `1.2.0 → 1.2.1` across the five surfaces listed in **B**.
+`build.sh`'s four-way guard enforces agreement on all but the README badge (it
+now looks the marketplace entry up **by name**, so the mirror's extra entries
+are safe); `test_plugin_manifests.py` covers the badge.
+
+**Land `scripts/bump_version.py` early in the release, then use it to cut this
+release's own bump** — that is both the fastest way to validate it and the most
+honest test. Then the CHANGELOG entry, the usual `dev` → `main` merge-commit
 promotion, fast-forward `dev`, and tag.
 
 **Remember what "released" means now:** the community catalog pins praxen's
