@@ -140,6 +140,12 @@ large, and it is optional for this release.
   the mechanism-vs-property note in the remit template. Author-side only; the
   committed remits 1.2.1 scores against are unchanged, so this is inert for the
   frozen set.
+- **#176 item 3 leftover** *(ride-along only)*: `rows_table` in
+  `tests/baselines/suite_health.py` reaches for the `DEFAULT_BASELINE` module
+  global at lines 121 and 131 rather than the resolved `baseline_dir`, so
+  `--baseline-dir` isn't honored for the report-link and remit columns. Roughly
+  two lines. Take it **only** if someone is already in that file — it does not
+  justify its own PR, and the rest of #176 stays gated on the re-baseline.
 
   ⚠️ **#65 item 8 is NOT in scope, contra the 1.3 plan's note.** That item puts
   absence-of-evidence confidence calibration into `KB_RAISE_SCANNING.md` — which
@@ -171,7 +177,7 @@ above is here with its reason.
 | #117 / #118 operator override + revision records | Schema-contract change |
 | #217 manifest-authoring fragility | Architectural; needs design |
 | #25 SKILL.md rendering/MVC split | Restructures the file the model reads — too structural for a patch, even as a pure refactor |
-| #176 suite_health full 0–5 scale | Gated on the next re-baseline by its own title. *Worth re-examining* — it looks like presentation over frozen data, so the gate may be conservative; decide deliberately rather than by inheritance |
+| #176 suite_health axis/labels | **Re-examined 2026-08-03 — the gate is correct, not inherited.** Items 1–2 are decisions about how to display a score distribution, and can't be made until that distribution changes (the 1.3 re-freeze). Both are latent today: roster max is hermes **2.55**, 0.45 clear of the 3.0 cap, so nothing clips or mislabels. Item 3's main half already shipped in 1.2 (`DEFAULT_BASELINE` now reads `CURRENT`). Issue retitled — the old title said "full 0–5 scale", which its own body argues *against* |
 | #151 Antigravity harness | **Held (Steve, 2026-08-03)** — additive packaging, but it opens a new supported harness. New surface, not a cleanup |
 | #90 org design system · #2 standing config | Larger efforts; #2 explicitly deferred long-standing |
 
