@@ -1,0 +1,72 @@
+# Export this repo's stargazer timestamps to a committed JSON file.
+#
+# WHY: on 2026-06-30 GitHub restricted the stargazers-listing endpoint
+# (per-star timestamps) to repo admins/collaborators. The org-pages
+# community-stats dashboard used to read it cross-repo via a PAT, which now
+# 403s. A repo's OWN Actions token still qualifies, so each repo exports its
+# own history to .github/stargazers.json, and the dashboard reads that file
+# over raw.githubusercontent.com (public, no auth, no restricted endpoint).
+#
+# Fail behavior: any error keeps the previously committed file — consumers
+# just see slightly stale data, never a broken chart.
+
+name: Export stargazer timestamps
+
+on:
+  schedule:
+    - cron: "41 2 * * *"   # daily, odd minute to dodge the top-of-hour queue
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export stargazer timestamps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate -H "Accept: application/vnd.github.star+json" \
+            "/repos/${{ github.repository }}/stargazers?per_page=100" > /tmp/stars_raw.json
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          with open("/tmp/stars_raw.json", encoding="utf-8") as fh:
+              raw = fh.read()
+          # gh --paginate concatenates one JSON array per page; parse them all.
+          dec, idx, stamps = json.JSONDecoder(), 0, []
+          while idx < len(raw):
+              while idx < len(raw) and raw[idx] in " \n\r\t":
+                  idx += 1
+              if idx >= len(raw):
+                  break
+              page, idx = dec.raw_decode(raw, idx)
+              stamps += [s["starred_at"] for s in page]
+          out = {
+              "updated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "count": len(stamps),
+              "starred_at": sorted(stamps),
+          }
+          with open(".github/stargazers.json", "w", encoding="utf-8") as fh:
+              json.dump(out, fh, indent=1)
+              fh.write("\n")
+          print(f"exported {len(stamps)} stargazer timestamps")
+          PY
+
+      - name: Commit if changed
+        run: |
+          git config user.name "stargazer-export-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/stargazers.json
+          # Ignore the volatile updated_utc line when deciding whether to commit,
+          # so quiet days don't produce a daily no-op commit.
+          if git diff --cached -I'"updated_utc"' --quiet; then
+            echo "No star changes."
+          else
+            git commit -s -m "chore: refresh stargazer-timestamps export [skip ci]"
+            git push
+          fi
