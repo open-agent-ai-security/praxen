@@ -155,6 +155,11 @@ _OWASP_CHIPS_PER_CARD = 3
 # Highest severity present in findings[] -> (badge class, badge label). Checked
 # top-to-bottom; "Medium" and "Low" both map to advisory; only-Informational or
 # no findings -> clean.
+#
+# The Medium/Low collapse to one ADVISORY badge is INTENTIONAL (#6): the header
+# badge answers "does anything here demand urgency?", and neither tier does —
+# the severity-counts row directly below distinguishes them. Revisit only as
+# part of a deliberate look-and-feel pass, not as a drive-by.
 _OVERALL_STATUS_RULES = [
     ("Critical", "critical", "CRITICAL"),
     ("High", "high", "HIGH"),
@@ -465,6 +470,7 @@ def _finding_ctx(finding, _idx):
         "SEVERITY_LABEL": _SEV_LABEL[finding["severity"]],
         "FINDING_ID": esc(finding["id"]),
         "FINDING_SUMMARY": render_rich(finding["summary"], allow=_RICH_FIELDS["finding_summary"]),
+        "CONFIDENCE": esc(finding["confidence"]),
         "EVIDENCE": _format_evidence(finding["evidence"]),
         "RECOMMENDED_ACTION": _format_recommended_actions(finding["recommended_actions"]),
     }
