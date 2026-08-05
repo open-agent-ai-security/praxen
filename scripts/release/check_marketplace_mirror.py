@@ -139,6 +139,15 @@ def main() -> int:
                 f"canonical praxen source deviates from the expected pin: "
                 f"{c_praxen_src!r} != {EXPECTED_CANONICAL_PRAXEN_SOURCE!r}"
             )
+    # The MIRROR praxen source is likewise exempt from the entry comparison
+    # (normalized() pops it), so pin it too: it must be exactly "./" — this
+    # repo serving its own plugin. (#236 review finding; previously only
+    # test_plugin_manifests.py caught a tampered mirror source.)
+    if "praxen" in m_by_name and m_by_name["praxen"].get("source") != "./":
+        drift.append(
+            f"mirror praxen source must be './' (this repo), "
+            f"got {m_by_name['praxen'].get('source')!r}"
+        )
 
     # Set comparison is asymmetric by design (#235): the mirror serves legacy
     # praxen installs only, so it may omit sibling plugins the canonical index
