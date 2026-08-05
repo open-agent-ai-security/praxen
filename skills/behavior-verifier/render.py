@@ -397,7 +397,7 @@ def _remit_row_ctx(rule, _idx):
     }
 
 
-_DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/docs/"
+_DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide/"
 _MCP_ANCHOR = "a-practical-guide-for-secure-mcp-server-development-2026"
 
 
