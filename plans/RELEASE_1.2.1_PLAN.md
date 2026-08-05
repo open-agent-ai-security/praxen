@@ -5,7 +5,7 @@
 
 # Praxen 1.2.1 — Fast-follow patch (docs, CI, packaging)
 
-> ## ▶ STATUS: DRAFT — proposed 2026-08-03, not yet approved
+> ## ▶ STATUS: ACTIVE — approved 2026-08-05 (Steve: "make a 1.2.1 branch and start the work"); working branch `1.2.1` off `dev`
 >
 > Drafted immediately after the `v1.2.0` release from the promotion and
 > post-release reviews. **Everything here is deliberately score-inert**: no
@@ -88,15 +88,18 @@ large, and it is optional for this release.
   assuming it, and note that re-running a failed run replays the *old* workflow
   definition — a fix needs a new tag, and this project does not re-point published
   tags.
-- **`scripts/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
-  version in **five** places and edits every one of them by hand:
+- **`scripts/release/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
+  version in **six** places and edits every one of them by hand *(the draft
+  said five — `marketplace.json` `metadata.version` surfaced when porting the
+  script against `test_plugin_manifests.py`'s actual check list)*:
 
   | Surface | Guarded by |
   |---|---|
   | `PRAXEN_SPEC.md` (`**Version:**`) | `build.sh` (the authority the tag is checked against) |
   | `.claude-plugin/plugin.json` | `build.sh` + `test_plugin_manifests.py` |
   | `.claude-plugin/marketplace.json` (praxen entry, **by name**) | as above |
-  | `.codex-plugin/plugin.json` | as above |
+  | `.claude-plugin/marketplace.json` (`metadata.version`) | `test_plugin_manifests.py` only — **not** `build.sh` |
+  | `.codex-plugin/plugin.json` | as above (`build.sh` + tests) |
   | `README.md` release badge | `test_plugin_manifests.py` only — **not** `build.sh` |
 
   The guards catch drift, but only *after* someone has already shipped a
@@ -235,7 +238,7 @@ Version bump is `1.2.0 → 1.2.1` across the five surfaces listed in **B**.
 now looks the marketplace entry up **by name**, so the mirror's extra entries
 are safe); `test_plugin_manifests.py` covers the badge.
 
-**Land `scripts/bump_version.py` early in the release, then use it to cut this
+**Land `scripts/release/bump_version.py` early in the release, then use it to cut this
 release's own bump** — that is both the fastest way to validate it and the most
 honest test. Then the CHANGELOG entry, the usual `dev` → `main` merge-commit
 promotion, fast-forward `dev`, and tag.
