@@ -214,25 +214,37 @@ above is here with its reason.
 
 ## Sequencing
 
-Four PRs, in this order:
+> **Amended 2026-08-05 (execution):** per Steve, all chunks accumulate on the
+> **rolling branch `1.2.1` (PR #233), held unmerged** until release-ready —
+> same chunks, same order, same per-chunk background review, one merge at the
+> end instead of four. Chunk 5 added: the section-C stragglers the original
+> four-PR list never assigned a slot (caught during execution). Chunks 1–4
+> landed 2026-08-05; release holds for 1.2.0 soak time (Steve, 2026-08-05).
 
-1. **A (docs)** and **B (CI + bump script)** — independent, one PR each. Land the
-   bump script first and use it to cut this release's own version bump.
+Five chunks, in this order:
+
+1. **A (docs)** and **B (CI + bump script)** — independent, one chunk each. Land
+   the bump script first and use it to cut this release's own version bump.
 2. **The SKILL prose pair — #216 + #4 — together**, gated by a single spot-check
    scan of one baseline target. One scan covers both; if it lands outside band,
-   drop the pair rather than debugging prose in a patch.
-3. **The render regeneration — #227 + #27 + #6 — last, and alone.** All three
-   touch `render.py` / `report_template.html` and force the same 85-file
-   regeneration, so they cost one regeneration together and three separately.
-   Landing them alone keeps that large diff reviewable instead of buried under
-   prose edits.
+   drop the pair rather than debugging prose in a patch. *(Executed: gate PASSED
+   — blind finbot at the frozen median 0.90.)*
+3. **The render regeneration — #227 + #6 (#27 deferred out) — last of the
+   render-touching work, and alone.** Both touch `render.py` /
+   `report_template.html` and force the same regeneration, so they cost one
+   regeneration together. Landing them alone keeps that large diff reviewable
+   instead of buried under prose edits.
+4. **The section-C stragglers — #106, #65 items 6–7, #135, #176 item 3** —
+   authoring-guidance and docs prose plus the two-line `suite_health.py` fix;
+   none touch the renderer, so they land after the regeneration without
+   re-paying it.
 
 **Verify the regeneration rather than trusting it:** for #227 every changed file's
 diff must be *only* the URL substitution. #27 and #6 legitimately change more, so
 review those diffs on their merits — and confirm no findings JSON moved, which is
 the actual invariant.
 
-Version bump is `1.2.0 → 1.2.1` across the five surfaces listed in **B**.
+Version bump is `1.2.0 → 1.2.1` across the six surfaces listed in **B**.
 `build.sh`'s four-way guard enforces agreement on all but the README badge (it
 now looks the marketplace entry up **by name**, so the mirror's extra entries
 are safe); `test_plugin_manifests.py` covers the badge.
