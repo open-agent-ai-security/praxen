@@ -166,17 +166,6 @@ The plugin is installed but the current session hasn't picked it up.
 - From the terminal: `claude plugin list` should show `praxen@open-agent-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen@open-agent-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
 - Using an unzipped release directly (no marketplace): point the agent at `skills/behavior-verifier/SKILL.md` explicitly rather than naming the skill.
 
-### `render.py` errored at the end of the run
-
-The LLM wrote a `findings.json` that didn't pass schema validation, so the deterministic render step refused to produce an HTML report. The error message names the offending JSON path (e.g. `$.findings[3].evidence: expected array, got string`).
-
-This is usually a context-pressure symptom — the analysis was synthesised under stress and the JSON came out malformed. Options:
-
-- **Re-run** in a larger context window or with a tighter input scope. See *Large workspaces and context sizing* above.
-- **Recover from the draft manifest** if Praxen wrote one (`./reports/<agent-slug>-draft-<timestamp>.md` — written just before the findings JSON). Tell the agent: *"the findings JSON failed validation — read the draft manifest and rebuild from it."*
-
-If the same JSON-shape error reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-agent-ai-security/praxen/issues/new/choose) with the schema error and the agent slug.
-
 ### "Worker Remit not found" / "no remit at that path"
 
 The skill couldn't find the path you named. Most common causes:
@@ -185,25 +174,11 @@ The skill couldn't find the path you named. Most common causes:
 - **A typo in the filename** — Praxen looks for the exact path you provide; it does not search.
 - **The agent's working directory isn't where you think it is** — re-`cd` and start fresh, or pass an absolute path.
 
-### Mid-analysis context auto-compaction (easy to miss)
+### A scan failed, went quiet, or the report looks thin
 
-A long scan can exceed the context window and **auto-compact mid-run** — the run still finishes, but findings gathered early can get summarised away before the report is written. It isn't loudly flagged, so it's easy to miss — but there are clear signs:
+Three rarer symptoms — a schema-validation error at the render step, a scan that goes silent for ~5 minutes mid-draft, or a finished report that's suspiciously thin next to the workspace's complexity (a long scan can auto-compact its context mid-run) — share one fix: **re-run against the same target in a fresh session, with a larger context window or a tighter scope.** Praxen writes its work incrementally (the draft manifest and early findings are already on disk), so a re-run or a *"read the draft manifest and rebuild from it"* instruction doesn't lose the analysis. Prevention and the sizing guidance live in [Large workspaces and context sizing](#large-workspaces-and-context-sizing) above.
 
-- The interim overview Praxen prints to stdout names findings the final HTML doesn't include.
-- The HTML report looks suspiciously thin compared to the workspace's complexity.
-- The agent suddenly switches to ad-hoc Python to "fix up" the JSON near the end of the run.
-
-→ Prevention and recovery (a larger window, tighter scope, and the draft-manifest safety net) are covered in [Large workspaces and context sizing](#large-workspaces-and-context-sizing) above.
-
-### Scan stopped emitting output for several minutes (streaming hiccup)
-
-Praxen scans ran 3–10 minutes of wallclock across our test suite; larger codebases scoped to a subdirectory sit at the high end. Your mileage will vary — target size and scope, model tier, and provider capacity at the time all move the number. If a scan goes quiet for ~5 minutes with no progress messages or tool activity, you've likely hit a streaming hiccup — usually during the long-form drafting of the findings JSON. Symptoms:
-
-- The agent emitted an analysis plan and started drafting findings, then went silent mid-document.
-- No new files appear in the output directory; any partial JSON on disk is still valid but incomplete.
-- The CLI shows the agent as still running but with no recent tool calls.
-
-What to do: cancel the run and re-invoke against the same target. The skill writes its report incrementally, so the skeleton and early findings are already persisted on disk — you won't lose the analysis the agent built up, and a fresh invocation can resume cleanly. Most retries succeed on the first try.
+If the same failure reproduces on a fresh run with plenty of context, that's a Praxen bug — please [file it](https://github.com/open-agent-ai-security/praxen/issues/new/choose) with the error and the agent slug.
 
 ### Scores look lower than reality
 

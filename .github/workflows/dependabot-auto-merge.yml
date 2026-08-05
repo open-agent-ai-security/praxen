@@ -37,18 +37,53 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # GitHub's `--auto` merges IMMEDIATELY when the base branch has no
+      # required status checks — there is nothing for auto-merge to wait for,
+      # so "auto-merge once CI is green" silently degrades to "merge now,
+      # CI still running" (#209 item 2). Gate on the base branch actually
+      # having required checks, and fail CLOSED: if the protection summary
+      # is unreadable or lists none, auto-merge stays off.
+      - name: Check base branch has required status checks
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          n=$(gh api "repos/${{ github.repository }}/branches/$BASE" \
+                --jq '[.protection.required_status_checks.checks[]?] | length' \
+                2>/dev/null || echo 0)
+          echo "required-checks=${n:-0}" >> "$GITHUB_OUTPUT"
+          echo "base '$BASE' has ${n:-0} required status check(s)"
+
       - name: Enable auto-merge (patch / minor only)
         if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+          steps.gate.outputs.required-checks != '0' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+           steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Note why auto-merge was skipped (no required checks on base)
+        if: |
+          steps.gate.outputs.required-checks == '0' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+           steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "$PR_URL" --body \
+            "Auto-merge skipped: the base branch has **no required status \
+            checks**, so GitHub's auto-merge would merge immediately instead \
+            of waiting for CI. Merge manually after CI is green, or make the \
+            CI checks required on this branch to re-enable auto-merge. \
+            (see .github/workflows/dependabot-auto-merge.yml)"
 
       - name: Note that majors are left for a human
         if: steps.metadata.outputs.update-type == 'version-update:semver-major'
