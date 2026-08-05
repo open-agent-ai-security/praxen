@@ -6,13 +6,18 @@
 The canonical Claude Code marketplace for the org lives in
 https://github.com/open-agent-ai-security/plugins; this repo keeps an in-repo
 mirror so installs added from the legacy path (open-agent-ai-security/praxen)
-keep updating. The two files may differ in exactly three places:
+keep updating. The two files may differ in exactly four places:
 
   - the praxen entry's ``source`` ("./" here vs a pinned git URL there);
   - the praxen entry's ``version`` (required here by build.sh's version guard;
     absent there, where each plugin repo's plugin.json is the version
     authority);
-  - ``metadata`` prose (the mirror says it is a mirror).
+  - ``metadata`` prose (the mirror says it is a mirror);
+  - the mirror may OMIT canonical entries other than praxen (#235): the mirror
+    exists for legacy-praxen continuity only, and carrying sibling plugins
+    would acquire new users onto a deprecated channel — and couple this repo
+    to every sibling's layout changes. The praxen entry is REQUIRED here, and
+    an entry the mirror carries that the canonical index lacks is still drift.
 
 Everything else fails closed: entries are compared by FULL equality after
 excluding only those exemptions, and the top level likewise (full equality
@@ -135,9 +140,17 @@ def main() -> int:
                 f"{c_praxen_src!r} != {EXPECTED_CANONICAL_PRAXEN_SOURCE!r}"
             )
 
-    if set(c_by_name) != set(m_by_name):
+    # Set comparison is asymmetric by design (#235): the mirror serves legacy
+    # praxen installs only, so it may omit sibling plugins the canonical index
+    # carries — but it must always carry praxen, and it must never carry an
+    # entry the canonical index lacks (a mirror-only plugin would be a
+    # distribution channel nothing validates).
+    if "praxen" not in m_by_name:
+        drift.append("mirror has no praxen entry — the one plugin it exists to serve")
+    mirror_only = sorted(set(m_by_name) - set(c_by_name))
+    if mirror_only:
         drift.append(
-            f"plugin sets differ: canonical {sorted(c_by_name)} vs mirror {sorted(m_by_name)}"
+            f"mirror carries entries absent from the canonical index: {mirror_only}"
         )
 
     for name in sorted(set(c_by_name) & set(m_by_name)):
