@@ -121,7 +121,9 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
   **Deferred indefinitely** (Steve, 2026-08-05, during 1.2.1: *"Defer [#27]
   indefinitely, but leave it filed - don't close"*) — not scheduled here or
   anywhere; the open issue is the record.
-- **#6 remainder** — render polish: finding-card confidence, Medium/Low badge.
+- ~~**#6 remainder** — render polish: finding-card confidence, Medium/Low badge.~~
+  **Done in 1.2.1** (finding-card confidence line shipped; Medium/Low→ADVISORY
+  collapse documented as intentional; the TXT item had shipped in 1.0.1).
 - **#25** — split output-authoring conventions out of `SKILL.md`
   (rendering/MVC split). Refactor only; no output change.
 
