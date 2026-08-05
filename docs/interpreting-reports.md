@@ -11,11 +11,11 @@ Praxen produces three output files per analysis: a **findings JSON** (the canoni
 flowchart LR
   subgraph S1["Stage 1 — LLM (your coding agent)"]
     direction TB
-    SK["SKILL.md<br/>12-step procedure"] --> CJ["findings.json<br/>(canonical record)"]
+    SK["analysis<br/>(reads evidence, writes findings)"] --> CJ["findings.json<br/>(canonical record)"]
   end
   subgraph S2["Stage 2 — deterministic render (Python)"]
     direction TB
-    SC["schema.py<br/>validator"] --> RN["render.py"]
+    SC["schema check"] --> RN["report renderer"]
     RN --> HT["analysis.html"]
     RN --> TX["analysis.txt"]
   end
@@ -101,7 +101,7 @@ Log files Praxen found in the input, plus log files it could *infer* from the so
 
 A full-bleed **5×2 grid of cards** — one per LLM01–LLM10. Each populated card shows up to **three most-severe findings** that classify against that category as clickable severity-dot chips (anchored to the matching entry in the Findings Register). Empty cells render a muted **"No findings"** placeholder so the grid reads as a *coverage map*, not just a hit list — at a glance you see both where the agent has problems and which categories the analysis did not surface.
 
-Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, capped at three. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
+Each finding appears on the card of its primary OWASP LLM category, showing up to the three most severe findings per card. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
 
 ### 10. OWASP Agentic Top 10 (2026) Coverage
 

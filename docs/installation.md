@@ -33,7 +33,7 @@ claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.2.
 > the add + install commands above. Your plugin key (`praxen@open-agent-ai-security`) and
 > settings are unchanged.
 
-The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
+The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. (When scripting, prefer the terminal form — it behaves identically everywhere.)
 
 ## OpenAI Codex
 
