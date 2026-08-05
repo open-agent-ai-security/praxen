@@ -68,6 +68,26 @@ large, and it is optional for this release.
   branch has no required checks. Gate it.
 - **#209 item 3 — SHA-pin GitHub Actions** rather than floating major tags.
   Dependabot (now correctly targeting `dev`) keeps them current.
+- **#193 — `actions/setup-python` 6 → 7 — fold into the SHA-pinning above, do
+  not merge it standalone.** Parked through the 1.2.0 launch on purpose; the
+  launch is done, so it can proceed. Two reasons to merge it *as part of* item 3
+  rather than on its own:
+  1. **It is incomplete.** #193 touches `ci.yml` and `release.yml` only —
+     `marketplace-sync.yml` was added *after* dependabot opened it, so merging as-is
+     leaves setup-python at v7 in three places and **v6 in one**. Pin all four
+     together (`ci.yml` ×2, `release.yml`, `marketplace-sync.yml`).
+  2. **Pinning supersedes bumping.** SHA-pinning means choosing the SHA of the
+     version you want; doing the bump first and the pin second edits the same
+     four files twice.
+
+  ⚠️ **Known risk, now acceptable:** `release.yml` is tag-triggered, so no PR run
+  ever exercises it — **1.2.1's own tag push will be the first execution of
+  setup-python v7 in the release workflow.** That is precisely why this was held
+  out of 1.2.0: a failure there would have broken the flagship release build. On
+  a patch it is a recoverable place to find out. Watch the release run rather than
+  assuming it, and note that re-running a failed run replays the *old* workflow
+  definition — a fix needs a new tag, and this project does not re-point published
+  tags.
 - **`scripts/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
   version in **five** places and edits every one of them by hand:
 
