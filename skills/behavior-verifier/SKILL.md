@@ -164,7 +164,7 @@ If Praxen was invoked non-interactively (e.g., `claude -p`) and (1) does not app
 
 **Scan instructions (optional — scan-time scope).** Search for a `SCAN_INSTRUCTIONS.md` in the current directory (same search precedence as the remit: exact name first, then `SCAN_INSTRUCTIONS*.md`). This file is **operator input declaring *what* to scan for this invocation** — it is distinct from the Worker Remit, which declares what the subject is expected to *do*. It typically names: the **main target to scan** (its paths within a larger tree), any code marked **context** — read so its controls are visible, but not scored as the target's — code to exclude outright, and whether tree-wide hygiene sweeps still cover the whole workspace. If present, read it and carry its scope into Step 4; if absent, scan the whole resolved workspace as the target (no scope narrowing). A `SCAN_INSTRUCTIONS.md` never changes *how* controls are scored — only *which* code is evaluated as the subject.
 
-**Agent name.** Same priority: invocation message > infer from workspace directory name > ask. If the name contains spaces or capitals, compute a slug: lowercase, replace whitespace and punctuation with hyphens, strip anything not `[a-z0-9-]`. This slug is used in output filenames and in the `scan.agent_slug` field of the findings JSON.
+**Agent name.** Same priority: invocation message > infer from workspace directory name > ask. If the name contains spaces or capitals, compute a slug: lowercase, replace whitespace and punctuation with hyphens, strip anything not `[a-z0-9-]`. Compute the slug now and hold it — it names the Step 4 evidence checkpoint, the Step 9.9 manifest, every report file, and the `scan.agent_slug` field of the findings JSON.
 
 **Output directory.** Use `./reports/` relative to the current working directory. Create it if it doesn't exist:
 ```bash
@@ -237,12 +237,12 @@ Using the workspace path from Step 1, discover all artifacts in the agent's work
 
 **Large-file reading strategy — heuristic, not mandatory shell call.**
 
-The goal is to avoid blowing context on huge log/data files while still reading enough to reason about each artifact. Two ways to judge size:
+The goal is to avoid blowing context on huge log/data files while still reading enough to reason about each artifact. One decision tree — name first, then size:
 
-- **By name and extension** (preferred, no Bash required): treat `.log`, `.jsonl`, `.ndjson`, `package-lock.json`, `yarn.lock`, `poetry.lock`, and anything matching `*log*` / `*audit*` / `*session*` / `*events*` / `*history*` as large by default.
-- **By line count** (if Bash is available): `wc -l <file>` gives a precise size.
+1. **Name/extension matches a known-large pattern** — `.log`, `.jsonl`, `.ndjson`, `package-lock.json`, `yarn.lock`, `poetry.lock`, or anything matching `*log*` / `*audit*` / `*session*` / `*events*` / `*history*` → treat as large **regardless of line count**; no size check needed.
+2. **Anything else** → judge by line count (`wc -l <file>` if Bash is available, else estimate from the name): over 500 lines is large, at or under 500 (or unknown but likely small) reads in full.
 
-Apply this strategy:
+Then pick the read strategy by file type:
 
 | File type | Size signal | Read strategy |
 |-----------|------------|---------------|
@@ -500,6 +500,8 @@ Pay particular attention to:
 
 ### Remit-Delta Analysis
 
+This is Policy-Implementation Divergence's mirror image, and the two are complementary, not redundant: Divergence audits the remit's rules against the code (rules the code fails to honor); Remit-Delta audits the code's capabilities against the remit (capabilities no rule covers). Run both — a finding may surface from either direction.
+
 Compare the agent's current capability set — tools, channels, data access, outbound destinations in code — against the Worker Remit's Known Good Baseline and authorized lists.
 
 For each capability present in code but absent from the remit:
@@ -608,7 +610,7 @@ Two to four sentences describing **what the remit says the agent is for** — a 
 
 Two to four sentences describing **what you actually found in the workspace** — the as-built picture. Cover: the tech stack and primary framework; the agent's code-level shape (orchestration pattern — single agent / multi-agent / executor pair —, tool implementations discovered, system-prompt location, config-file locations); any notable external surface (admin API, HTTP endpoints, file I/O, subprocess execution, DB connections); and, neutrally, any material divergence from what the remit implies (detailed analysis goes in findings). Concrete and technical — a reader should know where to start if they opened the workspace. You may use `<code>` for filenames and function names. No lists, no headings.
 
-*Example:* "Python Flask application with a SQLAlchemy-backed SQLite database. A single `FinBotAgent` class in `src/services/finbot_agent.py` orchestrates OpenAI function-calling with five tools and two model paths (LLM and a fallback rule engine). Admin routes are exposed via a Flask blueprint at `/admin/*` with no authentication middleware. Invoice descriptions and vendor-submitted content flow into the LLM context through `process_invoice()`."
+*Example:* "Python FastAPI service with a Redis-backed job queue. A single `SchedulerAgent` class in `app/agents/scheduler.py` orchestrates Anthropic tool-use with six tools and a deterministic fallback path for slot lookups. Outbound mail is sent through an internal SMTP relay configured in `config/mail.yaml` with no sender authentication. Attendee names and free-text meeting notes flow into the LLM context through `build_request_context()`."
 
 ### 9.3 Behavior Summary narrative → `behavior_summary`
 
@@ -639,7 +641,7 @@ For each of the six RAISE categories — in this fixed order: **Limit Your Domai
 
 Before you commit the numbers: re-read the scoring discipline in Step 5 ("Calibration anchors"). Each score must trace to specific evidence — the operative controls you verified *and* the gaps you filed as findings. Don't let a one-line positive in 9.7 inflate a category that's unaddressed at runtime; equally, don't drop a category to 0 just because you filed findings about its gaps when the control underneath is real and running.
 
-*Example rationale (Implement Zero Trust, score 0):* "No code-level interposition exists on the agent's tool calls — `approve_invoice` writes `payment_processed=True` with no check on amount, fraud signal, or caller identity, and the only stated guardrails live in an LLM system prompt that an unauthenticated endpoint can overwrite at runtime."
+*Example rationale (Implement Zero Trust, score 0):* "No code-level interposition exists on the agent's tool calls — `send_invite` emails any address the model produces with no allowlist, recipient confirmation, or rate check, and the only stated guardrails live in an LLM system prompt that free-text meeting notes can influence at runtime."
 
 ### 9.5 Weighted-overall rationale → `raise_posture.weighted_overall` + `raise_posture.weighted_rationale`
 
