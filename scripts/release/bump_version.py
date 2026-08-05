@@ -55,7 +55,11 @@ def fail(msg):
 
 
 def _sub_once(text, pattern, repl, what):
-    new, n = re.subn(pattern, repl, text, count=1)
+    # No count cap: with count=1, re.subn reports at most 1 substitution, so a
+    # duplicate match would silently survive un-edited (review finding on
+    # #233). Replace all and demand exactly one — edits are computed before
+    # anything is written, so failing here aborts with no files touched.
+    new, n = re.subn(pattern, repl, text)
     if n != 1:
         fail(f"{what}: expected exactly 1 match, found {n} — file layout may have changed")
     return new
