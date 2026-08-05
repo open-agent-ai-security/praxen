@@ -117,7 +117,10 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 
 - **#113** — wrap technical tokens in `<code>` consistently across prose
   fields *(model-output change — schedule before the freeze, with bucket A)*.
-- **#27** — finding default-state (collapsed/expanded) + expand/collapse-all.
+- ~~**#27** — finding default-state (collapsed/expanded) + expand/collapse-all.~~
+  **Deferred indefinitely** (Steve, 2026-08-05, during 1.2.1: *"Defer [#27]
+  indefinitely, but leave it filed - don't close"*) — not scheduled here or
+  anywhere; the open issue is the record.
 - **#6 remainder** — render polish: finding-card confidence, Medium/Low badge.
 - **#25** — split output-authoring conventions out of `SKILL.md`
   (rendering/MVC split). Refactor only; no output change.

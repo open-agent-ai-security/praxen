@@ -140,14 +140,13 @@ large, and it is optional for this release.
   result lands outside band, drop the item rather than debug it in a patch.
 - **#106 — clarify Out-of-Scope remit coverage** as boundary-rule checks.
   Authoring-side guidance; no scan-behavior change against committed remits.
-- **#27 — finding default-state (collapsed/expanded) + expand/collapse-all.**
-  A report-UX change, so ordinarily 1.3 — but it lands in `render.py` /
-  `report_template.html` and therefore regenerates exactly the same 85 renders
-  #227 already forces. **If #227 is in, doing #27 in the same pass is nearly
-  free**; doing them in separate releases means paying the regeneration twice.
-  Score-inert either way. Include only if the UX decision (which state is
-  default) is settled — otherwise it is a design question wearing a cleanup's
-  clothes.
+- ~~**#27 — finding default-state (collapsed/expanded) + expand/collapse-all.**~~
+  **DEFERRED INDEFINITELY** (Steve, 2026-08-05: *"Defer [#27] indefinitely, but
+  leave it filed - don't close"*). Dropped from this release and from any
+  scheduled release; the issue stays open as the record. Implementation note
+  for whenever it revives: finding cards are already `<details open>` in the
+  template, so the change is the default attribute plus expand/collapse-all
+  controls — plus the render regeneration of the day.
 - **#6 — `render.py` / template polish** (finding-card confidence, Medium/Low
   badge, TXT High findings). The issue itself flags that it re-renders the
   byte-frozen baselines — which is precisely why it belongs *with* #227/#27
