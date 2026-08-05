@@ -598,7 +598,7 @@ Praxen produces three artifacts per analysis: a canonical findings JSON (Step 10
 
 This keeps the analysis durable, too: because you append each finding as you finish it, a compaction mid-Step-9 finds the earlier findings already on disk. **9.9 is the completeness gate** — the draft manifest complete on disk and the interim overview printed before Step 10 — and if you have heartbeated-then-appended finding by finding, reaching it is a matter of the last finding plus the overview, not one big terminal dump.
 
-**Across all three summaries below: cite files and functions, never line numbers.** A summary names *what* and *where* at the file/function level (`src/index.js`, `process_invoice()`) — the precise `file:line` coordinates (`index.js:374-457`) belong in each finding's evidence block, not these overviews. Repeating them here is noise the reader already gets below; keep the summaries pattern-level.
+**Across all three summaries below: cite files and functions, never line numbers.** A summary names *what* and *where* at the file/function level (`src/index.js`, `build_request_context()`) — the precise `file:line` coordinates (`index.js:374-457`) belong in each finding's evidence block, not these overviews. Repeating them here is noise the reader already gets below; keep the summaries pattern-level.
 
 ### 9.1 Agent Remit summary (intro band — left block) → `intro_band.agent_remit_summary`
 
