@@ -240,8 +240,8 @@ Five chunks, in this order:
    re-paying it.
 
 **Verify the regeneration rather than trusting it:** for #227 every changed file's
-diff must be *only* the URL substitution. #27 and #6 legitimately change more, so
-review those diffs on their merits — and confirm no findings JSON moved, which is
+diff must be *only* the URL substitution. #6 legitimately changes more, so
+review its diffs on their merits — and confirm no findings JSON moved, which is
 the actual invariant.
 
 Version bump is `1.2.0 → 1.2.1` across the six surfaces listed in **B**.
