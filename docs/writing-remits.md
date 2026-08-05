@@ -185,7 +185,10 @@ If the agent is asked to write or update its own remit, treat that with caution.
 A Worker Remit is written in Markdown — great for hand- and agent-editing, less so for display or review. To produce a styled, self-contained HTML version that matches the look of a Praxen analysis report (same header and footer, with each section badged **POLICY** or **CONTEXT**), run:
 
 ```bash
-python3 render_remit.py WORKER_REMIT.md      # writes WORKER_REMIT.html
+# render_remit.py ships inside the skill folder — point at your praxen
+# checkout (or installed plugin directory):
+python3 <praxen>/skills/behavior-verifier/render_remit.py WORKER_REMIT.md
+# writes WORKER_REMIT.html next to the input
 ```
 
 It's a mechanical, deterministic translation — Markdown in, one HTML file out — so re-rendering an unchanged remit produces byte-identical output. You can also just ask the agent to "pretty-print" or "render" a remit and it will run this for you. The example and baseline remits published on the Praxen site are rendered this way and linked, next to each target's analysis report, from the [Suite Health index](https://open-agent-ai-security.github.io/praxen/tests/baselines/suite-health-report.html).

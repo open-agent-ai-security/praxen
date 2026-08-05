@@ -56,6 +56,27 @@ The cost is real and linear: three runs is roughly three times the tokens and wa
 
 > **Rule of thumb.** One run to *understand* an agent; multiple runs to *grade* one.
 
+### Comparing two runs mechanically: `scan_diff.py`
+
+Step 4's theme-and-rule-text diff has a tool. `tests/scan_diff.py` (in the
+[source repository](https://github.com/open-agent-ai-security/praxen) — it is a
+maintainer/CI utility, so it ships in the repo rather than the release zip)
+joins two findings-JSON files from the *same target* and reports what is
+**new**, **resolved**, and **unchanged** — matching findings on their
+remit-anchored rule references and text similarity rather than on `R-NN`
+numbering, which is run-local and renumbers freely:
+
+```bash
+python3 tests/scan_diff.py reports/run-a-findings.json reports/run-b-findings.json
+python3 tests/scan_diff.py --json run-a.json run-b.json   # machine-readable
+```
+
+Use it to compare a re-scan against last month's scan of the same agent (what
+actually changed?), or two same-day runs (how much is wobble?). It is a
+mechanical join, not a judgment: two findings it calls "the same" may still
+differ in severity or score, and that difference is exactly what you want to
+read by hand. Requires schema-3.0 JSON (Praxen 1.2+) on both sides.
+
 ## What is **not** variable
 
 To be clear about the guarantees:
