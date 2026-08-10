@@ -56,9 +56,10 @@ during 1.2; deferred on the rest. The durable fix is generation-side — do it
 - **#196** — tighten the Step-8.5 fold-vs-break-out decomposition rule
   (finding-count variance). Same axis as #48 and the decomposition-independence
   generalization below — land them together.
-- **#197** — Thinking Modes: opt-in high-fidelity accuracy tiers (High = post-scan
-  FP review; X-High = 3-scan consensus). User-facing; no baseline impact — may
-  ship as a satellite ahead of the freeze.
+- **#197** — Thinking Modes: opt-in high-fidelity accuracy tiers. **Designed
+  2026-08-10 — see `plans/DESIGN_THINKING_MODES.md`** (evidence-adjudicated,
+  not consensus-counted; scores re-derived, never blended). User-facing; no
+  baseline impact — may ship as a satellite ahead of the freeze.
 
 ## Carried from the 1.2 Stage-1 gate — decomposition-independence generalization
 
