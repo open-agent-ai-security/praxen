@@ -11,11 +11,11 @@ Praxen produces three output files per analysis: a **findings JSON** (the canoni
 flowchart LR
   subgraph S1["Stage 1 — LLM (your coding agent)"]
     direction TB
-    SK["SKILL.md<br/>12-step procedure"] --> CJ["findings.json<br/>(canonical record)"]
+    SK["analysis<br/>(reads evidence, writes findings)"] --> CJ["findings.json<br/>(canonical record)"]
   end
   subgraph S2["Stage 2 — deterministic render (Python)"]
     direction TB
-    SC["schema.py<br/>validator"] --> RN["render.py"]
+    SC["schema check"] --> RN["report renderer"]
     RN --> HT["analysis.html"]
     RN --> TX["analysis.txt"]
   end
@@ -101,7 +101,7 @@ Log files Praxen found in the input, plus log files it could *infer* from the so
 
 A full-bleed **5×2 grid of cards** — one per LLM01–LLM10. Each populated card shows up to **three most-severe findings** that classify against that category as clickable severity-dot chips (anchored to the matching entry in the Findings Register). Empty cells render a muted **"No findings"** placeholder so the grid reads as a *coverage map*, not just a hit list — at a glance you see both where the agent has problems and which categories the analysis did not surface.
 
-Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, capped at three. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
+Each finding appears on the card of its primary OWASP LLM category, showing up to the three most severe findings per card. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
 
 ### 10. OWASP Agentic Top 10 (2026) Coverage
 
@@ -158,7 +158,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |
 | `remit_coverage` | `stat_counts` plus `rules[]` — every actionable remit rule with `rule_id`, `section`, quoted `rule_text`, `status` (`verified`/`gap`/`partial`/`vague`/`enp`), and the linked `finding_id` (or `null`) |
-| `findings[]` | each finding: `id`, `severity`, `summary`, optional `description`, `tags[]` (kind + full label), `policy_rule_ids` / `policy_rule_text`, **structured `evidence[]` of `{ file, line, snippet }`**, **`recommended_actions[]`** (array of one or more concrete actions), `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
+| `findings[]` | each finding: `id`, `severity`, `summary`, optional `description`, `tags[]` (kind + full label), `policy_rule_ids[]` / `policy_rule_text[]` (arrays since schema 3.0, parallel by index), **structured `evidence[]` of `{ file, line, snippet }`**, **`recommended_actions[]`** (array of one or more concrete actions), `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
 | `positives[]` | verified positive controls — `title`, `description`, `evidence_path` |
 | `log_files` | `present`, `no_logs_note`, and `rows[]` (path / source / content type / purpose / mtime / status) |
 | `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |

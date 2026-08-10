@@ -114,11 +114,11 @@ def mat_pill(label):
     return f'<span class="pill {cls}">{html.escape(label)}</span>'
 
 
-def rows_table(rows, out_dir: Path):
+def rows_table(rows, out_dir: Path, baseline_dir: Path):
     body = []
     for slug, disp, repo, stars, fresh, cad, note, w, mat in rows:
         c4, c12, c52 = cad
-        reports = sorted((DEFAULT_BASELINE / slug).glob(f"{slug}-analysis-*.html"))
+        reports = sorted((baseline_dir / slug).glob(f"{slug}-analysis-*.html"))
         rep = ""
         if reports:
             try:
@@ -128,7 +128,7 @@ def rows_table(rows, out_dir: Path):
                 pass
         # Pretty-printed Worker Remit (the policy the report was scored against),
         # rendered alongside the report in the same target dir by render_all_remits.py.
-        remit_html = DEFAULT_BASELINE / slug / f"{slug}-remit.html"
+        remit_html = baseline_dir / slug / f"{slug}-remit.html"
         rem = ""
         if remit_html.is_file():
             try:
@@ -270,7 +270,7 @@ def build_html(baseline_dir: Path, out_dir: Path):
     <table class="health">
       <thead><tr><th>Target</th><th>Sponsor</th><th class="num">★ Stars</th><th>Fresh 0–5</th><th class="cadence">Commits 4/12/52wk</th><th class="num">RAISE</th><th>Maturity</th><th>Activity</th></tr></thead>
       <tbody>
-{rows_table(rows, out_dir)}
+{rows_table(rows, out_dir, baseline_dir)}
       </tbody>
     </table>
     </div>
