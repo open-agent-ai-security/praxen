@@ -471,6 +471,7 @@ def _finding_ctx(finding, _idx):
         "FINDING_ID": esc(finding["id"]),
         "FINDING_SUMMARY": render_rich(finding["summary"], allow=_RICH_FIELDS["finding_summary"]),
         "CONFIDENCE": esc(finding["confidence"]),
+        "CONFIDENCE_CLASS": finding["confidence"].lower(),
         "EVIDENCE": _format_evidence(finding["evidence"]),
         "RECOMMENDED_ACTION": _format_recommended_actions(finding["recommended_actions"]),
     }

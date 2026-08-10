@@ -27,7 +27,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Report rendering *(re-render only — no findings JSON touched)*
 - **Report doc links target the styled `/guide/` pages** (#227) instead of the unstyled Jekyll render — every tag chip and template prose link. All byte-gated renders regenerated; verified mechanically that every changed line is exactly the URL substitution. `/docs/` keeps serving as the fallback for reports already in the wild (deliberately no `.nojekyll`).
-- **Finding cards show per-finding confidence** (#6) — previously collected but rendered nowhere on the card. The Medium/Low → ADVISORY header-badge collapse is documented as intentional. Now that it's visible, the docs explain where the value comes from: a new "How confidence is assigned" section in [Interpreting Reports](docs/interpreting-reports.md) covers the evidence discipline behind it and what confidence does — and deliberately does not — affect.
+- **Finding cards show per-finding confidence** (#6) — previously collected but rendered nowhere on the card. It renders as a color-stepped bubble (green/amber/gray dot) under the evidence block, and the bubble links to a new **"How confidence is assigned"** section in [Interpreting Reports](docs/interpreting-reports.md) explaining the evidence discipline behind the value and what confidence does — and deliberately does not — affect. The Medium/Low → ADVISORY header-badge collapse is documented as intentional.
 - Finding default-state / expand-collapse-all (#27) is **deferred indefinitely** by decision, not omission.
 
 ### CI and supply chain
