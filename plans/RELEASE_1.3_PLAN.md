@@ -9,19 +9,20 @@
 > the 1.2 close-out (2026-07-30)** now that 1.2 has frozen (shipped to `dev`).
 > Holds everything cut from 1.2, plus what 1.2 pushed (#48) or newly surfaced (the
 > remit-generator / over-reach class below). **Reference model is now Opus 5** —
-> 1.3 grades vs **`v1.2-opus5`**, not `v1.2-claude48`. Branches from `dev` after
-> the 1.2 → main promotion.
+> 1.3 grades vs **`v1.2-opus5`**, not `v1.2-claude48`.
 >
-> **`v1.2.0` shipped 2026-08-03.** A score-inert patch, **`RELEASE_1.2.1_PLAN.md`**,
-> is drafted ahead of this release for the docs/CI tail from the promotion reviews
-> — anything that moves a number stayed here. If 1.2.1 ships first, 1.3 branches
-> from `dev` after it.
+> **`v1.2.0` shipped 2026-08-03; `v1.2.1` shipped 2026-08-10** (score-inert, per
+> `RELEASE_1.2.1_PLAN.md` — now STATUS: SHIPPED). 1.2.1 absorbed the docs/CI tail
+> plus several items this plan had parked: **#106, #135, #4, #6 (complete, as a
+> linked confidence bubble), #65 items 6–7** — struck below. Anything that moves
+> a number stayed here. **1.3 branches from `dev` after the 1.2.1 promotion
+> (`c004640`).** Re-triaged at the 1.2.1 close-out, 2026-08-10.
 
 ## Objective
 
 With scans reliable and scores stable (1.2), widen what Praxen *finds* and
 polish what it *emits*. Detection additions move numbers → 1.3 re-freezes
-`v1.3-claude48`, graded vs `v1.2-claude48`. That freeze is why the detection
+**`v1.3-opus5`**, graded vs **`v1.2-opus5`**. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
 ## Arrived from 1.2 — #48 (Stage-2.5 PUSH — confirmed 2026-07-30)
@@ -132,27 +133,41 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 - **#151** — Google Antigravity (`agy` CLI) harness: packaging + docs only,
   engine unchanged. An external contact is waiting; there is no engineering
   reason this must wait for 1.3 — pull forward whenever convenient.
-- **#65 items 6–8** — remit-authoring guidance: code-first warning block,
-  mechanism-vs-property rule note in the remit template, absence-of-evidence
-  confidence calibration in `KB_RAISE_SCANNING.md`. *(Item 6–8 wording changes
-  what remit authors write, not what the scanner scores against committed
-  remits — safe outside the freeze.)*
-- **#106** — clarify Out-of-Scope remit coverage as boundary-rule checks (remit
-  coverage semantics; authoring-side, no scan-behavior change). Sits with the
-  remit-authoring guidance above and the #198 generator work.
+- ~~**#65 items 6–7** — code-first warning block, mechanism-vs-property rule
+  note.~~ **Done in 1.2.1.** **#65 item 8** (absence-of-evidence confidence
+  calibration in `KB_RAISE_SCANNING.md`) does **not** belong in this bucket:
+  that KB is scanner-read primary calibration — **it can move scores** (per the
+  1.2.1 plan's own exclusion) — so it rides **pre-freeze with bucket A**.
+  **#65 item 3** (25-word summary cap breaks down for compound findings) is
+  model-output prose — schedule with #113, pre-freeze.
+- ~~**#106** — Out-of-Scope coverage as boundary-rule checks.~~ **Done in 1.2.1.**
+- **#226 leftovers** — docs batch starting from the verified status list on the
+  issue (quickstart's `PRAX-005` fake ID; llms.txt has no Codex mention; spec
+  §"four files" undercount; duplicated "Working with Praxen"; items 10/13
+  unverified either way). Docs-only, no baseline impact.
 - **#117** — challenging-findings.md additions (gated on #118; collapses to a
   one-paragraph note if #118 isn't adopted) · **#118** operator override +
   finding-revision records (schema-contract change — if adopted, it must ride
-  a re-baseline release, this one or later) · **#135** docs simplicity pass ·
-  **#4** SKILL authoring aids · **#90** shared org design system · **#2**
-  standing config *(still explicitly deferred)*.
+  a re-baseline release, this one or later) · ~~**#135** docs simplicity pass ·
+  **#4** SKILL authoring aids~~ *(both done in 1.2.1)* · **#90** shared org
+  design system · **#2** standing config *(still explicitly deferred)* ·
+  **#217** manifest-authoring tooling assist *(robustness RFE — partially
+  mitigated by the mid-draft `--validate-manifest` flow; unscheduled, keep on
+  the radar)*.
 
 ## Sequencing
 
-A + #113 (everything that changes findings or model prose) → C/D in any order
-→ **one re-freeze `v1.3-claude48`, last.** Same discipline as 1.2: nothing
-that moves numbers lands after the freeze; a stressed schedule drops whole
-buckets by dated plan amendment, not by silent descope.
+A + #113 + #65 items 3/8 (everything that changes findings, scoring calibration,
+or model prose) → C/D in any order → **one re-freeze `v1.3-opus5`, last.** Same
+discipline as 1.2: nothing that moves numbers lands after the freeze; a stressed
+schedule drops whole buckets by dated plan amendment, not by silent descope.
+
+Release mechanics (learned in 1.2.1): the version bump must be followed by
+`tests/render/render_all_remits.py` — remit HTMLs stamp the version from
+`plugin.json` at render time, a de-facto seventh version surface (analysis
+reports are immune; they stamp `praxen_version` from the findings JSON). The
+docs tripwire will also flag the `v1.2.1+` install-confirm floors — ride them
+forward. `bump_version.py --dry-run` first; it is still not CI-exercised.
 
 ## Success metric (first cut — re-triage at 1.2 freeze)
 
@@ -164,5 +179,5 @@ buckets by dated plan amendment, not by silent descope.
   undocumented zero columns (P+S counting, per the 1.2 rule).
 - **Stability holds:** the 1.2 gates re-pass on the 1.3 stack — zero watchdog
   deaths on the freeze runs; calibration-target |drift| ≤ 0.2 vs
-  `v1.2-claude48`. New detection must not cost the reliability and scoring
+  `v1.2-opus5`. New detection must not cost the reliability and scoring
   stability 1.2 just bought.
