@@ -10,6 +10,7 @@
 # Praxen
 **agent behavior verifier**
 
+[![Project level: Flagship](https://img.shields.io/badge/project_level-flagship-8366f5)](https://open-agent-ai-security.github.io/project-levels/)
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/badge/release-v1.2.0-blue)](https://github.com/open-agent-ai-security/praxen/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
