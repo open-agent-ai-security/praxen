@@ -5,7 +5,7 @@
 
 # Praxen 1.2.1 — Fast-follow patch (docs, CI, packaging)
 
-> ## ▶ STATUS: ACTIVE — approved 2026-08-05 (Steve: "make a 1.2.1 branch and start the work"); working branch `1.2.1` off `dev`
+> ## ✅ STATUS: SHIPPED — v1.2.1 released 2026-08-10 (tag `v1.2.1`, promotion PR #241, independent checkpoint review passed, post-release install+scan smoke clean, blog live). Approved 2026-08-05 (Steve: "make a 1.2.1 branch and start the work"); working branch `1.2.1` off `dev`
 >
 > Drafted immediately after the `v1.2.0` release from the promotion and
 > post-release reviews. **Everything here is deliberately score-inert**: no
