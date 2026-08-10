@@ -5,10 +5,10 @@
 
 # Design — Praxen Thinking Modes (#197)
 
-> **STATUS: DESIGN — approved for design 2026-08-10** (Steve: "Think hard about
-> it then generate a design"). Implementation unscheduled; candidate satellite
-> release, freeze-independent (see §8). Kept separate from `RELEASE_1.3_PLAN.md`
-> by request.
+> **STATUS: DESIGN — approved 2026-08-10; ships as release 1.3** (the accuracy
+> release — see `RELEASE_1.3_PLAN.md`), deliberately **ahead of** the
+> detection/re-baseline release, which renumbered to 1.4. Ordering rationale in
+> the 1.3 plan. Freeze-independent by construction (see §8).
 
 ## 1. Purpose
 
@@ -153,11 +153,17 @@ rules. One canonical findings JSON, one report — plus:
 
 - **Claude Code:** subagents give real context isolation for the auditor /
   the three scan runs / the adjudicator. Full automation.
-- **Codex (today):** no equivalent subagent isolation — fallback is
-  sequential phases where phase 1 writes the audit brief + inputs to disk and
-  the operator starts a **fresh session** for the audit phase. Semi-automated,
-  honestly documented as such. Parity tracked; the design assumes nothing
-  Claude-specific in the artifacts themselves.
+- **Codex:** reports the same capability — sub-agents spawned with
+  `fork_turns="none"` get a genuinely fresh context (no parent conversation
+  history), async, same workspace. Full automation on both primary harnesses;
+  **verify empirically at implementation time** (a quick isolation probe: the
+  child must not know a fact only the parent context holds) before relying on
+  it. Shared-workspace caveat: phases write to disk sequentially, so no
+  simultaneous-edit coordination is needed.
+- **Any other harness:** fallback is sequential phases where phase 1 writes
+  the audit brief + inputs to disk and the operator starts a **fresh session**
+  for the audit phase. Semi-automated, honestly documented as such. The
+  artifacts themselves assume nothing harness-specific.
 - Docs state plainly: isolation quality is what makes the audit worth
   anything; a harness that can't isolate gets the manual-fresh-session recipe,
   not a fake same-context "audit."
