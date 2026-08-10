@@ -9,7 +9,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [1.2.1] — *unreleased (date stamped at tag)*
+## [1.2.1] — 2026-08-10
 
 **Fast-follow patch: docs, CI/supply-chain hardening, report polish.** Deliberately **score-inert**: no change to detection, scoring, remits, or any frozen finding — ships against the existing `v1.2-opus5` baseline with no re-scan, `schema_version` stays **3.0**. The one skill-prose change (below) was gated by a blind re-scan of a baseline target, which landed exactly on its frozen median.
 
