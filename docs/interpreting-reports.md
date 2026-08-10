@@ -147,6 +147,21 @@ Each finding (and each RAISE category score) has a confidence level:
 
 Low confidence is valid and expected when the input shape doesn't cover a category — for example, a behavior-only analysis cannot confidently assess Manage Your Supply Chain. Look at confidence alongside score: a 1/5 with Low confidence means "we couldn't see this category clearly," while a 1/5 with High confidence means "we saw it clearly and it's weak."
 
+### How confidence is assigned
+
+During a scan, the analysis tags every claim in its working notes by evidence type before using it: **verified** (directly observed in an artifact it actually read), **inferred** (a reasonable conclusion from indirect evidence — architecture, file naming, imports), or **unknown** (no evidence available; the absence is itself the signal). Those tags never appear in the report, but the `confidence` value is required to follow them:
+
+- **High** is reserved for findings whose evidence chain was directly observed — every cited file, line, and behavior was read, not deduced.
+- A finding that rests on any inferred link carries **Medium** at most.
+- **Low** marks findings (and category scores) drawn from absence or heuristics alone — common, and expected, when an input shape limits visibility.
+
+Two properties are worth knowing when you weigh it:
+
+- **It is an evidence-anchored judgment, not a computed statistic.** The scanning model assigns confidence under the rules above; there is no separate scoring formula behind it. Treat it as the analysis telling you how solid the ground under a finding is.
+- **It never gates or discounts anything.** Confidence doesn't change a finding's severity, doesn't feed the RAISE score, and never hides a finding — Praxen surfaces likely false positives too, at appropriately low confidence, and suppression belongs in your triage pipeline, not in the scanner (see [Challenging Findings](challenging-findings.md)).
+
+Severity and confidence answer different questions: severity is *how bad, if real*; confidence is *how solid the evidence that it's real*. A Critical finding at Medium confidence isn't a lesser Critical — it's your highest-priority verification target.
+
 ## The JSON output
 
 `<agent-slug>-findings-<date>.json` is the **canonical, complete record** of the analysis — everything the HTML report shows is derived from it. It is a single top-level object (not a list), with these sections:

@@ -91,6 +91,8 @@ Alongside each category score, Praxen reports a **confidence level**:
 
 Low confidence is valid and expected for categories where Praxen has limited visibility. It doesn't mean the score is wrong — it means more evidence would be useful.
 
+Category confidence follows the same evidence discipline as per-finding confidence — see [How confidence is assigned](interpreting-reports.md#how-confidence-is-assigned) for the rules behind the value.
+
 ## Scoring principles
 
 The scanner follows a small set of explicit anti-patterns:
