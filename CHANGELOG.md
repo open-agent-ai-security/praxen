@@ -41,7 +41,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - Post-promotion doc corrections (2026-08-03): `STABILITY.md` schema examples, 1.x security-support policy, reports-reference schema version, dead OWASP 2026 link.
 - **Legacy marketplace mirror is praxen-only** (#235, 2026-08-05): the socxen entry acquired users onto a deprecated channel and coupled this repo to socxen's layout. The mirror-drift check treats the omission as deliberate — asymmetric and fail-closed (praxen required, mirror-only entries still drift, mirror source pinned to `./`). Verified live: legacy praxen install works, legacy socxen install fails clean, canonical socxen install works.
 
-## [1.2.0] — 2026-08-04
+## [1.2.0] — 2026-08-03
 
 **OWASP 2026 + a fresh Opus 5 baseline.** Praxen's risk mapping moves to the newly published OWASP Top 10 for LLM Applications **2026** and the companion Agentic AI Top 10 2026 (both maintained by the [OWASP GenAI Security Project](https://genai.owasp.org/)), on a re-baselined engine: `schema_version` **3.0**, reference model **Claude Opus 5**, frozen set **`v1.2-opus5/`**. Not score-comparable to `v1.1-claude48` — model, knowledge bases, and remits all changed.
 
