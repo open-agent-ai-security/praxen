@@ -11,11 +11,11 @@ Praxen produces three output files per analysis: a **findings JSON** (the canoni
 flowchart LR
   subgraph S1["Stage 1 — LLM (your coding agent)"]
     direction TB
-    SK["SKILL.md<br/>12-step procedure"] --> CJ["findings.json<br/>(canonical record)"]
+    SK["analysis<br/>(reads evidence, writes findings)"] --> CJ["findings.json<br/>(canonical record)"]
   end
   subgraph S2["Stage 2 — deterministic render (Python)"]
     direction TB
-    SC["schema.py<br/>validator"] --> RN["render.py"]
+    SC["schema check"] --> RN["report renderer"]
     RN --> HT["analysis.html"]
     RN --> TX["analysis.txt"]
   end
@@ -101,7 +101,7 @@ Log files Praxen found in the input, plus log files it could *infer* from the so
 
 A full-bleed **5×2 grid of cards** — one per LLM01–LLM10. Each populated card shows up to **three most-severe findings** that classify against that category as clickable severity-dot chips (anchored to the matching entry in the Findings Register). Empty cells render a muted **"No findings"** placeholder so the grid reads as a *coverage map*, not just a hit list — at a glance you see both where the agent has problems and which categories the analysis did not surface.
 
-Card placement is driven by each finding's `owasp_llm` scalar; per-card ordering is severity DESC then finding-ID ASC, capped at three. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
+Each finding appears on the card of its primary OWASP LLM category, showing up to the three most severe findings per card. The full unfiltered set still appears in §6's Findings Register — the grid is a visualization, not a filter.
 
 ### 10. OWASP Agentic Top 10 (2026) Coverage
 
@@ -147,6 +147,21 @@ Each finding (and each RAISE category score) has a confidence level:
 
 Low confidence is valid and expected when the input shape doesn't cover a category — for example, a behavior-only analysis cannot confidently assess Manage Your Supply Chain. Look at confidence alongside score: a 1/5 with Low confidence means "we couldn't see this category clearly," while a 1/5 with High confidence means "we saw it clearly and it's weak."
 
+### How confidence is assigned
+
+During a scan, the analysis tags every claim in its working notes by evidence type before using it: **verified** (directly observed in an artifact it actually read), **inferred** (a reasonable conclusion from indirect evidence — architecture, file naming, imports), or **unknown** (no evidence available; the absence is itself the signal). Those tags never appear in the report, but the `confidence` value is required to follow them:
+
+- **High** is reserved for findings whose evidence chain was directly observed — every cited file, line, and behavior was read, not deduced.
+- A finding that rests on any inferred link carries **Medium** at most.
+- **Low** marks findings (and category scores) drawn from absence or heuristics alone — common, and expected, when an input shape limits visibility.
+
+Two properties are worth knowing when you weigh it:
+
+- **It is an evidence-anchored judgment, not a computed statistic.** The scanning model assigns confidence under the rules above; there is no separate scoring formula behind it. Treat it as the analysis telling you how solid the ground under a finding is.
+- **It never gates or discounts anything.** Confidence doesn't change a finding's severity, doesn't feed the RAISE score, and never hides a finding — Praxen surfaces likely false positives too, at appropriately low confidence, and suppression belongs in your triage pipeline, not in the scanner (see [Challenging Findings](challenging-findings.md)).
+
+Severity and confidence answer different questions: severity is *how bad, if real*; confidence is *how solid the evidence that it's real*. A Critical finding at Medium confidence isn't a lesser Critical — it's your highest-priority verification target.
+
 ## The JSON output
 
 `<agent-slug>-findings-<date>.json` is the **canonical, complete record** of the analysis — everything the HTML report shows is derived from it. It is a single top-level object (not a list), with these sections:
@@ -158,7 +173,7 @@ Low confidence is valid and expected when the input shape doesn't cover a catego
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |
 | `remit_coverage` | `stat_counts` plus `rules[]` — every actionable remit rule with `rule_id`, `section`, quoted `rule_text`, `status` (`verified`/`gap`/`partial`/`vague`/`enp`), and the linked `finding_id` (or `null`) |
-| `findings[]` | each finding: `id`, `severity`, `summary`, optional `description`, `tags[]` (kind + full label), `policy_rule_ids` / `policy_rule_text`, **structured `evidence[]` of `{ file, line, snippet }`**, **`recommended_actions[]`** (array of one or more concrete actions), `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
+| `findings[]` | each finding: `id`, `severity`, `summary`, optional `description`, `tags[]` (kind + full label), `policy_rule_ids[]` / `policy_rule_text[]` (arrays since schema 3.0, parallel by index), **structured `evidence[]` of `{ file, line, snippet }`**, **`recommended_actions[]`** (array of one or more concrete actions), `raise_category`, `owasp_llm` / `owasp_agentic`, `confidence`, `related_findings[]`, `escalation` |
 | `positives[]` | verified positive controls — `title`, `description`, `evidence_path` |
 | `log_files` | `present`, `no_logs_note`, and `rows[]` (path / source / content type / purpose / mtime / status) |
 | `raise_posture` | `weighted_overall` (the 0.0–5.0 scalar), `weighted_rationale`, and `categories[]` (the six RAISE categories, each with `key`, `name`, `score`, `confidence`, `weight`, `rationale`) |

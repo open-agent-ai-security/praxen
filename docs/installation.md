@@ -23,7 +23,7 @@ Install from the community plugin marketplace ([open-agent-ai-security/plugins](
 ```bash
 claude plugin marketplace add open-agent-ai-security/plugins
 claude plugin install praxen@open-agent-ai-security
-claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.0.0+
+claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.2.1+
 ```
 
 > **Added the marketplace from `open-agent-ai-security/praxen` previously?** That path still
@@ -33,7 +33,7 @@ claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.0.
 > the add + install commands above. Your plugin key (`praxen@open-agent-ai-security`) and
 > settings are unchanged.
 
-The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. Prefer the terminal form when scripting: `claude plugin …` is argument-driven and runs the same way on every interface, whereas in-session slash commands occasionally fall through and get sent as ordinary chat messages.
+The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. (When scripting, prefer the terminal form — it behaves identically everywhere.)
 
 ## OpenAI Codex
 
@@ -42,7 +42,7 @@ Codex has its own plugin marketplace, and Praxen installs from the **same commun
 ```bash
 codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen@open-agent-ai-security
-codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.0.0+
+codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.2.1+
 ```
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).
@@ -78,6 +78,8 @@ codex plugin add praxen@open-agent-ai-security
 ```
 
 **Any other agent** — `git pull` the clone (or re-clone), or download a newer release `.zip`. Praxen is stateless across analyses, so there's no migration step.
+
+> **Upgrading from 1.1?** The update commands above are the whole procedure — nothing to migrate. What you'll notice after the jump: findings JSON is now **schema 3.0** (findings carry `policy_rule_ids` / `policy_rule_text` *arrays* — anything parsing the old single-value fields needs updating; see the [reports reference](interpreting-reports.md) and the [schema stability policy](https://github.com/open-agent-ai-security/praxen/blob/main/STABILITY.md)), risk tags use the **2026 OWASP** LLM and Agentic Top 10 names, and scores are **not directly comparable** to 1.1 reports (the reference model, knowledge bases, and remit guidance all moved — see the [CHANGELOG](https://github.com/open-agent-ai-security/praxen/blob/main/CHANGELOG.md)). If you originally added the marketplace from `open-agent-ai-security/praxen`, see the migration note in the install section above — the legacy path still updates, but the community catalog is canonical.
 
 > Praxen is a security tool — staying current matters. Update on a regular cadence, or turn on auto-update (below).
 

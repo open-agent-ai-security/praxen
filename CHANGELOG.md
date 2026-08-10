@@ -9,7 +9,39 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [1.2.0] — 2026-08-04
+## [1.2.1] — 2026-08-10
+
+**Fast-follow patch: docs, CI/supply-chain hardening, report polish.** Deliberately **score-inert**: no change to detection, scoring, remits, or any frozen finding — ships against the existing `v1.2-opus5` baseline with no re-scan, `schema_version` stays **3.0**. The one skill-prose change (below) was gated by a blind re-scan of a baseline target, which landed exactly on its frozen median.
+
+### Documentation
+- **"Upgrading from 1.1?"** guidance in the install docs (schema 3.0 arrays, 2026 OWASP names, score non-comparability, legacy-marketplace migration pointer); install confirm lines now say `v1.2.0+`.
+- **`tests/scan_diff.py` is now documented** ([Understanding Variability](docs/understanding-variability.md)) — the shipped-but-undiscoverable scan-vs-scan diff from 1.2.
+- Corrections from the promotion reviews (#224, #225, #226): the `--validate-manifest` example in SKILL.md Step 9.9 is now runnable and its skeleton-tolerance wording matches verified validator behavior; `render_remit.py` invocation path fixed; `tests/README.md` no longer contradicts itself on baseline schema versions and points the release-review compare at the current set.
+- **Out-of-scope declarations documented as audited boundary rules** (#106) — never scan-scope exclusions (that's `SCAN_INSTRUCTIONS.md`).
+- Remit-authoring guidance (#65 items 6–7): a code-first warning block now leads the Pre-flight section; the template's Action Boundaries guidance says **write rules about properties, not mechanisms**.
+- Bounded simplicity pass (#135): troubleshooting folds three failure modes into one re-run recipe; pipeline internals trimmed from the report-reading walkthrough; README/install/quickstart de-jargoned.
+
+### Skill prose (gate-scanned)
+- **§9.2/§9.4 worked examples no longer describe FinBot** (#216) — a roster/demo target, including two of its real findings, previously appeared verbatim in the instructions the scanning model reads. Both examples are now an invented scheduling agent preserving the taught shape. Gate: a blind FinBot re-scan on the edited skill scored **0.90 — exactly the frozen median** — with the formerly pre-briefed admin-auth finding surfacing as the #1 Critical on independent evidence.
+- Authoring aids (#4 items 3–5): slug forward-reference, one large-file decision tree (semantics unchanged), and a bridge note stating Remit-Delta and Policy-Implementation Divergence are mirror-image complements.
+
+### Report rendering *(re-render only — no findings JSON touched)*
+- **Report doc links target the styled `/guide/` pages** (#227) instead of the unstyled Jekyll render — every tag chip and template prose link. All byte-gated renders regenerated; verified mechanically that every changed line is exactly the URL substitution. `/docs/` keeps serving as the fallback for reports already in the wild (deliberately no `.nojekyll`).
+- **Finding cards show per-finding confidence** (#6) — previously collected but rendered nowhere on the card. It renders as a color-stepped bubble (green/amber/gray dot) under the evidence block, and the bubble links to a new **"How confidence is assigned"** section in [Interpreting Reports](docs/interpreting-reports.md) explaining the evidence discipline behind the value and what confidence does — and deliberately does not — affect. The Medium/Low → ADVISORY header-badge collapse is documented as intentional.
+- Finding default-state / expand-collapse-all (#27) is **deferred indefinitely** by decision, not omission.
+
+### CI and supply chain
+- **Every GitHub Action across all seven workflows is SHA-pinned** with a version comment (#209 item 3; folds the parked #193 setup-python 6→7 bump, which also covered one workflow #193 predates). Dependabot keeps pins current.
+- **Dependabot auto-merge now fails closed** when the base branch has no required status checks (#209 item 2) — without them, GitHub's auto-merge merges immediately instead of waiting for CI.
+- **DCO bot exemption tightened** (#222): explicit login allowlist **and** GitHub commit-signature verification, so neither a bot-styled author name nor a forged bot email skips DCO.
+- **`scripts/release/bump_version.py`** — one-command version bump across all six version surfaces (one more than anyone thought there were), verify-after-edit, round-trip tested. This release's own bump is its first production cut.
+- `tests/baselines/suite_health.py` honors `--baseline-dir` for report/remit links (#176 item 3).
+
+### Shipped live ahead of this release *(unversioned, already on `main`)*
+- Post-promotion doc corrections (2026-08-03): `STABILITY.md` schema examples, 1.x security-support policy, reports-reference schema version, dead OWASP 2026 link.
+- **Legacy marketplace mirror is praxen-only** (#235, 2026-08-05): the socxen entry acquired users onto a deprecated channel and coupled this repo to socxen's layout. The mirror-drift check treats the omission as deliberate — asymmetric and fail-closed (praxen required, mirror-only entries still drift, mirror source pinned to `./`). Verified live: legacy praxen install works, legacy socxen install fails clean, canonical socxen install works.
+
+## [1.2.0] — 2026-08-03
 
 **OWASP 2026 + a fresh Opus 5 baseline.** Praxen's risk mapping moves to the newly published OWASP Top 10 for LLM Applications **2026** and the companion Agentic AI Top 10 2026 (both maintained by the [OWASP GenAI Security Project](https://genai.owasp.org/)), on a re-baselined engine: `schema_version` **3.0**, reference model **Claude Opus 5**, frozen set **`v1.2-opus5/`**. Not score-comparable to `v1.1-claude48` — model, knowledge bases, and remits all changed.
 

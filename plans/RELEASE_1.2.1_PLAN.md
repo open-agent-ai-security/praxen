@@ -5,7 +5,7 @@
 
 # Praxen 1.2.1 — Fast-follow patch (docs, CI, packaging)
 
-> ## ▶ STATUS: DRAFT — proposed 2026-08-03, not yet approved
+> ## ▶ STATUS: ACTIVE — approved 2026-08-05 (Steve: "make a 1.2.1 branch and start the work"); working branch `1.2.1` off `dev`
 >
 > Drafted immediately after the `v1.2.0` release from the promotion and
 > post-release reviews. **Everything here is deliberately score-inert**: no
@@ -88,15 +88,18 @@ large, and it is optional for this release.
   assuming it, and note that re-running a failed run replays the *old* workflow
   definition — a fix needs a new tag, and this project does not re-point published
   tags.
-- **`scripts/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
-  version in **five** places and edits every one of them by hand:
+- **`scripts/release/bump_version.py`** *(new — Steve, 2026-08-03)*. Praxen keeps the
+  version in **six** places and edits every one of them by hand *(the draft
+  said five — `marketplace.json` `metadata.version` surfaced when porting the
+  script against `test_plugin_manifests.py`'s actual check list)*:
 
   | Surface | Guarded by |
   |---|---|
   | `PRAXEN_SPEC.md` (`**Version:**`) | `build.sh` (the authority the tag is checked against) |
   | `.claude-plugin/plugin.json` | `build.sh` + `test_plugin_manifests.py` |
   | `.claude-plugin/marketplace.json` (praxen entry, **by name**) | as above |
-  | `.codex-plugin/plugin.json` | as above |
+  | `.claude-plugin/marketplace.json` (`metadata.version`) | `test_plugin_manifests.py` only — **not** `build.sh` |
+  | `.codex-plugin/plugin.json` | as above (`build.sh` + tests) |
   | `README.md` release badge | `test_plugin_manifests.py` only — **not** `build.sh` |
 
   The guards catch drift, but only *after* someone has already shipped a
@@ -137,14 +140,13 @@ large, and it is optional for this release.
   result lands outside band, drop the item rather than debug it in a patch.
 - **#106 — clarify Out-of-Scope remit coverage** as boundary-rule checks.
   Authoring-side guidance; no scan-behavior change against committed remits.
-- **#27 — finding default-state (collapsed/expanded) + expand/collapse-all.**
-  A report-UX change, so ordinarily 1.3 — but it lands in `render.py` /
-  `report_template.html` and therefore regenerates exactly the same 85 renders
-  #227 already forces. **If #227 is in, doing #27 in the same pass is nearly
-  free**; doing them in separate releases means paying the regeneration twice.
-  Score-inert either way. Include only if the UX decision (which state is
-  default) is settled — otherwise it is a design question wearing a cleanup's
-  clothes.
+- ~~**#27 — finding default-state (collapsed/expanded) + expand/collapse-all.**~~
+  **DEFERRED INDEFINITELY** (Steve, 2026-08-05: *"Defer [#27] indefinitely, but
+  leave it filed - don't close"*). Dropped from this release and from any
+  scheduled release; the issue stays open as the record. Implementation note
+  for whenever it revives: finding cards are already `<details open>` in the
+  template, so the change is the default attribute plus expand/collapse-all
+  controls — plus the render regeneration of the day.
 - **#6 — `render.py` / template polish** (finding-card confidence, Medium/Low
   badge, TXT High findings). The issue itself flags that it re-renders the
   byte-frozen baselines — which is precisely why it belongs *with* #227/#27
@@ -212,30 +214,42 @@ above is here with its reason.
 
 ## Sequencing
 
-Four PRs, in this order:
+> **Amended 2026-08-05 (execution):** per Steve, all chunks accumulate on the
+> **rolling branch `1.2.1` (PR #233), held unmerged** until release-ready —
+> same chunks, same order, same per-chunk background review, one merge at the
+> end instead of four. Chunk 5 added: the section-C stragglers the original
+> four-PR list never assigned a slot (caught during execution). Chunks 1–4
+> landed 2026-08-05; release holds for 1.2.0 soak time (Steve, 2026-08-05).
 
-1. **A (docs)** and **B (CI + bump script)** — independent, one PR each. Land the
-   bump script first and use it to cut this release's own version bump.
+Five chunks, in this order:
+
+1. **A (docs)** and **B (CI + bump script)** — independent, one chunk each. Land
+   the bump script first and use it to cut this release's own version bump.
 2. **The SKILL prose pair — #216 + #4 — together**, gated by a single spot-check
    scan of one baseline target. One scan covers both; if it lands outside band,
-   drop the pair rather than debugging prose in a patch.
-3. **The render regeneration — #227 + #27 + #6 — last, and alone.** All three
-   touch `render.py` / `report_template.html` and force the same 85-file
-   regeneration, so they cost one regeneration together and three separately.
-   Landing them alone keeps that large diff reviewable instead of buried under
-   prose edits.
+   drop the pair rather than debugging prose in a patch. *(Executed: gate PASSED
+   — blind finbot at the frozen median 0.90.)*
+3. **The render regeneration — #227 + #6 (#27 deferred out) — last of the
+   render-touching work, and alone.** Both touch `render.py` /
+   `report_template.html` and force the same regeneration, so they cost one
+   regeneration together. Landing them alone keeps that large diff reviewable
+   instead of buried under prose edits.
+4. **The section-C stragglers — #106, #65 items 6–7, #135, #176 item 3** —
+   authoring-guidance and docs prose plus the two-line `suite_health.py` fix;
+   none touch the renderer, so they land after the regeneration without
+   re-paying it.
 
 **Verify the regeneration rather than trusting it:** for #227 every changed file's
-diff must be *only* the URL substitution. #27 and #6 legitimately change more, so
-review those diffs on their merits — and confirm no findings JSON moved, which is
+diff must be *only* the URL substitution. #6 legitimately changes more, so
+review its diffs on their merits — and confirm no findings JSON moved, which is
 the actual invariant.
 
-Version bump is `1.2.0 → 1.2.1` across the five surfaces listed in **B**.
+Version bump is `1.2.0 → 1.2.1` across the six surfaces listed in **B**.
 `build.sh`'s four-way guard enforces agreement on all but the README badge (it
 now looks the marketplace entry up **by name**, so the mirror's extra entries
 are safe); `test_plugin_manifests.py` covers the badge.
 
-**Land `scripts/bump_version.py` early in the release, then use it to cut this
+**Land `scripts/release/bump_version.py` early in the release, then use it to cut this
 release's own bump** — that is both the fastest way to validate it and the most
 honest test. Then the CHANGELOG entry, the usual `dev` → `main` merge-commit
 promotion, fast-forward `dev`, and tag.

@@ -204,6 +204,15 @@
     "Handle email appropriately"
     "Be careful with sensitive data"
 
+  Write rules about PROPERTIES, not MECHANISMS. "MUST use HMAC-SHA256" is a
+  mechanism rule — it breaks when the team upgrades to a better algorithm, and
+  it fires on correct architectures that satisfy the intent another way
+  ("MUST NOT bind to 0.0.0.0" fails every well-isolated container deployment).
+  "Webhook payloads MUST be authenticated before processing" is a property
+  rule — it states the required outcome and survives the upgrade. State what
+  must be TRUE about the result; let the scan discover how (or whether) it is
+  achieved.
+
   These are forbidden or gated MOVES within work the agent is allowed to do —
   distinct from Prohibited Behaviors, which rules out whole categories of work.
 -->
