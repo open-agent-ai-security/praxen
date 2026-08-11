@@ -10,10 +10,15 @@
 > Knowledge Base, on the two targets that flip in exactly this category
 > (finbot and autogen both scored 2/1/1 in the v1.2 3× variance study).
 >
-> ## Headline
+> ## Headline — REVISED after round 2 (2026-08-11)
 >
-> **Both candidate fixes failed. The variance source is target-dependent, and
-> neither intervention is general.**
+> **Two fixes were found. Both work, independently, on both targets: 20 of 20
+> replays returned identical scores across four conditions.**
+>
+> Round 1 tested a checklist rubric (failed) and concluded improvement was not
+> generally possible. **That conclusion was wrong** — Steve pushed back that it
+> merely restated existing policy, and round 2 found two working fixes that
+> round 1 never tested. Round 1's findings are preserved below unchanged.
 >
 > - The **checklist rubric is not steadier** — higher sigma than the current
 >   rubric in 3 of 4 comparisons, and it scores a deliberately-vulnerable
@@ -108,6 +113,72 @@ one-notch wobble in general. The issue's own interim mitigation — treat the
 weighted score as **ordinal and advisory**, gate on dominant themes and
 severity-count neighbourhood — is looking less like an interim and more like
 the correct permanent policy, now with measurement behind it.
+
+## Round 2 — two fixes, both work
+
+```
+condition                scores        sigma
+finbot-holistic        1 1 1 1 1       0.000   round 1: frozen hand-built pack
+finbotvar-holistic     2 1 1 1 1       0.400   round 1: scorers explore freely
+autogen-holistic       2 2 1 1 1       0.490   round 1: frozen hand-built pack
+autogenvar-holistic    1 1 1 1 2       0.400   round 1: scorers explore freely
+--------------------------------------------------------------------------
+finbotfind-holistic    1 1 1 1 1       0.000   FIX A: score from the findings
+autogenfind-holistic   1 1 1 1 1       0.000   FIX A
+finbottb-holistic      1 1 1 1 1       0.000   FIX B: tie-break rules
+autogentb-holistic     1 1 1 1 1       0.000   FIX B
+```
+
+### Fix A — score from the scan's own findings, not from free exploration
+
+Give the scorer the findings JSON the scan already produced instead of letting
+it re-explore the workspace. **5/5 identical on both targets**, including
+autogen, which round 1 declared unfixable because its variance survived a
+frozen evidence pack.
+
+Why it works where a frozen *code* pack did not: findings are already a
+judgment about what matters. Raw code forces the scorer to make that judgment
+itself, and that is where scorers diverge — they weighed incidental controls
+(`suppress_result_output`, `silence_pip`) differently. Findings remove the
+question.
+
+Cost: a procedural change to the scan flow. No schema, template, scale, or
+baseline change.
+
+### Fix B — boundary tie-break rules
+
+Four rules appended to the existing rubric, applied in order before choosing
+between adjacent scores:
+
+1. Opt-in, default-off controls do not count as controls — capability, not posture.
+2. Side-effect behaviours do not count as controls (noise reduction, memory).
+3. If the dominant data path is unmanaged, incidental controls elsewhere cannot
+   lift the score above 1.
+4. When two adjacent scores both seem defensible, choose the lower, and name
+   which two you were choosing between.
+
+**5/5 identical on both targets, scoring raw code** — so the mapping ambiguity
+round 1 called irreducible was in fact reducible. Rationales show the rules
+firing by name and the scorers converging for stated reasons.
+
+Cost: text added to `KB_RAISE_SCANNING.md`. No flow change.
+
+The finbot arm doubles as a regression check: fix B did not disturb the
+condition that already agreed perfectly.
+
+### Limits that must travel with this
+
+- **N=5, one category, two targets.** Four perfect runs is a strong signal but
+  a narrow one.
+- **The tie-break rules were written after seeing where these two targets made
+  scorers disagree.** The rules themselves are generic — no target-specific
+  content — but they are calibrated on the test set. A cold run on a target
+  nobody has examined is required before claiming they generalise. Fix A has no
+  such problem; nothing in it was tuned to a target.
+- **Both fixes converge on 1**, the lower end of the production range for these
+  targets. Adopting either shifts these scores down slightly, so it rides a
+  re-baseline.
+- Rounds 1 and 2 ran the same day, same model, same bench.
 
 ## What survives
 
