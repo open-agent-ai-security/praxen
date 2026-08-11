@@ -56,6 +56,14 @@ The cost is real and linear: three runs is roughly three times the tokens and wa
 
 > **Rule of thumb.** One run to *understand* an agent; multiple runs to *grade* one.
 
+> **Or let Praxen do this for you.** The manual N-run discipline above is
+> automated by [Thinking Modes](thinking-modes.md): **x-high** mode runs three
+> independent scans and merges them by *evidence adjudication* (a fresh agent
+> re-verifies every finding against the code) rather than by score arithmetic,
+> and **high** mode adds an independent false-positive audit to a single run.
+> Reach for a mode when the number must be defensible; the steps above remain
+> the right mental model for what it is doing.
+
 ### Comparing two runs mechanically: `scan_diff.py`
 
 Step 4's theme-and-rule-text diff has a tool. `tests/scan_diff.py` (in the
@@ -100,6 +108,7 @@ gets scanned* — it does not make the score itself deterministic.
 
 ## Next steps
 
+- [Thinking Modes](thinking-modes.md) — opt-in high / x-high accuracy tiers that automate the multi-run discipline
 - [Interpreting Reports](interpreting-reports.md) — what each section means and how to read the maturity score
 - [Challenging and Revising Findings](challenging-findings.md) — the full revise-and-re-render workflow
 - [The RAISE Framework](RAISE.md) — the six-category 0–5 maturity scale the weighted score is built from

@@ -26,6 +26,8 @@ allowed-tools: Read Grep Glob Bash Write
 
 Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 — the manifest that lets a long scan recover from mid-analysis context compaction. **Do not skip Step 9.9.**
 
+**Thinking modes (opt-in).** This procedure is **standard mode** — the default, and complete as written. If, and only if, the operator's invocation names a thinking mode (**high** / **x-high**), read `THINKING_MODES.md` beside this file before Step 1 and orchestrate per that file — it wraps this pipeline in post-scan verification without changing any step. If no mode was named, skip this paragraph; nothing else in this file changes.
+
 **Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
 
 **Contents — jump table (useful after a context compaction).** A long scan can exceed the coding agent's context window; if your session resumed mid-procedure, this jump table is the fastest way to relocate the step you were on.

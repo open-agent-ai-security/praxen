@@ -1,0 +1,127 @@
+<!--
+  Copyright 2026 Exabeam, Inc.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# Thinking Modes
+
+Praxen supports opt-in **thinking modes** — accuracy tiers, the way LLMs
+expose effort levels. The default, **standard**, is the single scan described
+everywhere else in this guide. The two higher tiers spend more time and
+tokens to buy back the residual [run-to-run
+variability](understanding-variability.md) that comes with LLM judgment: they
+automate the verification practices Praxen's own release process uses by hand
+— an independent false-positive scrub, and multi-run comparison.
+
+| Mode | What runs | Cost (rough) | When to use it |
+|---|---|---|---|
+| **standard** | One scan | 1× | Default. Everyday scans, exploratory reads |
+| **high** | Scan → independent findings audit → cleaned report | ~2× | Before a report leaves your hands |
+| **x-high** | 3 independent scans → evidence adjudication → one "super-run" report | ~4–5× | Audits, gates, anything where quality outranks time and tokens |
+
+## Invoking a mode
+
+Modes are selected per-invocation, in natural language — there is no config
+file and no standing state:
+
+> "Run a Praxen analysis of `./my-agent` in **high** thinking mode."
+>
+> "Run an **x-high** Praxen scan of this workspace."
+
+If no mode is named you get standard mode. The skill announces the mode and
+its expected cost multiple before starting, so a mis-heard request is visible
+immediately.
+
+## What high mode does
+
+1. A complete standard scan runs first — if anything later fails, you still
+   have a full ordinary report.
+2. A **fresh, context-unaware agent** then audits the findings: it receives
+   only the findings JSON, the Worker Remit, and the workspace — none of the
+   scan's reasoning — and re-reads every cited artifact trying to *refute*
+   each finding. Verdicts are three-way: **confirmed**, **unsupported** (the
+   cited evidence doesn't support the claim — the auditor must cite what it
+   read that contradicts it), or **remit-defect** (the code honestly violates
+   the rule as written, but the rule itself over-reaches or contradicts the
+   agent's documented behavior).
+3. Unsupported and remit-defect findings are removed and the report is
+   re-rendered. Remit-defect findings aren't discarded — they become a
+   **remit feedback** list for whoever owns the remit. Category scores are
+   re-derived only where a removed finding was load-bearing.
+
+The audit is deliberately hard to please in one direction only: a kill
+requires cited contradicting evidence, "could not verify quickly" counts as
+confirmed, and the auditor can neither re-grade severities nor invent new
+findings.
+
+## What x-high mode does
+
+1. **Three independent scans** run from scratch — fresh context each, no
+   shared state.
+2. The finding sets are unioned and matched across runs (by rule text and
+   evidence, never by the run-local `R-NN` / `PRAX-…` IDs).
+3. A fresh adjudicator applies the high-mode audit to **every** finding in
+   the union, then assembles one canonical report — the **super-run** — from
+   the findings that survived, re-deriving all scores and prose from that
+   adjudicated set.
+
+Two principles govern the merge, and they are worth knowing because they are
+*not* voting:
+
+- **Evidence decides membership; run-count decides nothing.** A finding only
+  one run caught **stays** if the evidence verifies — that's the discovery
+  payoff of running three times. A finding all three runs agreed on **dies**
+  if the evidence doesn't hold up.
+- **Scores are re-derived, never blended.** The super-run's RAISE scores are
+  computed from the adjudicated finding set by the normal scoring rules — not
+  the median, mean, or best-of the three raw runs. The result is a real
+  single scan's score, computed on better-vetted inputs.
+
+## What you get on disk
+
+Both modes keep full provenance alongside the final report:
+
+- The **final report** (HTML / TXT / findings JSON) — same format and schema
+  as any standard scan; nothing downstream needs to change.
+- The **raw artifacts** — high mode keeps the pre-audit report with a `-raw`
+  suffix; x-high keeps all three runs in `xhigh-run1/2/3/` directories.
+- An **adjudication record** (`reports/<agent>-adjudication-<timestamp>.md`)
+  — every verdict with its rationale, the remit-feedback list, and (x-high) a
+  **variance diagnostic**: what flipped between runs, the per-run score
+  spread, and what the adjudication did about it. If you maintain the remit
+  or care *why* two runs disagreed, this file is the interesting one.
+
+## Scores and comparability
+
+Thinking-mode scores are **not comparable to standard-mode expectations or
+bands**. Praxen's published variance expectations (and its own frozen test
+baselines) are standard-mode, single-run artifacts; a high or x-high score is
+computed on an audited finding set and will typically be equal or slightly
+cleaner. Compare thinking-mode runs with thinking-mode runs. When a number
+must be defensible, x-high *is* the multi-run discipline the
+[variability guide](understanding-variability.md#when-stability-matters-more-than-runtime)
+describes — with the aggregation done by evidence adjudication instead of by
+score arithmetic.
+
+## Harness support
+
+The modes depend on **genuine context isolation** for the audit — a reviewer
+that shares the scan's conversation inherits its confirmation bias and checks
+nothing.
+
+- **Claude Code** — full automation: scans, auditor, and adjudicator run as
+  subagents.
+- **OpenAI Codex** — full automation: sub-agents spawned with a fresh context
+  (`fork_turns="none"`).
+- **Other harnesses** — a documented fallback: each phase writes its inputs
+  to disk and you start a fresh session for the audit phase. Semi-manual, but
+  the isolation is real; Praxen won't fake an "audit" in the same context.
+
+## Next steps
+
+- [Understanding Run-to-Run Variability](understanding-variability.md) — the
+  variance the modes exist to damp, and what single runs already guarantee
+- [Interpreting Reports](interpreting-reports.md) — reading the report the
+  modes produce (identical format in every mode)
+- [Challenging Findings](challenging-findings.md) — the conversational
+  revise-and-re-render workflow, which works in any mode

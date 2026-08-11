@@ -135,6 +135,8 @@ Praxen runs once per invocation: the skill reads and analyzes the workspace, wri
 
 Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs it by opening a session in their coding agent, in a directory containing the Praxen package, and asking the agent to read and execute `skills/behavior-verifier/SKILL.md`. Praxen is an on-demand tool — each invocation performs one full analysis and exits.
 
+**Thinking modes.** The invocation may name an opt-in accuracy tier — **high** (scan → context-unaware findings audit → cleaned re-render, ~2× cost) or **x-high** (three independent scans → evidence adjudication → one super-run report, ~4–5× cost) — selected per-invocation in natural language, with no config file or standing state. Mode orchestration lives in `skills/behavior-verifier/THINKING_MODES.md`, read only when a mode is named; with no mode named the skill runs the standard single-scan pipeline unchanged. Modes add verification around the pipeline, never new findings or schema fields: final scores are re-derived from the audited finding set by the normal scoring rules, raw artifacts are preserved alongside the final report, and every audit verdict is logged in a per-run adjudication record (`reports/<agent-slug>-adjudication-<timestamp>.md`).
+
 ### Inputs
 
 | Input | Source |
@@ -143,6 +145,7 @@ Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs 
 | Agent workspace | Path supplied by the operator at invocation time |
 | Knowledge base | `knowledge/` directory alongside the skill file |
 | Bundled scripts and template | `manifest_to_findings.py` (Step 10 converter), `render.py` (Step 11 renderer), `schema.py` (shared validator), `report_template.html` — all alongside the skill file in `skills/behavior-verifier/` |
+| Thinking-mode instructions | `THINKING_MODES.md` alongside the skill file — read only when the invocation names a high / x-high thinking mode |
 
 ### Outputs
 
