@@ -198,3 +198,77 @@ condition that already agreed perfectly.
 - The checklist as a variance fix.
 - The independence argument (39 small errors cancelling).
 - The "mapping is the coin flip" premise as a general claim.
+
+---
+
+## Round 3 — Steve's maturity objection, tested (2026-08-11)
+
+> Steve, on Fix A: *"If you're looking at the findings you're just seeing vulns.
+> You won't see red teams, advanced controls. You're just seeing vulns, or
+> their absence. This is a MATURITY score. We need to make sure we CAN see the
+> evidence that matters."*
+
+**Confirmed, and it is a correctness failure an order of magnitude larger than
+the variance problem this whole workstream was chasing.**
+
+### The artifact is blind to practice
+
+Searching hermes's own findings artifact: `red team`, `adversarial` and
+`test_` appear **zero times** in findings and positives. They appear only
+inside the sentence that asserts the score. The evidence for hermes scoring 3
+exists nowhere a findings-only scorer can reach.
+
+### Measured, on the adversarial-testing category
+
+```
+                              scores      vs baseline
+hermes, findings only        1 1 1 1 1    baseline 3  -- stable and WRONG BY TWO BANDS
+hermes, findings + maturity  3 3 3 3 3    baseline 3  -- stable and correct
+finbot, findings only        1 1 1 1 1    baseline 1  -- correct
+finbot, findings + maturity  2 2 2 2 2    baseline 1  -- +1, defensibly
+```
+
+**Fix A alone produces a perfectly stable score that is wrong by two bands** —
+0.30 of weighted total at this category's 15% weight, larger than any variance
+observed anywhere in this workstream. Stability without visibility is worse
+than instability: it is confidently wrong, every time.
+
+Adding a deliberate maturity sweep recovers the correct score exactly, and the
+rationales are better than the baseline's: 45 security-named test files / 871
+tests gating every PR, a real-world promptware payload pinned as a permanent
+regression anchor, a guard-removal canary suite, a per-release security ledger
+with GHSA IDs and external reporter credit — while correctly withholding 4
+because there is no red-team exercise, no attack corpus, no fuzzing or static
+analysis, and prompt injection is declared out of scope.
+
+### The sweep does not simply inflate
+
+finbot moved 1 → 2, and the rationale is defensible rather than generous: the
+sweep surfaced a graded goal-manipulation playbook with four attack vectors,
+per-tier pass conditions and success criteria instrumented as runtime oracles
+in application code. All five scorers then withheld 3 for the same stated
+reasons — no test files, no corpus, no cadence, no feedback loop, single-commit
+history. **A deliberately vulnerable demo did not get inflated toward maturity;
+it got credited for the one real adversarial artifact it has.**
+
+Whether the baseline's 1 or the sweep's 2 is right is a judgment call worth
+Steve's review — but the sweep's version is the better-evidenced one.
+
+### Corrected design
+
+**The canonical evidence pack is findings + positives + a deliberate maturity
+sweep.** Both halves are load-bearing and they fix different failures:
+
+- canonicalising the pack buys **stability** (rounds 1–2)
+- including presence-of-practice evidence buys **correctness** (round 3)
+
+A vulnerability scan sees only defects. A maturity score needs a counterpart
+step that goes looking for evidence the project does good things, and records
+verified absences too. That step does not exist in the pipeline today.
+
+### Score so far: 40 of 40 replays identical within condition
+
+Rounds 2 and 3, four rubric/pack combinations across three categories and three
+targets. Every condition returned a perfectly stable score. The open question
+is no longer stability — it is whether the pack shows the scorer the right
+things.
