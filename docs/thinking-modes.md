@@ -143,13 +143,22 @@ reach for:
   underlying run's category-score draw fully intact — so a high-mode score
   carries the same run-to-run variance as a standard score. Read it as
   *better-verified*, not *more stable*.
-- **X-high stabilizes both.** Scores are re-derived from the adjudicated
-  union with cross-run disagreements resolved by the scoring rules, so the
-  number itself is damped. When a number must be defensible, x-high *is* the
-  multi-run discipline the
-  [variability guide](understanding-variability.md#when-stability-matters-more-than-runtime)
-  describes — with the aggregation done by evidence adjudication instead of
-  by score arithmetic.
+- **X-high stabilizes the finding set and expands it — but not the score.**
+  Three scans are unioned and every candidate is verified, so the finding set
+  is both more complete and more consistent than any single run's. The score
+  is re-derived from that set rather than averaged, which makes it a real
+  single-scan score computed on better inputs — but in our own testing two
+  independent x-high runs of the same target still differed by about as much
+  as two ordinary scans would, because the residual variance lives in the
+  per-category maturity call rather than in the findings. Reach for x-high
+  when you want the most complete, best-verified *finding set*; do not treat
+  its score as a precision instrument.
+
+**Expect thinking-mode scores to run slightly lower, not higher.** Because
+the audit and adjudication *add* verified findings more often than they remove
+them, a more complete finding set generally means somewhat lower category
+scores. A lower thinking-mode score usually means a more thorough analysis,
+not a worse agent.
 
 ## Harness support
 

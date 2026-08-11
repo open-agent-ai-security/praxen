@@ -31,12 +31,13 @@
 | **In a controlled injection test, the audit caught 4 of 4 planted false positives and killed none of ~48 real findings.** | Four already-scanned sets booby-trapped with one plausible-but-fake finding each, rotating four refutation classes (inverted control / fabricated mechanism / misattributed evidence / over-claim); every kill carried correct contradicting citations. Plan + result: `plans/TEST_AUDITOR_FP_INJECTION.md`. | **The fakes were authored by the same operator running the test, and the auditor shares the model family.** N=4. Every fake was refutable by reading the cited code — real-world false positives may be subtler or arise from ambiguity rather than error. Publish as *"a controlled injection test"* with the authorship noted; **do not publish as an FP-detection rate, accuracy figure, or benchmark.** An independent party authoring the fakes would materially strengthen this. |
 | **Zero real findings were lost to over-zealous auditing across every run.** | ~48 real findings in the injection test plus 54 across the organic high-mode runs (finbot 13, aider 13, craftbot 12, uagents 16) — all CONFIRMED, no unjustified kills anywhere. | "No false kills observed," not "cannot false-kill." The targets' findings were mostly well-evidenced; a noisier scan is a harder test. |
 
-## Tier 3 — pending evidence (do not draft copy yet)
+## Tier 3 — resolved 2026-08-11 (`RESULTS_XHIGH_VALIDATION.md`)
 
-| Claim | Status |
+| Claim | Outcome |
 |---|---|
-| X-high damps score variance (super-run pair delta ≪ raw single-run spread) | **Running** — 2 targets × 2 super-runs × 3 scans (autogen, uagents — the two widest-band targets). Design §9.2. |
-| X-high discovery yield — verified findings a single run would miss | **Running.** Metric: expected single-run recall Σ(k/3)/N, graded by severity tier (design §9.5). Prior: FinBot 78.9% recall (single scan misses ~21% of the verified set) — **but all 6 Criticals were unanimous and every rescue was Medium/Low**. If that holds on wide-band targets, the honest claim is *"x-high buys tail coverage and score stability, not headline coverage."* Do not pre-write the stronger version. |
+| **Discovery yield — x-high surfaces verified findings a single run misses.** *(Tier 1: publishable.)* | **Confirmed, with numbers.** Across 4 super-runs on the two widest-variance targets (12 scans, ~3.4M tokens): expected single-run recall **74–93%** overall, i.e. an ordinary scan misses **7–26%** of the verified set. Broken out: **Critical 100% in all five x-high runs to date** · High 83–96% · Medium 57–78%. 12 single-run findings rescued, all independently verified. **Publishable claim: *a single scan finds the headline risks reliably; x-high buys the tail.*** Limits: 3 targets, one model, one operator. |
+| ~~X-high damps score variance~~ | **NOT SUPPORTED — do not claim.** Both super-run pairs differed by exactly the raw 6-run range (uAgents 0.15, AutoGen 0.25). The literal §9.2 criterion (delta inside the historical band) passes, but no damping was demonstrated. Diagnosis: **five of six categories agreed exactly in both pairs**; the whole delta is one band-edge category call (#195), which x-high inherits rather than fixes. Re-test after #195 lands. |
+| **Correction to prior guidance** | Thinking-mode scores trend **lower** than standard-mode, not "equal or cleaner" — adjudication adds verified findings far more often than it removes them. Docs corrected; any copy implying thinking modes produce *better-looking* scores is wrong. |
 
 ## Claims we must NOT make
 

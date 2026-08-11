@@ -199,12 +199,19 @@ rules. One canonical findings JSON, one report — plus:
 - Frozen baselines and per-target bands are **standard-mode artifacts**.
   Thinking-mode outputs are never graded against standard bands, and no
   baseline is ever frozen in a thinking mode. Docs state cross-mode scores are
-  not comparable-by-band. *(Sharpened after the 2026-08-11 FinBot smoke: the
-  "equal or cleaner" direction holds for the finding set, not the score —
-  high mode inherits its single run's category-score draw when the audit
-  kills nothing, since the auditor never rescores; x-high is the tier that
-  damps score variance via re-derivation. Docs and THINKING_MODES.md state
-  this explicitly.)*
+  not comparable-by-band.
+- **Corrected 2026-08-11 by the §9.2/§9.5 validation** (`RESULTS_XHIGH_VALIDATION.md`):
+  the original "expected direction: equal or cleaner" is **wrong in
+  direction**, and the claim that x-high "damps score variance" is **not
+  supported by the data**. Measured: adjudication *adds* verified findings
+  (12 single-run rescues across 4 super-runs, ~1 kill total), so super-run
+  scores trend **lower** than the raw runs (uAgents −0.125, AutoGen −0.017 vs
+  raw means). And two independent super-runs differed by exactly the raw
+  6-run range on both targets (0.15 / 0.25) — with **five of six categories
+  agreeing exactly** and the entire delta coming from one band-edge category
+  call. The honest statement, now in the docs: **x-high stabilises and expands
+  the finding set; per-category anchoring (#195) is what still moves the
+  score, and x-high inherits that rather than fixing it.**
 - **Freeze-independent satellite.** Standard path unchanged (modulo the
   gate-scanned SKILL pointer), no schema change, no template change ⇒ this can
   ship as a 1.2.x satellite or alongside 1.3 without riding the v1.3-opus5
