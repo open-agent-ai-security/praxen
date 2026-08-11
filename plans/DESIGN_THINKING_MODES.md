@@ -173,7 +173,12 @@ rules. One canonical findings JSON, one report — plus:
 - Frozen baselines and per-target bands are **standard-mode artifacts**.
   Thinking-mode outputs are never graded against standard bands, and no
   baseline is ever frozen in a thinking mode. Docs state cross-mode scores are
-  not comparable-by-band (expected direction: equal or cleaner).
+  not comparable-by-band. *(Sharpened after the 2026-08-11 FinBot smoke: the
+  "equal or cleaner" direction holds for the finding set, not the score —
+  high mode inherits its single run's category-score draw when the audit
+  kills nothing, since the auditor never rescores; x-high is the tier that
+  damps score variance via re-derivation. Docs and THINKING_MODES.md state
+  this explicitly.)*
 - **Freeze-independent satellite.** Standard path unchanged (modulo the
   gate-scanned SKILL pointer), no schema change, no template change ⇒ this can
   ship as a 1.2.x satellite or alongside 1.3 without riding the v1.3-opus5

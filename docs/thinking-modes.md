@@ -95,13 +95,25 @@ Both modes keep full provenance alongside the final report:
 
 Thinking-mode scores are **not comparable to standard-mode expectations or
 bands**. Praxen's published variance expectations (and its own frozen test
-baselines) are standard-mode, single-run artifacts; a high or x-high score is
-computed on an audited finding set and will typically be equal or slightly
-cleaner. Compare thinking-mode runs with thinking-mode runs. When a number
-must be defensible, x-high *is* the multi-run discipline the
-[variability guide](understanding-variability.md#when-stability-matters-more-than-runtime)
-describes — with the aggregation done by evidence adjudication instead of by
-score arithmetic.
+baselines) are standard-mode, single-run artifacts. Compare thinking-mode
+runs with thinking-mode runs.
+
+The two modes also stabilize different things, and it matters which one you
+reach for:
+
+- **High mode stabilizes the finding set, not the score.** The audit removes
+  findings the evidence doesn't support; scores are re-derived only where a
+  removed finding was load-bearing. A clean audit (nothing killed) leaves the
+  underlying run's category-score draw fully intact — so a high-mode score
+  carries the same run-to-run variance as a standard score. Read it as
+  *better-verified*, not *more stable*.
+- **X-high stabilizes both.** Scores are re-derived from the adjudicated
+  union with cross-run disagreements resolved by the scoring rules, so the
+  number itself is damped. When a number must be defensible, x-high *is* the
+  multi-run discipline the
+  [variability guide](understanding-variability.md#when-stability-matters-more-than-runtime)
+  describes — with the aggregation done by evidence adjudication instead of
+  by score arithmetic.
 
 ## Harness support
 

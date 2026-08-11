@@ -124,6 +124,14 @@ background.
 > create nothing. The remit's Never-Reprint-Secrets rule applies to your
 > output.
 >
+> One extraction convention to know before you judge any rule text: for
+> allow / trust / inventory **lists**, the scan extracts a single closure
+> rule whose `rule_text` is the list's *heading*, verbatim (e.g. "Approved
+> Communication Channels") — that is by design, not a defect. A
+> heading-as-rule is remit feedback only when the heading sits over
+> *definitional or descriptive* content (no allowlist to close over), so
+> the "rule" maps findings to a non-obligation.
+>
 > For every UNSUPPORTED verdict on a finding that carries `policy_rule_ids`,
 > also state what the linked rule's audit status should become
 > (`verified` / `gap` / `partial`) given what you actually read.
@@ -299,9 +307,15 @@ from a single run").
 ## Scores, bands, and what the modes never do
 
 - Frozen baselines and per-target bands are **standard-mode artifacts**. A
-  thinking-mode score is not comparable-by-band — expected direction is equal
-  or cleaner, and the adjudication record explains any delta. Never freeze a
-  baseline in a thinking mode.
+  thinking-mode score is not comparable-by-band, and the adjudication record
+  explains any delta. Never freeze a baseline in a thinking mode.
+- **The two modes stabilize different things.** High mode cleans the *finding
+  set*; its scores change only when a killed finding was load-bearing, so a
+  clean audit leaves the underlying run's category-score draw — high or low —
+  fully intact. X-high re-derives scores from the adjudicated set with
+  cross-run disagreements resolved by rule, so it is the tier that damps
+  *score* variance. Do not present a high-mode score as more stable than a
+  standard score; present it as better-verified.
 - The canonical findings JSON stays **schema 3.0, no new fields**; the
   renderer and template are untouched. Mode provenance lives in the
   adjudication artifact and the `-raw` / run-directory naming, not in the
