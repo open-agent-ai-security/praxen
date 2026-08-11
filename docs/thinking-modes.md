@@ -45,9 +45,13 @@ immediately.
    the rule as written, but the rule itself over-reaches or contradicts the
    agent's documented behavior).
 3. Unsupported and remit-defect findings are removed and the report is
-   re-rendered. Remit-defect findings aren't discarded — they become a
-   **remit feedback** list for whoever owns the remit. Category scores are
-   re-derived only where a removed finding was load-bearing.
+   re-rendered. Category scores are re-derived only where a removed finding
+   was load-bearing.
+4. The auditor also checks every cited remit rule against the target's own
+   documentation — fabricated obligations, prohibitions of documented
+   features, allowlists that documented operation would violate. What it
+   finds becomes a **remit feedback** list for whoever owns the remit, even
+   when the findings themselves survive on sounder rules.
 
 The audit is deliberately hard to please in one direction only: a kill
 requires cited contradicting evidence, "could not verify quickly" counts as

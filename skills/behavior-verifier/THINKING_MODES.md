@@ -117,7 +117,10 @@ background.
 >   the remit rule *as written*, but the rule itself is fabricated,
 >   over-reaching, or contradicts the target's documented behavior. Quote
 >   the rule text and state, with a citation into the target's own docs,
->   why the rule over-reaches.
+>   why the rule over-reaches. When a finding cites several rules, use this
+>   verdict only if **every** load-bearing rule is defective; a finding that
+>   also stands on a sound rule is CONFIRMED, and the defective rule goes in
+>   the remit-feedback pass below.
 >
 > Out of scope for you: re-grading severities, re-scoring RAISE categories,
 > proposing new findings, editing any file. You audit what exists; you
@@ -136,13 +139,31 @@ background.
 > also state what the linked rule's audit status should become
 > (`verified` / `gap` / `partial`) given what you actually read.
 >
+> **After the per-finding pass, run a rule-level remit check** on every rule
+> any finding cites in `policy_rule_ids`: read the rule's text against the
+> target's **own documentation** (README, docs site, in-repo design docs)
+> and ask three questions. Does the rule demand a mechanism, list, or
+> configuration that neither the code nor the docs have ever had — a
+> fabricated obligation no implementation could satisfy? Does it prohibit
+> behavior the target documents as an intended, supported feature? Does an
+> allow/trust list omit endpoints or behaviors the docs describe as routine
+> operation, so that documented operation violates the closure? A yes,
+> **with a doc citation**, is remit feedback. Remit feedback never kills a
+> finding that also stands on sound rules — it tells the remit owner which
+> rule to fix, and what the narrower obligation the docs actually support
+> would be.
+>
 > Write your output to `<reports dir>/<slug>-adjudication-<TIMESTAMP>.md`
 > with this structure: an `## Audit verdicts` section — one `### <finding
 > id> — <VERDICT>` block per finding, each recording what you read (files
 > and lines), your rationale in 1–3 sentences, and the rule re-status line
-> when required — followed by an `## Audit summary` section with verdict
-> counts and a one-paragraph overall assessment. Your final message: the
-> verdict counts and the output path.
+> when required — then a `## Remit feedback` section from the rule-level
+> check (one entry per defective rule: rule id + verbatim text, the defect
+> class, the doc citation, the findings it drives, the narrower obligation
+> the docs support; write `(none)` if the check found nothing) — then an
+> `## Audit summary` section with verdict counts, the remit-feedback count,
+> and a one-paragraph overall assessment. Your final message: the verdict
+> counts, the remit-feedback count, and the output path.
 
 Use the scan's `$TIMESTAMP` in the adjudication filename so the artifact set
 shares a base name.
@@ -157,7 +178,9 @@ verdict in the adjudication record.
 
 **If every finding is CONFIRMED:** the standard artifacts are the final
 deliverable unchanged. Append a short `## Cleanup record` to the adjudication
-file saying so, and finish with Step 12's summary plus the adjudication path.
+file saying so, and finish with Step 12's summary plus the adjudication path —
+and if the rule-level check produced remit feedback, say so explicitly to the
+operator: the report stands, and the remit owner has a fix list.
 
 Otherwise:
 
@@ -186,10 +209,11 @@ Otherwise:
    a **fresh** `$TIMESTAMP` for the final `<slug>-analysis-<ts>.html` / `.txt`.
 4. **Append a `## Cleanup record`** to the adjudication file: which findings
    were removed and why (one line each), rule re-statuses applied, category
-   scores re-derived (old → new, with the load-bearing reason), a
-   `## Remit feedback` list of REMIT-DEFECT rules (rule text + the auditor's
-   citation — this list is the remit owner's fix list, not the agent's risk
-   list), and the raw↔final artifact pairing by filename.
+   scores re-derived (old → new, with the load-bearing reason), and the
+   raw↔final artifact pairing by filename. The auditor's `## Remit feedback`
+   section — rule-level defects plus any REMIT-DEFECT kills — is the remit
+   owner's fix list, not the agent's risk list; make sure the close-out
+   message points at it.
 5. Finish with Step 12's summary for the **final** report, plus one line each
    for the raw report and the adjudication record.
 
@@ -255,7 +279,10 @@ file's path, and the instruction block below.
 > refutation, exactly as the audit-brief verdicts in `THINKING_MODES.md`
 > define them: CONFIRMED / UNSUPPORTED / REMIT-DEFECT, with the same
 > guardrails (a kill requires cited contradicting evidence; "could not
-> verify quickly" is CONFIRMED with a note; secrets are never reprinted).
+> verify quickly" is CONFIRMED with a note; secrets are never reprinted) —
+> including the audit brief's **rule-level remit check** against the
+> target's own documentation, whose output goes in your `## Remit feedback`
+> section.
 > Membership in the final set is decided by the evidence alone —
 > found-in-one-run is irrelevant if the evidence verifies; found-in-all is
 > irrelevant if it does not. Also rule on any union entries flagged as
