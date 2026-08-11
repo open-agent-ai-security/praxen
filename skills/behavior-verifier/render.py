@@ -525,7 +525,7 @@ def _log_row_ctx(row, _idx):
 def _raise_card_ctx(cat, _idx):
     score, weight = cat["score"], cat["weight"]
     if score is None:
-        # N/A category (KB Step B3 all-N/A): excluded from the weighted overall.
+        # N/A category (see schema.py NA_ELIGIBLE_KEYS): excluded from the weighted overall.
         # Reuses the mid-tone score class so no template change is needed.
         return {
             "SCORE_CLASS": _SCORE_CLASS[2],

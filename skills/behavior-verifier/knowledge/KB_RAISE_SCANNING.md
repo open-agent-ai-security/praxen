@@ -88,6 +88,48 @@ Zero Trust counts double because it covers the broadest surface and has the most
 4. **Rewarding intent:** Score implemented controls, not planned ones. "We're planning to add monitoring in Q3" = 0 until it ships.
 5. **One size fits all:** No rate limiting on an internal dev tool is Medium; on a public API it is High or Critical.
 
+### Boundary rules — decide the adjacent-band call
+
+Most scoring disagreement is not about what the evidence says; it is about
+which of two adjacent bands that evidence lands in. Apply these in order, and
+the first that applies decides.
+
+1. **Opt-in, default-off controls do not count as controls.** A capability the
+   operator must switch on is evidence of *capability*, not of *posture*. It
+   cannot lift a score.
+2. **Side-effect behaviours do not count as controls.** If something reduces
+   exposure incidentally while serving another goal — performance, memory, log
+   noise — it is not a control.
+3. **If the dominant data path is unmanaged, controls elsewhere cannot lift the
+   category above 1.** Identify the largest-volume or highest-risk path by which
+   data reaches the model. If nothing manages it, careful work on lesser paths
+   does not compensate.
+4. **When two adjacent bands are both defensible, choose the lower** — and name
+   both in the rationale, so the reader can see the call that was made.
+
+### The provenance test — whose defences is this evidence about?
+
+Security *material* is not the same as security *practice*. Before crediting
+any artifact, ask what it is for:
+
+- Adversarial material counts only when it shows the project attacking **its
+  own** defences. Attack content the project **ships** — to customers, to
+  students, to CTF players — is a product, however sophisticated.
+- Deliberately vulnerable demos, CTF targets and training labs ship attacks as
+  their deliverable. A challenge walkthrough, difficulty tiers, learning
+  objectives or flag-scoring logic are the product, not a testing programme.
+  Offensive capability built for a user to point at *their* systems is likewise
+  the product.
+- A finding is evidence of practice only if it changed the project's own
+  defences. Where weaknesses are preserved deliberately, no feedback loop
+  exists by definition.
+- Dead code is not a control. A sanitizer with no call sites, a scanner wired
+  into nothing, or a disabled CI file is evidence of intent, not of posture.
+
+Evidence failing this test scores as absent; say so in the rationale. See also
+`SKILL.md` Step 5, which caps demo and vulnerability-showcase material in
+*Build an AI Red Team*.
+
 ---
 
 ## Artifact Intake Patterns
@@ -324,12 +366,19 @@ When escalating, populate `related_findings` to link the injection finding, the 
 
 | Signal | Risk | Severity |
 |--------|------|----------|
-| External content (email, web, user uploads) in LLM context unvalidated | Indirect prompt injection highway | High |
+| External content in LLM context unvalidated — email, web, user uploads, **and tool results, MCP responses, or command/code execution output** | Indirect prompt injection highway. **For an agent, tool output is the dominant untrusted channel**: an executor returning a mounted file's contents, or an API response echoed into the next turn, reaches the model exactly as a poisoned document would — and is far easier to overlook, because it looks like the agent's own working data | High |
 | PII or confidential data in LLM context | Anything in context can be extracted | High |
 | System prompt invites speculation outside knowledge base | Explicit hallucination invitation | High |
 | User input used as training data or written to memory without review | Tay-pattern: user-controlled content poisons behavior | High |
 | No data minimization — agent knows more than needed | Breach surface larger than necessary | Medium |
 | RAG data unvetted or unreviewed | Poisoning and bias risk | Medium |
+| **Under-provisioned** — the agent must answer domain questions with no grounded source, or is told to "do its best" without one | The *other* half of the balance. Too little grounded data invites hallucination exactly as too much enlarges the breach surface; RAISE names both | Medium |
+| **No grounding controls** — no citation requirement, no refuse-on-no-evidence, no groundedness check, no way to tell a failed call from an empty result | Nothing distinguishes a supported answer from an invented one | Medium |
+
+**This category is a balance, and both directions score.** Reading it only as
+"is too much data reaching the model" leaves half the framework unmeasured —
+an agent starved of the grounding it needs to do its job is failing this
+category just as surely as one drowning in context it should never see.
 
 ### Category 3: Implement Zero Trust
 

@@ -28,7 +28,7 @@ Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 �
 
 **Thinking modes (opt-in).** This procedure is **standard mode** — the default, and complete as written. If, and only if, the operator's invocation names a thinking mode (**high** / **x-high**), read `THINKING_MODES.md` beside this file before Step 1 and orchestrate per that file — it wraps this pipeline in post-scan verification without changing any step. If no mode was named, skip this paragraph; nothing else in this file changes.
 
-**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
+**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8b sweeps for maturity evidence** (practice, not defects — a findings list alone cannot see a red team or a shipped telemetry pipeline); **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **assigns the RAISE scores in 9.4 from that gathered evidence rather than from a fresh workspace read**, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
 
 **Contents — jump table (useful after a context compaction).** A long scan can exceed the coding agent's context window; if your session resumed mid-procedure, this jump table is the fastest way to relocate the step you were on.
 
@@ -40,10 +40,11 @@ Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 �
 - [Step 3 — Load Your Calibration](#step-3--load-your-calibration) — KB_RAISE_SCANNING, KB_AGENTIC_TOP10, KB_LLM_TOP10 (+ KB_MCP_SECURITY if MCP config is present)
 - [Step 4 — Discover and Read the Workspace](#step-4--discover-and-read-the-workspace) — artifact sweep, large-file strategy, empty-file signal, log-file discovery
 - [Step 4b — Secondary Prompt Discovery](#step-4b--secondary-prompt-discovery-session-loaded-files) — session-loaded files (`SOUL.md`, `MEMORY.md`, …); compound escalation
-- [Step 5 — Analyze Against RAISE Categories](#step-5--analyze-against-raise-categories) — six-category 0–5 scoring + confidence
+- [Step 5 — Analyze Against RAISE Categories](#step-5--analyze-against-raise-categories) — six-category analysis; evidence gathered here, **scored in 9.4**
 - [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; configuration gaps; MCP server evaluation; remit-delta
 - [Step 7 — Compound Signal Reasoning](#step-7--compound-signal-reasoning) — combination escalations to Critical
 - [Step 8 — Positive Posture Recognition](#step-8--positive-posture-recognition) — confirmed positives
+- [Step 8b — Maturity Evidence Sweep](#step-8b--maturity-evidence-sweep) — hunt *practice*, not defects: adversarial testing, feedback loops, supply-chain hygiene, monitoring; record verified absences too. Feeds the 9.4 scores
 - [Step 8.5 — Finding-Themes Outline](#step-85--finding-themes-outline-decomposition-primer) — commit the decomposition (one line per intended finding) before drafting; stabilises finding count across runs
 - [Step 9 — Synthesize the Report Prose](#step-9--synthesize-the-report-prose) — 9.1 remit summary · 9.2 structure summary · 9.3 behavior summary · 9.4 RAISE rationales · 9.5 weighted rationale · 9.6 remit coverage · 9.7 positives (drafted + **appended to the manifest one at a time**) · 9.8 log files · **9.9 completeness gate: manifest on disk + interim overview**
 - [Step 10 — Write the Canonical Findings JSON](#step-10--write-the-canonical-findings-json) — manifest-exists pre-check, JSON shape, common validation errors
@@ -380,7 +381,7 @@ Score each category 0–5 with a confidence level (High / Medium / Low). Score w
 
 **Monitor Continuously** — Does the agent log its actions? Are logs structured enough to support automated detection? Look for: no logging calls in skill code, free-form log format with no schema, log files present but capturing only errors (not actions and decisions).
 
-Hold the six scores, confidences, and the evidence behind each — you will write the per-category rationale prose in Step 9.4.
+**Do not commit scores here.** Hold the per-category evidence and your provisional read of each. The numbers are assigned in **Step 9.4**, against the committed findings, positives, and the Step 8b maturity record — not against this working-memory pass. Scoring here, before the findings exist, is what made the number depend on whatever this read happened to notice.
 
 ---
 
@@ -555,6 +556,47 @@ For each of the following, check whether the evidence supports it. Include confi
 
 ---
 
+## Step 8b — Maturity Evidence Sweep
+
+Step 8 recognises positives for the *report*. This step gathers the evidence
+the *score* needs, and it is the counterpart to everything before it: Steps 6–8
+hunt defects, this one hunts practice.
+
+A scan that only records what is wrong cannot measure maturity. A project with
+a red-team corpus, a drift-checked component inventory and shipped telemetry
+looks identical, in a findings list, to one with none of it — because none of
+that appears as a finding.
+
+Sweep for the following. Quote what you find with `file:line`. **Record verified
+absences too** — "no security-named test file anywhere in the tree" is evidence,
+and is what lets Step 9.4 distinguish *"we looked and it is not there"* from
+*"we could not tell."*
+
+| Area | What to look for |
+|------|------------------|
+| Adversarial testing | Attack corpora; jailbreak/injection suites; security-named test files; garak / promptfoo / PyRIT / Giskard config; pentest or red-team reports; a threat model with tests attached to it |
+| Testing discipline | Whether that testing is command-invocable and repeatable; whether it runs on a cadence; whether it gates a release; retests after a fix |
+| Feedback loop | Findings traceable to issues, PRs or commits; a ledger linking finding → fix; architectural change attributable to a finding |
+| Supply chain | Component inventory (SBOM / ML-BOM / AIBOM), drift-checked or hand-maintained; lockfiles and pinning; dependency or container scanning; `SECURITY.md` and a disclosure path |
+| Monitoring | Structured logging; log shipping config (OTel, fluentbit/vector, a SIEM exporter, cloud logging IAM) or an observed connection on a deployed target; alert rules, anomaly detection, dashboards-as-code |
+| Knowledge handling | Retrieval configuration; grounding and citation settings; data scoping, filtering, and what is deliberately excluded from context |
+
+**Record what each artifact is *for*, not just that it exists.** Where you find
+adversarial or attack-related material, note whether it exists so the project
+can find its own weaknesses, or whether it is content the project ships to its
+users. Do not judge it here — Step 9.4 applies the provenance test. Just record
+enough for that judgment to be made.
+
+**CI is one form of evidence, not the required form.** A deliberate pre-release
+exercise driven by a runner script is stronger practice than a CI job, not
+weaker.
+
+This record is working material for Step 9.4. It is **not** serialized —
+nothing here changes the report schema. Confirmed positives still go to
+`positives[]` via Step 9.7 as they always did.
+
+---
+
 ## Step 8.5 — Finding-Themes Outline (decomposition primer)
 
 Before you draft any finding prose, commit the **decomposition** — how the raw signals from Steps 5–8 carve into discrete findings — as a short outline. This is a thinking step with one small on-disk artifact; it exists because the carve is where run-to-run variance is born: the same evidence, split one way, is 8 findings; split another, 13. Deciding the split *once, up front* is what keeps two scans of the same agent comparable.
@@ -641,9 +683,20 @@ The renderer wraps this in a `.body` div that styles `<p>` paragraph breaks and 
 
 ### 9.4 RAISE per-category rationale ×6 → `raise_posture.categories[].rationale`
 
-For each of the six RAISE categories — in this fixed order: **Limit Your Domain, Balance Your Knowledge Base, Implement Zero Trust, Manage Your Supply Chain, Build an AI Red Team, Monitor Continuously** — record the score (0–5) and confidence (High/Medium/Low) you arrived at in Step 5, plus a **rationale of one to two sentences** naming the specific evidence (or observed absence) behind the score: which file, which control, which gap. Concrete, not generic.
+**This is where the scores are assigned.** For each of the six RAISE categories — in this fixed order: **Limit Your Domain, Balance Your Knowledge Base, Implement Zero Trust, Manage Your Supply Chain, Build an AI Red Team, Monitor Continuously** — assign a score (0–5) and confidence (High/Medium/Low), plus a **rationale of one to two sentences** naming the specific evidence (or observed absence) behind the score: which file, which control, which gap. Concrete, not generic.
 
-Before you commit the numbers: re-read the scoring discipline in Step 5 ("Calibration anchors"). Each score must trace to specific evidence — the operative controls you verified *and* the gaps you filed as findings. Don't let a one-line positive in 9.7 inflate a category that's unaddressed at runtime; equally, don't drop a category to 0 just because you filed findings about its gaps when the control underneath is real and running.
+**Score from a fixed evidence set — do not re-read the workspace.** Four things, and only these:
+
+1. the committed `findings[]` and their severities,
+2. `positives[]` from Step 8,
+3. the **Step 8b maturity record**, including its verified absences,
+4. your Step 5 per-category evidence notes.
+
+Going back to the workspace for a fresh look is what makes two runs of the same scan disagree: each pass notices different things and scores what it noticed. The evidence is already gathered. Score it.
+
+Before you commit the numbers: re-read the scoring discipline in Step 5 ("Calibration anchors") and the scoring model in `KB_RAISE_SCANNING.md` — its **provenance test** and its **boundary rules**, which decide the adjacent-band calls. Each score must trace to specific evidence — the operative controls you verified *and* the gaps you filed as findings. Don't let a one-line positive in 9.7 inflate a category that's unaddressed at runtime; equally, don't drop a category to 0 just because you filed findings about its gaps when the control underneath is real and running.
+
+**A category is not scored on defects alone.** Findings show what is broken; the Step 8b record shows what is practised. A category with few findings and no practice is not healthy, and one with real practice and several findings is not immature. *Build an AI Red Team* and *Monitor Continuously* are the categories where this bites hardest — almost nothing about them ever surfaces as a finding, so scoring them from `findings[]` alone will read every target as absent.
 
 *Example rationale (Implement Zero Trust, score 0):* "No code-level interposition exists on the agent's tool calls — `send_invite` emails any address the model produces with no allowlist, recipient confirmation, or rate check, and the only stated guardrails live in an LLM system prompt that free-text meeting notes can influence at runtime."
 

@@ -53,7 +53,9 @@ RAISE_NAMES = {
 }
 # Zero Trust counts double (0.25); the other five each count 0.15.
 RAISE_WEIGHTS = {k: (0.25 if k == "implement_zero_trust" else 0.15) for k in RAISE_KEYS}
-# Vector-scored categories (KB Scoring Model Step B3) may be N/A (score: null)
+# Vector-scored categories may be N/A (score: null). Support landed with #48
+# (17d7a51); the KB/SKILL guidance that defined "Step B3" was reverted in 7b53ccb,
+# so no scan emits null today. Kept because schema 3.0 published it.
 # when every applicability trigger fails — the category is excluded and the
 # weighted overall renormalizes over the rest. Presence-scored categories
 # (Red Team, Monitor) can never be N/A: their absence is a 0, not an exclusion.
