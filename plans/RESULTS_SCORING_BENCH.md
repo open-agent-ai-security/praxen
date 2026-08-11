@@ -331,3 +331,63 @@ current scan did not record.
 categories and five targets, with the generalisation gate passed on cold ones.
 
 **Next: Gate 2** — none of this has run inside a real scan.
+
+---
+
+## Round 5 — Gate 2: end-to-end scans (2026-08-11) — **FAIL**
+
+Nine full Praxen scans (3 targets × 3) on the modified pipeline, Opus 5,
+~2.3M tokens. First test of the change inside a real scan rather than an
+isolated scoring step.
+
+```
+target      new runs           spread    v1.2 3x study       spread   criterion <=0.15
+finbot      1.00 1.00 1.00      0.00     1.30 0.90 0.75       0.55    PASS
+autogen     1.70 1.30 1.30      0.40     1.85 1.55 1.30       0.55    FAIL
+hermes      3.00 2.60 2.30      0.70     2.30 2.60 2.70       0.40    FAIL (widened)
+```
+
+finbot's three runs produced **byte-identical category vectors** — `2 1 1 1 0 1`
+three times, from a target whose prior spread was the joint-widest in the suite.
+
+### Cause — the variance moved into the step I added
+
+```
+hermes run   maturity signals in the Step 8b record   weighted
+  r1                      16                           3.00
+  r2                       9                           2.60
+  r3                       7                           2.30
+```
+
+Monotonic. **Step 8b is itself a free-exploration step**, so how much practice a
+run happens to find varies, and the score tracks it. Fixing the scoring step's
+dependence on a variable workspace read did not remove that dependence — it
+relocated it one step upstream, into the new step.
+
+The target pattern confirms the mechanism: the fix is perfect where there is
+nothing for 8b to vary on (finbot, almost no practice → 0.00), degrades with a
+little (autogen → 0.40), and is worse than the status quo with a lot (hermes →
+0.70). That is exactly backwards, because maturity-rich targets are the ones
+8b exists to serve.
+
+### Disposition
+
+**Not shipping**, per the kill criterion stated in the approved plan before the
+result was known. 1.3 ships score-inert as originally scoped.
+
+The SKILL/KB changes are committed at `3b6884f` and are **not reverted** — they
+are correct in isolation, gate-tested, and cost nothing serialized. But they do
+not deliver the outcome, so they are not a release claim.
+
+### The identified next iteration, if anyone spends it
+
+Step 8b needs the same treatment the scoring step got: a **bounded, enumerated
+gathering task** — does a security-named test file exist, is there a CI
+workflow, is there a finding→fix ledger, is log shipping configured — rather
+than an open instruction to sweep for practice. Two runs answering a fixed list
+gather the same evidence; two runs told to look for good things find different
+amounts. Re-run the same three targets to test it; cost is roughly this round.
+
+**Session totals: 80 bench replays + 9 full scans.** Three structural
+interventions measured, two discarded on evidence, one diagnosed and stopped at
+its gate.
