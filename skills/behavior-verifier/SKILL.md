@@ -567,29 +567,53 @@ a red-team corpus, a drift-checked component inventory and shipped telemetry
 looks identical, in a findings list, to one with none of it — because none of
 that appears as a finding.
 
-Sweep for the following. Quote what you find with `file:line`. **Record verified
-absences too** — "no security-named test file anywhere in the tree" is evidence,
-and is what lets Step 9.4 distinguish *"we looked and it is not there"* from
-*"we could not tell."*
+**This is an enumerated lookup, not an open sweep.** Work the twelve questions
+below in order and answer **every one**, including the ones whose answer is
+nothing. Do not go looking for maturity evidence in any other way, and do not
+stop early because the target "obviously" has none — an unanswered question and
+a question answered "none" are different inputs to the score, and only the
+second is evidence.
 
-| Area | What to look for |
-|------|------------------|
-| Adversarial testing | Attack corpora; jailbreak/injection suites; security-named test files; garak / promptfoo / PyRIT / Giskard config; pentest or red-team reports; a threat model with tests attached to it |
-| Testing discipline | Whether that testing is command-invocable and repeatable; whether it runs on a cadence; whether it gates a release; retests after a fix |
-| Feedback loop | Findings traceable to issues, PRs or commits; a ledger linking finding → fix; architectural change attributable to a finding |
-| Supply chain | Component inventory (SBOM / ML-BOM / AIBOM), drift-checked or hand-maintained; lockfiles and pinning; dependency or container scanning; `SECURITY.md` and a disclosure path |
-| Monitoring | Structured logging; log shipping config (OTel, fluentbit/vector, a SIEM exporter, cloud logging IAM) or an observed connection on a deployed target; alert rules, anomaly detection, dashboards-as-code |
-| Knowledge handling | Retrieval configuration; grounding and citation settings; data scoping, filtering, and what is deliberately excluded from context |
+The searches are specified so that two scans of the same target gather the same
+material. Run the search as written, then record what it returned.
 
-**Record what each artifact is *for*, not just that it exists.** Where you find
-adversarial or attack-related material, note whether it exists so the project
-can find its own weaknesses, or whether it is content the project ships to its
-users. Do not judge it here — Step 9.4 applies the provenance test. Just record
-enough for that judgment to be made.
+| # | Question | Search |
+|---|---|---|
+| M1 | Security-named test files? | Filenames matching `*test*security*`, `*security*test*`, `*test*guard*`, `*guard*test*`, `*test*auth*`, `*test*sanitiz*`, `*test*permission*`, `*test*sandbox*`, `*test*inject*` |
+| M2 | A dedicated adversarial directory or corpus? | Directories named `redteam`, `red-team`, `red_team`, `adversarial`, `attacks`, `pentest`; and any schema-validated attack fixture set |
+| M3 | Named adversarial tooling? | Grep dependency and config files for `garak`, `promptfoo`, `pyrit`, `giskard`, `textattack`, `deepeval` |
+| M4 | A written threat model or security policy? | `SECURITY.md`, `THREAT_MODEL*`, `docs/security*` — and whether it names what is in and out of scope |
+| M5 | Dated security result reports? | Files under a results/reports directory whose names carry a date, or a report series in the security/threat-model docs |
+| M6 | Is the testing command-invocable? | An executable runner (`run.py`, `*.sh`) in the directories from M2, or a test suite invocable by a single documented command |
+| M7 | Does it run automatically, and on what trigger? | `.github/workflows/*.yml` (or the equivalent) — read each and record its trigger: on push, on PR, on a schedule, manual only |
+| M8 | Does security testing gate a release? | Grep workflow files and the M4/M5 documents for a stated pass bar, blocking verdict, or release gate |
+| M9 | Findings traced to fixes? | A ledger, changelog or release-notes section linking a reported finding to a commit, PR or advisory ID |
+| M10 | A component inventory? | `*.cdx.json`, `*.spdx*`, `sbom*`, `aibom*`, `mlbom*` — and whether anything checks it for drift |
+| M11 | Dependency and container scanning? | Workflow or config for Dependabot, Renovate, `osv-scanner`, CodeQL, Trivy, Snyk, Semgrep, `pip-audit`, `npm audit` |
+| M12 | Monitoring beyond local logs? | Config for OpenTelemetry, OTLP, fluentbit, vector, Splunk, Datadog, Elastic, CloudWatch; alert rules; dashboards-as-code; on a deployed target, an observed telemetry connection |
 
-**CI is one form of evidence, not the required form.** A deliberate pre-release
-exercise driven by a runner script is stronger practice than a CI job, not
-weaker.
+**Answer format — one line per question, all twelve, in order:**
+
+```
+M1: <paths found, or "none — searched <patterns>">
+M2: ...
+```
+
+Where an answer is non-empty, add `file:line` and one clause on **what the
+artifact is for**: whether it exists so the project can find its own
+weaknesses, or whether it is content the project ships to its users. Do not
+judge it here — Step 9.4 applies the provenance test. Record enough for that
+judgment to be made.
+
+**Two rules that keep this honest:**
+
+- **A pattern hit is a place to look, not an answer.** M1's filename patterns
+  will miss a project whose security tests are named for the thing they guard,
+  and will match a vulnerable demo whose "attacks" are its product. Open what
+  you find before recording what it is.
+- **CI is one form of evidence, not the required form.** A deliberate
+  pre-release exercise driven by a runner script is stronger practice than a CI
+  job, not weaker. M7 records the trigger; it does not require one.
 
 This record is working material for Step 9.4. It is **not** serialized —
 nothing here changes the report schema. Confirmed positives still go to
