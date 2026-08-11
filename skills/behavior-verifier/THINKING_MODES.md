@@ -142,12 +142,15 @@ background.
 > **After the per-finding pass, run a rule-level remit check** on every rule
 > any finding cites in `policy_rule_ids`: read the rule's text against the
 > target's **own documentation** (README, docs site, in-repo design docs)
-> and ask three questions. Does the rule demand a mechanism, list, or
+> and ask four questions. Does the rule demand a mechanism, list, or
 > configuration that neither the code nor the docs have ever had — a
 > fabricated obligation no implementation could satisfy? Does it prohibit
 > behavior the target documents as an intended, supported feature? Does an
 > allow/trust list omit endpoints or behaviors the docs describe as routine
-> operation, so that documented operation violates the closure? A yes,
+> operation, so that documented operation violates the closure? Does one
+> clause bundle or conflate **distinct obligations** — a sound prohibition
+> plus an extension that documented, routine operation triggers — so the
+> sound half lends its severity to the over-broad half? A yes,
 > **with a doc citation**, is remit feedback. Remit feedback never kills a
 > finding that also stands on sound rules — it tells the remit owner which
 > rule to fix, and what the narrower obligation the docs actually support
