@@ -229,6 +229,27 @@ rules. One canonical findings JSON, one report — plus:
 4. **Duplicate audit:** the x-high output contains no unmatched duplicates
    (scan_diff assist + adjudicator hand-check is the mitigation; this test is
    the proof it worked).
+5. **Discovery yield — does x-high catch verified findings a single run
+   misses?** (Added 2026-08-11 at Steve's direction; the stability proof in
+   §9.2 measures the *damping* half, this measures the *discovery* half, and
+   it is why principle 1 bans vote-counting.) For every finding in the
+   adjudicated super-run set, record how many of the three raw runs found it
+   (`k` ∈ {1,2,3}); **expected single-run recall = Σ(k/3) / N**. The
+   complement is the share of verified findings an ordinary single scan would
+   have missed on average. Grade it **overall and by severity tier** — a
+   missed Critical and a missed Medium are not the same result. Pass = the
+   super-run demonstrably contains verified findings a single run would have
+   missed, with the rescue rate stated, not asserted.
+
+   *Prior data point (FinBot x-high, 2026-08-11):* 19 union entries — 11
+   found-in-3, 4 found-in-2, 4 found-in-1 → **expected single-run recall
+   78.9%**, i.e. an ordinary scan misses ~21% of the verified set. Severity
+   split matters: **all 6 Criticals were unanimous** (found by all three
+   runs), and every single-run rescue was Medium or Low. On this target the
+   headline risks reproduced reliably and the discovery payoff sat entirely in
+   the tail. Whether that holds on the wide-band targets — or whether
+   Criticals themselves flip there — is the open question the §9.2 pairs on
+   autogen/uagents answer.
 
 ## 10. Risks
 
