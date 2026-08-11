@@ -19,28 +19,37 @@ automate the verification practices Praxen's own release process uses by hand
 | **high** | Scan → independent findings audit → cleaned report | ~2× | Before a report leaves your hands |
 | **x-high** | 3 independent scans → evidence adjudication → one "super-run" report | ~4–5× | Audits, gates, anything where quality outranks time and tokens |
 
-## How much longer it takes
+## What it costs — time and tokens
 
-The "cost" column above is a rough token/compute multiple. The **wall-clock**
-cost is smaller, and smaller than you might expect for x-high, because the
-audit is a *targeted re-read* (bounded by the number of findings) rather than
-a second full discovery pass, and x-high's three scans run in parallel:
+The two costs move differently, and if you are budgeting tokens the
+distinction matters: **parallelism shortens x-high's wall-clock but not its
+token bill.** Three scans' worth of tokens are spent whether they run at once
+or one after another — running them concurrently only saves you the *waiting*.
 
-| Mode | Wall-clock vs. a standard scan | In practice |
-|---|---|---|
-| **high** | **~1.3–1.6×** | a standard scan **plus a few extra minutes** for the audit |
-| **x-high** | **~2–2.5×** | roughly two standard scans back-to-back, not four |
+| Mode | Wall-clock vs. a scan | Token burn vs. a scan | In practice |
+|---|---|---|---|
+| **standard** | 1× | 1× | one scan |
+| **high** | **~1.3–1.6×** | **~1.4–1.5×** | a scan **plus a few minutes** of audit |
+| **x-high** | **~2–2.5×** | **~4×** | ~2 scans' *time*, but ~4 scans' *tokens* |
 
-Early measured data (Opus 5, three real targets — a small dense app and two
-production agents): a standard scan ran **~14–19 min**; the high-mode audit
-added **~4–10 min** on top, so high mode finished in **~17–28 min** total.
-X-high ran its three scans concurrently (~15 min wall-clock for all three)
-then spent a comparable stretch on adjudication and assembly, landing near
-**2–2.5×** a single scan's wall-clock even though it does **~4×** the token
-work. Your numbers will move with target size, finding count, and evidence
-density — subtle production agents audit slower than dense demo apps — but the
-shape holds: **high mode buys a false-positive audit for a few extra minutes;
-x-high buys three-scan stability for roughly the time of two scans.**
+Early measured data (Opus 5, four real targets — a small dense app and three
+production agents):
+
+- A **standard scan** ran **~14–19 min** and burned **~215k–265k tokens**.
+- **High mode** added a **~4–10 min / ~90k–135k token** audit on top, finishing
+  around **~17–28 min** and **~305k–395k tokens** total.
+- **X-high** ran its three scans concurrently (~15 min wall-clock for all
+  three) then spent a comparable stretch on adjudication and assembly —
+  landing near **~2–2.5×** a single scan's *wall-clock* but **~4×** its
+  *tokens* (three full scans ≈ 3× on their own, plus a scan-sized adjudication
+  pass), roughly **0.9M tokens** for the run.
+
+Your numbers move with target size, finding count, and evidence density —
+subtle production agents audit slower than dense demo apps — but the shape
+holds: **high mode buys a false-positive audit for a few extra minutes and
+~40% more tokens; x-high buys three-scan stability for about the time of two
+scans but the tokens of four.** For a token-constrained budget, choose by the
+token column, not the clock.
 
 ## Invoking a mode
 

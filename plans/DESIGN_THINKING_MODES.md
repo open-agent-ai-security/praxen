@@ -46,18 +46,26 @@ token estimate — actual numbers below).** Wall-clock expansion runs *lower*
 than the token multiple, because the audit is a finding-bounded re-read (not a
 second discovery pass) and x-high's three scans run concurrently:
 
-| Mode | Tokens (measured) | Wall-clock (measured) | Sample |
+| Mode | Tokens (measured) | Wall-clock (measured) | Absolute (Opus 5) |
 |---|---|---|---|
-| **high** | ~1.4–1.5× | **~1.3–1.6×** (scan + a few min audit) | FinBot 1.41×tok / 1.27×wc; Aider 1.40 / 1.52; CraftBot 1.52 / 1.57 |
-| **x-high** | ~4.0× | **~2.0–2.5×** (parallel scans + one adjudication) | FinBot 4.06×tok, ~2.25×wc |
+| **standard** | 1× | 1× | ~215k–265k tok, ~14–19 min |
+| **high** | ~1.4–1.5× | **~1.3–1.6×** (scan + a few min audit) | ~305k–395k tok, ~17–28 min |
+| **x-high** | **~4.0×** | ~2.0–2.5× (parallel scans + one adjudication) | ~0.9M tok, ~30–35 min |
 
-Concretely: standard scans ran ~14–19 min; high-mode audits added ~4–10 min
-(audit time scales with finding count × evidence density — subtle production
-agents audit slower than dense demo apps). X-high's three scans overlapped at
-~15 min wall-clock, then adjudication/assembly added a comparable stretch. The
-docs' cost table keeps the round token multiples (~2× / ~4–5×) as conservative
-planning ceilings; the operator-facing "how much longer" guidance is the
-measured wall-clock (`docs/thinking-modes.md`).
+Per-target: high FinBot 1.41×tok/1.27×wc, Aider 1.40/1.52, CraftBot 1.52/1.57,
+uAgents 1.42/—; x-high FinBot 4.06×tok/~2.25×wc.
+
+**Token burn and wall-clock diverge, and the divergence is the budgeting
+point.** Parallelism cuts x-high's *wall-clock* (three scans overlap at ~15
+min) but not its *token bill* — three full scans' tokens are spent regardless
+of concurrency, plus a scan-sized adjudication pass (the adjudicator re-runs
+Steps 5–12 on the union), so ~3× + ~1× ≈ 4× tokens at ~2.25× wall-clock. High
+mode's audit is a finding-bounded re-read: ~90k–135k tokens / ~4–10 min on top
+of the scan (scales with finding count × evidence density — subtle production
+agents audit slower than dense demo apps). The docs keep the round multiples
+(~2× / ~4–5×) as conservative planning ceilings; operator guidance carries both
+measured axes and says to budget by tokens, not the clock
+(`docs/thinking-modes.md`).
 
 ## 3. First principles
 
