@@ -14,11 +14,11 @@
 >
 > ## Headline
 >
-> **The current RT band is a floor artifact, not a measurement.** Seven of
-> twelve baseline targets scored exactly RAISE `RT = 1` while containing *zero*
-> observable adversarial-testing evidence — and two targets that do have real
-> security testing scored *lower* than targets that have none. The checklist
-> reorders them correctly using evidence anyone can re-check.
+> **The current RT band is a floor artifact, not a measurement.** **Ten** of
+> twelve baseline targets contain *zero* adversarial security testing — and the
+> holistic scorer gave those ten identical-evidence targets **seven 1s and
+> three 0s**. Same evidence, different score, no discernible reason. The
+> checklist puts all ten on a stable 0.0 with nothing left to flip.
 >
 > **Agreement holds where the holistic score is trustworthy:** socxen scores
 > **4.6** against a prior holistic **4**; hermes **2.9** against **3**.
@@ -46,8 +46,8 @@ collapses hardest: 7 of 12 targets sit at exactly 1.
 | **socxen** | MET | MET | PARTIAL | MET | MET | MET | **4.6** | *4 (prior)* | +0.6 |
 | **hermes-agent-desktop** | MET | MET | PARTIAL | NOT EVID | PARTIAL | PARTIAL | **2.9** | 3 | −0.1 |
 | deepagents-cli | PARTIAL | MET | PARTIAL | NOT EVID | NOT MET | NOT MET | **1.7** | 3 | −1.3 |
-| openhands | PARTIAL | MET | PARTIAL | NOT EVID | NOT MET | NOT MET | **1.7** | 1 | +0.7 |
-| openai-customer-service | PARTIAL | MET | PARTIAL | NOT EVID | NOT MET | NOT MET | **1.7** | 0 | **+1.7** |
+| openhands | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 1 | −1.0 |
+| openai-customer-service | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 0 | 0 |
 | aider | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 1 | −1.0 |
 | autogen-code-executor | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 1 | −1.0 |
 | craftbot | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 0 | 0 |
@@ -57,27 +57,56 @@ collapses hardest: 7 of 12 targets sit at exactly 1.
 | uagents | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 1 | −1.0 |
 | yaah | NOT MET | NOT MET | NOT MET | NOT EVID | NOT MET | NOT MET | **0.0** | 1 | −1.0 |
 
-Supporting evidence counts (security-control test files; security CI workflows):
+### 2.0 Correction — file counts are not evidence (2026-08-11)
 
-```
-hermes-agent   38 / 1      deepagents  16 / 0      openhands    11 / 0
-openai-cs       9 / 0      autogen      0 / 1      all others    0 / 0
-```
+An earlier revision of this document reported "security-control test file"
+counts (hermes 38, deepagents 16, openhands 11, openai-cs 9) as supporting
+evidence, derived from **filename patterns without reading the files**. Steve
+challenged the openai-cs call. On inspection, **two of the four non-zero rows
+were false**:
+
+| Target | Claimed | What the tests actually do |
+|---|---|---|
+| hermes | 38 | **Verified real.** `_resolve_trust_level("official/attacker-skill") == "community"`, sibling-prefix spoofing, skills.sh typo-squatting, cross-profile write/patch bypass, tirith block-on-terminal-injection. Adversarial inputs throughout. |
+| deepagents | 16 | **Verified real.** Genuine bypass attempts against a shell allow-list — `;`, pipes, `&&`, quoting, malformed input. |
+| openhands | 11 | **False.** Docker/remote *sandbox provisioning service* lifecycle tests, plus React route guards (`permission-guard.test.ts` checks UI redirects). Matched on the words "sandbox" and "guard". |
+| openai-cs | 9 | **False.** Guardrail *plumbing*: a stub guardrail returns `tripwire_triggered=True` and the test asserts the framework stops. No attack appears anywhere; the tripwire is written by the test. |
+
+**This document's §3 argues that pattern matching cannot distinguish
+adversarial testing from adversarial content — and its own evidence table was
+built by pattern matching.** String right, meaning wrong, in the section
+warning about exactly that. Recorded rather than quietly fixed: it is the
+strongest available argument for keeping observation with the model, and for
+the rule that a count of matching filenames is a place to start looking, never
+a finding.
+
+The distinction that survives, and that generalises: **does the test contain an
+adversarial input, or does it verify that machinery fires when told to?**
+Nothing to do with whether the control is a shipped product feature — the
+original stated reason for discounting openai-cs, which was wrong.
 
 ### 2.1 The floor artifact
 
-Seven targets — aider, autogen, finbot, helperbot, uagents, yaah, and
-(baseline) openhands — scored **RT = 1** with no adversarial testing, no
-security-control tests, and no security CI. Meanwhile craftbot, salesforce and
-openai-cs scored **RT = 0** on the same emptiness. **Identical evidence
-produced different scores**, which is the #195 mechanism caught in the act,
-directly rather than through score spread.
+**Ten of twelve targets contain no adversarial security testing whatsoever**
+(all but hermes and deepagents). The holistic scorer gave those ten:
 
-Worse, it inverts: **openai-customer-service has 9 security-control test files
-and scored 0; uagents has none and scored 1.**
+- **RT = 1** — aider, autogen, finbot, helperbot, openhands, uagents, yaah
+- **RT = 0** — craftbot, openai-customer-service, salesforce
 
-Under the checklist all seven no-evidence targets land on a stable **0.0** with
-every item NOT MET. There is nothing left to flip.
+**Identical evidence, two different scores, seven-to-three.** This is the #195
+mechanism caught directly rather than inferred from score spread, and the
+correction in §2.0 *strengthened* it: verifying the file counts moved openhands
+and openai-cs into the no-evidence group, taking it from 7-of-12 to 10-of-12.
+
+Under the checklist all ten land on a stable **0.0**, every item NOT MET.
+Nothing left to flip.
+
+**Note on item conditionality (design gap found here).** The first pass gave
+openhands and openai-cs `MET` on "an automated runner exists" and `PARTIAL` on
+"testing is ongoing" purely for having pytest and CI — 1.5 free points in the
+red-team category for owning a normal test suite. Items 2–6 **qualify the
+adversarial testing found in item 1**; where item 1 is NOT MET there is nothing
+to qualify and they are NOT MET, not NOT EVIDENCED. Now applied above.
 
 ### 2.2 Where the holistic score was right
 
@@ -94,9 +123,11 @@ was filling a vacuum.
   testing the LLM loop against untrusted input. Good control unit-testing is
   not adversarial testing of an agent. **Needs Steve's adjudication** — this is
   the sharpest ground-truth question the eval produced.
-- **openai-cs 0 → 1.7.** Nine guardrail tests. Note these largely test the
-  project's *own shipped guardrail feature* — product QA, which is why RT-1 is
-  PARTIAL rather than MET. Still strictly more than the zero its 0 implied.
+- **openai-cs 0 → 0.0** *(revised from 1.7 — see §2.0)*. Its guardrail tests
+  contain no adversarial input; they verify the tripwire mechanism fires when a
+  stub guardrail says to. The baseline's 0 was right.
+- **openhands 1 → 0.0** *(revised from 1.7 — see §2.0)*. Sandbox provisioning
+  lifecycle tests and frontend route guards. No adversarial testing.
 
 ## 3. The mechanical sweep — a research instrument, and a cautionary one
 
@@ -188,8 +219,12 @@ earned no place in the design.
 
 ## 6. Next
 
-1. **Steve adjudicates the disagreement cases** — deepagents (3 → 1.7) and
-   openai-cs (0 → 1.7). These become ground-truth anchors.
+1. ~~Steve adjudicates the disagreement cases~~ — **done 2026-08-11.**
+   Bypass-shaped tests against your own control **partly count** (half credit),
+   so deepagents settles at **1.7**. Whether an attack arrives through the real
+   front door is judged as a **separate question** (attack-surface coverage),
+   not folded into "do they test at all." openai-cs resolved itself once the
+   tests were actually read (§2.0).
 2. **Repeat the exercise for BKB**, the other collapsed category, where the
    design predicts the restored under-provisioning items (BKB-3, BKB-4) create
    the missing range.

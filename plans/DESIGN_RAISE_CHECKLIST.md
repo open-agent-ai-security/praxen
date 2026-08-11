@@ -103,7 +103,9 @@ Two fidelity gaps found in the same pass, both in flipping categories:
    item granularity, where it is concrete, rather than at band granularity,
    where it is adjectives.
 3. **Evidence classes are drawn from real repositories**, never invented — see
-   §5 and the eval doc.
+   §5 and the eval doc. **A count of files matching a naming pattern is a place
+   to start looking, never a finding**; the first eval published such counts and
+   two of four were false (eval §2.0).
 4. **Absence of evidence still scores as absence** (existing KB principle), but
    is *reported* distinctly, with the artifact that would change it.
 5. **Aggregation is arithmetic**, performed in code, not by the model.
@@ -259,14 +261,19 @@ per-category confidence prose.
 Renamed from "Build an AI Red Team": grade the practice, not the staffing.
 Abbreviation stays **RT**.
 
+**Items 2–6 qualify the testing found in item 1.** Where item 1 is NOT MET
+there is nothing to qualify and items 2–6 are NOT MET, not NOT EVIDENCED.
+Without this, any project with a CI-run pytest suite collects free points in
+the red-team category — which is exactly what happened in the first eval.
+
 | ID | Item | Evidence that satisfies | PARTIAL when |
 |---|---|---|---|
-| RT-1 | Adversarial testing exists, specific to this agent's threat model | Structured attack corpus; garak / promptfoo / PyRIT / Giskard configuration; jailbreak or injection test suite; checked-in red-team or pentest report; threat model with attached tests | Generic security tests not targeting agent behaviour |
+| RT-1 | Adversarial testing exists, specific to this agent's threat model | Structured attack corpus; garak / promptfoo / PyRIT / Giskard configuration; jailbreak or injection test suite; checked-in red-team or pentest report; threat model with attached tests. **The test must contain an adversarial input** — a hostile string, a bypass attempt, a spoofed identifier. A test that verifies security *machinery fires when told to* (a stub tripwire returning true) is not adversarial testing, regardless of whether the control is a shipped feature. | Bypass-shaped tests against a control, without any test of the agent itself (Steve, 2026-08-11: *"partly counts"*) |
 | RT-2 | An automated, repeatable runner exists | An executable runner; a command-invocable suite; a CI workflow. **CI is sufficient but not necessary** — a deliberate pre-release live exercise qualifies | Manual procedure documented but not executable |
 | RT-3 | Testing is ongoing, not point-in-time | Dated report series; scheduled runs; documented per-release cadence; retests after fixes | One run, or cadence stated without history |
 | RT-4 | Findings feed back into the system | Findings traceable to issues/PRs/commits; a ledger linking finding → fix; architectural change attributable to a finding | Findings recorded, remediation untraceable |
 | RT-5 | Testing gates the release | Stated pass bar; a blocking verdict; a CI gate that can fail the build | Bar stated but advisory |
-| RT-6 | Coverage spans the real attack surface | Attacks entering by the agent's actual untrusted channels (telemetry, email, RAG, tool output), tool misuse, and encoding variants — not direct jailbreak prompts alone | Direct-prompt jailbreaks only |
+| RT-6 | Coverage spans the real attack surface | Attacks entering by the agent's actual untrusted channels (telemetry, email, RAG, tool output), tool misuse, and encoding variants — not direct jailbreak prompts alone. **This is where "did the attack come through the real front door" is judged** (Steve, 2026-08-11): a control tested only by calling its function directly loses this item, not RT-1. | Direct-prompt jailbreaks only, or control-level tests that never exercise the running agent |
 
 ### MC — Monitor Continuously (6)
 
