@@ -41,6 +41,24 @@ Selected per-invocation in natural language ("run a Praxen analysis in high
 thinking mode"). No config file, no standing state (consistent with #2's
 deferral). Unrecognized/absent mode ⇒ standard.
 
+**Measured cost (Opus 5, 2026-08-11 dry-runs; the "Cost (rough)" column is a
+token estimate — actual numbers below).** Wall-clock expansion runs *lower*
+than the token multiple, because the audit is a finding-bounded re-read (not a
+second discovery pass) and x-high's three scans run concurrently:
+
+| Mode | Tokens (measured) | Wall-clock (measured) | Sample |
+|---|---|---|---|
+| **high** | ~1.4–1.5× | **~1.3–1.6×** (scan + a few min audit) | FinBot 1.41×tok / 1.27×wc; Aider 1.40 / 1.52; CraftBot 1.52 / 1.57 |
+| **x-high** | ~4.0× | **~2.0–2.5×** (parallel scans + one adjudication) | FinBot 4.06×tok, ~2.25×wc |
+
+Concretely: standard scans ran ~14–19 min; high-mode audits added ~4–10 min
+(audit time scales with finding count × evidence density — subtle production
+agents audit slower than dense demo apps). X-high's three scans overlapped at
+~15 min wall-clock, then adjudication/assembly added a comparable stretch. The
+docs' cost table keeps the round token multiples (~2× / ~4–5×) as conservative
+planning ceilings; the operator-facing "how much longer" guidance is the
+measured wall-clock (`docs/thinking-modes.md`).
+
 ## 3. First principles
 
 1. **Evidence decides membership; run-count decides nothing.** A finding seen

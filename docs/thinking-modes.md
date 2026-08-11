@@ -19,6 +19,29 @@ automate the verification practices Praxen's own release process uses by hand
 | **high** | Scan → independent findings audit → cleaned report | ~2× | Before a report leaves your hands |
 | **x-high** | 3 independent scans → evidence adjudication → one "super-run" report | ~4–5× | Audits, gates, anything where quality outranks time and tokens |
 
+## How much longer it takes
+
+The "cost" column above is a rough token/compute multiple. The **wall-clock**
+cost is smaller, and smaller than you might expect for x-high, because the
+audit is a *targeted re-read* (bounded by the number of findings) rather than
+a second full discovery pass, and x-high's three scans run in parallel:
+
+| Mode | Wall-clock vs. a standard scan | In practice |
+|---|---|---|
+| **high** | **~1.3–1.6×** | a standard scan **plus a few extra minutes** for the audit |
+| **x-high** | **~2–2.5×** | roughly two standard scans back-to-back, not four |
+
+Early measured data (Opus 5, three real targets — a small dense app and two
+production agents): a standard scan ran **~14–19 min**; the high-mode audit
+added **~4–10 min** on top, so high mode finished in **~17–28 min** total.
+X-high ran its three scans concurrently (~15 min wall-clock for all three)
+then spent a comparable stretch on adjudication and assembly, landing near
+**2–2.5×** a single scan's wall-clock even though it does **~4×** the token
+work. Your numbers will move with target size, finding count, and evidence
+density — subtle production agents audit slower than dense demo apps — but the
+shape holds: **high mode buys a false-positive audit for a few extra minutes;
+x-high buys three-scan stability for roughly the time of two scans.**
+
 ## Invoking a mode
 
 Modes are selected per-invocation, in natural language — there is no config
