@@ -117,6 +117,44 @@ standing regression — decide at 1.3 close). Artifacts are dry-run working
 files; the durable outputs are the graded results table (reported on #197)
 and any brief changes they force.
 
+## Addendum — Phase 3 cleanup test (2026-08-11)
+
+The injection test above proves **detection**. It does not exercise **removal**:
+its audits stop at verdicts. And because all four organic high-mode runs
+confirmed everything, high mode's Phase 3 cleanup path (preserve `-raw`, edit
+the audited manifest, re-convert, re-render) had **never executed** — an
+untested path in shipping instructions. Closed with this end-to-end test:
+
+1. Injected the class-A fake into the **draft manifest** (not just the JSON),
+   proving a fake is manifest-representable; converted → 14 findings, valid.
+2. Rendered that as the simulated Phase-1 output; applied the existing audit
+   verdict (fake = UNSUPPORTED, 13 others CONFIRMED).
+3. Executed Phase 3 verbatim: renamed the three artifacts with `-raw`, wrote
+   `<slug>-draft-<TS>-audited.md` with the fake's block removed, re-ran
+   `manifest_to_findings.py` then `render.py` at a fresh timestamp.
+
+**Result — every checkpoint passed:**
+
+| Check | Outcome |
+|---|---|
+| Fake in raw / absent from final | ✅ / ✅ |
+| Finding IDs never reused or renumbered | ✅ 001–013, no 014 — the gap is provenance |
+| Dangling references to the removed id | ✅ none |
+| `footer.severity_counts` re-derived | ✅ medium 5 → 4 |
+| Category scores re-derived only if load-bearing | ✅ unchanged (the fake was not load-bearing in any rationale) |
+| Raw artifacts preserved alongside final | ✅ `-raw` html/txt/json |
+| **Cleaned final vs. the never-injected original** | ✅ **finding-for-finding identical, and the rendered HTML/TXT are byte-identical** |
+
+That last row is the strongest statement available: inject a false positive →
+the audit detects it → cleanup removes it → **the result is byte-for-byte what
+the scan would have produced had the false positive never existed.** Detection
+and removal are both now demonstrated end-to-end.
+
+Residual gap: every fake carried `policy_rule_ids: null` by design, so the
+**rule re-status path** (an UNSUPPORTED kill forcing a linked rule from `gap`
+back to `verified`/`partial`) is still unexercised. Worth one targeted fake
+carrying a real rule link before ship.
+
 ## Known limits
 
 - Tests the auditor's *refutation* skill on single fakes, not saturation
