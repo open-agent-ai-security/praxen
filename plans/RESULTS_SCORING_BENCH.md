@@ -272,3 +272,62 @@ Rounds 2 and 3, four rubric/pack combinations across three categories and three
 targets. Every condition returned a perfectly stable score. The open question
 is no longer stability — it is whether the pack shows the scorer the right
 things.
+
+---
+
+## Round 4 — Gate 1: cold-target generalisation (2026-08-11) — **PASS**
+
+The tie-break and provenance rules were written after watching finbot and
+autogen. This is the honest test: **salesforce and craftbot**, neither examined
+while the rules were being written, scored with the proposed pack (findings +
+positives + maturity sweep) and the proposed rubric.
+
+```
+                    scores        baseline   verdict
+salesforce  RT      0 0 0 0 0        0       stable, exact match
+craftbot    RT      0 0 0 0 0        0       stable, exact match
+salesforce  KB      2 2 2 2 2        2       stable, exact match
+craftbot    KB      1 1 1 1 1        1       stable, exact match
+```
+
+**20/20 identical, four for four against the frozen baseline.**
+
+### The provenance rule generalised to two more artifact classes
+
+The specific risk was inflation: the sweep hands the scorer 86–89 KB of "here
+is what is good about this project," and both targets held at zero.
+
+- **craftbot** — the sweep surfaced `skills/shannon`'s live pentester,
+  `skills/differential-review/adversarial.md`, `skills/sharp-edges`, and a Kali
+  MCP entry. All five scorers rejected the lot as shipped end-user capability
+  aimed at the customer's systems, not craftbot testing itself. This is the
+  exact artifact class that defeated the mechanical sweep in §3.
+- **salesforce** — the scorers rejected its prompt-resident guardrail block as
+  *"defensive content deployed into the customer's org… not the project
+  attacking its own defences."* A subtler call than craftbot's, made
+  consistently five times.
+
+The rule now has four independent confirmations on three targets it was not
+written from: hermes (a shipped jailbreak toolkit), craftbot (pentesting
+skills), salesforce (a guardrail template).
+
+### The tie-break rules resolve a real band edge
+
+Salesforce is genuinely ambiguous — **every** scorer stated it was choosing
+between 2 and 3, and rule 4 settled it identically five times. Craftbot's
+scorers cited rule 3 (unmanaged dominant path caps at 1) by name. This is the
+mechanism working as designed: the ambiguity is real and the rule makes it
+deterministic, rather than leaving it to a per-run draw.
+
+### The new signals earn their place
+
+Craftbot's scorers independently identified **tool and MCP output** as the
+dominant untrusted channel — the signal absent from the shipping knowledge base
+— and surfaced that `PromptSanitizer` is 246 lines with zero call sites and
+that `run_shell` hands `os.environ.copy()` to every command. Evidence the
+current scan did not record.
+
+**Running total: 80 of 80 replays identical within condition**, across four
+categories and five targets, with the generalisation gate passed on cold ones.
+
+**Next: Gate 2** — none of this has run inside a real scan.
