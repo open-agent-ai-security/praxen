@@ -150,10 +150,22 @@ the audit detects it → cleanup removes it → **the result is byte-for-byte wh
 the scan would have produced had the false positive never existed.** Detection
 and removal are both now demonstrated end-to-end.
 
-Residual gap: every fake carried `policy_rule_ids: null` by design, so the
-**rule re-status path** (an UNSUPPORTED kill forcing a linked rule from `gap`
-back to `verified`/`partial`) is still unexercised. Worth one targeted fake
-carrying a real rule link before ship.
+**Rule re-status path — checked and closed, no work needed.** Every fake
+carried `policy_rule_ids: null`, so the branch where a kill forces a linked
+rule's status back from `gap` was never exercised by a live audit. Tested the
+worst case directly instead: a cleanup that removes the finding and *forgets*
+to re-status its rule. The converter refuses it —
+
+```
+manifest_to_findings.py: schema validation failed — $.remit_coverage (rule R-07):
+references finding 'PRAX-2026-08-11-014' which does not exist in findings[]   (exit 1)
+```
+
+— naming the offending rule and exiting non-zero. There is no silent-wrong
+path: the only way to get a broken coverage table past the converter is for it
+to not be broken. An untested branch guarded by a loud, specific failure is not
+a defect, and the recovery is SKILL.md's standard loop (fix the manifest,
+rerun). **Not a ship blocker; no fix required.**
 
 ## Known limits
 
