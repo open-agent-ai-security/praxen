@@ -108,7 +108,45 @@ Two fidelity gaps found in the same pass, both in flipping categories:
    is *reported* distinctly, with the artifact that would change it.
 5. **Aggregation is arithmetic**, performed in code, not by the model.
 
-### 3.2 Answer values
+### 3.2 Division of labour — what the model does, what code does
+
+**The model answers every item. Code does nothing but arithmetic.** This is not
+a mechanization proposal, and the checklist is not a grep list.
+
+| | Who | Why |
+|---|---|---|
+| *"Is this file adversarial security testing, or adversarial content that is part of the product?"* | **Model** | Requires reading the code and understanding intent. Pattern matching cannot do it — see the eval's false positives, where a deliberately-vulnerable app, a skill *about* red-teaming, and an input sanitiser all matched the same patterns. |
+| *"Does this evidence make the item MET, PARTIAL, or NOT MET?"* | **Model** | A judgment about evidence sufficiency. |
+| *"What number does that add up to?"* | **Code** | Arithmetic. There is no judgment here and the model should not be near it. |
+
+Evidence classes in §4 are **guidance for a reader**, not patterns to match.
+They tell the model what would satisfy an item; they do not tell it where to
+`grep`.
+
+#### Why this reduces variance even though the model answers everything
+
+The fix does not come from determinism in observation. It comes from three
+places:
+
+1. **The scale mapping leaves the model entirely.** Today the model must answer
+   two questions at once: *how good is this?* and *what integer on a 6-point
+   CMM scale represents that?* The second has no ground truth — it is an
+   arbitrary mapping — and that is where the coin flip lives. Under the
+   checklist the model only ever answers questions about evidence.
+2. **Each question is narrower and better posed**, so per-judgment error is
+   lower than for one unconstrained holistic call.
+3. **Errors become partially independent** across 39 items and partially
+   cancel, instead of quantizing into one visible band jump.
+
+**The RT eval is direct evidence for (1).** The model had no difficulty seeing
+that aider, finbot, uagents and yaah contain no adversarial testing — the
+*observation* was never in doubt. What wobbled was whether "no adversarial
+testing" maps to 0 or to 1: seven targets got 1, three got 0, on identical
+emptiness. Observation was fine; the mapping was the coin flip. Removing the
+mapping from the model's job is the fix, and it survives every item being
+LLM-answered.
+
+### 3.3 Answer values
 
 | Value | Meaning | Points |
 |---|---|---|
@@ -128,7 +166,7 @@ rescan."* That converts the epistemic limit into the product's feedback loop:
 **N/A must be justified from the target's architecture** and is listed in the
 report with its justification. Unjustified N/A is the obvious gaming vector.
 
-### 3.3 Aggregation
+### 3.4 Aggregation
 
 ```
 category_score (0–5) = 5 × (points_earned / points_applicable)      # 1 decimal
@@ -153,10 +191,10 @@ step on one item:
 
 Beyond finer granularity, the errors become **independent**: 39 narrow
 judgments whose disagreements partially cancel, versus 6 judgments where one
-disagreement *is* the delta. That is the variance hypothesis — it is a
+disagreement *is* the delta. That is the variance hypothesis (mechanism in §3.2) — it is a
 hypothesis, and the replay bench (§6) is how it gets measured, not asserted.
 
-### 3.4 Evidence coverage as a second axis
+### 3.5 Evidence coverage as a second axis
 
 Today "we looked and it is bad" and "we could not see much" produce
 indistinguishable reports. Publishing evidence coverage alongside the score

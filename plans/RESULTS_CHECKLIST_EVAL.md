@@ -98,10 +98,18 @@ was filling a vacuum.
   project's *own shipped guardrail feature* — product QA, which is why RT-1 is
   PARTIAL rather than MET. Still strictly more than the zero its 0 implied.
 
-## 3. What is mechanically decidable — measured, not assumed
+## 3. The mechanical sweep — a research instrument, and a cautionary one
 
-Of 14 probed items, the sweep produced **usable determinism on 8** (MSC-1, -2,
--4, -6, -7; RT-2, RT-3; ZT-8) and **failed on the rest**, in two distinct ways:
+**Correction (Steve, 2026-08-11): mechanization was never the goal, and this
+section originally implied it was.** The checklist is model-answered
+throughout; code does arithmetic only (design §3.2). The sweep existed to
+survey 13 repositories cheaply for *this* eval, not as a proposed product
+component.
+
+It is reported here because it **under-performed**, and that failure is the
+argument for keeping observation with the model. Of 14 probed items it screened
+8 usably (MSC-1, -2, -4, -6, -7; RT-2, RT-3; ZT-8) and failed the rest in two
+distinct ways:
 
 **Precision failures (false positives).** Filename matching cannot tell
 adversarial testing from adversarial *content*:
@@ -123,11 +131,15 @@ with deepagents' 16, openhands' 11 and openai-cs' 9. **Every non-zero RT score
 in this eval except socxen came from the corrected pass**, so the naive sweep
 would have reported a corpus in which only socxen tests anything.
 
-**Conclusion:** artifact presence is a *screening* layer, not the answer.
-RT-2/RT-3 (does a runner exist, is there a dated series) are reliably
-mechanical. RT-1/RT-6 (is this adversarial testing, does it cover the real
-attack surface) require judgment and must stay model-answered with the
-evidence classes as guidance.
+**Conclusion:** *"is this adversarial security testing?"* is not a
+pattern-matching question and never will be. Every false positive above is a
+case where the string was right and the meaning was wrong; the recall failure
+is a case where the meaning was right and the string was absent. Both are
+category errors that only reading the code resolves.
+
+The items stay model-answered. Where the eval's numbers came from mechanical
+screening, they came with hand adjudication on top — and the screening layer
+earned no place in the design.
 
 ## 4. Corrections this eval forced on the draft
 
@@ -159,8 +171,8 @@ evidence classes as guidance.
   removal is verifiable from evidence rather than from judgment.
 - The checklist reproduces the holistic score where the practice is real
   (socxen 4.6 vs 4; hermes 2.9 vs 3).
-- Roughly half the probed items are mechanically screenable; the other half
-  are not, and the failure modes are now characterised rather than guessed.
+- Pattern matching cannot answer the interesting items, with the failure modes
+  now characterised rather than guessed.
 
 **Does not show:**
 
