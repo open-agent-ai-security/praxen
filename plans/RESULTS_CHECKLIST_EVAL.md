@@ -129,6 +129,71 @@ was filling a vacuum.
 - **openhands 1 → 0.0** *(revised from 1.7 — see §2.0)*. Sandbox provisioning
   lifecycle tests and frontend route guards. No adversarial testing.
 
+## 2.5 Balance Your Knowledge Base — second category pass (2026-08-11)
+
+The other collapsed category: **BKB scored 1 or 2 on all twelve targets**, never
+0, never 3+. Hypothesis from the design: the missing under-provisioning items
+would create range.
+
+**Scored only what was read.** Three targets read properly, one partially. The
+remaining eight are deliberately unscored — the RT pass established that
+unverified counts are worthless.
+
+| Target | Sources enumerated | Minimised | Grounded knowledge | Hallucination controls | Untrusted marked as data | Sensitive data out | **Checklist** | Baseline |
+|---|---|---|---|---|---|---|---|---|
+| salesforce-help-agent | MET | PARTIAL | MET | PARTIAL | NOT EVID | PARTIAL | **2.9** | 2 |
+| finbot | PARTIAL | PARTIAL | MET | NOT MET | NOT MET | NOT MET | **1.7** | 1 |
+| autogen-code-executor | **N/A** | **N/A** | **N/A** | **N/A** | NOT MET | NOT MET | **0.0** *(2 applicable)* | 1 |
+| *aider (partial read)* | *PARTIAL* | *MET* | *MET* | *NOT MET* | *NOT MET* | *unread* | *provisional* | *1* |
+
+Range across three fully-read targets: **0.0 – 2.9**, against `{1, 2}` for all
+twelve under the holistic scorer.
+
+### The collapse mechanism here is different from RT's
+
+RT collapsed because *nothing found* mapped arbitrarily to 0 or 1. **BKB
+collapses because the category frequently does not apply and the scale cannot
+say so.**
+
+The AutoGen subject is five code-executor implementations. They have no
+knowledge base, no retrieval, no corpus, no context assembly — they receive
+code blocks and run them. Four of six items are genuinely **not applicable**.
+The honest answer is "this category barely applies here," and a 0–5 maturity
+scale has no way to express that, so the holistic judgment produced a shrug in
+the low-middle band: **1**.
+
+That is a second, independent generator of band-edge wobble, invisible in the
+current model, and it explains why BKB never reaches 0 or 3: a target with no
+knowledge base cannot score 0 (that would read as "they have one and it is
+terrible") and cannot score 3 (they have nothing to be good at), so every such
+target lands on 1 or 2 regardless of evidence.
+
+### A defect the number was hiding
+
+Salesforce's agent instruction says *"include sources in your response when
+available from the knowledge articles."* Its configuration says
+**`citations_enabled: False`** with an empty `citations_url`. The policy
+requires citation; the implementation disables it. Two `filter_from_agent:
+False` settings sit alongside it.
+
+The holistic score for this was **2** — a number that surfaces none of it. The
+checklist forces the question "are there hallucination controls?" to be
+answered against configuration, and the answer names the exact line to fix.
+This is the *"provide more evidence"* loop working in reverse: it tells the
+owner what to *change*, not just what to send.
+
+### New design problem this pass found
+
+**N/A shrinks the denominator, which makes quantization worse, not better.**
+AutoGen's BKB is computed from 2 applicable items, so each item is worth 2.5
+points on the 0–5 scale — coarser than today's 1-point bands. The design's
+resolution argument (§3.4) silently assumed all items apply.
+
+Unresolved; the options are a minimum applicable-item count before a category
+gets a number at all, reporting "insufficient applicable items" instead of a
+score, or folding N/A-heavy categories out of the weighted average and
+renormalising the weights. **This needs deciding before any of it is built.**
+
 ## 3. The mechanical sweep — a research instrument, and a cautionary one
 
 **Correction (Steve, 2026-08-11): mechanization was never the goal, and this
@@ -225,8 +290,10 @@ earned no place in the design.
    front door is judged as a **separate question** (attack-surface coverage),
    not folded into "do they test at all." openai-cs resolved itself once the
    tests were actually read (§2.0).
-2. **Repeat the exercise for BKB**, the other collapsed category, where the
-   design predicts the restored under-provisioning items (BKB-3, BKB-4) create
-   the missing range.
+2. ~~Repeat the exercise for BKB~~ — **done, §2.5.** Range confirmed (0.0–2.9
+   vs `{1,2}`), and a second, distinct collapse mechanism found: the category
+   often does not apply and the scale cannot say so. **Open decision: how to
+   score a category with few applicable items** — N/A currently makes
+   quantization worse.
 3. **Then the bench.** Variance is the claim that matters and it is still
    entirely unmeasured.
