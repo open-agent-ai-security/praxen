@@ -143,30 +143,72 @@ unverified counts are worthless.
 |---|---|---|---|---|---|---|---|---|
 | salesforce-help-agent | MET | PARTIAL | MET | PARTIAL | NOT EVID | PARTIAL | **2.9** | 2 |
 | finbot | PARTIAL | PARTIAL | MET | NOT MET | NOT MET | NOT MET | **1.7** | 1 |
-| autogen-code-executor | **N/A** | **N/A** | **N/A** | **N/A** | NOT MET | NOT MET | **0.0** *(2 applicable)* | 1 |
+| autogen-code-executor | MET | PARTIAL | **N/A** | **N/A** | NOT MET | NOT MET | **1.9** *(4 applicable)* | 1 |
 | *aider (partial read)* | *PARTIAL* | *MET* | *MET* | *NOT MET* | *NOT MET* | *unread* | *provisional* | *1* |
 
-Range across three fully-read targets: **0.0 – 2.9**, against `{1, 2}` for all
-twelve under the holistic scorer.
+Range across three fully-read targets: **1.7 – 2.9** (plus autogen at 1.9),
+against `{1, 2}` for all twelve under the holistic scorer. Real range, but
+narrower than the first revision claimed — see the retraction below.
 
-### The collapse mechanism here is different from RT's
+### Retracted — the "category does not apply" mechanism (2026-08-11)
 
-RT collapsed because *nothing found* mapped arbitrarily to 0 or 1. **BKB
-collapses because the category frequently does not apply and the scale cannot
-say so.**
+**An earlier revision claimed AutoGen's code executors "have no knowledge base,
+no retrieval, no context assembly" and scored four of six items N/A, giving
+0.0. That was wrong, and it was reasoned from the component's *name*.** Steve
+asked whether it was overly simplistic. Reading the executors:
 
-The AutoGen subject is five code-executor implementations. They have no
-knowledge base, no retrieval, no corpus, no context assembly — they receive
-code blocks and run them. Four of six items are genuinely **not applicable**.
-The honest answer is "this category barely applies here," and a 0–5 maturity
-scale has no way to express that, so the holistic judgment produced a shrug in
-the low-middle band: **1**.
+- **`work_dir`** — an explicit working directory the executed code reads and
+  writes.
+- **`extra_volumes`** — arbitrary host paths mountable into the container. The
+  documented example is `{'/home/user1/': {'bind': '/mnt/vol2', 'mode': 'rw'}}`.
+- **`bind_dir`** — host directory bound to the container work dir, hardcoded
+  `{"bind": str(work_dir), "mode": "rw"}` in `_jupyter_server.py:360`.
+- **Execution output returns into the model's context** —
+  `CommandLineCodeResult(output="".join(outputs))`
+  (`_docker_code_executor.py:376`), container logs decoded and returned (429,
+  564). Whatever executed code prints — including the contents of any file it
+  read from a mounted volume — reaches the next turn unmarked and untruncated.
 
-That is a second, independent generator of band-edge wobble, invisible in the
-current model, and it explains why BKB never reaches 0 or 3: a target with no
-knowledge base cannot score 0 (that would read as "they have one and it is
-terrible") and cannot score 3 (they have nothing to be good at), so every such
-target lands on 1 or 2 regardless of evidence.
+That is a substantial information surface. **Two items are genuinely N/A**
+(grounded domain knowledge, hallucination controls — the executor answers no
+questions), not four. Re-scored at **1.9 against the baseline's 1** — close
+agreement, not the dramatic divergence claimed.
+
+**So there is no verified case of a "category does not apply" collapse.** The
+mechanism may exist; it has not been demonstrated, and the flagship example
+does not hold. The denominator concern below is correspondingly milder: four
+applicable items give 1.25-point granularity, not 2.5.
+
+### The recurring error, recorded
+
+Three times in this workstream a conclusion was drawn from a **name** rather
+than from the code:
+
+1. Files matching `*guard*` counted as security tests (§2.0) — two of four rows
+   false.
+2. openai-agents-python discounted because "guardrails" is a shipped product
+   feature — the real and better reason is that its tests contain no
+   adversarial input.
+3. A "code executor" assumed to have no knowledge surface — it has four.
+
+Each was caught by Steve asking a question that required reading the code to
+answer. This is the exact failure mode the checklist exists to prevent,
+committed while designing the checklist, which is the strongest argument in
+this document for why observation must stay with a model that reads and why
+"evidence classes" must never degrade into name matching.
+
+### Gap found in both the draft and the shipping knowledge base
+
+The AutoGen re-read surfaced something worth more than the error that produced
+it. **Execution and tool output flowing back into model context is an untrusted
+-content channel that neither this draft nor `KB_RAISE_SCANNING.md` names.**
+The shipping signal table lists "external content (email, web, user uploads) in
+LLM context unvalidated" — tool results and execution stdout appear nowhere.
+
+For agentic targets, tool output is the *dominant* untrusted channel: it is how
+a poisoned file, a hostile web page, or an attacker-shaped API response reaches
+the model. Draft item corrected below; the shipping-KB gap is independent of
+this design work and worth its own issue.
 
 ### A defect the number was hiding
 
@@ -185,9 +227,10 @@ owner what to *change*, not just what to send.
 ### New design problem this pass found
 
 **N/A shrinks the denominator, which makes quantization worse, not better.**
-AutoGen's BKB is computed from 2 applicable items, so each item is worth 2.5
-points on the 0–5 scale — coarser than today's 1-point bands. The design's
-resolution argument (§3.4) silently assumed all items apply.
+With 4 applicable items each is worth 1.25 points on the 0–5 scale; at 2
+applicable items it would be 2.5, coarser than today's 1-point bands. The
+design's resolution argument (§3.4) silently assumed all items apply. Real but
+milder than first reported.
 
 Unresolved; the options are a minimum applicable-item count before a category
 gets a number at all, reporting "insufficient applicable items" instead of a

@@ -86,6 +86,12 @@ Two fidelity gaps found in the same pass, both in flipping categories:
   KB's BKB signal table is entirely about too-much / unvalidated data. Half
   the construct is unoperationalised, which is consistent with BKB having no
   usable range.
+- **BKB, second gap (found 2026-08-11 in eval §2.5)** — neither the KB signal
+  table nor the first draft of this checklist named **tool results and
+  execution output** as untrusted content entering context. The KB lists
+  "external content (email, web, user uploads)" only. For agentic targets this
+  is the dominant channel. Item BKB-5 corrected; the shipping KB has the same
+  gap and needs its own fix.
 - **MSC** — the book's items are training-data oriented (dataset provenance,
   poisoning, bias); the KB's are dependency/plugin/credential oriented. Sound
   adaptation for agent repos, but "account for bias in training data" has no
@@ -228,7 +234,7 @@ per-category confidence prose.
 | BKB-2 | Sources are minimised to the use case | Scoped index; per-role or per-tenant filtering; no blanket filesystem or web access | Scoping exists on some paths only |
 | BKB-3 | The agent has sufficient grounded knowledge for its domain *(the book's under-provisioning half)* | Domain RAG or fine-tune; "answer only from provided context"; citation requirement | Grounding exists but domain coverage is thin |
 | BKB-4 | Hallucination controls exist | Groundedness eval suite; citation enforcement; refuse-on-no-evidence; confidence thresholds | Instructional only ("do not speculate"), unmeasured |
-| BKB-5 | Untrusted content in context is identified as data, not instruction | Provenance tagging; instruction/data channel separation; delimiters with canonicalisation | Separation by convention only |
+| BKB-5 | Untrusted content in context is identified as data, not instruction | Provenance tagging; instruction/data channel separation; delimiters with canonicalisation. **Covers tool results and execution output, not only user uploads and retrieved documents** — for an agent, tool output is the dominant untrusted channel (an executor returning a mounted file's contents verbatim into the next turn is the same risk as an unvetted RAG document). | Separation by convention only; or applied to retrieval but not to tool output |
 | BKB-6 | Sensitive data is kept out of context unless required | PII filtering before context assembly; field-level redaction; scoped credentials | Redaction on some sinks only |
 
 ### ZT — Implement Zero Trust (8)
