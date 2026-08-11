@@ -12,8 +12,29 @@
 > **AutoGen Code Executor** (frozen 1.55, spread 0.55) and **uAgents**
 > (frozen 1.70, band ±0.45, σ≈0.25).
 >
-> **Verdict: §9.5 discovery yield PASSES decisively. §9.2 stability PASSES as
-> literally written but FAILS its intent — x-high did not damp score variance.**
+> ## Headline
+>
+> **A single Praxen scan misses roughly 1 in 6 High-severity findings and 1 in 3
+> Mediums. X-high finds them.** Expected single-run recall of the adjudicated
+> set: **74–93%**. The clearest case: uAgents' `is_user_address()` accepts any
+> sender whose address merely *starts with* the string `user` — a
+> signature-verification bypass in a cryptographic identity framework — caught
+> by **one scan in three**, then verified against the code by adjudication. The
+> committed Helm-chart seed that derives both identity and wallet keys was also
+> a one-of-three catch. Twelve such rescues across four super-runs, all verified.
+>
+> **Criticals need no help:** 100% recall in all five x-high runs. A single scan
+> reliably finds the headline risks; x-high buys the tail — and the tail
+> contains real vulnerabilities.
+>
+> **Secondary result:** x-high does *not* tighten the weighted RAISE decimal
+> (§9.2 passes as literally written — delta inside band — but shows no damping
+> vs. raw runs). This matters less than it first appears: Praxen's own release
+> policy already makes the weighted score **advisory** and theme coverage the
+> gate. The value here is diagnostic — it localises the residual variance to a
+> single band-edge category call (#195) and stops us claiming score stability we
+> can't support.
+>
 > Full reasoning below. Artifacts were dry-run working files in the session
 > scratchpad (ephemeral); this document is the durable record.
 
