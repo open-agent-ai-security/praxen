@@ -525,6 +525,35 @@ def main():
     check("no secret warning on a clean (redacted) snippet", "WARNING" not in rc.stderr,
           f"stderr: {rc.stderr!r}")
 
+    # #243 — interpolation/placeholder references are NOT secret values. A snippet
+    # quoting auth_token="${TOKEN}" (or $VAR / {{var}} / %VAR% / <VAR>) must render
+    # verbatim: the "value" is a reference token with no secret content. A real
+    # literal in the same assignment shape must still redact.
+    ph = json.loads(json.dumps(data))
+    ph["findings"][0]["evidence"][0]["snippet"] = (
+        'ENV auth_token="${TOKEN}" api_key="$API_KEY" passwd="{{vault_pw}}" secret="%SECRET%" client_secret="<CLIENT_SECRET>"')
+    ph_path = os.path.join(tmp, "ph.json")
+    ph_html = os.path.join(tmp, "ph.html")
+    dump_json(ph_path, ph)
+    rph = run_render(["--findings", ph_path, "--template", TEMPLATE,
+                      "--out-html", ph_html, "--out-txt", os.path.join(tmp, "ph.txt")])
+    phh = text_or_empty(ph_html)
+    check("#243: placeholder references (${VAR} et al.) are not redacted",
+          rph.returncode == 0 and "WARNING" not in rph.stderr
+          and "${TOKEN}" in phh and "%SECRET%" in phh,
+          f"stderr: {rph.stderr!r}")
+    lit = json.loads(json.dumps(data))
+    lit["findings"][0]["evidence"][0]["snippet"] = 'auth_token="hunter2secret" # literal'
+    lit_path = os.path.join(tmp, "lit.json")
+    lit_html = os.path.join(tmp, "lit.html")
+    dump_json(lit_path, lit)
+    rlit = run_render(["--findings", lit_path, "--template", TEMPLATE,
+                       "--out-html", lit_html, "--out-txt", os.path.join(tmp, "lit.txt")])
+    lith = text_or_empty(lit_html)
+    check("#243 guard: a real credential literal in the same shape still redacts",
+          rlit.returncode == 0 and "hunter2secret" not in lith and "[REDACTED" in lith,
+          "literal credential leaked after the placeholder exemption")
+
     # 5. negative cases — each must exit non-zero with a useful message
     def _first_ruled(d):
         """Index of the first finding that cites remit rules (policy_rule_ids

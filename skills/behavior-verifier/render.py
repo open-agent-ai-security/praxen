@@ -900,9 +900,14 @@ _SECRET_PATTERNS = [
     ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b")),
     ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
+    # The negative lookahead exempts interpolation/placeholder references whose
+    # entirety is the quoted "value" — ${VAR}, $VAR, {{var}}, %VAR%, <VAR> —
+    # a reference token carries no secret content to leak (#243).
     ("assigned credential literal", re.compile(
         r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)\b"
-        r"\s*[:=]\s*['\"][^'\"\s]{6,}['\"]")),
+        r"\s*[:=]\s*['\"]"
+        r"(?!(?:\$\{[^'\"]{1,64}\}|\$[A-Za-z_][A-Za-z0-9_]{0,64}|\{\{[^'\"]{1,64}\}\}|%[^'\"%]{1,64}%|<[^'\"<>]{1,64}>)['\"])"
+        r"[^'\"\s]{6,}['\"]")),
 ]
 
 
