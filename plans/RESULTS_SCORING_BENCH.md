@@ -467,3 +467,146 @@ One adjudicator per target; a model judging models, not human ground truth. The
 verdicts are evidence-cited and re-checkable. Hermes's Red Team (2) and
 Knowledge Base (2) are the two calls most worth human review — both sit on the
 practice-versus-provenance boundary this work introduced.
+
+## Round 7 — full-corpus sweep and scaled blind adjudication (2026-08-11)
+
+Gate 2 measured stability. This round asks the remaining question at corpus
+scale: when the new pipeline disagrees with the shipping baseline, **who is
+right?**
+
+### The sweep
+
+All 12 targets scanned once on the new pipeline (Steps 5 / 8b / 9.4 as
+committed). Against `v1.2-opus5`: **24 of 72 category calls moved**, and the
+movement is systematically downward — mean weighted delta **−0.23**, with only
+finbot up (+0.10) and aider net flat. That direction had to be treated as a
+suspect, not a result: three of the four boundary rules can only push scores
+down, and rule 4 breaks ties downward by design. Whether the shift was
+*correction* or *a deflation machine* is exactly what adjudication had to
+settle.
+
+### Blind adjudication, all 24 moved calls
+
+Each moved call was put to an independent Fable adjudicator (one per target,
+12 total across rounds 6–7) as Position A vs Position B with rationales,
+provenance hidden, A/B order flipped per category by a deterministic hash, with
+source access and instructions to verify claims rather than trust either side —
+and an explicit invitation to name any directional bias they saw.
+
+```
+new pipeline upheld   22/24
+baseline upheld        2/24
+neither                0/24
+```
+
+The moved calls, decoded (baseline → new, ✓ = new upheld):
+
+| target | category | baseline → new | upheld |
+|---|---|---|---|
+| aider | Manage Your Supply Chain | 3 → 2 | ✓ |
+| aider | Monitor Continuously | 1 → 2 | ✓ |
+| autogen-code-executor | Implement Zero Trust | 2 → 1 | ✓ |
+| craftbot | Monitor Continuously | 3 → 2 | ✓ |
+| deepagents-cli | Balance Your Knowledge Base | 2 → 1 | ✓ |
+| deepagents-cli | Manage Your Supply Chain | 3 → 2 | ✓ |
+| deepagents-cli | Build an AI Red Team | 3 → 2 | ✓ |
+| finbot | Implement Zero Trust | 0 → 1 | ✓ |
+| finbot | Build an AI Red Team | 1 → 0 | ✓ |
+| helperbot | Balance Your Knowledge Base | 1 → 0 | ✓ |
+| helperbot | Build an AI Red Team | 1 → 0 | ✓ |
+| hermes-agent-desktop | Balance Your Knowledge Base | 2 → 3 | ✗ baseline (2) |
+| hermes-agent-desktop | Implement Zero Trust | 3 → 2 | ✓ |
+| hermes-agent-desktop | Manage Your Supply Chain | 2 → 3 | ✓ |
+| hermes-agent-desktop | Build an AI Red Team | 3 → 2 | ✓ |
+| openai-customer-service | Manage Your Supply Chain | 3 → 2 | ✓ |
+| openai-customer-service | Monitor Continuously | 3 → 2 | ✓ |
+| openhands | Implement Zero Trust | 2 → 1 | ✓ |
+| salesforce-help-agent-accelerator | Limit Your Domain | 3 → 2 | ✓ |
+| salesforce-help-agent-accelerator | Implement Zero Trust | 2 → 1 | ✗ adjudicated 2 |
+| uagents | Limit Your Domain | 3 → 2 | ✓ |
+| yaah | Limit Your Domain | 3 → 2 | ✓ |
+| yaah | Manage Your Supply Chain | 3 → 2 | ✓ |
+| yaah | Build an AI Red Team | 1 → 0 | ✓ |
+
+**The −0.23 shift is correction, not deflation.** Blind adjudicators with
+source access sided with the new scores on 22 of 24 disputes. Four
+adjudicators, on four different targets, independently named the losing side's
+bias in near-identical words — *"capability counted as posture"*: crediting
+machinery the shipped default never invokes. That is precisely the failure
+boundary rules 1 and 3 were written against, named unprompted by judges who
+could not know which position carried those rules. Several also noted the
+winning side "never deflated a real control."
+
+### The two losses, and what each one is
+
+- **hermes Balance Your Knowledge Base (new said 3, adjudicated 2).** The
+  adjudicator applied the Balance table's own new signal — execution and
+  terminal output entering context unwrapped — against the new run.
+  **Run-level under-application; the rule is right; no instrument change.**
+- **salesforce Implement Zero Trust (new said 1, adjudicated 2).** The
+  adjudicator ruled boundary rule 3 over-applied: the dominant path was
+  *prompt-managed*, not unmanaged, and *"if prompt-managed paths triggered
+  rule 3, the separate 'prompt-only controls → capped at 2' rule could never
+  bind."* **Instrument defect — rule 3 as written swallowed the prompt-only
+  cap. Fixed** (2026-08-11): rule 3 now states that *unmanaged means no
+  control addresses the path at all*; a prompt-covered path belongs to the
+  prompt-only rule (cap 2).
+
+### Rule-3 fix, regression-tested (A/B, old text vs new text)
+
+The fix must flip salesforce Zero Trust to the adjudicated 2 without
+un-flipping the rule-3-adjacent downshifts the adjudicators upheld (openhands,
+autogen). Method: three independent scorers per condition, each given only a
+rules extract and a frozen evidence sheet, blind to every prior score.
+
+**Test-construction error, caught and corrected.** The first evidence sheets
+were built from the losing runs' own rationales — prose written to justify a 1,
+which understated controls (salesforce's `MAX_QUERY_LENGTH` and
+`disableInlineAutoLaunch` were absent entirely). On that biased sheet the new
+rules still scored salesforce 1 — via rule 4, after correctly declining to fire
+rule 3. The sheet was rebuilt from the union of both adjudication positions'
+source-verified facts, and the old rule text was run on the same sheet as a
+control. Results, all unanimous:
+
+| condition | scores | route taken |
+|---|---|---|
+| salesforce, **old** rule text, full facts | 1, 1, 1 | rule 3 fired on the prompt-managed path — the defect, reproduced |
+| salesforce, **new** rule text, full facts | 2, 2, 2 | rule 3 declined per carve-out; prompt-only cap binds at 2 — the adjudicated answer |
+| openhands, new rule text | 1, 1, 1 | rule 3 fires: nothing at all covers the default V1 path, carve-out explicitly reasoned through |
+| autogen, **old** rule text | 2, 2, 2 | rule 3 not fired — real code controls address the execution path |
+| autogen, **new** rule text | 2, 2, 2 | identical — the fix is provably neutral here |
+
+Routing was correct in 21 of 21 replays: every scorer, under both texts,
+identified whether the dominant path was unmanaged, weakly managed, or
+code-managed, and the new carve-out changed the outcome only on the one call
+the adjudicator said was wrong.
+
+**Honest residual:** on the condensed autogen sheet, both rule texts score 2,
+while the three full end-to-end runs scored 1 (adjudicated as correct). The gap
+is evidence richness, not rule text — the full runs saw the component's core
+sandbox promise and the off-host-reachable Jupyter backend, which the sheet
+omitted, and judged band 1 defensible on that basis. Unrelated to the fix, but
+it is one more datum for the session's central finding: band choice follows
+what the evidence set contains.
+
+### What adjudication surfaced beyond the scoreboard
+
+- **A phantom number in two independent reviews.** Both the new run *and* the
+  v1.2 baseline described yaah as having "74 skills" — a figure matching
+  nothing in the tree (46 remote, 49 enabled, 78 catalog entries). Two
+  independent scans repeating the same wrong number implies a shared upstream
+  artifact being trusted without verification. Process smell, unresolved.
+- **A control both pipelines missed.** openai-customer-service ships
+  `[tool.uv] exclude-newer = "7 days"` — a supply-chain freshness gate neither
+  review credited (the strongest such control in that tree).
+- **Right band on wrong facts.** The new craftbot run reached the adjudicated
+  Monitor score (2) while asserting two false claims about the audit trail
+  (missed the SQLite layer entirely). Counted as upheld on the number, flagged
+  because right-by-luck is not rigor.
+
+### Limits
+
+Same as round 6: model-judged, one adjudicator per target, no human ground
+truth. The blinding held (order-flip per category defeated attempts to profile
+A/B as consistent reviewers). The gate defined for this work — *upheld across
+the corpus the way it was 6/7 in round 6* — is met at 22/24.

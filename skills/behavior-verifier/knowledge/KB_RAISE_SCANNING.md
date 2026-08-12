@@ -103,7 +103,11 @@ the first that applies decides.
 3. **If the dominant data path is unmanaged, controls elsewhere cannot lift the
    category above 1.** Identify the largest-volume or highest-risk path by which
    data reaches the model. If nothing manages it, careful work on lesser paths
-   does not compensate.
+   does not compensate. *Unmanaged means no control addresses the path at all.*
+   A path covered only by a prompt-level instruction is weakly managed, not
+   unmanaged — that case belongs to the prompt-only rule (cap at 2), and this
+   rule does not apply. If this rule fired whenever the only control was a
+   prompt, the prompt-only cap could never bind.
 4. **When two adjacent bands are both defensible, choose the lower** — and name
    both in the rationale, so the reader can see the call that was made.
 
