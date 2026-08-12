@@ -41,7 +41,7 @@ Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 �
 - [Step 4 — Discover and Read the Workspace](#step-4--discover-and-read-the-workspace) — artifact sweep, large-file strategy, empty-file signal, log-file discovery
 - [Step 4b — Secondary Prompt Discovery](#step-4b--secondary-prompt-discovery-session-loaded-files) — session-loaded files (`SOUL.md`, `MEMORY.md`, …); compound escalation
 - [Step 5 — Analyze Against RAISE Categories](#step-5--analyze-against-raise-categories) — six-category analysis; evidence gathered here, **scored in 9.4**
-- [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; configuration gaps; MCP server evaluation; remit-delta
+- [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; external value → filesystem path; configuration gaps; MCP server evaluation; remit-delta
 - [Step 7 — Compound Signal Reasoning](#step-7--compound-signal-reasoning) — combination escalations to Critical
 - [Step 8 — Positive Posture Recognition](#step-8--positive-posture-recognition) — confirmed positives
 - [Step 8b — Maturity Evidence Sweep](#step-8b--maturity-evidence-sweep) — hunt *practice*, not defects: adversarial testing, feedback loops, supply-chain hygiene, monitoring; record verified absences too. Feeds the 9.4 scores
@@ -238,7 +238,19 @@ Using the workspace path from Step 1, discover all artifacts in the agent's work
 | Dependency files | `requirements*.txt`, `package-lock.json`, `yarn.lock`, `Pipfile.lock`, `poetry.lock` |
 | Credential-adjacent files | `.env`, `secrets*`, `credentials*`, `token*`, `key*`, `auth*` — read carefully |
 | Memory files | `MEMORY.md`, `memory*.md`, `*memory*.json`, `sessions.json` |
+| IaC / deployment artifacts | Helm values (`values.yaml`, `values-*.yaml`); Kubernetes manifests (`*.yaml` under `k8s/`, `deploy/`, `manifests/`, `helm/`); Terraform (`*.tf`, `*.tfvars`); `docker-compose*.yml`; `Dockerfile`. Look for: seed phrases, API keys, and default credentials committed as chart/compose defaults; hardcoded env vars; missing securityContext or overly permissive RBAC; public network exposure; rw host mounts. These surfaces carry deployment defaults that are high-yield and routinely missed — a committed Helm default is as real as a hardcoded credential in code. |
 | Action logs and postmortems | `*log*`, `*audit*`, `*postmortem*`, `*incident*` |
+
+**Adapter surfaces — sample by risk, not by architecture.** When the target has
+many parallel adapters, connectors, or platform integrations (a `platforms/`,
+`adapters/`, `integrations/`, or `connectors/` directory with N similar files),
+each one is a distinct input-validation surface — "read the architecturally
+load-bearing files" under-covers exactly these. Do not read all N
+indiscriminately; sample deliberately: prioritize adapters that perform
+**filesystem writes, path construction, or database operations with
+externally-supplied values** (an ID from an API response used in a path join is
+the canonical miss), and record in the evidence checkpoint which adapters were
+read and which were not, so the coverage decision is visible.
 
 **Large-file reading strategy — heuristic, not mandatory shell call.**
 
@@ -486,6 +498,34 @@ Search for planning documents, architectural notes, TODO comments, or design doc
 
 A document that says "we will add input validation" with no corresponding validation code: **Medium finding**. The plan does not protect production.
 
+### External Value → Filesystem Path
+
+An identifier or name sourced from an **external system's response** — an API
+reply, a webhook payload, a platform callback, a message header — used in
+filesystem path construction (path join, f-string into a path, directory
+creation) without validation is a path-traversal primitive. The trust question
+is the *source*: the same variable is in-envelope when it comes from operator
+config, and out-of-envelope when it comes back from a remote service's
+response.
+
+Check every site where an externally-sourced value meets a path:
+- No `resolve()` + `is_relative_to()` (or equivalent containment check), and no
+  character filtering, between the external value and the path constructor →
+  **High**; **Critical** when the write path auto-creates parent directories
+  (`mkdir(parents=True)` before write turns `../../../` into arbitrary
+  directory creation plus file write).
+- A fixed suffix appended at the call site (`f"{external_id}.json"`) limits
+  exact-file overwrite but does **not** prevent traversal — say so in the
+  finding rather than crediting it as a control.
+- The same external value flowing into multiple path constructors is one
+  finding with multiple evidence sites (the control gap is the unvalidated
+  source, not each sink).
+
+The same source-trust test applies to database identifiers and shell-command
+fragments built from external responses; file paths are called out because the
+class was demonstrably missed (a CVE-confirmed traversal in a scanned target's
+platform adapter, found only by third-party cross-reference).
+
 ### Configuration Gaps
 
 For each config file found, check for:
@@ -665,7 +705,7 @@ Each line carries: intended **severity**, a **one-line theme** (what the finding
 
 - **One finding per distinct control gap**, not per file and not per symptom. Two symptoms of the same missing control are one finding with two evidence sites; one control gap that surfaces in two unrelated subsystems is two findings.
 
-- **Compound chains (Step 7) and their contributors — the decidable fold/break-out test.** A compound chain is **one** finding (list it once, with its contributing mechanisms noted inline). A contributing mechanism gets its **own** standalone finding *in addition* to the compound **only if it passes this test: would it still be a finding after the other links in the chain are fixed?** — i.e. it is exploitable on its own, not solely as a step in the chain.
+- **Compound chains (Step 7) and their contributors — the decidable fold/break-out test.** A compound chain is **one** finding (list it once, with its contributing mechanisms noted inline). A contributing mechanism gets its **own** standalone finding *in addition* to the compound **only if it passes both halves of this test: (a) would it still be a finding after the other links in the chain are fixed?** — i.e. it is exploitable on its own, not solely as a step in the chain — **and (b) does it have a distinct fix-point** — a different file, control, or configuration change than the one that fixes the chain? A mechanism that is independently exploitable but fixed by the same change as the chain folds anyway: it will disappear with the chain, and breaking it out double-counts one repair as two findings.
   - Passes → standalone (and it also appears as a contributor in the compound's chain note). *Example: a `0.0.0.0` public bind with no auth is a finding even if every downstream admin endpoint were removed → standalone.*
   - Fails → **folded** into the compound, no standalone finding. *Example: `forwarded_allow_ips="*"` (spoofable-loopback guard) or an inspector that is on-by-default are only exploitable **because** the endpoints are remotely reachable; fix the bind/exposure and they are no longer findings → fold them.*
   - Mark every contributor in the outline `[folded]` or `[standalone: independently exploitable because …]`. Never emit a mechanism **both** as a standalone finding and as a broken-out link of the compound — that double-counts (the exact carve that made one scan report 13 findings where two others reported 9).

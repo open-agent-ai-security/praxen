@@ -476,6 +476,17 @@ category just as surely as one drowning in context it should never see.
 - Findings led to architectural changes, not just config tweaks
 - Ongoing cadence, not point-in-time
 
+**Confidence for absence-based scores.** A 0 grounded in the Step 8b maturity
+record's verified "none" answers is still only as confident as the workspace
+is canonical. Use **High** when the workspace is the canonical artifact store
+(an open-source repo, a self-contained deployment) and the M-record's searches
+covered the relevant tree. Use **Medium** when the target may plausibly keep
+its security practice outside the scanned workspace (a separate security
+repo, a vendor-managed red team) — say so in the rationale, and note that the
+operator can raise the score by providing that evidence. Use **Low** only
+when the workspace is known to be incomplete. This applies to any category
+scored on verified absence; Red Team and Monitor are where it bites.
+
 ### Category 6: Monitor Continuously
 
 | Signal | Risk | Severity |
