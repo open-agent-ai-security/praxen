@@ -47,7 +47,10 @@ def discover():
             md = d / "WORKER_REMIT.md"
             if md.is_file():
                 targets.append((md, d / "WORKER_REMIT.html"))
-    # Frozen baseline targets — remit source lives in tests/remits/<slug>.md.
+    # Frozen baseline targets — remit source is the freeze-pinned copy in the
+    # baseline dir (<slug>-remit.md), so pre-freeze evolution of the live
+    # tests/remits/<slug>.md cannot rewrite a frozen artifact. Fall back to the
+    # live remit only when no pinned copy exists (pre-1.3 layout).
     base = REPO / "tests" / "baselines" / _current_baseline()
     remits = REPO / "tests" / "remits"
     if base.is_dir():
@@ -55,7 +58,9 @@ def discover():
             slug = d.name
             if not list(d.glob(f"{slug}-findings-*.json")):
                 continue  # not a scanned target dir
-            md = remits / f"{slug}.md"
+            md = d / f"{slug}-remit.md"
+            if not md.is_file():
+                md = remits / f"{slug}.md"
             if md.is_file():
                 targets.append((md, d / f"{slug}-remit.html"))
     return targets

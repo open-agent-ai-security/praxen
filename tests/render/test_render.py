@@ -663,13 +663,20 @@ def main():
         except ValueError:
             pv = (0,)
         slug = bdata.get("scan", {}).get("agent_slug") or os.path.basename(bdir)
-        remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
+        # Prefer the freeze-pinned remit copy in the baseline dir: the invariant
+        # is "findings quote the remit they were SCANNED against", and the live
+        # tests/remits/<slug>.md may legitimately evolve between freezes
+        # (pre-freeze cleanup riders). Fall back to the live remit when no
+        # pinned copy exists (pre-1.3 layout).
+        remit_path = os.path.join(bdir, f"{slug}-remit.md")
+        if not os.path.isfile(remit_path):
+            remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
         if pv < (0, 6, 0):
             check(f"baseline {rel}: praxen_version < 0.6.0 — remit-quote check skipped", True)
         elif set_name != CURRENT_BASELINE:
             check(f"baseline {rel}: archival set ({set_name}) — remit-verbatim not re-checked against current remits (only {CURRENT_BASELINE} is gated)", True)
         elif not os.path.isfile(remit_path):
-            check(f"baseline {rel}: has a matching tests/remits/{slug}.md", False)
+            check(f"baseline {rel}: has a matching remit ({slug}-remit.md pinned or tests/remits/{slug}.md)", False)
         else:
             if slug not in remit_cache:
                 remit_cache[slug] = read_text(remit_path)
