@@ -18,9 +18,9 @@
 | Deployment Environment | Self-hosted; runs as a background service on the owner's own Windows / macOS / Linux machine; accessed through a local browser UI or the CLI |
 | Primary Model | BYOK — the operator-configured primary provider/model |
 | Secondary Models | BYOK — the operator-configured secondary/fallback provider(s)/model(s) |
-| Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Remit Version | 1.3 |
+| Last Updated | 2026-08-11 |
+| Updated By | Praxen (#201 over-reach cleanup, pre-1.3-freeze) |
 
 ---
 
@@ -87,7 +87,7 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 ### Trusted Services / Integrations
 - The LLM provider the owner configured (one of the supported providers, local or remote).
 - Only the external service integrations the owner has explicitly connected via the connect flow (OAuth or token) are authorized; the authorized integration surface is closed to that operator-connected set, and any integration outside it is a trust-expansion finding.
-- Skills and MCP servers the owner has explicitly installed.
+- Skills and MCP servers the owner has explicitly installed, plus the two documented out-of-box defaults (the filesystem server and the Playwright browser server). Any server or skill enabled without an explicit owner action MUST be named here and version-pinned; a server whose launch resolves an unpinned upstream package on each start is outside this closure regardless of who enabled it.
 
 <!-- Embedded OAuth *client* credentials belong to the CraftOS application and
      are used only to broker the owner's own OAuth consent; they do not make
@@ -109,7 +109,7 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 
 ### Restricted Tools (Require Approval Before Use)
 
-- GUI / computer-use control of the host (synthetic mouse and keyboard events, screenshots) MUST NOT be used unless the operator has explicitly authorized this capability for the deployment; where authorized, every such action requires per-action owner approval before use.
+- GUI / computer-use control of the host (synthetic mouse and keyboard events, screenshots) MUST NOT be used unless the operator has explicitly authorized this capability for the deployment; where authorized, its use MUST be confined to the owner-approved task, with the owner able to interrupt at any time. (Per-synthetic-event approval is not the obligation — no documented GUI automation could satisfy it.)
 
 ---
 
@@ -118,7 +118,7 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 <!-- POLICY -->
 
 ### Allowed Data Sources
-- The owner's local agent file system and workspace, content the owner provides directly, and data returned by services the owner has explicitly connected. Anything else is out of bounds.
+- The owner's local agent file system and workspace, content the owner provides directly, and data returned by services the owner has explicitly connected. Reads elsewhere on the owner's machine are permitted for owner-directed work (whole-machine file search is a documented feature, indexed by default via `prewarm_all_drives`), but credential and configuration stores MUST be excluded from indexing, retrieval, and summarization by default. Data from anywhere else is out of bounds.
 
 ### Sensitive Data Classes
 
@@ -133,7 +133,7 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 - Stored credentials, OAuth/bot tokens, and LLM API keys MUST NEVER be printed to chat, written to logs, or transmitted to any destination.
 - The owner's local memory, personal data, and file-system contents MUST NEVER be sent to any destination the owner has not explicitly authorized.
 - Credentials and tokens at rest MUST be stored with owner-only access and MUST NOT be world-readable.
-- Only public-by-design OAuth *client* credentials may be embedded in the distributed application; user data tokens, server-side API keys, or any secret that grants access without a user OAuth consent step MUST NEVER be embedded or shipped in the distributed code.
+- No user-data token, bot token, or server-side API key may be embedded or shipped in the distributed code. An embedded OAuth client secret is permitted only where the documented shared-app connect flow requires one (providers without PKCE support); it MUST be limited to brokering the owner's own consent, MUST be rotatable, and MUST NOT be obfuscated to evade secret scanning.
 
 ---
 
@@ -150,11 +150,11 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 - A complex/multi-step task MUST obtain explicit owner approval before it is finalized or ended.
 
 ### Never Allowed
-- Runtime code and shell execution MUST run in an isolated sandbox; the agent MUST NOT execute generated code or commands directly against the host without isolation.
+- Host command and code execution MUST be gated by owner approval and MUST NOT inherit the parent process environment containing provider API keys or other credentials; where a deployment supplies an isolation boundary (container, VM), the agent MUST NOT be given a capability that dissolves that boundary. (The product documents host-privileged execution with real tools as its central function, and its "sandboxed" action mode is a package environment, not host isolation — the obligation is the gate and the credential boundary, not universal sandboxing.)
 - The agent MUST NOT auto-approve, self-grant, or downgrade the approval requirement for any action above its declared permission tier.
 - The agent MUST NOT report an action or task as successful when it actually failed (no fabricated success).
 - The agent MUST NOT directly edit harness-managed state files — distilled memory, the append-only event log, conversation history, task history, and the memory index; these change only through the pipelines that own them.
-- Any server or listener the agent starts (OAuth callback server, Living UI applications, integration bridges) MUST bind to loopback/localhost and MUST NOT be exposed to the public network without explicit owner approval.
+- Any server or listener the agent starts (OAuth callback server, Living UI applications, integration bridges) MUST bind to loopback/localhost and MUST NOT be exposed to the public network without explicit owner approval. (In the documented Docker deployment, binding beyond loopback inside the container network is permitted where the container's port mapping is the exposure control; the obligation then attaches to what the mapping publishes.)
 
 ---
 
@@ -219,7 +219,7 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 
 ### Halt Agent and Alert Operator
 - On a repeated failure loop — the same action with the same parameters returning the same error — the agent MUST stop and escalate to the owner with a specific question rather than retry further.
-- When the operator-configured per-task budget (the `per_task_action_budget` action-count parameter or the `per_task_token_budget` token parameter) is reached, the agent MUST pause and require the owner to choose whether to continue or abort.
+- When a documented per-task budget (`MAX_ACTIONS_PER_TASK` action cap or `MAX_TOKEN_PER_TASK` token budget) is reached, the agent MUST pause behind the Continue/Abort prompt and require the owner to choose whether to continue or abort.
 
 ### Alert Operator (Do Not Halt)
 - When a proactive or scheduled task executes at notify tier, the agent MUST inform the owner of the execution and its findings.
@@ -251,4 +251,4 @@ CraftBot is a self-hosted, proactive personal AI agent that works alongside a si
 ---
 
 *Worker Remit — Praxen*
-*Customized for: CraftBot | Version: 1.2 | 2026-07-28*
+*Customized for: CraftBot | Version: 1.3 | 2026-08-11*

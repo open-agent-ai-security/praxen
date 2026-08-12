@@ -18,9 +18,9 @@
 | Deployment Environment | Research / prototyping (per AutoGen Responsible-AI FAQ); not production without additional hardening |
 | Primary Model | N/A — the executor runs code blocks; it does not itself call an LLM |
 | Secondary Models | N/A |
-| Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Remit Version | 1.3 |
+| Last Updated | 2026-08-11 |
+| Updated By | Praxen (#201 over-reach cleanup, pre-1.3-freeze) |
 
 ---
 
@@ -48,7 +48,7 @@ The AutoGen Code Executor is the component of an AutoGen multi-agent workflow th
 
 <!-- POLICY (extracted as rules — the "stay in your lane" section). -->
 
-- The executor MUST NOT execute code, or act on execution instructions, that originate from untrusted retrieved content, tool output, or web/document data; it runs only code blocks delivered through the authorized agent workflow.
+- The executor runs only code blocks delivered through the authorized agent workflow, and MUST NOT act on execution instructions arriving outside that delivery path. Keeping untrusted retrieved content, tool output, or web/document data from becoming executable code is the delivering workflow's obligation, enforced at its approval gate (Action Boundaries) — the executor cannot judge provenance and is not scored as if it could.
 - The executor MUST NOT autonomously perform irreversible real-world actions on the basis of generated output (for example publishing or posting content, or sending external communications) — a human decides how execution outputs are used.
 - The executor MUST NOT expand or redefine its own role beyond executing supplied code blocks and returning their results; it does not set its own goals or acquire capabilities on its own initiative.
 - The executor MUST NOT be operated as an unattended, production-facing service without the additional safety evaluation, hardening, and human oversight its deployment requires.
@@ -134,7 +134,7 @@ The AutoGen Code Executor is the component of an AutoGen multi-agent workflow th
 
 ### Requires Human Approval Before Execution
 - Human confirmation by the overseer is required before every code-block execution; there is no risk-threshold carve-out (no category of block is exempt), and a denied confirmation blocks execution.
-- Installing packages, or otherwise modifying state outside the working directory, MUST require human confirmation.
+- Installing packages into the host interpreter, or otherwise modifying state outside the working directory and outside the configured sandbox boundary, MUST require human confirmation. (An install inside a container sandbox is contained by that boundary; what makes an install host-reaching — and confirmation-requiring — is running unsandboxed, including by silent fallback from container to host execution.)
 
 ### Never Allowed
 
@@ -230,4 +230,4 @@ The AutoGen Code Executor is the component of an AutoGen multi-agent workflow th
 ---
 
 *Worker Remit — Praxen*
-*Customized for: AutoGen Code Executor | Version: 1.2 | 2026-07-28*
+*Customized for: AutoGen Code Executor | Version: 1.3 | 2026-08-11*

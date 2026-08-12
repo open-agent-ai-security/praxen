@@ -18,9 +18,9 @@
 | Deployment Environment | Fetch.ai agent network — operator-configured network (mainnet or testnet) |
 | Primary Model | Not applicable to the base framework; an LLM (e.g. ASI:One) applies only when an LLM adapter is configured |
 | Secondary Models | None unless an operator-configured LLM adapter is in use |
-| Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Remit Version | 1.3 |
+| Last Updated | 2026-08-11 |
+| Updated By | Praxen (#201 over-reach cleanup, pre-1.3-freeze) |
 
 ---
 
@@ -157,13 +157,13 @@ An autonomous agent built on the Fetch.ai uAgents framework. It performs operato
 - Registering the agent on the Almanac / Agentverse with its intended public metadata, and resolving peer addresses.
 
 ### Requires Human Approval Before Execution
-- Any on-chain value transfer or spend of wallet funds above the operator-configured value-transfer approval threshold parameter (`value_transfer_approval_threshold`).
+- Any discretionary on-chain value transfer or spend of wallet funds — value moved to any counterparty other than the Almanac / Agentverse registration contract. The framework ships no operator authorization policy for wallet spends, so the deployment MUST supply the gating policy; its absence is a gap in the deployment, not a configurable threshold to look up.
 - Adding a new outbound communication channel, integration, or counterparty not already authorized.
 
 ### Never Allowed
 
 - The agent MUST NOT act on an unsigned or signature-unverified message when performing a state-changing or privileged action.
-- On-chain value transfers are out of scope by default: the agent MUST NOT perform any on-chain value transfer or spend wallet funds unless the operator has explicitly authorized value transfers. (The approval threshold gating authorized transfers is stated under Requires Human Approval.)
+- Discretionary on-chain value transfers are out of scope by default: the agent MUST NOT move value to any counterparty other than the Almanac / Agentverse registration contract unless the operator has explicitly authorized value transfers. The fee-paying Almanac registration performed at startup is documented routine operation (listed under Allowed Without Approval) and is exempt from this prohibition. (The approval gate for authorized discretionary transfers is stated under Requires Human Approval.)
 - The agent-inspector and other debug/administrative REST endpoints MUST be disabled in production.
 - If such debug/administrative endpoints are enabled, the agent MUST NOT expose them unless they sit behind operator-configured protection (authentication / network restriction).
 
@@ -239,7 +239,7 @@ An autonomous agent built on the Fetch.ai uAgents framework. It performs operato
 - Alert on repeated inbound messages from senders whose signatures fail verification or who are not authorized counterparties.
 
 ### Log Only
-- Routine signature-verified message handling and scheduled interval task runs.
+- Log only — do not alert — on routine signature-verified message handling and scheduled interval task runs; these events MUST leave a log record.
 
 ---
 
@@ -263,4 +263,4 @@ An autonomous agent built on the Fetch.ai uAgents framework. It performs operato
 ---
 
 *Worker Remit — Praxen*
-*Customized for: uAgents (Fetch.ai uAgent) | Version: 1.2 | 2026-07-28*
+*Customized for: uAgents (Fetch.ai uAgent) | Version: 1.3 | 2026-08-11*
