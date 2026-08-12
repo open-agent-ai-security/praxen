@@ -427,7 +427,7 @@ No scheduler, daemon, installer, or configuration file is required.
 3. Open a session in your coding agent, in the Praxen directory (or any parent).
 4. Tell the coding agent:
    > *"Please read and run skills/behavior-verifier/SKILL.md to analyze [agent workspace path]."*
-5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — four files in `./reports/` (the draft manifest is a working artifact that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
+5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — five files in `./reports/` (the evidence checkpoint and the draft manifest are working artifacts that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
 6. Open the HTML report in a browser.
 
 ### Re-running
