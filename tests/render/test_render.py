@@ -719,7 +719,7 @@ def main():
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
 
-    # 8. N/A (null-score) categories — KB Step B3 all-N/A exclusion.
+    # 8. N/A (null-score) categories — schema.py all-N/A exclusion.
     #    A vector-scored category may be null (excluded, weights renormalized);
     #    presence-scored categories (Red Team, Monitor) may not; the declared
     #    weighted_overall must use the renormalized formula.

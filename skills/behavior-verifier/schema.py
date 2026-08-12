@@ -53,11 +53,11 @@ RAISE_NAMES = {
 }
 # Zero Trust counts double (0.25); the other five each count 0.15.
 RAISE_WEIGHTS = {k: (0.25 if k == "implement_zero_trust" else 0.15) for k in RAISE_KEYS}
-# Vector-scored categories may be N/A (score: null). Support landed with #48
-# (17d7a51); the KB/SKILL guidance that defined "Step B3" was reverted in 7b53ccb,
-# so no scan emits null today. Kept because schema 3.0 published it.
-# when every applicability trigger fails — the category is excluded and the
-# weighted overall renormalizes over the rest. Presence-scored categories
+# Vector-scored categories may be N/A (score: null) when every applicability
+# trigger fails — the category is excluded and the weighted overall
+# renormalizes over the rest. Support landed with #48 (17d7a51); the KB/SKILL
+# guidance that drove emission was reverted in 7b53ccb, so no scan emits null
+# today. Kept because schema 3.0 published it. Presence-scored categories
 # (Red Team, Monitor) can never be N/A: their absence is a 0, not an exclusion.
 NA_ELIGIBLE_KEYS = frozenset({
     "limit_your_domain",
@@ -486,7 +486,7 @@ def _validate_consistency(data, findings, finding_ids):
 
     # 4. weighted overall matches Σ(score × weight) over the scored categories,
     # renormalized: N/A (null-score) categories are excluded and the remaining
-    # weights divided by their sum (KB Scoring Model B3). With no N/A category
+    # weights divided by their sum. With no N/A category
     # the divisor is exactly 1.0 and this is the classic fixed-weight sum. The
     # divisor can never be 0 (Red Team and Monitor may not be N/A). The only
     # slack allowed is the two-decimal JSON rounding (0.011, just over half a

@@ -91,25 +91,51 @@ Zero Trust counts double because it covers the broadest surface and has the most
 ### Boundary rules — decide the adjacent-band call
 
 Most scoring disagreement is not about what the evidence says; it is about
-which of two adjacent bands that evidence lands in. Apply these in order, and
-the first that applies decides.
+which of two adjacent bands that evidence lands in. Work the rules in order,
+but know what kind of rule each is: **rules 1–2 are evidence filters** — they
+decide what counts, then you continue — and **rules 3–4 decide the band** on
+the evidence that survives them.
 
 1. **Opt-in, default-off controls do not count as controls.** A capability the
    operator must switch on is evidence of *capability*, not of *posture*. It
-   cannot lift a score.
+   cannot lift a score — and for rule 3's purposes, a path whose only controls
+   were discounted here is **unmanaged in the shipped default**. (This is why
+   an ungated-by-default server scores 1 even when its opt-in auth is
+   well-built.)
 2. **Side-effect behaviours do not count as controls.** If something reduces
    exposure incidentally while serving another goal — performance, memory, log
-   noise — it is not a control.
-3. **If the dominant data path is unmanaged, controls elsewhere cannot lift the
-   category above 1.** Identify the largest-volume or highest-risk path by which
-   data reaches the model. If nothing manages it, careful work on lesser paths
-   does not compensate. *Unmanaged means no control addresses the path at all.*
-   A path covered only by a prompt-level instruction is weakly managed, not
-   unmanaged — that case belongs to the prompt-only rule (cap at 2), and this
-   rule does not apply. If this rule fired whenever the only control was a
-   prompt, the prompt-only cap could never bind.
+   noise — it is not a control. A path covered only by side-effects is likewise
+   unmanaged for rule 3.
+3. **The dominant-path ladder.** This rule applies to the categories where a
+   data path into the model is identifiable — *Limit Your Domain*, *Balance
+   Your Knowledge Base*, *Implement Zero Trust*, *Monitor Continuously*. For
+   *Manage Your Supply Chain* and *Build an AI Red Team* there is no data path
+   to rank; skip to rule 4. Identify the dominant path: the **highest-risk**
+   path by which data reaches the model, using volume to break ties between
+   comparable risks. When two paths are co-dominant, the ladder is set by the
+   **worse-covered** of the two — careful work on one door does not close the
+   other. Then, with rules 1–2 already applied:
+   - **Nothing addresses the dominant path** — no surviving control of any
+     kind → the category caps at **1**, whatever exists on lesser paths.
+   - **The dominant path is covered only by prompt-level instruction**, no
+     code enforcement → the category caps at **2**. This rung holds in every
+     applicable category, not only where a named prompt-only cap appears
+     elsewhere in this file — those (Zero Trust, Domain) are instances of it.
+   - **An operative code control runs on the dominant path** → this rule
+     imposes no cap; score the category on its merits, filing the gaps as
+     findings.
 4. **When two adjacent bands are both defensible, choose the lower** — and name
-   both in the rationale, so the reader can see the call that was made.
+   both in the rationale, so the reader can see the call that was made. "Both
+   defensible" means you can cite committed evidence supporting each band, not
+   merely that you feel unsure; bare uncertainty is the "score what you can
+   verify" rule's territory, not this rule's.
+
+These four rules only ever push scores down. The guard in the other direction
+is the calibration-anchor discipline in `SKILL.md` Step 5 — *read both
+directions*: an operative control earns its band even with documented gaps —
+which Step 9.4 requires re-reading before any number is committed. Apply both;
+a scorer using this section without the anchors is running half the
+instrument.
 
 ### The provenance test — whose defences is this evidence about?
 
@@ -130,19 +156,27 @@ any artifact, ask what it is for:
 - Dead code is not a control. A sanitizer with no call sites, a scanner wired
   into nothing, or a disabled CI file is evidence of intent, not of posture.
 
-**Evidence failing this test contributes nothing — score it as absent, and say
+**Evidence failing this test contributes nothing — treat it as absent, and say
 so in the rationale.** Do not read that as "score it 1": a category with no
-surviving evidence is **0**.
+surviving evidence is **0**. (And never as `N/A` — RAISE categories are always
+presence-scored.)
 
 Distinguish the two cases, because they land on different numbers:
 
 | What you found | Score effect |
 |---|---|
-| The project's **own** demo suite or fixtures — it exercises their defences, but no fix ever followed | **Ceiling of 1** (`SKILL.md` Step 5). Real material, no feedback loop. |
+| The project's **own** demo suite or fixtures — it exercises their defences, but no fix ever followed | **That artifact alone justifies at most 1** (`SKILL.md` Step 5). Real material, no feedback loop. |
 | Material the project **ships to users** — CTF walkthrough, challenge target, training lab, offensive tooling aimed elsewhere | **Absent.** A product, not a practice. If nothing else survives, the category is **0**. |
 
-A ceiling is not a floor. The first case caps an otherwise-higher score at 1;
-the second removes the evidence entirely.
+A ceiling is not a floor, and **the ceiling binds the artifact, not the
+category**: the first case limits what that material can justify to 1, while
+other evidence that passes the test is scored on its own merits — a target
+with an inert demo suite *and* a documented exercise that drove an
+architectural change is scored on the exercise, and deleting the demo suite
+must never raise a score. Hybrids resolve the same way: when shipped material
+(a challenge, a lab) demonstrably surfaced a weakness in the project's **own**
+defences that the team then fixed, the *fix and its feedback loop* are
+practice and count; the shipped artifact itself still contributes nothing.
 
 ---
 

@@ -36,9 +36,11 @@ name means standard — say so and proceed with `SKILL.md` alone.
    finding seen by all three that fails verification **dies**. Never count
    votes, in either direction.
 2. **No score selection, no score blending.** Scores in a mode's final report
-   are **re-derived from the adjudicated finding set** by the normal `SKILL.md`
-   scoring rules. Never carry over, average, or pick-the-best-of the raw runs'
-   scores.
+   are **re-derived from the adjudicated evidence** by the normal `SKILL.md`
+   scoring rules — which (per Step 9.4) means the finding set *plus* the
+   maturity record and category evidence notes; a finding set alone is an
+   insufficient scoring input by design. Never carry over, average, or
+   pick-the-best-of the raw runs' scores.
 3. **The auditor is genuinely context-unaware.** The audit and adjudication
    agents receive only on-disk artifacts — findings JSON, remit, workspace —
    never the scan's conversation, reasoning, or your summary of it. A
@@ -204,7 +206,10 @@ Otherwise:
      list instead.
    - Re-derive a RAISE category score **only** where a removed finding was
      load-bearing in that category's rationale, updating the rationale prose
-     to match; recompute `weighted_overall` = Σ(score × weight) to two
+     to match — re-derive it per `SKILL.md` 9.4's evidence set, using the
+     scan's evidence checkpoint (its `RAISE NOTES` and `MATURITY (M1-M12)`
+     sections), never from the surviving findings alone; recompute
+     `weighted_overall` = Σ(score × weight) to two
      decimals. Update `behavior_summary` or the intro-band prose only where
      it asserts a removed finding's claim.
 3. **Re-run the mechanical tail:** `manifest_to_findings.py` on the audited
@@ -310,15 +315,21 @@ file's path, and the instruction block below.
 > decomposition flips between runs.
 >
 > Then **assemble the super-run** in the main working directory per
-> `SKILL.md` Steps 8.5–12: a fresh finding-themes outline from the
-> adjudicated set, a full draft manifest with **fresh sequential finding
-> IDs** in canonical order (record the per-run source ids of each in the
-> adjudication record), your own remit-rule inventory per Step 6 Phase 1
-> with statuses derived from the evidence you verified, RAISE category
-> scores and **all** report prose re-derived from the adjudicated set by
-> the normal scoring rules — never copied from a raw run's scores, never
-> averaged. Convert and render (Steps 10–11). Your final message: Step 12's
-> summary plus the adjudication record path.
+> `SKILL.md` Steps 8b, 8.5–12. Run **Step 8b yourself** — it is an
+> enumerated lookup, and your twelve answers should match the
+> `MATURITY (M1-M12)` sections in the raw runs' evidence checkpoints; a
+> mismatch there is adjudication evidence, record it. Then: a fresh
+> finding-themes outline from the adjudicated set, a full draft manifest
+> with **fresh sequential finding IDs** in canonical order (record the
+> per-run source ids of each in the adjudication record), your own
+> remit-rule inventory per Step 6 Phase 1 with statuses derived from the
+> evidence you verified, RAISE category scores assigned per **Step 9.4's
+> evidence set** — your adjudicated finding set, the adjudicated positives,
+> your own 8b record, and the raw runs' `RAISE NOTES` checkpoint sections
+> for the claims you verified — and **all** report prose re-derived from
+> that evidence by the normal scoring rules, never copied from a raw run's
+> scores, never averaged. Convert and render (Steps 10–11). Your final
+> message: Step 12's summary plus the adjudication record path.
 
 ### Phase 4 — orchestrator close-out
 

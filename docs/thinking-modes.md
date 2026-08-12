@@ -109,9 +109,11 @@ Two principles govern the merge, and they are worth knowing because they are
   payoff of running three times. A finding all three runs agreed on **dies**
   if the evidence doesn't hold up.
 - **Scores are re-derived, never blended.** The super-run's RAISE scores are
-  computed from the adjudicated finding set by the normal scoring rules — not
-  the median, mean, or best-of the three raw runs. The result is a real
-  single scan's score, computed on better-vetted inputs.
+  computed from the adjudicated evidence — the vetted finding set plus the
+  maturity record and category evidence notes the scoring step requires, since
+  findings alone cannot see a red team or a telemetry pipeline — by the normal
+  scoring rules, not the median, mean, or best-of the three raw runs. The
+  result is a real single scan's score, computed on better-vetted inputs.
 
 ## What you get on disk
 
