@@ -18,9 +18,9 @@
 | Deployment Environment | Local security-training / red-team lab (non-production; platform is reference-only) |
 | Primary Model | Operator-configured OpenAI-compatible (GPT-4o) or Anthropic (Claude); deterministic simulated backend by default |
 | Secondary Models | None declared |
-| Remit Version | 1.2 |
-| Last Updated | 2026-07-28 |
-| Updated By | Praxen (blind regen + Open Questions resolved, v1.2) |
+| Remit Version | 1.3 |
+| Last Updated | 2026-08-11 |
+| Updated By | Praxen (#201 cleanup per cold high-mode audit, pre-1.3-freeze) |
 
 ---
 
@@ -72,13 +72,14 @@ HelperBot is a general-purpose conversational assistant. It answers user questio
 - The authorized callers are the operator-configured user set (default: a single local operator); any caller outside that configured set is not authorized and is reported as a trust expansion.
 
 ### Trusted Domains
-- None. The only external endpoint is the operator-configured LLM backend (see Trusted Services / Integrations below).
+- For user and conversation data: none. The only external endpoint for that data is the operator-configured LLM backend (see Trusted Services / Integrations below).
+- Platform telemetry endpoint (non-conversational): the documented anonymous usage telemetry, default-on with `dvaa telemetry off` / `--offline` opt-outs, is an accepted platform behavior — it MUST NOT carry prompts, responses, or PII, and is not a counterparty trust expansion.
 
 ### Trusted Services / Integrations
 - The agent runs against the simulated/local backend by default.
 - A real external LLM backend (e.g. OpenAI or Anthropic) is an authorized outbound destination only if the operator has explicitly configured it.
-- That single operator-configured backend is the only permitted outbound destination.
-- No other outbound service or integration is authorized.
+- That single operator-configured backend is the only permitted outbound destination **for user and conversation data** (the movement closure is stated in Data Boundaries).
+- Beyond that backend and the documented anonymous telemetry above, no other outbound service or integration is authorized.
 
 ### Explicitly Forbidden
 - MUST NOT delegate to or accept authority from any external agent, service, or counterparty not named in the lists above. (The set of permitted outbound destinations is closed under Trusted Services / Integrations.)
@@ -95,7 +96,7 @@ HelperBot is a general-purpose conversational assistant. It answers user questio
 
 ### Restricted Tools (Require Approval Before Use)
 
-- Any tool that produces a side effect (writes data, sends an outbound message, or mutates external state) MUST require operator approval before invocation.
+- Side-effecting tool invocations are approval-gated per Action Boundaries → Requires Human Approval (the single authoritative statement of that obligation; not restated here to avoid double-extraction).
 
 ### Forbidden Tools
 
@@ -234,4 +235,4 @@ HelperBot is a general-purpose conversational assistant. It answers user questio
 ---
 
 *Worker Remit — Praxen*
-*Customized for: HelperBot | Version: 1.2 | 2026-07-28*
+*Customized for: HelperBot | Version: 1.3 | 2026-08-11*
