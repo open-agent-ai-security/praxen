@@ -1,0 +1,154 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    aider
+Analysis: August 12, 2026, 17:59 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a single well-built gate surrounded by unguarded
+doors. Aider deliberately hardened the path everyone worries about —
+model-suggested shell commands are confirmed through
+`confirm_ask(explicit_yes_required=True)`, which `io.py` makes immune to
+`--yes-always` — but that discipline was never extended to the neighbouring
+paths: scraped pages and command output enter the model's context as ordinary
+user-role messages phrased in the operator's own voice with no provenance or
+trust labeling, and model-supplied file paths reach `Path(root) / path` and
+`resolve()` with no repo-root containment and no `.aiderignore` check. The
+result is a chain that stays open in unattended mode: injected text in fetched
+content is indistinguishable from an operator instruction, and the only thing
+standing between it and an arbitrary filesystem write is a confirmation prompt
+that `--yes-always` answers for you. Secondary themes are operator-configured
+commands that execute with no pre-execution confirmation at all (`auto-lint`,
+on by default) and a set of shipped defaults that quietly invert declared
+policy — pre-commit hooks bypassed unless re-enabled, and a browser UI
+launched with no bind address and no authentication.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 1   High: 5   Medium: 6   Low: 0   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 12   Gap: 2   Partial: 12   Vague: 0   Enforcement-not-possible: 0   (of 26 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Untrusted fetched content reaches the model unlabeled
+            and can steer an unbounded file write whose only gate
+            `--yes-always` answers automatically.
+      Action 1: Set `explicit_yes_required=True` on the two `confirm_ask`
+                calls in `allowed_to_edit` (`aider/coders/base_coder.py:2207`
+                and `:2226`) so a model-chosen path outside the chat cannot be
+                auto-approved in unattended runs, matching the treatment
+                already given to suggested shell commands.
+      Action 2: Add a containment check in `allowed_to_edit` before any gate —
+                resolve the candidate path and require
+                `is_relative_to(self.root)` — so an absolute or `../` path
+                from model output is rejected outright rather than merely
+                confirmed.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-002  Scraped pages and command output enter the model
+            context as operator-voiced user messages with no provenance or
+            trust labeling anywhere in the prompt stack.
+      Action 1: Introduce a distinct wrapper for externally-sourced content in
+                `aider/prompts.py` that names the origin and states it is
+                reference data, never instructions, and use it for both
+                `run_output` and the `cmd_web` insertion in
+                `aider/commands.py:244`.
+      Action 2: Add a standing clause to `CoderPrompts.system_reminder` in
+                `aider/coders/base_prompts.py` telling the model that content
+                inside those wrappers must never be followed as a directive.
+
+  PRAX-2026-08-12-003  Model-supplied file paths are resolved with no
+            repo-root containment, and the operator's `.aiderignore` scope is
+            never consulted on the edit path.
+      Action 1: In `allowed_to_edit` (`aider/coders/base_coder.py:2191`),
+                reject any candidate whose resolved path is not
+                `is_relative_to(self.root)` before the existence check, so
+                out-of-tree paths fail closed instead of prompting.
+      Action 2: Call `self.repo.ignored_file(path)` alongside the existing
+                `git_ignored_file` check at `aider/coders/base_coder.py:2202`
+                so `.aiderignore` and `--subtree-only` bind on the edit path
+                as they already do on `/add`.
+
+  PRAX-2026-08-12-004  Auto-lint runs a shell command after every edit with no
+            pre-execution confirmation and is enabled by default; auto-test
+            behaves the same way.
+      Action 1: Gate the lint and test invocations in
+                `aider/coders/base_coder.py:1599` and `:1618` behind a
+                `confirm_ask(..., explicit_yes_required=True)` showing the
+                exact command line, matching how model-suggested commands are
+                already handled at `:2456`.
+      Action 2: If a per-edit prompt is judged too noisy, confirm the
+                configured lint and test commands once at session start and
+                record that acceptance, rather than executing them unprompted.
+
+  PRAX-2026-08-12-005  Browser mode launches Streamlit with no bind address
+            and no authentication, so the code-editing UI listens on every
+            interface.
+      Action 1: Add `--server.address=127.0.0.1` to the `st_args` list in
+                `aider/main.py:243` so the UI binds loopback by default, and
+                require an explicit opt-in flag before any other address is
+                used.
+      Action 2: Document in the browser-mode help text that the UI has no
+                authentication, so an operator who deliberately widens the
+                bind understands what is exposed.
+
+  PRAX-2026-08-12-006  Every aider commit passes `--no-verify` by default,
+            bypassing the repository's pre-commit hooks unless the operator
+            opts back in.
+      Action 1: Flip the `--git-commit-verify` default to True in
+                `aider/args.py:493` so the repository's configured hooks run
+                unless the operator explicitly opts out, which is the
+                direction the remit requires.
+      Action 2: If the default must stay for compatibility, emit a one-time
+                warning naming the hooks being skipped when a
+                `.git/hooks/pre-commit` or `.pre-commit-config.yaml` is
+                detected.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

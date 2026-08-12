@@ -711,7 +711,7 @@ def main():
                 remit_cache[slug] = read_text(remit_path)
             remit = remit_cache[slug]
             missing = _remit_quote_violations(bdata, remit)
-            check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from tests/remits/{slug}.md",
+            check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from {os.path.relpath(remit_path, REPO_ROOT)}",
                   not missing,
                   "; ".join(f"{kind} of {who}: {txt[:60]!r}" for kind, who, txt in missing[:3]))
 
