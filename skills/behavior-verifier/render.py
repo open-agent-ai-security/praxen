@@ -531,7 +531,9 @@ def _raise_card_ctx(cat, _idx):
             "SCORE_CLASS": _SCORE_CLASS[2],
             "CATEGORY_NAME": esc(cat["name"]),
             "SCORE": "N/A",
-            "SCORE_PCT": "0",
+            # An N/A category is excluded from the weighted score, so no pill is
+            # lit — five ghosts read as "not assessed", distinct from a real 0.
+            "SCORE_PIPS": _score_pips(0),
             "CONFIDENCE": esc(cat["confidence"]),
             "WEIGHT_PCT": str(round(weight * 100)),
             "WEIGHTED_CONTRIBUTION": "excluded",
@@ -541,12 +543,37 @@ def _raise_card_ctx(cat, _idx):
         "SCORE_CLASS": _SCORE_CLASS[score],
         "CATEGORY_NAME": esc(cat["name"]),
         "SCORE": str(score),
-        "SCORE_PCT": str(score * 20),
+        "SCORE_PIPS": _score_pips(score),
         "CONFIDENCE": esc(cat["confidence"]),
         "WEIGHT_PCT": str(round(weight * 100)),
         "WEIGHTED_CONTRIBUTION": f"{score * weight:.2f}",
         "RATIONALE": render_rich(cat["rationale"], allow=_RICH_FIELDS["raise_rationale"]),
     }
+
+
+def _score_pips(value, *, fractional=False):
+    """Render a 0-5 RAISE score as five discrete pills.
+
+    A RAISE score is an ordinal band, not a percentage, so the readout is
+    segmented: the reader counts lit pills instead of eyeballing a fill width.
+    Category scores are integers and light whole pills only. The weighted
+    overall IS fractional, so with fractional=True the first partial pill
+    carries a --fill percentage and the remainder stay ghosted.
+    """
+    full = int(value)
+    out = []
+    for i in range(5):
+        if i < full:
+            out.append('<i class="on"></i>')
+        elif fractional and i == full:
+            frac = value - full
+            if frac <= 0:
+                out.append("<i></i>")
+            else:
+                out.append(f'<i class="part" style="--fill: {round(frac * 100)}%"></i>')
+        else:
+            out.append("<i></i>")
+    return "".join(out)
 
 
 # ── OWASP coverage grid ─────────────────────────────────────────────────────
@@ -682,7 +709,7 @@ def _global_ctx(data):
         "N_LOW": str(sc["low"]),
         "N_INFO": str(sc["info"]),
         "WEIGHTED_SCORE": f"{wo:.2f}",
-        "RAISE_PCT": str(round(wo / 5 * 100)),
+        "RAISE_PIPS": _score_pips(wo, fractional=True),
         "MATURITY_BAND_CLASS": _maturity_band_class(wo),
         "MATURITY_LABEL": maturity_label(wo),
         "WEIGHTED_RATIONALE": render_rich(posture["weighted_rationale"], allow=_RICH_FIELDS["weighted_rationale"]),
