@@ -391,3 +391,79 @@ amounts. Re-run the same three targets to test it; cost is roughly this round.
 **Session totals: 80 bench replays + 9 full scans.** Three structural
 interventions measured, two discarded on evidence, one diagnosed and stopped at
 its gate.
+
+---
+
+## Round 6 — Gate 2 PASS, and blind adjudication of the moved scores (2026-08-11)
+
+### Gate 2, after correcting Step 8b to an enumerated lookup
+
+Nine full scans; hermes r2 self-reported as **Opus 4.5** (classifier fallback),
+was excluded, and re-run as r2b on Opus 5. Table is Opus 5 only.
+
+```
+target      runs                 spread   v1.2 3x   1st try
+finbot      1.00 0.85 1.00        0.15     0.55      0.00
+autogen     1.30 1.15 1.30        0.15     0.55      0.40
+hermes      2.45 2.45 2.45        0.00     0.40      0.70
+                          mean    0.10     0.50
+```
+
+**PASS** — all three at or under the ≤0.15 criterion; mean spread 0.50 → 0.10.
+Hermes, the maturity-rich target that the open sweep took to 0.70, is now
+**0.00**, with r1 and r2b producing identical category vectors.
+
+The enumerated lookup did its job: hermes's three M-blocks now return the same
+artifacts every time, where the open sweep found 16 / 9 / 7 signals and scored
+3.00 / 2.60 / 2.30.
+
+### Blind adjudication — is the new score *better*, or just steadier?
+
+Seven category calls moved against the v1.2 baseline. Each was put to an
+independent adjudicator (**Fable**, one per target) as Position A vs Position B
+with rationales, **provenance hidden and A/B order varied per category**, with
+source access and instructions to verify rather than trust.
+
+```
+disputed call                                adj  upheld
+finbot     Implement Zero Trust                1   NEW
+finbot     Build an AI Red Team                0   NEW
+autogen    Implement Zero Trust                1   NEW
+hermes     Balance Your Knowledge Base         2   baseline
+hermes     Implement Zero Trust                2   NEW
+hermes     Manage Your Supply Chain            3   NEW
+hermes     Build an AI Red Team                2   NEW
+------------------------------------------------------------
+new pipeline upheld 6/7        shipping baseline 1/7
+```
+
+**So the change is an accuracy improvement, not merely a stability one** — the
+earlier "accuracy-neutral until someone adjudicates" position was too cautious.
+
+Two adjudicators tried to characterise A and B as consistent reviewers; they
+were not, since the labels flipped per category. That they attempted it is
+reasonable evidence the blinding held.
+
+### What the adjudication found that the scoreboard does not
+
+- **The single loss turns the new KB signal against the new run.** On hermes's
+  knowledge base the new pipeline said 3 and the adjudicator said 2, because
+  *"code-execution and terminal output are not wrapped"* and the Balance table
+  names execution output as the dominant agent channel — the signal added this
+  session. The rule is right; that run under-applied it.
+- **A doctrinal conflict introduced by this work.** `KB_RAISE_SCANNING.md` said
+  demo attack material *"scores as absent"* while `SKILL.md` said it *"does not
+  lift above 1"* — floor versus ceiling. The finbot adjudicator named it as the
+  cause of that disagreement. **Fixed**: the two cases are now distinguished
+  explicitly in both files — the project's *own* demo suite caps at 1; material
+  the project *ships* contributes nothing and the category can be 0.
+- **Both pipelines missed a live defect.** The plain `jupyter` backend runs a
+  local kernel on the host via nbclient with no warning — a second unsandboxed
+  execution path neither the baseline nor any new run reported.
+
+### Limits
+
+One adjudicator per target; a model judging models, not human ground truth. The
+verdicts are evidence-cited and re-checkable. Hermes's Red Team (2) and
+Knowledge Base (2) are the two calls most worth human review — both sit on the
+practice-versus-provenance boundary this work introduced.

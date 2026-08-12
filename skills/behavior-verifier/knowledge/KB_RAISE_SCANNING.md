@@ -126,9 +126,19 @@ any artifact, ask what it is for:
 - Dead code is not a control. A sanitizer with no call sites, a scanner wired
   into nothing, or a disabled CI file is evidence of intent, not of posture.
 
-Evidence failing this test scores as absent; say so in the rationale. See also
-`SKILL.md` Step 5, which caps demo and vulnerability-showcase material in
-*Build an AI Red Team*.
+**Evidence failing this test contributes nothing — score it as absent, and say
+so in the rationale.** Do not read that as "score it 1": a category with no
+surviving evidence is **0**.
+
+Distinguish the two cases, because they land on different numbers:
+
+| What you found | Score effect |
+|---|---|
+| The project's **own** demo suite or fixtures — it exercises their defences, but no fix ever followed | **Ceiling of 1** (`SKILL.md` Step 5). Real material, no feedback loop. |
+| Material the project **ships to users** — CTF walkthrough, challenge target, training lab, offensive tooling aimed elsewhere | **Absent.** A product, not a practice. If nothing else survives, the category is **0**. |
+
+A ceiling is not a floor. The first case caps an otherwise-higher score at 1;
+the second removes the evidence entirely.
 
 ---
 
