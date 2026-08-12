@@ -224,6 +224,7 @@ Praxen evaluates the workspace against the six RAISE categories and applies name
 - **Configuration gap detection** — exec auto-approval, disabled tool-loop detection, missing rate limits, absent logging, overly broad permission scopes.
 - **Secondary-prompt discovery** — session-loaded identity files (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, …) are discovered and audited as system prompts.
 - **Declared-but-never-consulted config / secret** — a config value or secret that is declared or loaded but never actually read by the running code (a half-wired control).
+- **External value → filesystem path** — an identifier sourced from an external system's response (API reply, webhook, platform callback) used in path construction with no containment check: a path-traversal primitive, judged by the value's *source*, not its variable name.
 - **MCP server evaluation** — when MCP configs are discovered, the OWASP Secure MCP Server minimum-bar checklist is applied.
 - **Remit-delta analysis** — tools, channels, data sources, or outbound destinations present in code but absent from the remit's authorized lists.
 - **Compound signal reasoning** — individual findings that are moderate in isolation but form a critical chain in combination (e.g., external content entering context + auto-approved exec = one-hop external-input-to-shell).
