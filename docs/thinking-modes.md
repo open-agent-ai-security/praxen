@@ -29,27 +29,33 @@ or one after another — running them concurrently only saves you the *waiting*.
 | Mode | Wall-clock vs. a scan | Token burn vs. a scan | In practice |
 |---|---|---|---|
 | **standard** | 1× | 1× | one scan |
-| **high** | **~1.3–1.6×** | **~1.4–1.5×** | a scan **plus a few minutes** of audit |
+| **high** | **~1.8×** | **~1.2×** | a scan **plus a substantial audit pass** |
 | **x-high** | **~2–2.5×** | **~4×** | ~2 scans' *time*, but ~4 scans' *tokens* |
 
-Early measured data (Opus 5, four real targets — a small dense app and three
-production agents):
+**High mode costs more time than tokens, and the gap is wide** — measured at **1.81×
+wall-clock against 1.23× tokens** across four audited targets. Quote the clock when
+someone asks "how long", not the token figure; a 1.2× token estimate will understate the
+wait by roughly a third. The audit is a *fresh, context-unaware agent* that re-reads
+source and remit from cold, so it costs round-trips more than it costs context.
 
-- A **standard scan** ran **~14–19 min** and burned **~215k–265k tokens**.
-- **High mode** added a **~4–10 min / ~90k–135k token** audit on top, finishing
-  around **~17–28 min** and **~305k–395k tokens** total.
-- **X-high** ran its three scans concurrently (~15 min wall-clock for all
-  three) then spent a comparable stretch on adjudication and assembly —
-  landing near **~2–2.5×** a single scan's *wall-clock* but **~4×** its
-  *tokens* (three full scans ≈ 3× on their own, plus a scan-sized adjudication
-  pass), roughly **0.9M tokens** for the run.
+High mode is also markedly **more predictable** than standard: audited runs landed in a
+27–29 minute band regardless of target size, where standard runs on the same suite swung
+10–22 minutes with complexity. The audit acts as a floor.
+
+Measured on Opus 5 across the 1.3 regression suite:
+
+- A **standard scan** ran **~10–22 min** (mean ~16) and burned **~270k tokens**.
+- **High mode** ran **~27–29 min** (mean ~28) and **~333k tokens** — the audit phase
+  alone is about **60%** of the scan it audits, so it is not a cheap rubber stamp.
+- **X-high** runs its three scans concurrently, then a full adjudication and assembly
+  pass — roughly **~4×** a single scan's tokens.
+
+Your numbers move with target size and evidence density, but the shape holds.
 
 Your numbers move with target size, finding count, and evidence density —
-subtle production agents audit slower than dense demo apps — but the shape
-holds: **high mode buys a false-positive audit for a few extra minutes and
-~40% more tokens; x-high buys three-scan stability for about the time of two
-scans but the tokens of four.** For a token-constrained budget, choose by the
-token column, not the clock.
+subtle production agents audit slower than dense demo apps — **Budget by whichever is scarcer.** If tokens are the constraint, high mode is
+cheap (~1.2×) and x-high is not (~4×). If wall-clock is the constraint, high mode is
+the one that surprises people.
 
 ## Invoking a mode
 
@@ -129,38 +135,80 @@ Both modes keep full provenance alongside the final report:
   spread, and what the adjudication did about it. If you maintain the remit
   or care *why* two runs disagreed, this file is the interesting one.
 
-## Scores and comparability
+## Which mode, and why
 
-Thinking-mode scores are **not comparable to standard-mode expectations or
-bands**. Praxen's published variance expectations (and its own frozen test
-baselines) are standard-mode, single-run artifacts. Compare thinking-mode
-runs with thinking-mode runs.
+| | Use it to | It stabilizes |
+|---|---|---|
+| **standard** | Find and fix. One run surfaces most of what is there and everything it reports is dependable. | — |
+| **high** | **Sharpen your remit**, and catch the occasional finding the evidence doesn't support. | the finding set (verification) |
+| **x-high** | **When a miss would ship.** Release gates, security sign-off, before/after comparison, publishing a number. | the finding set **and** the score |
 
-The two modes also stabilize different things, and it matters which one you
-reach for:
+### High mode's main value is your remit, not false positives
 
-- **High mode stabilizes the finding set, not the score.** The audit removes
-  findings the evidence doesn't support; scores are re-derived only where a
-  removed finding was load-bearing. A clean audit (nothing killed) leaves the
-  underlying run's category-score draw fully intact — so a high-mode score
-  carries the same run-to-run variance as a standard score. Read it as
-  *better-verified*, not *more stable*.
-- **X-high stabilizes the finding set and expands it — but not the score.**
-  Three scans are unioned and every candidate is verified, so the finding set
-  is both more complete and more consistent than any single run's. The score
-  is re-derived from that set rather than averaged, which makes it a real
-  single-scan score computed on better inputs — but in our own testing two
-  independent x-high runs of the same target still differed by about as much
-  as two ordinary scans would, because the residual variance lives in the
-  per-category maturity call rather than in the findings. Reach for x-high
-  when you want the most complete, best-verified *finding set*; do not treat
-  its score as a precision instrument.
+This is the counter-intuitive one. On a mature scanner there is usually little to kill —
+across four audited targets the audit confirmed **48 findings and removed none**. In the
+same four runs it found **nine defective rules in the remits**: obligations no
+implementation could satisfy, prohibitions on behavior the target documents as intended,
+allow-lists omitting routine operation, and sound prohibitions welded to over-broad
+extensions.
 
-**Expect thinking-mode scores to run slightly lower, not higher.** Because
-the audit and adjudication *add* verified findings more often than they remove
-them, a more complete finding set generally means somewhat lower category
-scores. A lower thinking-mode score usually means a more thorough analysis,
-not a worse agent.
+That matters because **a defective rule produces a finding that looks completely real** —
+correct file, correct line, an honest violation of the rule *as written*. You cannot spot
+it by reading findings. High mode reads your rules against the target's own documentation
+and hands back a fix list. Reach for it whenever a remit is new or has just changed; see
+[Writing Worker Remits → Advanced](writing-remits.md#advanced--hardening-a-new-remit).
+
+### X-high buys coverage first, stability second
+
+Three scans, unioned, then every candidate re-verified — so the finding set is more
+complete than any single run's. That is the primary value: in multi-run studies **about
+half of the verified finding set had been seen by only one of the three scans, and none
+of those was refutable**. A single run is dependable in what it reports and incomplete in
+what it covers.
+
+**It also stabilizes the score, which it previously did not.** Two independent x-high
+runs of the same target derived the same weighted score *and the same six category
+scores* — reproduced on both of the two most variable targets in the suite, against a raw
+single-run range of 0.70 in each case.
+
+Two things to understand about that result:
+
+- **It is the combination that works.** X-high alone did not stabilize scores before the
+  1.3 scoring changes, and those changes alone do not eliminate single-run spread. The
+  mechanism is that scores are re-derived from an evidence sweep that returns the same
+  answers every run, so two adjudicators reading different finding sets still land on the
+  same scorecard.
+- **The score is re-derived, never blended.** It is not the median, mean, or best of the
+  three runs — in one study it was a value that appeared in *none* of them. It is a real
+  single-scan score computed on better-verified inputs.
+
+Scope honestly: demonstrated on two targets, one model, one adjudication brief. It is a
+measured result, not a guarantee.
+
+## Comparability
+
+**Thinking-mode scores are not comparable to standard-mode bands.** Praxen's published
+variance expectations and its frozen baselines are standard-mode artifacts. Compare
+thinking-mode runs with thinking-mode runs.
+
+Do **not** expect modes to push scores in a consistent direction. Earlier guidance said
+thinking-mode scores trend lower, on the reasoning that adjudication adds findings. That
+no longer holds: in 1.3 testing, high-mode runs landed at or **above** their target's
+median while x-high super-runs re-derived below it. **The direction is not the finding —
+the reproducibility is.**
+
+## Gating on a mode
+
+If you are wiring Praxen into a release process, two recommendations:
+
+1. **Gate on the presence of a Critical finding, not on a score threshold.** A binary
+   check is far more robust than a decimal against a line — across the 12-target suite,
+   10 of 12 gave the same Critical/no-Critical verdict on every run, while only one
+   scored identically on all three.
+2. **Run the gate scan in x-high.** In the two targets whose verdict was *not* consistent,
+   the odd run found **zero** Criticals where the others found some — the failure
+   direction is a **false pass**, which is exactly what a gate exists to prevent. That is
+   a coverage problem, and adjudicating three scans is what closes it.
 
 ## Harness support
 

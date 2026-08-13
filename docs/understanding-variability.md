@@ -5,7 +5,9 @@
 
 # Understanding Run-to-Run Variability
 
-Run Praxen twice on the *same* agent, with the *same* Worker Remit and the *same* evidence, and the two reports will not be byte-identical. The big findings will be the same; the exact severity counts and the weighted RAISE score may shift a little. This is expected, and this page explains why, how much to expect, and what to do when you need a more stable number.
+Run Praxen twice on the *same* agent, with the *same* Worker Remit and the *same* evidence, and the two reports will not be byte-identical. The themes will be the same, but **the two runs will not find exactly the same set of findings**, and the weighted RAISE score will shift a little. This page explains why, how much to expect from measured data, and — the part that matters most — **what to do when a miss would be expensive**.
+
+The single most useful thing to know up front: on a large codebase, the dominant variability is not the decimal on the score. It is **coverage** — two runs read different parts of the tree. Praxen has a mode built for exactly that, and [Thinking Modes](thinking-modes.md) is where to go when completeness matters.
 
 ## Where the variability comes from
 
@@ -22,20 +24,24 @@ Both are normal. Both are larger for *judgment-sensitive* targets (see below) an
 
 ## How much to expect
 
-The stable signal is the **finding set**; the noisy signal is the **exact numbers**.
+The figures below are measured, not estimated — from **48 runs** across Praxen's 12-target
+regression suite plus a dedicated multi-run study on the two most variable targets.
 
-| What | Stability | What to expect |
+| What | Stability | Measured |
 |---|---|---|
-| **Dominant findings / themes** | **High** | The material findings — the Criticals, the headline divergences — reproduce run to run. If a finding is real, it shows up every time. |
-| **Severity counts** (C/H/M/L/I) | Moderate | Expect a swing of roughly **±2–3 in a bucket** between runs, mostly from Critical↔High reclassification and borderline finding consolidation. |
-| **Weighted RAISE score** | Moderate | Typically within **±0.3** of its centre, occasionally up to **±0.5** for judgment-sensitive targets — usually less than half a maturity-band step. |
-| **Per-category 0–5 scores** | Lower at the margins | The `0↔1` ("absent vs ad-hoc") and `2↔3` ("partial vs established") boundaries are where most of the wobble lives. |
+| **Themes** | **High** | The classes of divergence a report describes reproduce run to run. |
+| **Individual findings** | **Moderate — this is the big one** | A single run surfaces most of what is there, not all. In multi-run studies **~half** of the verified finding set had been seen by only one scan of three. |
+| **Weighted RAISE score** | Moderate | Across the suite, three runs of a target spread **0.00–0.55**, median **0.20**. Six runs of the two *most* variable targets spanned **0.70**. |
+| **Per-category 0–5 scores** | Lower at the margins | Concentrated, not diffuse: on one target four of six categories were **identical in every run**, with the whole spread carried by two. **Balance Your Knowledge Base** is the least stable category measured. |
+| **Severity of a given finding** | Moderate | The same defect can be graded Critical in one run and High in another. Reclassification, not disappearance. |
 | **Rendered HTML / TXT** | Exact | Byte-identical for a given JSON. No variability. |
-| **`R-NN` rule IDs** | Run-local | The rule numbering is re-derived each run; the *same* remit clause can get a different `R-NN` in two runs. Compare by rule **text**, not ID. |
+| **`R-NN` rule IDs** | Run-local | Renumbered every run. Compare by rule **text**, never ID. |
 
 **Judgement-sensitive targets vary more.** Where a target has *operative-but-imperfect controls* — a framework that ships guardrails the example doesn't wire up, a sandbox with permissive defaults, a partial mitigation — the "how much credit does this earn?" call is genuinely ambiguous, and that's where the weighted score moves most between runs. Well-engineered agents (controls clearly present and operative) are the *most* reproducible, because there's little to debate. Targets in the messy middle are the least.
 
-**Read the themes, not the decimal.** A weighted score of 1.3 on one run and 1.5 on the next is the *same posture* described with normal judgment scatter. A maturity **label** that changes (e.g. *Ad hoc* ↔ *Partial*) right at a band boundary is the same story — the boundary is a round number, not a cliff. What should *not* change between runs is the set of material findings and the Critical themes; if those move, that's signal, not noise.
+**Read the themes, not the decimal.** A weighted score of 1.3 on one run and 1.5 on the next is the *same posture* described with normal judgment scatter. A maturity **label** that changes (e.g. *Ad hoc* ↔ *Partial*) right at a band boundary is the same story — the boundary is a round number, not a cliff.
+
+**But do not read a shorter finding list as good news.** If a re-scan reports fewer Criticals, the likeliest explanation is that this run read less of the tree, not that the agent improved. Comparing two scans for *change* is a job for a mode that stabilizes the finding set — see below.
 
 ## Following up with the LLM
 
@@ -43,26 +49,53 @@ Because synthesis is an LLM step, you can interrogate and revise it in conversat
 
 The move specific to *variability*: **re-run the whole analysis** and see whether a borderline result reproduces. If it holds, it's real; if it swings, the target is judgment-sensitive (above) and worth characterising over several runs — see below.
 
-## When stability matters more than runtime
+## When a miss would be expensive
 
-A single run is the right default — it's fast and cheap, and for reading an agent's posture the themes are what matter. But when the *number itself* matters — gating a release, freezing a baseline, comparing before-and-after, or reporting a maturity score to a stakeholder — trade some runtime and token cost for stability:
+A single run is the right default. It is fast, it is cheap, and what it reports is
+dependable — it is what it *omits* that varies. So the question to ask is not "how
+precise is this number" but **"what does it cost me if this scan missed something?"**
 
-1. **Run the analysis N times** (3 is a good default) on identical inputs. Keep the Worker Remit and the analyzed scope *byte-identical* across runs so you're measuring synthesis variance, not input differences. *(The findings JSON is keyed by date — one per agent per day — so same-day reruns overwrite it; copy each run's JSON aside, or read from the always-timestamped HTML, if you want to keep all N.)*
-2. **Aggregate the score** — report the **median (or mean) weighted score**, and note the **range**. A target whose three runs land at 1.3 / 1.4 / 1.3 is well-characterised; one that lands 1.0 / 1.6 / 1.2 is telling you it's judgment-sensitive — report the spread, don't pretend the single number is precise.
-3. **Union the findings** — take the set of material findings that appear across runs. A Critical that appears in all three is solid; one that appears in one of three is worth a closer look (often a real edge case, occasionally an over-call) — a good candidate to [follow up with the LLM](#following-up-with-the-llm).
-4. **Diff by theme and rule text, not by score or rule ID.** Run-to-run, compare which Critical themes are present and which remit clauses are flagged; ignore `R-NN` renumbering and small decimal moves.
+| Your situation | Reach for |
+|---|---|
+| Understanding an agent; fixing what's obviously broken | **standard** — one run |
+| Your remit is new, or findings look wrong | **[high](thinking-modes.md)** — audits every finding *and* checks your remit's own rules against the target's docs |
+| Release gate, security sign-off, before/after comparison, publishing a number | **[x-high](thinking-modes.md)** — three scans, adjudicated into one |
 
-The cost is real and linear: three runs is roughly three times the tokens and wall-clock of one. Spend it when a stable, defensible number is worth more than the runtime — and skip it for exploratory or one-off reads, where a single run and a focus on the findings is enough.
+**One run to understand an agent; x-high to gate one.**
 
-> **Rule of thumb.** One run to *understand* an agent; multiple runs to *grade* one.
+### Gate on Criticals, not on the score
 
-> **Or let Praxen do this for you.** The manual N-run discipline above is
-> automated by [Thinking Modes](thinking-modes.md): **x-high** mode runs three
-> independent scans and merges them by *evidence adjudication* (a fresh agent
-> re-verifies every finding against the code) rather than by score arithmetic,
-> and **high** mode adds an independent false-positive audit to a single run.
-> Reach for a mode when the number must be defensible; the steps above remain
-> the right mental model for what it is doing.
+If you are wiring Praxen into a release process, gate on **the presence of a Critical
+finding**, not on a score threshold. A binary "is there at least one" is far more robust
+than "is this decimal above a line": across the 12-target suite, **10 of 12** targets gave
+the same Critical/no-Critical verdict on every run, while only one target scored
+identically across all three.
+
+**Run the gate scan in x-high**, and this is why. In the two targets where the verdict was
+*not* consistent, the odd run found **zero** Criticals where the others found some — the
+failure direction is a **false pass**, which is the outcome a gate exists to prevent. That
+is a recall problem, and adjudicating three scans is the thing that fixes it.
+
+### Characterising a judgment-sensitive target
+
+Running the same analysis N times is a **diagnostic** — it tells you how much a given
+target's score moves and which categories are doing the moving. It is not a way to
+manufacture a reported number.
+
+**Do not average, median, or blend scores across runs.** One scan produces one score;
+that is the product. A mean of three runs is not a score any scan produced, and it hides
+the spread instead of reporting it. If you run N times to characterise a target, publish
+**the range**, and say it is a range.
+
+x-high is the supported way to get a single defensible number: it re-derives the score
+from an adjudicated evidence set by the ordinary rules — **not** by averaging the three
+runs it started from.
+
+**And it measurably works.** In a controlled study, two *independent* x-high runs of the
+same target derived the same weighted score **and the same six category scores** — twice
+over, on the two most variable targets in the suite, against a raw single-run range of
+0.70 in both cases. Scope: those two targets, one model, one adjudication brief. It is a
+demonstrated result, not a general guarantee.
 
 ### Comparing two runs mechanically: `scan_diff.py`
 
@@ -85,13 +118,29 @@ mechanical join, not a judgment: two findings it calls "the same" may still
 differ in severity or score, and that difference is exactly what you want to
 read by hand. Requires schema-3.0 JSON (Praxen 1.2+) on both sides.
 
+Two limits worth knowing. Its join threshold **under-matches rewordings**, so treat
+anything it reports as unique as a candidate to verify by hand, not a fact. And on a
+**multi-root workspace** — a target scanned as two sibling checkouts — runs may disagree
+about whether an evidence path carries the root prefix; matching is suffix-aware from
+1.3 onward, but older versions silently under-joined such targets.
+
 ## What is **not** variable
 
 To be clear about the guarantees:
 
 - **Rendering is deterministic** — same JSON → byte-identical HTML/TXT, every time.
 - **The schema is fixed** — every report has the same sections, the same six RAISE categories, the same OWASP tag vocabulary.
-- **Real findings reproduce** — a genuine Critical does not vanish on the next run. Disappearing material findings or dropped Critical themes are *not* normal variance; treat them as something to investigate.
+- **Themes reproduce.** The *story* a report tells about an agent — the classes of divergence, the shape of its posture — is stable. What is on the list can move; what the list is *about* does not.
+
+### What we used to say here, and why it was wrong
+
+Earlier versions of this page promised that *"a genuine Critical does not vanish on the next run"*, and told you to treat a disappearing finding as something anomalous. **That was measured and is false.**
+
+Across two targets scanned six times each, raw Critical counts were `[1, 3, 0, 3, 2, 2]` and `[2, 2, 1, 2, 3, 3]`. One run of a target found **zero** Criticals where its siblings found up to three, and adjudication confirmed two were real. Across four independent adjudications, **roughly half of every verified finding set had been seen by exactly one scan of three — and not one of those was refutable.**
+
+**Individual findings do not reliably reproduce. Expect a single run to surface most of what is there, not all of it.** This is a *recall* limit, not a correctness one: what a single run reports is dependable — across 76 adjudicated rulings, **zero** were unsupported by their evidence. It is what a single run *omits* that varies.
+
+That reframes the whole page. The question is not "how much does the number wobble" but **"how complete is one read?"**
 
 ### One extra source of variance: an ambiguous subject
 
@@ -108,7 +157,7 @@ gets scanned* — it does not make the score itself deterministic.
 
 ## Next steps
 
-- [Thinking Modes](thinking-modes.md) — opt-in high / x-high accuracy tiers that automate the multi-run discipline
+- [Thinking Modes](thinking-modes.md) — opt-in high / x-high tiers: what each stabilizes, what each costs
 - [Interpreting Reports](interpreting-reports.md) — what each section means and how to read the maturity score
 - [Challenging and Revising Findings](challenging-findings.md) — the full revise-and-re-render workflow
 - [The RAISE Framework](RAISE.md) — the six-category 0–5 maturity scale the weighted score is built from
