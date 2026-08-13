@@ -43,17 +43,19 @@ High mode is also markedly **more predictable** than standard: audited runs land
 Measured on Opus 5 across the 1.3 regression suite:
 
 - A **standard scan** ran **~10–22 min** (mean ~16) and burned **~270k tokens**.
-- **High mode** ran **~27–29 min** (mean ~28) and **~333k tokens** — the audit phase
-  alone is about **60%** of the scan it audits, so it is not a cheap rubber stamp.
+- **High mode** ran **~27–29 min** (mean ~28) and **~333k tokens**. On the one run where
+  the phases were timed separately, the audit took about **60% of the scan's wall-clock**
+  — it is not a cheap rubber stamp, though in tokens it is far lighter (~23%).
 - **X-high** runs its three scans concurrently, then a full adjudication and assembly
-  pass — roughly **~4×** a single scan's tokens.
+  pass — roughly **~4×** a single scan's tokens (measured on one target; a second record
+  computes nearer 3×).
 
-Your numbers move with target size and evidence density, but the shape holds.
+Your numbers move with target size, finding count and evidence density — subtle
+production agents audit slower than dense demo apps — but the shape holds.
 
-Your numbers move with target size, finding count, and evidence density —
-subtle production agents audit slower than dense demo apps — **Budget by whichever is scarcer.** If tokens are the constraint, high mode is
-cheap (~1.2×) and x-high is not (~4×). If wall-clock is the constraint, high mode is
-the one that surprises people.
+**Budget by whichever is scarcer.** If tokens are the constraint, high mode is cheap
+(~1.2×) and x-high is not (~4×). If wall-clock is the constraint, high mode is the one
+that surprises people.
 
 ## Invoking a mode
 
@@ -154,7 +156,7 @@ That matters because **a defective rule produces a finding that looks completely
 correct file, correct line, an honest violation of the rule *as written*. You cannot spot
 it by reading findings. High mode reads your rules against the target's own documentation
 and hands back a fix list. Reach for it whenever a remit is new or has just changed; see
-[Writing Worker Remits → Advanced](writing-remits.md#advanced--hardening-a-new-remit).
+[Writing Worker Remits → Advanced](writing-remits.md#advanced-hardening-a-new-remit).
 
 ### X-high buys coverage first, stability second
 
@@ -186,8 +188,9 @@ measured result, not a guarantee.
 ## Comparability
 
 **Thinking-mode scores are not comparable to standard-mode bands.** Praxen's published
-variance expectations and its frozen baselines are standard-mode artifacts. Compare
-thinking-mode runs with thinking-mode runs.
+variance expectations are standard-mode figures; compare thinking-mode runs with
+thinking-mode runs. (The `v1.3-opus5` baseline is mostly standard-mode but freezes three of
+its twelve targets at a high-mode run — `BASELINE.md` records which, and why.)
 
 **Do not expect a mode to push a score in a consistent direction.** In 1.3 testing,
 high-mode runs landed at or **above** their target's median while x-high super-runs
@@ -203,10 +206,11 @@ If you are wiring Praxen into a release process, two recommendations:
    check is far more robust than a decimal against a line — across the 12-target suite,
    10 of 12 gave the same Critical/no-Critical verdict on every run, while only one
    scored identically on all three.
-2. **Run the gate scan in x-high.** In the two targets whose verdict was *not* consistent,
-   the odd run found **zero** Criticals where the others found some — the failure
-   direction is a **false pass**, which is exactly what a gate exists to prevent. That is
-   a coverage problem, and adjudicating three scans is what closes it.
+2. **Consider raising the effort level for the gate scan.** When a Critical verdict does
+   flip, it flips toward a **false pass** — in both inconsistent targets the odd run found
+   *zero* Criticals where the others found some. Scoped honestly: a separate study measured
+   **100% Critical recall in every single run**, and the two flipping targets were never put
+   through x-high. Higher effort is a reasonable precaution here, not a measured fix.
 
 ## Harness support
 

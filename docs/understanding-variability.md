@@ -24,8 +24,8 @@ Both are normal. Both are larger for *judgment-sensitive* targets (see below) an
 
 ## How much to expect
 
-The figures below are measured, not estimated — from **48 runs** across Praxen's 12-target
-regression suite plus a dedicated multi-run study on the two most variable targets.
+The figures below are measured, not estimated — from the 36-run 12-target regression
+suite, plus a dedicated 12-run study on the two most variable targets.
 
 | What | Stability | Measured |
 |---|---|---|
@@ -71,10 +71,15 @@ than "is this decimal above a line": across the 12-target suite, **10 of 12** ta
 the same Critical/no-Critical verdict on every run, while only one target scored
 identically across all three.
 
-**Run the gate scan in x-high**, and this is why. In the two targets where the verdict was
-*not* consistent, the odd run found **zero** Criticals where the others found some — the
-failure direction is a **false pass**, which is the outcome a gate exists to prevent. That
-is a recall problem, and adjudicating three scans is the thing that fixes it.
+**Know the failure direction.** In the two suite targets whose verdict was *not* consistent,
+the odd run found **zero** Criticals where the others found some — so when a Critical gate
+does flip, it flips toward a **false pass**, which is the outcome a gate exists to prevent.
+
+If that matters for your pipeline, raise the effort level for the gate scan. Be aware of what
+is and isn't measured: in a separate multi-run study, **single runs recalled 100% of Criticals
+in every case** — so Critical-level recall held there. The zero-Critical runs above are from
+different targets that were never put through x-high. Treat higher effort on a gate scan as a
+reasonable precaution, not as a measured fix for this specific failure.
 
 ### Characterising a judgment-sensitive target
 
@@ -143,8 +148,10 @@ Measured: across two targets scanned six times each, raw Critical counts ran
 and not one of those was refutable.**
 
 This is a **coverage** limit, not a correctness one. What a single run reports is
-dependable: across 76 adjudicated rulings, **zero** were unsupported by their evidence.
-It is what a single run *omits* that varies.
+largely dependable: across 75 adjudicated rulings in those four studies, **none** was
+unsupported by its evidence. False positives are not unheard of — a separate multi-run
+study did produce one, out of 69 candidate findings — but they are rare next to what a
+single pass misses. It is what a single run *omits* that varies most.
 
 So the useful question is not "how much does the number wobble" but **"how complete is one
 read?"** — and that has a direct answer: [x-high](thinking-modes.md) adjudicates three

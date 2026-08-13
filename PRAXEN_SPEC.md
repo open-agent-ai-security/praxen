@@ -276,7 +276,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 ```json
 {
   "schema_version": "3.0",
-  "praxen_version": "1.2.0",
+  "praxen_version": "1.3.0",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",

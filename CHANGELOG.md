@@ -32,7 +32,8 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - **Remit quality.** On a mature scanner the audit's measurable yield is not FP removal — across four 1.3 high-mode audits it was **48 findings, 48 confirmed, 0 killed, but 9 rule-level remit defects surfaced**, four of them in a remit authored twenty minutes earlier.
 
 ### Baseline — `v1.3-opus5`
-- 12 targets, **36 runs** (median-of-3), Claude Opus 5, same pinned sources and remits as v1.2. Mean weighted RAISE **1.49** (v1.2: 1.671). Three targets are frozen at a high-mode run by maintainer decision — a **deliberately mixed method**, recorded as a caveat in `BASELINE.md`.
+- 12 targets, **36 standard runs** (median-of-3) plus 3 high-mode runs, Claude Opus 5, on the **same pinned sources** as v1.2. Mean weighted RAISE **1.49** (v1.2: 1.671); frozen entirely at medians it would be **1.45**. Three targets are frozen at a high-mode run by maintainer decision — a **deliberately mixed method**, recorded as a caveat in `BASELINE.md`.
+- **Attribution caveat:** **7 of 12** targets are a clean like-for-like comparison. For the other five (aider, autogen, craftbot, helperbot, uagents) the #200/#201 remit cleanups landed in the same release, so their movement mixes the scoring change with a changed standard. The numbers stand; the attribution to #195 alone does not, for those five.
 - Movement is **bounded and two-directional**: 2 targets up, 1 flat, 9 down, none beyond −0.45. Supply Chain is the dominant mover; **Red Team moves both ways** — down on demo/CTF targets via the provenance test, *up* on one target, and held at 3 where the maturity sweep found a real advisory→fix→regression-test loop.
 - **Every run cleared a dual provenance gate**, checked on disk rather than self-reported: `praxen_version == "1.3.0"` **and** a `MATURITY (M1-M12)` block in the evidence checkpoint — the second catches a run that stamps the right version while having followed an older process.
 

@@ -933,7 +933,13 @@ _SECRET_PATTERNS = [
     ("assigned credential literal", re.compile(
         r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)\b"
         r"\s*[:=]\s*['\"]"
-        r"(?!(?:\$\{[^'\"]{1,64}\}|\$[A-Za-z_][A-Za-z0-9_]{0,64}|\{\{[^'\"]{1,64}\}\}|%[^'\"%]{1,64}%|<[^'\"<>]{1,64}>)['\"])"
+        # Placeholder exemption is CASE-RESTRICTED on the bare-token forms: an
+        # interpolation name is conventionally SCREAMING_SNAKE, while a real
+        # secret that merely starts with '$' (e.g. "$ecretPassw0rd") is not.
+        # Without this, the exemption itself becomes a redaction bypass.
+        # (?-i:...) is required — the (?i) at the head of the pattern would
+        # otherwise silently case-fold these classes.
+        r"(?!(?-i:\$\{[A-Z0-9_]{1,64}\}|\$[A-Z][A-Z0-9_]{0,64}|\{\{[^'\"]{1,64}\}\}|%[A-Z0-9_]{1,64}%|<[A-Z0-9_]{1,64}>)['\"])"
         r"[^'\"\s]{6,}['\"]")),
 ]
 

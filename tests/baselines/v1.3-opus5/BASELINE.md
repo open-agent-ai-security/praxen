@@ -5,10 +5,14 @@
 
 # Baseline — v1.3-opus5 (current)
 
-The **v1.3 scoring re-freeze.** Supersedes `v1.2-opus5` (now archival). Same model, same
-pinned sources, same remits as v1.2 — **the scoring pipeline is what changed** (#195). So
-unlike the v1.1→v1.2 transition, this one **is** a like-for-like comparison, and every score
-movement is attributable to the scoring fix rather than to a change of subject or model.
+The **v1.3 scoring re-freeze.** Supersedes `v1.2-opus5` (now archival). Same model and same
+pinned sources as v1.2 — **the scoring pipeline is what changed** (#195).
+
+For **7 of 12 targets** this is a clean like-for-like comparison and the movement is
+attributable to the scoring fix. For the other five — **aider, autogen-code-executor,
+craftbot, helperbot, uagents** — the #200/#201 remit cleanups landed pre-freeze, so the
+remit those targets were scanned against also changed. Their deltas (−0.15, −0.15, 0.00,
+−0.15, −0.15) mix the two causes and should not be read as measuring #195 alone.
 
 Roster prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
 
@@ -27,9 +31,10 @@ Roster prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
   test — adversarial material counts only when the project attacks its **own** defences.
 - **Model unchanged:** Claude Opus 5 (`claude-opus-5[1m]`). `praxen_version 1.3.0`,
   `schema_version 3.0` (unchanged — nothing serialised changed).
-- **Remits unchanged in substance**, apart from the #200/#201 over-reach cleanups landed
-  pre-freeze. Each target dir pins its freeze-state remit as `<slug>-remit.md`, verified
-  byte-identical to the `tests/remits/<slug>.md` the scans actually read.
+- **Remits: 7 unchanged, 5 materially revised** by the #200/#201 over-reach cleanups landed
+  pre-freeze (see the attribution note above). Each target dir pins its freeze-state remit as
+  `<slug>-remit.md`, verified byte-identical to the `tests/remits/<slug>.md` the scans
+  actually read — so the two baselines' pinned copies show exactly what changed.
 
 ## Freeze method — median-of-3, with three high-mode substitutions
 
@@ -84,20 +89,26 @@ Detail: `../../../local/v1.3-freeze/PIN_INCIDENT.md`.
    autogen 2→1, openai-cs 3→1, openhands 3→2, salesforce 2→1, yaah 3→2), **up in 1**
    (hermes 2→3). The M1–M12 sweep asks for real inventory / pinning / scanning evidence rather
    than crediting the impression of hygiene.
-2. **Build an AI Red Team moves in both directions** — down on demo/CTF/training targets via the
-   provenance test (aider 1→0, finbot 1→0, yaah 1→0, where the shipped attack content *is* the
-   product), **up on openai-cs** (0→1), and **held at 3 on hermes**, where the sweep found a real
-   closed loop: GHSA-rhgp-j443-p4rf and GHSA-5qr3-c538-wm9j traced to fixing PRs, the fix present
-   at `tools/env_passthrough.py:48-100`, regression test beside it. This two-directionality is
-   the evidence that #195 is a correction, not a deflation.
-3. **Limit Your Domain down in 4** (craftbot, salesforce, uagents, yaah) via the dominant-path
-   ladder — prompt-only domain framing now caps at 2.
+2. **Build an AI Red Team moves in both directions**, but mostly down — **five** targets fell:
+   aider 1→0, finbot 1→0, yaah 1→0 (demo/CTF/training material, where the shipped attack content
+   *is* the product — the provenance test), plus **helperbot 1→0** and **deepagents-cli 3→2**.
+   deepagents is the largest RT drop in the set and is *not* a demo target: its programme is real
+   but the sweep found no adversarial corpus, tooling, or dated results. Against that, RT rose on
+   **openai-cs** (0→1) and **held at 3 on hermes**, where the sweep found a genuine closed loop —
+   GHSA-rhgp-j443-p4rf and GHSA-5qr3-c538-wm9j traced to fixing PRs, the fix at
+   `tools/env_passthrough.py:48-100`, regression test beside it. The movement is two-directional,
+   which is the evidence #195 corrects rather than deflates — but note the instrument is
+   asymmetric by construction: three of the four boundary rules can only lower a band, and rule 4
+   breaks ties downward.
+3. **Limit Your Domain down in 3** (salesforce, uagents, yaah — all 3→2) via the dominant-path
+   ladder: prompt-only domain framing now caps at 2. (craftbot's LD is unchanged at 2.)
 4. **Two targets improved.** finbot +0.10 (ZT 0→1: the ladder credits its genuinely narrow,
    code-enforced tool surface instead of flooring the category) and hermes +0.05.
 
 ## High-mode audit results (hermes, openhands, yaah)
 
-**35 findings audited, 35 CONFIRMED, 0 UNSUPPORTED, 0 REMIT-DEFECT.** The auditor is known to
+**35 findings audited — per-finding verdicts: 35 CONFIRMED, 0 UNSUPPORTED, 0 REMIT-DEFECT.**
+(Rule-level *remit feedback* is tallied separately and is not zero — see the caveats below.) The auditor is known to
 kill bad findings when they exist — the FP-injection test caught 4/4 planted fakes while
 retaining ~48 real findings — so a clean sweep here is signal, not a rubber stamp.
 
