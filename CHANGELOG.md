@@ -11,7 +11,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ## [1.3.0] — unreleased
 
-**Thinking modes, and a scoring pipeline that reproduces.** Two features that turn out to depend on each other: opt-in **high / x-high** accuracy tiers (#197), and a structural fix to how RAISE scores are formed (#195). **This is a scoring release, not a score-inert one** — it ships a fresh frozen baseline, **`v1.3-opus5`**, and its numbers are not comparable to `v1.2-opus5` scan-for-scan. `schema_version` stays **3.0**; nothing serialised changed.
+**Thinking modes, and a scoring pipeline that reproduces.** Two features that turn out to depend on each other: the **high** and **x-high** thinking modes (#197), and a structural fix to how RAISE scores are formed (#195). **This is a scoring release, not a score-inert one** — it ships a fresh frozen baseline, **`v1.3-opus5`**, and its numbers are not comparable to `v1.2-opus5` scan-for-scan. `schema_version` stays **3.0**; nothing serialised changed.
 
 > **Soak note for anything landing before release.** The baseline is already frozen against this skill. **Any further change that can move a score — scoring rules, Step 8b searches, KB anchors, remits, detection — invalidates `v1.3-opus5` and requires a re-freeze.** Score-inert work (docs, rendering, CI, tooling that does not ship) folds in freely. Two known score-moving items are deliberately deferred to 1.4 for exactly this reason (#248, and scanner evidence-path consistency).
 

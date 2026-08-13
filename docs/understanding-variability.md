@@ -165,7 +165,7 @@ gets scanned* — it does not make the score itself deterministic.
 
 ## Next steps
 
-- [Thinking Modes](thinking-modes.md) — opt-in high / x-high tiers: what each stabilizes, what each costs
+- [Thinking Modes](thinking-modes.md) — the **high** and **x-high** effort levels: what each stabilizes, what each costs
 - [Interpreting Reports](interpreting-reports.md) — what each section means and how to read the maturity score
 - [Challenging and Revising Findings](challenging-findings.md) — the full revise-and-re-render workflow
 - [The RAISE Framework](RAISE.md) — the six-category 0–5 maturity scale the weighted score is built from

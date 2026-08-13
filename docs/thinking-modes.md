@@ -5,13 +5,11 @@
 
 # Thinking Modes
 
-Praxen supports opt-in **thinking modes** — accuracy tiers, the way LLMs
-expose effort levels. The default, **standard**, is the single scan described
-everywhere else in this guide. The two higher tiers spend more time and
-tokens to buy back the residual [run-to-run
-variability](understanding-variability.md) that comes with LLM judgment: they
-automate the verification practices Praxen's own release process uses by hand
-— an independent false-positive scrub, and multi-run comparison.
+Praxen supports **thinking modes** — the same effort dial reasoning models
+expose, applied to a whole scan. The default, **standard**, is the single scan
+described everywhere else in this guide. The two higher effort levels spend
+more time and tokens on verification: an independent audit of every finding,
+and — at the top level — three scans adjudicated into one.
 
 | Mode | What runs | Cost (rough) | When to use it |
 |---|---|---|---|
