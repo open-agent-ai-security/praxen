@@ -33,8 +33,10 @@ Git adds it for you with the `-s` flag:
 git commit -s -m "Your commit message"
 ```
 
-The name and email must match a real identity (no anonymous or pseudonymous
-contributions). A CI check (`.github/workflows/dco.yml`) verifies every non-merge
+The name and email must be a known identity — your real name, or an established
+identity you're known by in the community (a long-standing handle counts),
+reachable at the address you sign with. Anonymous or throwaway identities aren't
+accepted. A CI check (`.github/workflows/dco.yml`) verifies every non-merge
 commit in a pull request carries a `Signed-off-by` line matching the author or
 committer; PRs that don't pass will be asked to amend before merge.
 
