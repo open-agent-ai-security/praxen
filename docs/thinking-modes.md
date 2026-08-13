@@ -116,8 +116,13 @@ Both modes keep full provenance alongside the final report:
 
 - The **final report** (HTML / TXT / findings JSON) — same format and schema
   as any standard scan; nothing downstream needs to change.
-- The **raw artifacts** — high mode keeps the pre-audit report with a `-raw`
-  suffix; x-high keeps all three runs in `xhigh-run1/2/3/` directories.
+- The **raw artifacts** — x-high always keeps all three runs in
+  `xhigh-run1/2/3/` directories. High mode only writes a `-raw` copy when the
+  audit actually changed something; if every finding is confirmed, the scan's
+  own artifacts *are* the final report and there is nothing to preserve a
+  copy of. On a well-tuned remit that is the common outcome, so **no `-raw`
+  files is a clean result, not a missing step** — the adjudication record
+  below is where you confirm the audit ran.
 - An **adjudication record** (`reports/<agent>-adjudication-<timestamp>.md`)
   — every verdict with its rationale, the remit-feedback list, and (x-high) a
   **variance diagnostic**: what flipped between runs, the per-run score
