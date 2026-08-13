@@ -11,53 +11,40 @@ described everywhere else in this guide. The two higher effort levels spend
 more time and tokens on verification: an independent audit of every finding,
 and — at the top level — three scans adjudicated into one.
 
-| Mode | What runs | Cost (rough) | When to use it |
-|---|---|---|---|
-| **standard** | One scan | 1× | Default. Everyday scans, exploratory reads |
-| **high** | Scan → independent findings audit → cleaned report | ~2× | Before a report leaves your hands |
-| **x-high** | 3 independent scans → evidence adjudication → one "super-run" report | ~4–5× | Audits, gates, anything where quality outranks time and tokens |
+| Mode | What runs | When to use it |
+|---|---|---|
+| **standard** | One scan | Default. Everyday scans, exploratory reads |
+| **high** | Scan → independent findings audit → cleaned report | Before a report leaves your hands |
+| **x-high** | 3 independent scans → evidence adjudication → one "super-run" report | Audits, gates, anything where quality outranks time and tokens |
 
 ## What it costs — time and tokens
 
-The two costs move differently, and if you are budgeting tokens the
-distinction matters: **parallelism shortens x-high's wall-clock but not its
-token bill.** Three scans' worth of tokens are spent whether they run at once
-or one after another — running them concurrently only saves you the *waiting*.
-
-| Mode | Wall-clock vs. a scan | Token burn vs. a scan | In practice |
+| Mode | Time | Tokens | A typical run (Opus 5) |
 |---|---|---|---|
-| **standard** | 1× | 1× | one scan |
-| **high** | **~1.3–1.8×** | **~1.4×** | a scan **plus a substantial audit pass** |
-| **x-high** | **~2–2.5×** | **~4×** | ~2 scans' *time*, but ~4 scans' *tokens* |
+| **standard** | 1× | 1× | ~10–22 min · ~215k–265k tokens |
+| **high** | ~1.3–1.6× | ~1.4× | ~17–29 min · ~305k–395k tokens |
+| **x-high** | ~2–2.5× | ~4× | ~30–35 min · ~0.9M tokens |
 
-Measured on Opus 5 as **matched pairs** — the same target run both ways, which is the
-only comparison that isolates the mode from the target. Across four targets, high mode
-cost **1.40–1.52× tokens** and **1.27–1.57× wall-clock**.
+Three things worth knowing before you budget.
 
-**Concurrency lands on the clock, not on the burn.** Run several scans at once and the
-wall-clock multiple stretches toward **~1.8×** while the token multiple does not move.
-The audit is a *fresh, context-unaware agent* that re-reads source and remit from cold,
-so it spends round-trips more than it spends context — and round-trips are what queue up
-under parallel load. Budget tokens from the matched figure; budget time from your own
-concurrency.
+**Time and tokens do not move together.** High mode adds roughly 40% to the token
+bill but usually more than that to the clock. Its audit runs as a fresh agent that
+re-reads the source and remit from cold — cheap in tokens, expensive in round-trips.
+If someone asks how long a run will take, don't answer from the token figure.
 
-Absolute numbers, same suite:
+**Concurrency shows up on the clock, never on the burn.** Running scans in parallel
+pushes high mode's time multiple toward 1.8× without changing what it spends. The
+same effect works in your favour at the top level: x-high runs its three scans
+concurrently, so it finishes in about 2–2.5× the time while still spending 4× the
+tokens. Parallelism buys back waiting, never burn.
 
-- A **standard scan** ran **~10–22 min**, **~215k–265k tokens**.
-- **High mode** ran **~17–29 min**, **~305k–395k tokens**. On the one run timed by phase,
-  the audit took about **60% of the scan's wall-clock** and roughly **90k–135k tokens** —
-  not a cheap rubber stamp.
-- **X-high** runs its three scans concurrently, then a full adjudication and assembly
-  pass — roughly **~4×** a single scan's tokens (measured on one target; a second record
-  computes nearer 3×).
+**Both multiples scale with finding count.** The audit re-verifies findings one at a
+time, so a dense report costs more to audit than a thin one — a subtle production
+agent audits slower than a demo app with obvious holes. Where the phases were timed
+separately, the audit came to about 60% of the scan's own wall-clock.
 
-The audit is **finding-bounded**: it re-verifies each finding in turn, so both multiples
-climb with finding count and evidence density. A subtle production agent audits slower
-than a dense demo app.
-
-**Budget by whichever is scarcer.** In tokens, high mode is a modest add (~1.4×) and
-x-high is not (~4×). In wall-clock, high mode is the one that surprises people —
-especially under concurrency.
+Budget by whichever is scarcer. In tokens, high mode is a modest add and x-high is
+not. In time, high mode is the one people underestimate.
 
 ## Invoking a mode
 

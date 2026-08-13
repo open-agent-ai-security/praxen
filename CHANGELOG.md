@@ -22,7 +22,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - Validated before shipping: **blind adjudication upheld the new pipeline 22 of 24** category calls, with judges naming the old bias as "capability counted as posture". Two structural alternatives were measured and discarded first; a checklist rubric was tested and **killed** (higher variance, and it averaged a deliberately-vulnerable target's disqualifying failure away).
 
 ### Thinking modes (#197)
-- **`high`** — a context-unaware auditor re-reads every finding at its cited location and tries to refute it, then checks the remit's own rules against the target's documentation. **~1.4× tokens, ~1.3–1.6× wall-clock** on matched same-target pairs; the wall-clock multiple stretches toward ~1.8× under concurrency, where the token multiple does not move.
+- **`high`** — a context-unaware auditor re-reads every finding at its cited location and tries to refute it, then checks the remit's own rules against the target's documentation. Costs **~1.4× tokens and ~1.3–1.6× the clock** — and under concurrency the time multiple stretches toward 1.8× while the token cost holds, so estimate duration from the clock figure, not the token one.
 - **`x-high`** — three independent scans, unioned and adjudicated into one **super-run**. Two principles that are explicitly *not* voting: **evidence decides membership, run-count decides nothing** (a finding one run caught survives if it verifies; one all three agreed on dies if it does not), and **scores are re-derived, never blended**.
 - Modes are selected in natural language per invocation. The standard path is unchanged.
 
