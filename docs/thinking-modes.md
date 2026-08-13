@@ -27,35 +27,37 @@ or one after another — running them concurrently only saves you the *waiting*.
 | Mode | Wall-clock vs. a scan | Token burn vs. a scan | In practice |
 |---|---|---|---|
 | **standard** | 1× | 1× | one scan |
-| **high** | **~1.8×** | **~1.2×** | a scan **plus a substantial audit pass** |
+| **high** | **~1.3–1.8×** | **~1.4×** | a scan **plus a substantial audit pass** |
 | **x-high** | **~2–2.5×** | **~4×** | ~2 scans' *time*, but ~4 scans' *tokens* |
 
-**High mode costs more time than tokens, and the gap is wide** — measured at **1.81×
-wall-clock against 1.23× tokens** across four audited targets. Quote the clock when
-someone asks "how long", not the token figure; a 1.2× token estimate will understate the
-wait by roughly a third. The audit is a *fresh, context-unaware agent* that re-reads
-source and remit from cold, so it costs round-trips more than it costs context.
+Measured on Opus 5 as **matched pairs** — the same target run both ways, which is the
+only comparison that isolates the mode from the target. Across four targets, high mode
+cost **1.40–1.52× tokens** and **1.27–1.57× wall-clock**.
 
-High mode is also markedly **more predictable** than standard: audited runs landed in a
-27–29 minute band regardless of target size, where standard runs on the same suite swung
-10–22 minutes with complexity. The audit acts as a floor.
+**Concurrency lands on the clock, not on the burn.** Run several scans at once and the
+wall-clock multiple stretches toward **~1.8×** while the token multiple does not move.
+The audit is a *fresh, context-unaware agent* that re-reads source and remit from cold,
+so it spends round-trips more than it spends context — and round-trips are what queue up
+under parallel load. Budget tokens from the matched figure; budget time from your own
+concurrency.
 
-Measured on Opus 5 across the 1.3 regression suite:
+Absolute numbers, same suite:
 
-- A **standard scan** ran **~10–22 min** (mean ~16) and burned **~270k tokens**.
-- **High mode** ran **~27–29 min** (mean ~28) and **~333k tokens**. On the one run where
-  the phases were timed separately, the audit took about **60% of the scan's wall-clock**
-  — it is not a cheap rubber stamp, though in tokens it is far lighter (~23%).
+- A **standard scan** ran **~10–22 min**, **~215k–265k tokens**.
+- **High mode** ran **~17–29 min**, **~305k–395k tokens**. On the one run timed by phase,
+  the audit took about **60% of the scan's wall-clock** and roughly **90k–135k tokens** —
+  not a cheap rubber stamp.
 - **X-high** runs its three scans concurrently, then a full adjudication and assembly
   pass — roughly **~4×** a single scan's tokens (measured on one target; a second record
   computes nearer 3×).
 
-Your numbers move with target size, finding count and evidence density — subtle
-production agents audit slower than dense demo apps — but the shape holds.
+The audit is **finding-bounded**: it re-verifies each finding in turn, so both multiples
+climb with finding count and evidence density. A subtle production agent audits slower
+than a dense demo app.
 
-**Budget by whichever is scarcer.** If tokens are the constraint, high mode is cheap
-(~1.2×) and x-high is not (~4×). If wall-clock is the constraint, high mode is the one
-that surprises people.
+**Budget by whichever is scarcer.** In tokens, high mode is a modest add (~1.4×) and
+x-high is not (~4×). In wall-clock, high mode is the one that surprises people —
+especially under concurrency.
 
 ## Invoking a mode
 

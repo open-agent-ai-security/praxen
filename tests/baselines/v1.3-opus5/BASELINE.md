@@ -47,6 +47,12 @@ largest movers and the widest-spread target, each given a full high thinking-mod
 the freeze. **This is a deliberately mixed method: those 3 are scored by a deeper, costlier
 process than the other 9.** It is recorded here so the baseline is not read as uniform.
 
+**Baselines are a median-of-3 artifact.** That is the methodology this generation of baselines
+was built on, and every number below is a reading from it. Thinking modes are a *different*
+instrument over the same targets — an x-high super-run on a target in this table will not
+generally reproduce its frozen value, and that is a methodology difference, not a defect in
+either. A future baseline generation may be built on x-high runs; this one was not.
+
 | Target | Frozen run | Weighted RAISE | 3× spread | v1.2 | Δ |
 |---|---|---|---|---|---|
 | helperbot | run2 | 0.45 | 0.15 | 0.60 | −0.15 |
