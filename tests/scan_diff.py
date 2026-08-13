@@ -58,6 +58,44 @@ def _evidence_files(f):
     return {e["file"] for e in f.get("evidence", []) if e.get("file")}
 
 
+def _same_file(a, b):
+    """True when two evidence paths denote the same file.
+
+    On a **multi-root** workspace (e.g. a target scanned as two sibling
+    checkouts) runs disagree about whether an evidence path carries the root
+    prefix — `hermes-agent/agent/x.py` in one run, `agent/x.py` in another.
+    Exact string comparison drove the evidence signal, which is the *strongest*
+    of the four, to a Jaccard of 0 and silently collapsed otherwise-good matches
+    below the join threshold. Treat one path as the other when it is a
+    path-suffix of it, so a differing root prefix no longer defeats the match.
+    """
+    if a == b:
+        return True
+    return a.endswith("/" + b) or b.endswith("/" + a)
+
+
+def _evidence_overlap(fa, fb):
+    """Suffix-aware Jaccard over the two findings' evidence file sets.
+
+    Greedy one-to-one pairing: each path on the left claims at most one partner
+    on the right, so a file cited twice cannot inflate the intersection.
+    """
+    A, B = _evidence_files(fa), _evidence_files(fb)
+    if not A and not B:
+        return 0.0
+    claimed, inter = set(), 0
+    for a in sorted(A):
+        for b in sorted(B):
+            if b in claimed:
+                continue
+            if _same_file(a, b):
+                claimed.add(b)
+                inter += 1
+                break
+    union = len(A) + len(B) - inter
+    return inter / union if union else 0.0
+
+
 _SEV_RANK = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1, "Informational": 0}
 
 
@@ -89,7 +127,7 @@ def _candidate_score(fa, fb):
     RAISE-category agreement, rule-text overlap, and summary-token overlap.
     A severity-distance factor keeps a Critical and a Medium at the same
     location from collapsing into one match."""
-    ev = _jaccard(_evidence_files(fa), _evidence_files(fb))
+    ev = _evidence_overlap(fa, fb)
     cat = 1.0 if fa.get("raise_category") == fb.get("raise_category") else 0.0
     rule = _jaccard(_rule_text_key(fa), _rule_text_key(fb))
     summ = _jaccard(_norm_tokens(fa.get("summary")), _norm_tokens(fb.get("summary")))
