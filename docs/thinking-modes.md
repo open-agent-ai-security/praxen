@@ -191,11 +191,11 @@ measured result, not a guarantee.
 variance expectations and its frozen baselines are standard-mode artifacts. Compare
 thinking-mode runs with thinking-mode runs.
 
-Do **not** expect modes to push scores in a consistent direction. Earlier guidance said
-thinking-mode scores trend lower, on the reasoning that adjudication adds findings. That
-no longer holds: in 1.3 testing, high-mode runs landed at or **above** their target's
-median while x-high super-runs re-derived below it. **The direction is not the finding —
-the reproducibility is.**
+**Do not expect a mode to push a score in a consistent direction.** In 1.3 testing,
+high-mode runs landed at or **above** their target's median while x-high super-runs
+re-derived below it. A mode gives you a better-evidenced score, not a systematically
+higher or lower one — **the reproducibility is the property to rely on, not the
+direction.**
 
 ## Gating on a mode
 

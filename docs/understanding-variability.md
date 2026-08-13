@@ -132,15 +132,23 @@ To be clear about the guarantees:
 - **The schema is fixed** — every report has the same sections, the same six RAISE categories, the same OWASP tag vocabulary.
 - **Themes reproduce.** The *story* a report tells about an agent — the classes of divergence, the shape of its posture — is stable. What is on the list can move; what the list is *about* does not.
 
-### What we used to say here, and why it was wrong
+### Coverage is what varies
 
-Earlier versions of this page promised that *"a genuine Critical does not vanish on the next run"*, and told you to treat a disappearing finding as something anomalous. **That was measured and is false.**
+**Expect a single run to surface most of what is there, not all of it** — and plan around
+that rather than against it. Individual findings do not all reproduce.
 
-Across two targets scanned six times each, raw Critical counts were `[1, 3, 0, 3, 2, 2]` and `[2, 2, 1, 2, 3, 3]`. One run of a target found **zero** Criticals where its siblings found up to three, and adjudication confirmed two were real. Across four independent adjudications, **roughly half of every verified finding set had been seen by exactly one scan of three — and not one of those was refutable.**
+Measured: across two targets scanned six times each, raw Critical counts ran
+`[1, 3, 0, 3, 2, 2]` and `[2, 2, 1, 2, 3, 3]`. Across four independent adjudications,
+**roughly half of every verified finding set had been seen by exactly one scan of three —
+and not one of those was refutable.**
 
-**Individual findings do not reliably reproduce. Expect a single run to surface most of what is there, not all of it.** This is a *recall* limit, not a correctness one: what a single run reports is dependable — across 76 adjudicated rulings, **zero** were unsupported by their evidence. It is what a single run *omits* that varies.
+This is a **coverage** limit, not a correctness one. What a single run reports is
+dependable: across 76 adjudicated rulings, **zero** were unsupported by their evidence.
+It is what a single run *omits* that varies.
 
-That reframes the whole page. The question is not "how much does the number wobble" but **"how complete is one read?"**
+So the useful question is not "how much does the number wobble" but **"how complete is one
+read?"** — and that has a direct answer: [x-high](thinking-modes.md) adjudicates three
+scans into one, which is precisely what closes the gap.
 
 ### One extra source of variance: an ambiguous subject
 
