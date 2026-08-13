@@ -6,19 +6,32 @@
 # Results — x-high damping re-test (design §9.2, post-#195)
 
 > **Run 2026-08-12/13**, Praxen **1.3.0** skill on branch `1.3-thinking-modes`, all
-> agents Opus 5 (`claude-opus-5[1m]`, identity-gated per run). One target × two
-> independent super-runs × three independent scans = **6 scans + 2 adjudications**.
-> Target: **Hermes (agent + desktop)**, pinned `b1a2540` / `4e8388a` — chosen because
+> agents Opus 5 (`claude-opus-5[1m]`, identity-gated per run). Two targets × two
+> independent super-runs × three independent scans = **12 scans + 4 adjudications**.
+> Targets: **Hermes (agent + desktop)** `b1a2540`/`4e8388a`, then **Deep Agents Code**
+> (`libs/code`) `a80355a` — the two widest-variance targets in the suite. Hermes chosen because
 > #195 left it the **widest-variance target in the suite** (freeze spread 0.55). The
 > original §9.2 test used autogen and uagents; #195 has since tightened those to 0.25
 > and 0.15, so they no longer stress the question.
 >
 > ## Headline
 >
-> **§9.2 PASSES. Damping is demonstrated — pair delta 0.00 against a 6-run raw range
-> of 0.70.** Both super-runs derived not merely the same weighted score but the
-> **identical category vector** `[3,2,2,3,2,2]`, from raw scans that spread 0.55 (A)
-> and 0.40 (B).
+> **§9.2 PASSES, replicated on two targets. Both pair deltas 0.00 against 6-run raw
+> ranges of 0.70.** In each case the two super-runs derived not merely the same
+> weighted score but the **identical category vector** — hermes `[3,2,2,3,2,2]`,
+> deepagents `[2,1,2,3,2,1]`.
+>
+> | Target | Raw runs | Raw range | Super-run A | Super-run B | **Pair delta** |
+> |---|---|---|---|---|---|
+> | Hermes | 2.30·2.60·2.85 / 2.15·2.55·2.45 | 0.70 | 2.30 | 2.30 | **0.00** |
+> | Deep Agents Code | 2.40·1.85·2.00 / 2.00·1.70·1.70 | 0.70 | 1.85 | 1.85 | **0.00** |
+>
+> **Deep Agents is the stronger case.** 1.85 appears nowhere in super-run B's raw
+> scans (2.00/1.70/1.70), so convergence cannot be an artifact of gravitating to a
+> run's value — the coincidence flagged as a limit in the hermes-only draft does not
+> recur. Its unions were also built with `scan_diff.py`'s own tuned scorer plus
+> union-find, not the hand-clustering hermes required, which removes the other stated
+> limit.
 >
 > This **reverses** `RESULTS_XHIGH_VALIDATION.md` (2026-08-11), where both pairs
 > differed by exactly the raw range and damping was recorded as NOT DEMONSTRATED.
@@ -28,24 +41,42 @@
 
 ## Raw inputs
 
+**Hermes** — 6-run range **0.70**, Critical counts 0 → 3:
+
 | Pair | run1 | run2 | run3 | spread | findings |
 |---|---|---|---|---|---|
-| **A** | 2.30 | 2.60 | 2.85 | **0.55** | 11 · 11 · 9 |
-| **B** | 2.15 | 2.55 | 2.45 | **0.40** | 13 · 12 · 9 |
+| A | 2.30 | 2.60 | 2.85 | **0.55** | 11 · 11 · 9 |
+| B | 2.15 | 2.55 | 2.45 | **0.40** | 13 · 12 · 9 |
 
-6-run range **0.70**. Raw Critical counts spanned **0 → 3**.
+**Deep Agents Code** — 6-run range **0.70**, Critical counts 1 → 3:
 
-Per-category, the raw runs disagreed on five of six categories at least once. Balance
-Your Knowledge Base is the extreme: the six runs drew **1, 2, 2, 3, 3, 3** on one
-codebase.
+| Pair | run1 | run2 | run3 | spread | findings |
+|---|---|---|---|---|---|
+| A | 2.40 | 1.85 | 2.00 | **0.55** | 13 · 15 · 14 |
+| B | 2.00 | 1.70 | 1.70 | **0.30** | 15 · 14 · 13 |
+
+**Balance Your Knowledge Base is the least stable category on both targets.** Hermes's
+six runs drew **1, 2, 2, 3, 3, 3**; Deep Agents' drew **1, 1, 1, 2, 2, 2**. On Deep
+Agents four of six categories were *identical in every run* (LD 2, ZT 2, SC 3, MON 1),
+with the entire spread carried by BK and Red Team. That makes BK a specific
+anchor-sharpening candidate for 1.4, rather than diffuse noise.
 
 ## §9.2 — stability
 
 | Target | Super-run A | Super-run B | Pair delta | 6-run raw range | Damping? |
 |---|---|---|---|---|---|
 | Hermes | **2.30** (18 findings) | **2.30** (19) | **0.00** | 0.70 | **yes** |
+| Deep Agents Code | **1.85** (20) | **1.85** (18) | **0.00** | 0.70 | **yes** |
 
-Category vectors: A `[3,2,2,3,2,2]`, B `[3,2,2,3,2,2]` — identical.
+Category vectors identical within each target: hermes `[3,2,2,3,2,2]`, deepagents
+`[2,1,2,3,2,1]`.
+
+**The two targets vary for different reasons, and both converge.** Hermes's spread is
+*recall* — the runs read different parts of a large dual-root tree. Deep Agents' is
+*judgment*: its adjudicator recorded that "the entire spread is two categories where
+run1 did not apply the KB's dominant-path ladder or the choose-the-lower rule, and
+finding-count variance (13/15/14) was decomposition, not discovery." Adjudication
+resolves both.
 
 **The score is re-derived, not blended.** B's adjudicator recorded it explicitly: 2.30
 is *"not the median (2.45), mean (2.38), or any run's value (2.15 / 2.55 / 2.45)."*
@@ -77,14 +108,16 @@ alone did not stabilise scores (August). #195 alone narrows raw spread but does 
 eliminate it (hermes still spreads 0.55 raw). Together they produce a reproducible
 score.
 
-## §9.5 corollary — recall, not precision, is this target's failure mode
+## §9.5 corollary — what a single run misses
 
 Both adjudicators found the same shape independently:
 
 | | single-run findings | refuted |
 |---|---|---|
-| Super-run A | **9 of 18** | 0 |
-| Super-run B | **10 of 19** | 0 |
+| hermes A | **9 of 18** | 0 |
+| hermes B | **10 of 19** | 0 |
+| deepagents A | **9 entries + 2 split-outs** | 0 |
+| deepagents B | **10 distinct claims** | 0 |
 
 Roughly half of each super-run's findings were seen by **exactly one scan of three**,
 and **not one was refuted**. The runs were not disagreeing about the code — they were
@@ -105,8 +138,14 @@ that better prompting fixes.
 
 | | entries → rulings | CONFIRMED | UNSUPPORTED | REMIT-DEFECT |
 |---|---|---|---|---|
-| A | 15 → 18 | 18 | 0 | 0 |
-| B | 13 → 19 | 18 | 0 | 1 |
+| hermes A | 15 → 18 | 18 | 0 | 0 |
+| hermes B | 13 → 19 | 18 | 0 | 1 |
+| deepagents A | 21 → 20 | 21 | 0 | 0 |
+| deepagents B | 21 → 18 | 20 | 0 | 1 |
+
+**76 rulings across four adjudications: 0 UNSUPPORTED.** Not one finding rested on a
+misread line, a stale reference, or an over-claim. Two were removed, both on
+**remit defects** rather than bad readings.
 
 Both adjudicators **split** over-merged union clusters (A: 3 splits, 1 merge; B: 5
 splits, 0 merges — one candidate merge considered and rejected on distinct fix-points).
@@ -164,12 +203,15 @@ deferred to 1.4 rather than landed against a completed freeze.
 
 ## Limits
 
-- **n = 1 pair, one target.** Damping is demonstrated here, not established across the
-  suite. The honest claim is "demonstrated post-#195 on the suite's widest-variance
-  target", not "x-high scores are stable".
-- Both super-runs converged on 2.30, which is also A/run1's raw value. Coincidence, and
-  the adjudication records show independent derivation — but a second target would be
-  needed before treating convergence-to-a-raw-value as anything other than chance.
-- The adjudicators were given union worklists built by the same orchestrator using the
-  same (defective) diff tool, then hand-corrected the same way. A different union
-  construction might present different entries.
+- **n = 2 targets, 2 pairs each.** Damping is demonstrated on the two widest-variance
+  targets, not established across the suite. The honest claim is "demonstrated
+  post-#195 on the two widest-variance targets, both at 0.70 raw range" — not "x-high
+  scores are stable".
+- The hermes-only limits are **retired by the second target**: convergence-to-a-raw-value
+  was ruled out (deepagents B derived 1.85 from 2.00/1.70/1.70), and the hand-clustered
+  union was replaced by `scan_diff.py`'s tuned scorer plus union-find.
+- Both targets were scanned by the same model (Opus 5) under the same orchestrator. A
+  different model, or a genuinely independent operator building the unions, remains
+  untested.
+- All four super-runs were adjudicated by the same agent *type* with the same brief.
+  The brief itself is therefore a shared, untested dependency of the result.
