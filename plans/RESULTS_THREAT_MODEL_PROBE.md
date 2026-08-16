@@ -138,3 +138,107 @@ layer) was 6/7 and ~5/5; attack paths 2/3 and 3/3.
 
 Before Phase 1: re-run one pair on the scan model (Opus 5) with spec v0.2
 to confirm the readout transfers; then freeze the graph spec.
+
+---
+
+# Round 2 — spec v0.2, Opus 5, + socxen (2026-08-16)
+
+Steve asked for a spec update, a re-run, and a **real, well-understood
+target**: socxen (SOC investigator — skill + Exabeam MCP connector, i.e. a
+prompt-shaped agent, the shape most Praxen targets will have). Inputs:
+`socxen-rev2/socxen-src` @ e913025 with its coherent same-day (2026-07-03)
+schema-2.0 findings JSON and 15-rule remit. Spec v0.2 changes: nullable
+`owasp` (ASI | LLM | null), mechanical ID formula, 11-entry boundary
+archetype menu, granularity convention, edgeless nodes blessed, input
+tolerance (old schema / drifted lines), prompt-shaped-target section.
+All six runs pinned `model: opus` — **all six self-reported Opus 5**.
+
+## Stability, v1 → v2 (same-target pairs)
+
+| target | node id-Jaccard | boundary id-Jaccard | edge id-Jaccard |
+|---|---|---|---|
+| finbot | 0.00 → **0.79** | 0.00 → **0.82** | 0.00 → 0.55 |
+| uagents | 0.07 → **0.59** | 0.00 → **0.73** | 0.02 → 0.28 |
+| socxen | — → 0.54 (0.72 fuzzy) | — → **1.00** | — → 0.22 |
+
+The mechanical formulas work: raw-id convergence went from ~zero to
+strong, and **socxen's boundary set converged perfectly (8/8)** — the
+archetype menu is the single most effective v0.2 change. The nullable
+`owasp` also behaved: no forced tags, and matching codes now largely agree
+across runs (finbot: ASI01 2=2, LLM02 4=4; ~10 threats/run honestly null).
+
+Remaining variance is precisely located, and **every major class was
+self-reported by the agents as a spec gap before comparison**:
+
+1. **Same-file splits** (headline v0.3 fix, hit on all 3 targets): the ID
+   collision rule only covers different files, so a file holding multiple
+   trust-distinct roles (finbot's fallback engine + approve tool in the
+   orchestrator module; socxen's 3–4 instruction-level controls in
+   SKILL.md) either collapses or forces invented prefixes — runs resolved
+   it differently. Fix: bless a `<function-or-section>-` prefix.
+2. **`__init__.py` basenames** degrade ids (uagents, both runs predicted
+   it, resolved it two ways). Fix: mandate parent-dir prefix for
+   `__init__.*`/`index.*`; also state underscore→dash and the
+   runtime-created-artifact naming rule (`private_keys.json`).
+3. **Edgeless boundaries** (`secret-material`, `supply-chain` are repo
+   posture with no runtime flow): one run emits `crossing_edges: []`,
+   another attaches a nearby edge. Fix: bless `[]`.
+4. **Edge topology on hub components** stays the loosest layer (0.22–0.55):
+   granularity of framework internals (uagents context/protocol split vs
+   one hub) and hub routing choices dominate. Conclusion unchanged —
+   product comparisons and baselines should anchor on boundaries + threat
+   content, treating edges as illustrative, not contractual.
+
+## Socxen — the "real target" readout
+
+The prompt-shaped section worked. Both runs modeled instruction-level
+controls as `control` nodes with markdown evidence, put the executing
+orchestrator question in the right place (the hosted model executes; the
+skill is the policy surface), and produced SOC-native attack paths — both
+runs' top path is the same one: **planted benign content in adversary
+sighted logs manufactures the analyst's yes / a production suppression**
+(r1 also surfaced unattended-run suppression and the defanging gap).
+Boundary set: 8/8 identical archetypes. Remit attachment surfaced 3
+boundaries with **zero governing remit rules** (secret-material,
+supply-chain, telemetry-egress) — direct #198-style feed on a real remit.
+Both runs correctly resolved the **2025→2026 OWASP renumbering** skew
+between the old findings JSON and current KBs, tagging per current KB and
+logging the divergence.
+
+## Emergent capabilities observed (unprompted)
+
+- **Residual-threat surfacing works**: uagents r1 modeled the in-scope
+  experimental `chat_agent` LLM tool loop (inbound chat →
+  `tool_choice="required"` → any handler, ToolContext inheriting ledger +
+  storage) which carries **zero baseline findings** — flagged as the most
+  notable unscanned surface. §2.3 of the design doc, demonstrated.
+- **Baseline auditing for free — with a false-positive lesson.** Verified
+  by hand before acting (per standing practice), agent claims about our
+  baselines went 2-for-3:
+  - CONFIRMED, filed as **praxen#253**: uagents -002 overstates the Helm
+    Secret wiring — `secrets.yaml` renders `UAGENT_SEED` but
+    `deployment.yaml` has no env/envFrom/secret volume, so nothing
+    delivers it to the pod (the committed seed default itself stays
+    Critical).
+  - CONFIRMED, filed as **praxen#254**: uagents -013 carries ASI08 against
+    the KB's own arbitration (pure alerting gap → RAISE-only; missing halt
+    is an explicitly non-tag-earning predisposing artifact). Both v2 runs
+    independently applied the KB correctly and diverged from the baseline.
+  - REFUTED: finbot "~35-line evidence drift" — the baseline cites
+    behavior lines (807–820 IS the threshold-expedite logic, 841–850 IS
+    the `contains_injection` approve branch); the extraction agent misread
+    body-line citations as function-def citations. Baseline accurate.
+  Net: extraction doubles as a light audit of finding wiring-claims and
+  tags, but its audit claims need the same adversarial verification as
+  anything else.
+
+## Round-2 verdict
+
+Concept confirmed on the target shape that matters (prompt-shaped, real),
+on the scan model, with converging ids and perfectly converging boundary
+archetypes. Cost held at ~0.5× a scan (123–160k tokens/run). Phase-1
+posture: fold the four v0.3 spec fixes in, then freeze the graph spec;
+treat **boundaries + threats as the stable contract** and edges as
+rendering detail. Next optional hardening before Phase 1: an x-high-style
+adjudicated pair (union two runs, adjudicate splits) if we want a single
+canonical graph per target rather than picking one run.
