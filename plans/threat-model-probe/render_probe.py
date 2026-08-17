@@ -188,6 +188,8 @@ def main(graph_path, out_path):
     svg.append('<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3A4A6B"/></marker>'
                '<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#006BFF"/></marker></defs>')
     loop_count = {}
+    elbls = []   # edge labels render in a top layer AFTER nodes so boxes
+    ei = 0       # never paint over them; linked to edges via data-ei
     for e in g["edges"]:
         f, t = pos.get(e["from"]), pos.get(e["to"])
         if not f or not t: continue
@@ -205,11 +207,12 @@ def main(graph_path, out_path):
             fnn = esc(nodes[e["from"]]["name"]); tnn = esc(nodes[e["to"]]["name"])
             lbl0 = esc(e.get("label", ""))
             tip0 = f'{fnn} → {tnn}: {lbl0}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
-            svg.append(f'<g class="edge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip0}">')
+            svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip0}">')
             svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
             svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"/>')
-            svg.append(f'<text class="elbl" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">{lbl0}</text>')
             svg.append('</g>')
+            elbls.append(f'<text class="elbl" data-ei="{ei}" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">{lbl0}</text>')
+            ei += 1
             continue
         mx = (x1 + x2) / 2
         if span >= 2:
@@ -224,13 +227,14 @@ def main(graph_path, out_path):
         lbl = esc(e.get("label", ""))
         tip = f'{fn} → {tn}: {lbl}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
         dim = ' style="opacity:.35"' if span >= 2 else ''
-        svg.append(f'<g class="edge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip}">')
+        svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip}">')
         svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
         svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"{dim}/>')
+        svg.append('</g>')
         # cross-lane labels rotate 90° to run along the (narrow) lane gap
         ly_mid = (fy + ty) / 2 + (55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1) * 0.75 if span >= 2 else 0)
-        svg.append(f'<text class="elbl" x="{mx - 4}" y="{ly_mid}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5" transform="rotate(-90 {mx - 4} {ly_mid})">{lbl}</text>')
-        svg.append('</g>')
+        elbls.append(f'<text class="elbl" data-ei="{ei}" x="{mx - 4}" y="{ly_mid}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5" transform="rotate(-90 {mx - 4} {ly_mid})">{lbl}</text>')
+        ei += 1
 
     # attack-path badges (first path only, numbered)
     ap = g.get("attack_paths", [])
@@ -245,6 +249,8 @@ def main(graph_path, out_path):
         c = KIND_COLOR.get(n.get("kind"), "#666")
         tip = esc(n.get("description", "")) + " | evidence: " + esc("; ".join(
             f"{ev.get('file')}:{ev.get('line','-')}" for ev in n.get("evidence", [])[:4]))
+        if n["id"] in badge_at and ap:
+            tip += esc(f' | ⚔ attack-path step {badge_at[n["id"]]} of {len(ap[0].get("steps",[]))}: “{ap[0].get("name","")}”')
         svg.append(f'<g class="node" data-id="{esc(n["id"])}" data-tip="{tip}">')
         svg.append(f'<rect x="{x}" y="{y}" width="{COL_W}" height="{h}" rx="8" fill="#fff" stroke="{c}" stroke-width="1.6"/>')
         svg.append(f'<rect x="{x}" y="{y}" width="5" height="{h}" rx="2.5" fill="{c}"/>')
@@ -255,6 +261,7 @@ def main(graph_path, out_path):
             svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+14}" r="10" fill="#C0392B"/>'
                        f'<text x="{x+COL_W-14}" y="{y+18}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{badge_at[n["id"]]}</text>')
         svg.append('</g>')
+    svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
     # --- HTML panels below the diagram ---
     def chip(text, color):
@@ -289,6 +296,21 @@ def main(graph_path, out_path):
     notes = g.get("notes", {})
     warn_html = "".join(f"<li>{esc(w)}</li>" for w in warnings) or "<li>none — all refs resolve, all nodes cited</li>"
 
+    kinds_present = []
+    for n in g["nodes"]:
+        k = n.get("kind")
+        if k not in kinds_present: kinds_present.append(k)
+    legend_items = [f'<span class="lg"><i style="background:#fff;border:2px solid {KIND_COLOR.get(k,"#666")};border-left:5px solid {KIND_COLOR.get(k,"#666")}"></i>{esc(k.replace("_"," "))}</span>'
+                    for k in kinds_present]
+    legend_items += [
+        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary, worst threat residual</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>… finding</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>… mitigated</span>',
+        '<span class="lg"><b class="lg-b">B1</b>boundary badge (hover for name)</span>',
+        '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (first path)</span>',
+        '<span class="lg"><i class="lg-arc"></i>dimmed arc = flow spanning 2+ lanes</span>',
+    ]
+    legend_html = "".join(legend_items)
     mh_logo, ft_logo = load_brand()
     n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "residual")
     n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "finding")
@@ -329,8 +351,14 @@ def main(graph_path, out_path):
  .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
  .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; font-size:13px; }}
  .diag {{ font-size:12px; color:var(--text-muted); }} .diag ul {{ margin:6px 0 0 18px; }}
- .edge .elbl {{ opacity:0; pointer-events:none; transition:opacity .1s; }}
- .edge:hover .elbl, .edge.hi .elbl {{ opacity:1; }}
+ .elbl {{ opacity:0; pointer-events:none; transition:opacity .1s; }}
+ .elbl.show {{ opacity:1; }}
+ .legend {{ display:flex; flex-wrap:wrap; gap:8px 18px; font-size:11.5px; color:var(--text-muted); align-items:center; }}
+ .legend .lg {{ display:inline-flex; align-items:center; gap:6px; }}
+ .legend .lg i {{ display:inline-block; width:20px; height:12px; border-radius:3px; }}
+ .legend .lg i.lg-dash {{ width:22px; height:0; border-top:2px dashed; border-radius:0; background:none; }}
+ .legend .lg i.lg-arc {{ width:22px; height:8px; border:1.5px solid #3A4A6B; border-bottom:none; border-radius:11px 11px 0 0; opacity:.4; background:none; }}
+ .legend .lg b.lg-b {{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#E67E00; color:#fff; font-size:10px; }}
  .edge:hover .vis, .edge.hi .vis {{ stroke:var(--blue); stroke-width:2.6; opacity:1 !important; marker-end:url(#arr-hi); }}
  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.55)); cursor:default; }}
  .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:default; }}
@@ -364,6 +392,7 @@ def main(graph_path, out_path):
 <div class="section-title">Architecture &amp; Trust Boundaries</div>
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Every component, flow, and boundary cites evidence — hover nodes for citations, edges for what flows, and B-badges for boundary detail. Dimmed long arcs span multiple lanes. PROBE ARTIFACT, not a product report.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
+<div class="legend" style="max-width:1100px;margin:12px auto 0">{legend_html}</div>
 </div>
 <div class="section"><div class="section-title">Attack Paths</div>{"".join(appanels) or "<div class='diag'>none grounded in findings</div>"}</div>
 <div class="section"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
@@ -387,11 +416,17 @@ document.querySelectorAll('[data-tip]').forEach(el => {{
   }});
   el.addEventListener('mouseleave', () => tt.style.opacity = 0);
 }});
+const lblOf = e => document.querySelector('.elbl[data-ei="' + e.dataset.ei + '"]');
+document.querySelectorAll('.edge').forEach(e => {{
+  const l = lblOf(e);
+  e.addEventListener('mouseenter', () => l && l.classList.add('show'));
+  e.addEventListener('mouseleave', () => l && l.classList.remove('show'));
+}});
 document.querySelectorAll('.node').forEach(n => {{
   const id = n.dataset.id;
   const mine = [...document.querySelectorAll('.edge')].filter(e => e.dataset.from === id || e.dataset.to === id);
-  n.addEventListener('mouseenter', () => mine.forEach(e => e.classList.add('hi')));
-  n.addEventListener('mouseleave', () => mine.forEach(e => e.classList.remove('hi')));
+  n.addEventListener('mouseenter', () => mine.forEach(e => {{ e.classList.add('hi'); const l = lblOf(e); l && l.classList.add('show'); }}));
+  n.addEventListener('mouseleave', () => mine.forEach(e => {{ e.classList.remove('hi'); const l = lblOf(e); l && l.classList.remove('show'); }}));
 }});
 </script>
 </body></html>"""
