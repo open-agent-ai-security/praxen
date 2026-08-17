@@ -468,7 +468,7 @@ def main(graph_path, out_path):
  .legend .lg i {{ display:inline-block; width:20px; height:12px; border-radius:3px; }}
  .legend .lg i.lg-dash {{ width:22px; height:0; border-top:2px dashed; border-radius:0; background:none; }}
  .legend .lg i.lg-arc {{ width:22px; height:8px; border:1.5px solid #3A4A6B; border-bottom:none; border-radius:11px 11px 0 0; opacity:.4; background:none; }}
- .legend .lg b.lg-b {{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#E67E00; color:#fff; font-size:10px; }}
+ b.lg-b {{ display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 3px; border-radius:10px; background:#E67E00; color:#fff; font-size:10px; font-weight:700; }}
  .edge:hover .vis, .edge.hi .vis {{ stroke:var(--blue); stroke-width:2.6; opacity:1 !important; marker-end:url(#arr-hi); }}
  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.55)); cursor:default; }}
  .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:default; }}
