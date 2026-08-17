@@ -1,10 +1,16 @@
-# Threat-Model Graph JSON — probe spec v0.3
+# Threat-Model Graph JSON — probe spec v0.4.1
 
 One JSON object per target. This is the Phase-0 probe shape, not a product
 contract. Everything is evidence-derived: **no node, edge, boundary, or
 threat without a citation into the source tree, the findings JSON, or the
 remit.** If you cannot cite it, leave it out and note the omission in
 `notes`.
+
+v0.4 changes (from the round-3 probe): control nodes sit in the lane of
+their ENFORCING PROCESS; rule-3 prefix extended to named constructs;
+family-node prefix tiebreak; heading-shaped remit rules ruling;
+arbitration precedence stated (KB wins over stored finding tags);
+mitigation-check sweep before threat status assignment.
 
 v0.3 changes (from the round-2 probe + remit-semantics correction):
 `spec_version` literal is now `0.3-probe`; same-file split IDs get a
@@ -20,7 +26,7 @@ tolerance, prompt-shaped targets.
 
 ```json
 {
-  "spec_version": "0.3-probe",
+  "spec_version": "0.4.1-probe",
   "target": { "slug": "<slug>", "source_root": "<abs path scanned>" },
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
@@ -44,6 +50,14 @@ tolerance, prompt-shaped targets.
 
 A component goes in exactly one lane. If placement is genuinely ambiguous,
 pick the best fit and record the ambiguity in `notes.lane_fit`.
+
+**Control-lane rule (v0.4):** a `control` node sits in the lane of the
+PROCESS THAT ENFORCES IT, not the lane of the thing it conceptually
+protects. A guardrail executing inside the MCP bridge process is
+`tools_mcp`; a browser-side gate is `client_adapters`; instruction-level
+controls in a skill/prompt file are `agent_core` (the prompt is the
+enforcing surface). This keeps control chains local instead of
+double-crossing lanes.
 
 ## Nodes
 
@@ -71,7 +85,9 @@ runs looking at the same code MUST coin the same id. The formula:
    `__init__` to `init`.
 3. **Same-file split** (the granularity rule carves two trust-distinct
    nodes out of one file): prefix the defining function / class / section
-   heading, kebab-cased: `fallback-processing-finbot-agent-py-orchestrator`,
+   heading — or, when the code has no named defining scope (a conditional
+   block, registration inside `__init__`), **the named construct the block
+   turns on** (the flag, constant, or registry it registers), kebab-cased: `fallback-processing-finbot-agent-py-orchestrator`,
    `approve-invoice-finbot-agent-py-tool`, `redaction-skill-md-control`.
    The base file id names the file's dominant role; splits take prefixes.
 4. **Cross-file collision** (two nodes, same basename+kind, different
@@ -99,7 +115,11 @@ single file into multiple nodes only when the roles differ in trust
 consequence (e.g. an orchestrator and a wallet in one module). A family of
 parallel same-role items (many tools, many adapters) is ONE node named for
 the family unless a specific member carries a distinct trust consequence —
-then that member alone splits out. **Framework runtime internals**
+then that member alone splits out. A family node carved from a file that
+also hosts a split (rule 3) takes the prefix of **the function or table
+that enumerates the family** (e.g. the tool-definitions function, the
+allow-list constant) — never an invented collective noun. **Framework
+runtime internals**
 (context/protocol/dispatch/session plumbing) collapse into the
 orchestrator node unless a piece carries a distinct trust consequence of
 its own (a wallet, a signer, a store) — plumbing is evidence on the
@@ -139,7 +159,7 @@ dominant direction.
       "stride": "S | T | R | I | D | E",
       "owasp": "ASI01".."ASI10" | "LLM01".."LLM10" | null,
       "summary": "<one sentence, specific to THIS target>",
-      "status": "finding | mitigated | residual",
+      "status": "finding | mitigated | open",
       "finding_id": "<finding id from the findings JSON, when status=finding>",
       "mitigation_evidence": { "file": "...", "line": 123 }
     }
@@ -186,6 +206,22 @@ distinguish in `name`.
     problem anywhere in the graph or notes.
   - For rules you do attach, copy the coverage status from the findings
     JSON `remit_coverage` block (match by rule TEXT, not by R-number).
+  - **Heading-shaped rules (v0.4):** when a rule's extracted text is a bare
+    section heading ("Approved Communication Channels"), the governing
+    artifact is the table/list under that heading in the remit — attach the
+    rule iff that content governs the boundary, and quote a content line,
+    not the heading, as the excerpt.
+- **Arbitration precedence (v0.4):** when the findings JSON's stored
+  OWASP tag disagrees with the current KB arbitration on the same
+  evidence, **the KB wins** — tag per the KB and record the divergence in
+  `notes.omissions`. Stored tags are a snapshot; the KB is the authority.
+- **Mitigation-check sweep (v0.4) — run BEFORE assigning any threat
+  status.** For each enumerated threat, actively look for the control that
+  would mitigate it (the lane table's control locations, plus config and
+  deploy artifacts) before writing the status: `mitigated` requires a
+  citation to the enforcing code/config; `open` asserts you LOOKED and
+  found none — record where you looked when non-obvious. Never assign
+  `open` as a default for not having checked.
 - `threats`: enumerate per crossing via STRIDE. `owasp` is the primary
   OWASP code under the KB's arbitration conventions: an ASI code when an
   agentic primary honestly applies, an LLM code when only the LLM Top 10
@@ -194,7 +230,12 @@ distinguish in `name`.
   tag is worse than a null. `status`:
   - `finding` — an existing finding in the findings JSON addresses it (cite the id)
   - `mitigated` — a control demonstrably handles it (cite code)
-  - `residual` — neither; plausible but unaddressed/unexamined
+  - `open` — neither: the mitigation-check sweep looked for a control and
+    found none, and no finding covers it. (Renamed from `residual` in
+    v0.4.1 — "residual risk" is ISO/NIST vocabulary for the *post-control
+    remainder*, the opposite end of the process; `open` is what SOC
+    tooling calls this state. Probe graphs written before the rename use
+    `residual` as a legacy synonym.)
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
 
 ## Attack paths

@@ -54,7 +54,9 @@ def icon_svg(kind, color, size=18):
     return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" '
             f'stroke="{color}" stroke-width="1.8" stroke-linecap="round" '
             f'stroke-linejoin="round" aria-hidden="true">{p}</svg>')
-STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "residual": "#C0392B"}
+STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "open": "#C0392B",
+                "residual": "#C0392B"}  # legacy synonym in pre-v1 probe graphs
+def norm_status(st): return "open" if st == "residual" else st
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
                   "vague": "#6C757D", "enp": "#6C757D"}
 
@@ -191,8 +193,8 @@ def main(graph_path, out_path):
         gap = max(set(gaps), key=gaps.count) if gaps else 1
         worst = "mitigated"
         for t in b.get("threats", []):
-            if t.get("status") == "residual": worst = "residual"; break
-            if t.get("status") == "finding": worst = "finding"
+            if norm_status(t.get("status")) == "open": worst = "open"; break
+            if norm_status(t.get("status")) == "finding": worst = "finding"
         bnd_at_gap.setdefault(gap, []).append((b, worst))
     bnd_num = {}  # boundary id -> B<n>, in declaration order
     for i, b in enumerate(g.get("trust_boundaries", []), 1):
@@ -320,7 +322,7 @@ def main(graph_path, out_path):
             fid = t.get("finding_id") or ""
             rows.append(f'<tr><td>{esc(t.get("stride","?"))}</td><td>{esc(t.get("owasp") or "—")}</td>'
                         f'<td>{esc(t.get("summary",""))}</td>'
-                        f'<td>{chip(t.get("status","?"), STATUS_COLOR.get(t.get("status"), "#666"))} {esc(fid)}</td></tr>')
+                        f'<td>{chip(norm_status(t.get("status","?")), STATUS_COLOR.get(norm_status(t.get("status")), "#666"))} {esc(fid)}</td></tr>')
         remits = " ".join(
             chip(f'{r.get("rule_id","R-?")} {r.get("coverage_status","?")}',
                  COVERAGE_COLOR.get(r.get("coverage_status"), "#666")) +
@@ -352,7 +354,7 @@ def main(graph_path, out_path):
     row2 = "".join(f'<span class="lg">{icon_svg(k, KIND_COLOR.get(k, "#666"), 16)}{esc(k.replace("_", " "))}</span>'
                    for k in kinds_present)
     row3 = "".join([
-        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat residual</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat open</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— finding</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
         '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
@@ -368,8 +370,8 @@ def main(graph_path, out_path):
     for b in g.get("trust_boundaries", []):
         worst = "mitigated"
         for t in b.get("threats", []):
-            if t.get("status") == "residual": worst = "residual"; break
-            if t.get("status") == "finding": worst = "finding"
+            if norm_status(t.get("status")) == "open": worst = "open"; break
+            if norm_status(t.get("status")) == "finding": worst = "finding"
         c = STATUS_COLOR[worst]
         bk_rows.append(f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num_pre[b["id"]]}</b></td>'
                        f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
@@ -389,7 +391,7 @@ def main(graph_path, out_path):
     inventory_html = ('<table><tr><th>Component</th><th>Kind</th><th>Lane</th><th>Description</th>'
                       '<th>Evidence</th></tr>' + "".join(inv_rows) + '</table>')
     mh_logo, ft_logo = load_brand()
-    n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "residual")
+    n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "open")
     n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "finding")
     n_mit = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "mitigated")
     doc = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -471,7 +473,7 @@ def main(graph_path, out_path):
       <div class="mh-metric"><b>{len(g["edges"])}</b><span>Flows</span></div>
       <div class="mh-metric"><b>{len(g.get("trust_boundaries",[]))}</b><span>Boundaries</span></div>
       <div class="mh-metric mh-fin"><b>{n_fin}</b><span>Findings</span></div>
-      <div class="mh-metric mh-res"><b>{n_res}</b><span>Residual</span></div>
+      <div class="mh-metric mh-res"><b>{n_res}</b><span>Open</span></div>
       <div class="mh-metric mh-mit"><b>{n_mit}</b><span>Mitigated</span></div>
     </div>
   </div>
