@@ -5,7 +5,14 @@
 
 # Results — Threat-Model Phase-0 Probe
 
-> **STATUS: PROBE COMPLETE 2026-08-16.**
+> **STATUS: PROBE CLOSED — PHASE 1 GO (Steve, 2026-08-17).** Four spec
+> rounds plus a full design-review cycle on the renderer (brand
+> alignment, print-first statics, icons + 6-family colors, status set
+> confirmed/potential/partial/mitigated with blue off-ladder potential,
+> interaction discipline). Steve approved the v4 socxen render as the
+> 2.0 visual reference: "Good enough to move us to the next phase."
+> Spec v0.4.3 is the freeze candidate; everything from here is the
+> Phase-1 port per `RELEASE_2.0_PLAN.md`.
 > Design under test: `DESIGN_THREAT_MODEL.md`. Artifacts (graph JSONs,
 > comparison outputs, spec, prompt, probe scripts) are checked in at
 > `plans/threat-model-probe/`; rendered HTML is generated output —
