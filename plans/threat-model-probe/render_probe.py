@@ -208,7 +208,7 @@ def main(graph_path, out_path):
             lbl0 = esc(e.get("label", ""))
             tip0 = f'{fnn} → {tnn}: {lbl0}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
             svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip0}">')
-            svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
+            svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
             svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"/>')
             svg.append('</g>')
             elbls.append(f'<text class="elbl" data-ei="{ei}" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">{lbl0}</text>')
@@ -228,7 +228,7 @@ def main(graph_path, out_path):
         tip = f'{fn} → {tn}: {lbl}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
         dim = ' style="opacity:.35"' if span >= 2 else ''
         svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip}">')
-        svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
+        svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
         svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"{dim}/>')
         svg.append('</g>')
         # cross-lane labels rotate 90° to run along the (narrow) lane gap
@@ -407,15 +407,31 @@ def main(graph_path, out_path):
 <div id="tt"></div>
 <script>
 const tt = document.getElementById('tt');
+// Tooltip discipline: 250ms show-delay (deliberate dwell, not traversal),
+// click anywhere dismisses (until you enter a different element), and a
+// 6s dwell auto-fade so it never parks on screen indefinitely.
+let showTimer = null, fadeTimer = null, suppressed = false, mx = 0, my = 0;
+const place = () => {{
+  tt.style.left = Math.min(mx + 14, window.innerWidth - 400) + 'px';
+  tt.style.top = (my + 14) + 'px';
+}};
+const hideTip = () => {{ clearTimeout(showTimer); clearTimeout(fadeTimer); tt.style.opacity = 0; }};
 document.querySelectorAll('[data-tip]').forEach(el => {{
-  el.addEventListener('mousemove', ev => {{
-    tt.textContent = el.dataset.tip;
-    tt.style.opacity = 1;
-    tt.style.left = Math.min(ev.clientX + 14, window.innerWidth - 400) + 'px';
-    tt.style.top = (ev.clientY + 14) + 'px';
+  el.addEventListener('mouseenter', ev => {{
+    suppressed = false; mx = ev.clientX; my = ev.clientY;
+    clearTimeout(showTimer);
+    showTimer = setTimeout(() => {{
+      if (suppressed) return;
+      tt.textContent = el.dataset.tip; place(); tt.style.opacity = 1;
+      clearTimeout(fadeTimer);
+      fadeTimer = setTimeout(() => tt.style.opacity = 0, 6000);
+    }}, 250);
   }});
-  el.addEventListener('mouseleave', () => tt.style.opacity = 0);
+  el.addEventListener('mousemove', ev => {{ mx = ev.clientX; my = ev.clientY; if (!suppressed && tt.style.opacity == 1) place(); }});
+  el.addEventListener('mouseleave', hideTip);
 }});
+document.addEventListener('click', () => {{ suppressed = true; hideTip(); }});
+document.addEventListener('keydown', ev => {{ if (ev.key === 'Escape') {{ suppressed = true; hideTip(); }} }});
 const lblOf = e => document.querySelector('.elbl[data-ei="' + e.dataset.ei + '"]');
 // Single-edge hover: tooltip only (it carries the label + endpoints + data).
 // On-canvas labels appear only on NODE hover, where they annotate the whole
