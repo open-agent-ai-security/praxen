@@ -65,6 +65,16 @@ as input, so the generator work is *better* after this ships.
    color is brand blue. The probe renderer's brand re-skin (2026-08-17)
    is the visual reference; the product port replaces its
    extract-at-render hack with a proper shared source.
+   **Static-completeness requirement (Steve, 2026-08-17): the report must
+   read complete on paper — interactivity is an enhancement layer, never
+   the only carrier of information.** Concretely: printed legend (6
+   component families + kind icon key + mark key), static boundary key
+   table resolving every B-badge, kind ICONS on nodes carrying meaning
+   alongside (reduced, 6-family) color, the primary attack path drawn as
+   a bold static route through the flow graph, a component-inventory
+   appendix carrying every node's evidence citations, and print CSS
+   (labels shown, tooltip hidden, diagram scaled). Hover behaviors
+   (highlighting, fan labels, tooltips) stay — as additive polish.
 5. **Semantic comparator** (test tooling, not user-facing): boundary/threat
    content matching for pair diffing and future baseline comparison —
    explicitly not raw-id or edge-topology matching.

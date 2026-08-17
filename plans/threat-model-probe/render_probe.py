@@ -18,13 +18,42 @@ LANE_TITLES = {
 # Orange is chrome-only (masthead/footer rules), never data — same rule as
 # the analysis report. Severity semantics: residual=red, finding=amber,
 # mitigated=green.
+# Color carries FAMILY (6, trackable); the icon carries the exact KIND.
 KIND_COLOR = {
-    "entrypoint": "#8D00FF", "client": "#006BFF", "adapter": "#006BFF",
-    "orchestrator": "#003FCC", "model": "#003FCC", "prompt": "#3A4A6B",
-    "memory": "#3A4A6B", "datastore": "#3A4A6B", "tool": "#009D00",
-    "mcp_server": "#106D00", "control": "#D4A017", "external_service": "#6C757D",
-    "deploy_surface": "#C0392B", "secret_store": "#C0392B", "log_sink": "#6C757D",
+    "entrypoint": "#8D00FF",
+    "client": "#006BFF", "adapter": "#006BFF",
+    "orchestrator": "#003FCC", "model": "#003FCC", "prompt": "#003FCC", "memory": "#003FCC",
+    "tool": "#009D00", "mcp_server": "#009D00", "datastore": "#009D00",
+    "control": "#D4A017",
+    "external_service": "#6C757D", "deploy_surface": "#6C757D",
+    "secret_store": "#6C757D", "log_sink": "#6C757D",
 }
+FAMILIES = [("actors & inputs", "#8D00FF"), ("client / adapters", "#006BFF"),
+            ("agent core", "#003FCC"), ("tools & data", "#009D00"),
+            ("controls", "#D4A017"), ("external & deploy", "#6C757D")]
+# 24x24 stroke glyphs; a tool looks like a tool.
+ICONS = {
+    "entrypoint": '<path d="M13 4h6v16h-6M3 12h11M10 8l4 4-4 4"/>',
+    "client": '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M9 21h6M12 17v4"/>',
+    "adapter": '<path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 0 1-10 0zM12 17v4"/>',
+    "orchestrator": '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+    "model": '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9z"/>',
+    "prompt": '<path d="M6 3h9l4 4v14H6zM15 3v4h4M9 11h7M9 15h7"/>',
+    "memory": '<rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+    "datastore": '<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5V18c0 1.7 3.6 3 8 3s8-1.3 8-3V5.5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    "tool": '<path d="M14.5 6.5a4.5 4.5 0 0 0-6 5.6L3 17.6V21h3.4l5.5-5.5a4.5 4.5 0 0 0 5.6-6L14 13l-3-3z"/>',
+    "mcp_server": '<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><circle cx="7" cy="7.5" r="0.8"/><circle cx="7" cy="16.5" r="0.8"/>',
+    "control": '<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6zM8.8 12l2.2 2.2 4.2-4.2"/>',
+    "external_service": '<path d="M7 18a4.5 4.5 0 1 1 .8-8.9A6 6 0 0 1 19 11a3.5 3.5 0 0 1-1 7z"/>',
+    "deploy_surface": '<path d="M12 2l8 4.5v11L12 22l-8-4.5v-11zM12 2v9M4 6.5l8 4.5 8-4.5M12 22V11"/>',
+    "secret_store": '<circle cx="8" cy="8" r="5"/><path d="M11.5 11.5L21 21M17 17l2-2M14 14l2-2"/>',
+    "log_sink": '<path d="M4 5h2M9 5h11M4 12h2M9 12h11M4 19h2M9 19h11"/>',
+}
+def icon_svg(kind, color, size=18):
+    p = ICONS.get(kind, "")
+    return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" '
+            f'stroke="{color}" stroke-width="1.8" stroke-linecap="round" '
+            f'stroke-linejoin="round" aria-hidden="true">{p}</svg>')
 STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "residual": "#C0392B"}
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
                   "vague": "#6C757D", "enp": "#6C757D"}
@@ -186,10 +215,12 @@ def main(graph_path, out_path):
     # Tooltip carries the full from -> to story. data-from/data-to feed the
     # node-hover highlighting script.
     svg.append('<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3A4A6B"/></marker>'
-               '<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#006BFF"/></marker></defs>')
+               '<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#006BFF"/></marker>'
+               '<marker id="arr-path" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#C0392B"/></marker></defs>')
     loop_count = {}
     elbls = []   # edge labels render in a top layer AFTER nodes so boxes
     ei = 0       # never paint over them; linked to edges via data-ei
+    edge_d = {}  # (from,to) -> path d, for the static attack-path overlay
     for e in g["edges"]:
         f, t = pos.get(e["from"]), pos.get(e["to"])
         if not f or not t: continue
@@ -209,7 +240,8 @@ def main(graph_path, out_path):
             tip0 = f'{fnn} → {tnn}: {lbl0}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
             svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip0}">')
             svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
-            svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"/>')
+            edge_d[(e["from"], e["to"])] = d
+            svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.2" marker-end="url(#arr)" opacity="0.4"/>')
             svg.append('</g>')
             elbls.append(f'<text class="elbl" data-ei="{ei}" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">{lbl0}</text>')
             ei += 1
@@ -226,10 +258,11 @@ def main(graph_path, out_path):
         fn = esc(nodes[e["from"]]["name"]); tn = esc(nodes[e["to"]]["name"])
         lbl = esc(e.get("label", ""))
         tip = f'{fn} → {tn}: {lbl}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
-        dim = ' style="opacity:.35"' if span >= 2 else ''
+        dim = ' style="opacity:.22"' if span >= 2 else ''
         svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip}">')
         svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
-        svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"{dim}/>')
+        edge_d[(e["from"], e["to"])] = d
+        svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.2" marker-end="url(#arr)" opacity="0.4"{dim}/>')
         svg.append('</g>')
         # cross-lane labels rotate 90° to run along the (narrow) lane gap
         ly_mid = (fy + ty) / 2 + (55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1) * 0.75 if span >= 2 else 0)
@@ -257,10 +290,43 @@ def main(graph_path, out_path):
         for li, line in enumerate(lines):
             svg.append(f'<text x="{x+14}" y="{y+20+14*li}" font-size="12" font-weight="600" fill="#0D1B2A">{esc(line)}</text>')
         svg.append(f'<text x="{x+14}" y="{y+h-8}" font-size="9.5" fill="{c}" font-weight="600">{esc(n.get("kind","?").upper())}</text>')
+        ic = ICONS.get(n.get("kind"), "")
+        if ic:
+            svg.append(f'<g transform="translate({x+COL_W-26},{y+7}) scale(0.75)" fill="none" stroke="{c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{ic}</g>')
         if n["id"] in badge_at:
-            svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+14}" r="10" fill="#C0392B"/>'
-                       f'<text x="{x+COL_W-14}" y="{y+18}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{badge_at[n["id"]]}</text>')
+            svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+h-13}" r="10" fill="#C0392B"/>'
+                       f'<text x="{x+COL_W-14}" y="{y+h-9}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{badge_at[n["id"]]}</text>')
         svg.append('</g>')
+    # static overlay: the badged (first) attack path drawn as a bold route so
+    # the meaningful connections read without any interaction; other edges
+    # recede. Consecutive steps with no direct edge are left to the badges.
+    if ap:
+        adj = {}
+        for (a0, b0) in edge_d:
+            adj.setdefault(a0, set()).add(b0); adj.setdefault(b0, set()).add(a0)
+        def route(a, b, cap=4):
+            # BFS through the flow graph: consecutive attack-path steps often
+            # connect via a hub (harness, bridge) rather than a direct edge.
+            from collections import deque
+            q, seen = deque([[a]]), {a}
+            while q:
+                path = q.popleft()
+                if len(path) > cap: continue
+                for nx in adj.get(path[-1], ()):
+                    if nx == b: return path + [b]
+                    if nx not in seen:
+                        seen.add(nx); q.append(path + [nx])
+            return None
+        steps = [st.get("node") for st in ap[0].get("steps", []) if st.get("node") in pos]
+        hop_pairs = set()
+        for a, b in zip(steps, steps[1:]):
+            r = route(a, b)
+            if r:
+                for h1, h2 in zip(r, r[1:]): hop_pairs.add((h1, h2))
+        for (a, b) in hop_pairs:
+            d_ab = edge_d.get((a, b)) or edge_d.get((b, a))
+            if d_ab:
+                svg.append(f'<path d="{d_ab}" fill="none" stroke="#C0392B" stroke-width="2.6" opacity="0.8" marker-end="url(#arr-path)"/>')
     svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
     # --- HTML panels below the diagram ---
@@ -300,17 +366,49 @@ def main(graph_path, out_path):
     for n in g["nodes"]:
         k = n.get("kind")
         if k not in kinds_present: kinds_present.append(k)
-    legend_items = [f'<span class="lg"><i style="background:#fff;border:2px solid {KIND_COLOR.get(k,"#666")};border-left:5px solid {KIND_COLOR.get(k,"#666")}"></i>{esc(k.replace("_"," "))}</span>'
-                    for k in kinds_present]
-    legend_items += [
-        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary, worst threat residual</span>',
-        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>… finding</span>',
-        '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>… mitigated</span>',
-        '<span class="lg"><b class="lg-b">B1</b>boundary badge (hover for name)</span>',
-        '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (first path)</span>',
-        '<span class="lg"><i class="lg-arc"></i>dimmed arc = flow spanning 2+ lanes</span>',
-    ]
-    legend_html = "".join(legend_items)
+    fam_present = set(KIND_COLOR.get(k, "#666") for k in kinds_present)
+    row1 = "".join(f'<span class="lg"><i style="background:#fff;border:2px solid {c};border-left:5px solid {c}"></i>{esc(nm)}</span>'
+                   for nm, c in FAMILIES if c in fam_present)
+    row2 = "".join(f'<span class="lg">{icon_svg(k, KIND_COLOR.get(k, "#666"), 16)}{esc(k.replace("_", " "))}</span>'
+                   for k in kinds_present)
+    row3 = "".join([
+        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat residual</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— finding</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
+        '<span class="lg"><i style="background:none;border-top:3px solid #C0392B;height:0;border-radius:0"></i>attack-path route</span>',
+        '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step</span>',
+        '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
+    ])
+    legend_html = (f'<div class="lg-row"><span class="lg-cap">Families</span>{row1}</div>'
+                   f'<div class="lg-row"><span class="lg-cap">Kinds</span>{row2}</div>'
+                   f'<div class="lg-row"><span class="lg-cap">Marks</span>{row3}</div>')
+
+    # static boundary key — the B-badges resolved on paper, no hover needed
+    bnd_num_pre = {b["id"]: f"B{i}" for i, b in enumerate(g.get("trust_boundaries", []), 1)}
+    bk_rows = []
+    for b in g.get("trust_boundaries", []):
+        worst = "mitigated"
+        for t in b.get("threats", []):
+            if t.get("status") == "residual": worst = "residual"; break
+            if t.get("status") == "finding": worst = "finding"
+        c = STATUS_COLOR[worst]
+        bk_rows.append(f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num_pre[b["id"]]}</b></td>'
+                       f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
+                       f'<td>{len(b.get("threats", []))}</td><td>{len(b.get("remit_rules", []))}</td>'
+                       f'<td style="color:{c};font-weight:700">{worst}</td></tr>')
+    boundary_key_html = ('<table class="bk"><tr><th></th><th>Trust boundary</th><th>Threats</th>'
+                         '<th>Remit rules</th><th>Worst status</th></tr>' + "".join(bk_rows) + '</table>')
+
+    # component inventory appendix — node evidence on paper, not only in tooltips
+    inv_rows = []
+    for n in g["nodes"]:
+        evs = "; ".join(f'{ev.get("file")}:{ev.get("line", "—")}' for ev in n.get("evidence", [])[:2])
+        c = KIND_COLOR.get(n.get("kind"), "#666")
+        inv_rows.append(f'<tr><td style="white-space:nowrap">{icon_svg(n.get("kind"), c, 14)} <b>{esc(n["name"])}</b></td>'
+                        f'<td>{esc(n.get("kind", ""))}</td><td>{esc(n.get("lane", ""))}</td>'
+                        f'<td>{esc(n.get("description", ""))}</td><td class="rx">{esc(evs)}</td></tr>')
+    inventory_html = ('<table><tr><th>Component</th><th>Kind</th><th>Lane</th><th>Description</th>'
+                      '<th>Evidence</th></tr>' + "".join(inv_rows) + '</table>')
     mh_logo, ft_logo = load_brand()
     n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "residual")
     n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "finding")
@@ -353,7 +451,19 @@ def main(graph_path, out_path):
  .diag {{ font-size:12px; color:var(--text-muted); }} .diag ul {{ margin:6px 0 0 18px; }}
  .elbl {{ opacity:0; pointer-events:none; transition:opacity .1s; }}
  .elbl.show {{ opacity:1; }}
- .legend {{ display:flex; flex-wrap:wrap; gap:8px 18px; font-size:11.5px; color:var(--text-muted); align-items:center; }}
+ .legend {{ font-size:11.5px; color:var(--text-muted); }}
+ .legend .lg-row {{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:3px 0; }}
+ .legend .lg-cap {{ font-size:10px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:#8A97A8; width:58px; flex-shrink:0; }}
+ .legend .lg svg {{ display:inline-block; vertical-align:middle; }}
+ .bk {{ margin-top:14px; }} .bk td, .bk th {{ padding:4px 9px; }}
+ @media print {{
+   .elbl {{ opacity:1 !important; }}
+   #tt {{ display:none; }}
+   .svgwrap {{ overflow:visible; border:none; padding:0; }}
+   .svgwrap svg {{ max-width:100%; height:auto; }}
+   details {{ page-break-inside:avoid; }} details:not([open]) {{ display:block; }}
+   .section {{ page-break-inside:avoid; }}
+ }}
  .legend .lg {{ display:inline-flex; align-items:center; gap:6px; }}
  .legend .lg i {{ display:inline-block; width:20px; height:12px; border-radius:3px; }}
  .legend .lg i.lg-dash {{ width:22px; height:0; border-top:2px dashed; border-radius:0; background:none; }}
@@ -393,9 +503,12 @@ def main(graph_path, out_path):
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Every component, flow, and boundary cites evidence — hover nodes for citations, edges for what flows, and B-badges for boundary detail. Dimmed long arcs span multiple lanes. PROBE ARTIFACT, not a product report.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
 <div class="legend" style="max-width:1100px;margin:12px auto 0">{legend_html}</div>
+<div style="max-width:1100px;margin:0 auto">{boundary_key_html}</div>
 </div>
 <div class="section"><div class="section-title">Attack Paths</div>{"".join(appanels) or "<div class='diag'>none grounded in findings</div>"}</div>
 <div class="section"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
+<div class="section"><div class="section-title">Component Inventory</div>
+<div class="section-desc">Every component with its kind, lane, and source evidence — the diagram's tooltips, on paper.</div>{inventory_html}</div>
 <div class="section"><div class="section-title">Probe Diagnostics</div>
 <div class="diag">lane_fit: {esc(notes.get("lane_fit",""))}<br>omissions: {esc(notes.get("omissions",""))}<br>model: {esc(g.get("model_identity",""))}<ul>{warn_html}</ul></div></div>
 </div>
