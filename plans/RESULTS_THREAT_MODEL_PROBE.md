@@ -238,6 +238,83 @@ logging the divergence.
   tags, but its audit claims need the same adversarial verification as
   anything else.
 
+---
+
+# Round 3 — full regeneration under corrected assumptions + review (2026-08-16)
+
+Steve: *"Regen all with these new assumptions. Then review."* Spec v0.3 =
+the remit-is-a-job-description semantics made binding (attach only genuine
+governance; empty `remit_rules` is normal and must not be remarked on) +
+the round-2 mechanical fixes (six-rule ID formula with same-file split
+prefixes, `__init__` dir-prefix, runtime-artifact naming, edgeless
+boundaries, framework-internals collapse, `spec_version` literal). Six
+fresh Opus-5 runs (two were sleep-killed mid-run and rerun under
+`caffeinate`; the originals in fact survived and their duplicates were
+stopped — all six final graphs validated).
+
+## Review
+
+**1. Mechanical — PASS.** 6/6 graphs: `0.3-probe` stamp, Opus 5 identity,
+0 renderer warnings (all refs resolve, every node cited). finbot and
+uagents place all 14 baseline findings in both runs; none invented.
+
+**2. Stability (v1 → v2 → v3, node/boundary raw id-Jaccard):**
+
+| target | nodes | boundaries |
+|---|---|---|
+| finbot | 0.00 → 0.79 → 0.58 | 0.00 → 0.82 → **0.90** |
+| uagents | 0.07 → 0.59 → **0.72** (0.85 fuzzy) | 0.00 → 0.73 → **1.00** (11/11) |
+| socxen | — → 0.54 → 0.44 | — → 1.00 → **1.00** (8/8) |
+
+The **boundary layer — the intended contract — has converged (0.90–1.00)**
+and threat status mixes track closely. Node ids plateau: each mechanical
+fix closed one wobble and opened a smaller one (family-node prefixes,
+rule-5-vs-rule-1 datastore naming, unnamed-block prefixes — each
+self-reported by the runs). Verdict: stop chasing raw-id 1.0; the product
+contract is boundaries + threat content, node matching is content-based,
+edges are rendering detail. This mirrors how we already treat remit rules.
+
+**3. Semantics — PASS, with the best evidence being socxen.** All six runs
+attach only genuinely governing rules, leave posture boundaries empty
+without comment, and — the clincher — both socxen runs leave
+`untrusted-ingress` remit-empty because **the remit genuinely has no
+telemetry-as-data rule**: that control exists only in SKILL.md
+(implementation), which the graphs correctly model as a control node.
+v2 had stretched a thematic match there; v3 keeps declared-intent vs
+implementation clean. Pair-consistent empty sets everywhere (finbot:
+secret-material/supply-chain ×2; uagents: data-at-rest/supply-chain ×2).
+
+**4. Substance — PASS.** Ground-truth chains present in both runs per
+target (finbot: goal-override, fallback-manipulation, PII-harvest; uagents:
+default-on inspector, replay→wallet; socxen: planted-benign-explanation →
+suppression, export-injection). Third paths diverge per run — path
+*selection* under a 2–3 cap varies even when underlying threats agree;
+product answer: derive paths from the full threat set, cap at render time.
+
+**5. Byproducts — verified 4, refuted 1, filed 3 more issues** (all
+hand-verified before filing, continuing the 2-for-3 lesson):
+- **praxen#255** — finbot console approve/reject buttons POST to routes
+  that don't exist (`admin-dashboard.html:519,537` vs `admin.py:26`); the
+  human-review UI 404s while the unauthenticated API works. Detection
+  pattern candidate: client-side call sites vs declared routes.
+- **praxen#256** — unauthenticated `/api/users` CRUD (`user.py:6-34`)
+  uncovered by any baseline finding (-001 is admin-scoped).
+- **praxen#257** — uagents -007 tags ASI02 on a missing approval gate;
+  KB arbitration: LLM03 primary, "never ASI02 for the gate itself".
+  Flagged independently by runs in both rounds.
+
+## Round-3 verdict
+
+The regeneration validates the corrected assumptions end-to-end: the
+threat models are stable where the contract needs them stable, honest
+about the remit's role, grounded in citations, and productive as a
+baseline cross-check (five issues filed from three targets: #253–#257).
+Spec learnings for a product freeze: bind arbitration explicitly (KB wins
+over stored finding tags — already implicit, make it a line), rule-3
+prefix for unnamed blocks ("or the named construct the block turns on"),
+heading-shaped remit rules ruling, and the family-prefix tiebreak. Phase 1
+remains a go on the design doc's shape.
+
 ## Round-2 verdict
 
 Concept confirmed on the target shape that matters (prompt-shaped, real),
