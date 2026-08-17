@@ -303,6 +303,37 @@ hand-verified before filing, continuing the 2-for-3 lesson):
   KB arbitration: LLM03 primary, "never ASI02 for the gate itself".
   Flagged independently by runs in both rounds.
 
+## Run-to-run evaluation framework (the yardstick, settled with Steve 2026-08-16)
+
+Consistency is layered — concentric rings, tightest to loosest:
+
+1. **Verdict layer — effectively deterministic.** Boundary sets identical
+   by archetype across all v3 pairs (8/8, 11/11, 9/10); every ground-truth
+   critical chain in both runs; all baseline findings placed in both runs.
+   Two readers of r1 and r2 write the same executive summary.
+2. **Component inventory — same architecture, different box count.**
+   0.70–0.85 fuzzy agreement; deltas are granularity calls at the margins,
+   never a different system.
+3. **Per-threat detail — visible wobble, near-zero contradiction.** Three
+   wobble species, each with a known scan-variance analog: *enumeration
+   depth* (4 vs 2 disclosure variants of one risk), *credit wobble*
+   (mitigated vs residual = did the run go look for the control — the
+   maturity-evidence wobble Step 8b fixed for scores), *adjacent-tag
+   wobble* (LLM02 vs LLM04 — the severity-assignment analog). No run
+   asserts a control the other denies; no inversions observed in any pair.
+
+Same shape as the x-high scan validation (discovery stable, assignment
+wobbles) → the same medicine applies if a canonical graph is ever needed:
+union two runs, adjudicate credit/tag splits against evidence.
+
+**Product-gate metrics, in order:** (1) boundary-set agreement (now
+0.9–1.0 — gate-worthy), (2) threat-status agreement on matched threats
+(~80% — the improvable one; credit wobble is the fix target), (3)
+component fuzzy agreement (0.7–0.85 — acceptable). Explicitly NOT
+yardsticks: raw node-id and edge-topology match. Reader-level summary:
+either run correctly informs; both runs inform slightly better; neither
+misleads.
+
 ## Round-3 verdict
 
 The regeneration validates the corrected assumptions end-to-end: the
