@@ -1,5 +1,10 @@
 # Threat-Model Graph JSON — probe spec v0.4.3
 
+> **SUPERSEDED (2026-08-17):** the frozen v1.0 contract lives at
+> `skills/behavior-verifier/THREAT_MODEL_SPEC.md` (folds in the five
+> round-4 clarifications, adds `praxen_version`/`analysis_ref`, retires
+> legacy status synonyms). This file is kept as the probe-era record.
+
 One JSON object per target. This is the Phase-0 probe shape, not a product
 contract. Everything is evidence-derived: **no node, edge, boundary, or
 threat without a citation into the source tree, the findings JSON, or the
