@@ -35,11 +35,14 @@ as input, so the generator work is *better* after this ships.
 ## Contents (Phase 1 of the design doc, productized)
 
 1. **Graph spec freeze.** Probe spec v0.4.2 → the v1 contract. Threat
-   status triad settled with Steve (2026-08-17) after two vocabulary
-   collisions: **confirmed / potential / mitigated** — `confirmed` = a
+   status set settled with Steve (2026-08-17) after two vocabulary
+   collisions: **confirmed / potential / partial / mitigated** — `confirmed` = a
    scan finding proves it (ID cited); `potential` = an unanswered
    hypothesis (no finding covers it, no control answers it, the
-   mitigation sweep looked); `mitigated` = control cited. Rejected:
+   mitigation sweep looked); `partial` = a control covers part of the threat (citation + stated
+   remainder required; matches the remit-coverage term — Praxen targets
+   are full of partial mitigation); `mitigated` = control covers the
+   whole threat, cited. Rejected:
    `residual` (ISO/NIST post-control meaning), `open` (tracker meaning =
    filed-and-unaddressed, which is our `confirmed`). Gate: the
    v0.4 confirmation pair (socxen ×2, in flight at drafting time) holds

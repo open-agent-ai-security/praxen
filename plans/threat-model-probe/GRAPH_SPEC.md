@@ -1,4 +1,4 @@
-# Threat-Model Graph JSON — probe spec v0.4.2
+# Threat-Model Graph JSON — probe spec v0.4.3
 
 One JSON object per target. This is the Phase-0 probe shape, not a product
 contract. Everything is evidence-derived: **no node, edge, boundary, or
@@ -26,7 +26,7 @@ tolerance, prompt-shaped targets.
 
 ```json
 {
-  "spec_version": "0.4.2-probe",
+  "spec_version": "0.4.3-probe",
   "target": { "slug": "<slug>", "source_root": "<abs path scanned>" },
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
@@ -159,9 +159,10 @@ dominant direction.
       "stride": "S | T | R | I | D | E",
       "owasp": "ASI01".."ASI10" | "LLM01".."LLM10" | null,
       "summary": "<one sentence, specific to THIS target>",
-      "status": "confirmed | potential | mitigated",
+      "status": "confirmed | potential | partial | mitigated",
       "finding_id": "<finding id from the findings JSON, when status=confirmed>",
-      "mitigation_evidence": { "file": "...", "line": 123 }
+      "mitigation_evidence": { "file": "...", "line": 123 },
+      "remainder": "<REQUIRED when status=partial: what the control does not cover>"
     }
   ]
 }
@@ -229,7 +230,14 @@ distinguish in `name`.
   browser-layer vulns, generic web hygiene). Never force a code — a wrong
   tag is worse than a null. `status`:
   - `confirmed` — an existing finding in the findings JSON proves it (cite the id)
-  - `mitigated` — a control demonstrably handles it (cite code)
+  - `partial` — a control demonstrably answers PART of the threat (cite
+    the enforcing code in `mitigation_evidence`, same bar as mitigated)
+    and the unaddressed remainder is stated in a required `remainder`
+    field (one clause). If a finding covers the remainder, the status is
+    `confirmed` instead — findings win. The name deliberately matches the
+    remit-coverage `partial` status; Praxen targets are full of
+    partial-mitigation cases and a binary mitigated-or-not loses them.
+  - `mitigated` — a control demonstrably handles the whole threat (cite code)
   - `potential` — neither: the mitigation-check sweep looked for a
     control and found none, and no finding covers it — an unanswered
     hypothesis. (Naming history: `residual` collided with ISO/NIST

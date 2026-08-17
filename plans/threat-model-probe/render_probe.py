@@ -58,7 +58,8 @@ def icon_svg(kind, color, size=18):
 # proves it, ID cited) / potential (amber — hypothesis the model derived;
 # no finding covers it, no control answers it) / mitigated (green —
 # control cited). Legacy probe-graph synonyms normalized below.
-STATUS_COLOR = {"confirmed": "#C0392B", "mitigated": "#009D00", "potential": "#E67E00",
+STATUS_COLOR = {"confirmed": "#C0392B", "potential": "#E67E00", "partial": "#D4A017",
+                "mitigated": "#009D00",
                 "finding": "#C0392B", "open": "#E67E00", "residual": "#E67E00"}
 def norm_status(st):
     return {"finding": "confirmed", "open": "potential", "residual": "potential"}.get(st, st)
@@ -197,9 +198,11 @@ def main(graph_path, out_path):
         gaps = [x for x in gaps if x is not None]
         gap = max(set(gaps), key=gaps.count) if gaps else 1
         worst = "mitigated"
+        rank = {"mitigated": 0, "partial": 1, "potential": 2, "confirmed": 3}
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "confirmed": worst = "confirmed"; break
-            if norm_status(t.get("status")) == "potential": worst = "potential"
+            st = norm_status(t.get("status"))
+            if rank.get(st, 0) > rank.get(worst, 0): worst = st
+            if worst == "confirmed": break
         bnd_at_gap.setdefault(gap, []).append((b, worst))
     bnd_num = {}  # boundary id -> B<n>, in declaration order
     for i, b in enumerate(g.get("trust_boundaries", []), 1):
@@ -361,6 +364,7 @@ def main(graph_path, out_path):
     row3 = "".join([
         '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat: confirmed</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— potential (unanswered hypothesis)</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#D4A017"></i>— partial (control covers part; remainder stated)</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
         '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
         '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
@@ -374,9 +378,11 @@ def main(graph_path, out_path):
     bk_rows = []
     for b in g.get("trust_boundaries", []):
         worst = "mitigated"
+        rank = {"mitigated": 0, "partial": 1, "potential": 2, "confirmed": 3}
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "confirmed": worst = "confirmed"; break
-            if norm_status(t.get("status")) == "potential": worst = "potential"
+            st = norm_status(t.get("status"))
+            if rank.get(st, 0) > rank.get(worst, 0): worst = st
+            if worst == "confirmed": break
         c = STATUS_COLOR[worst]
         bk_rows.append(f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num_pre[b["id"]]}</b></td>'
                        f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
