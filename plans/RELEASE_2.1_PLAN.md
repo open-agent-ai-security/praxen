@@ -3,7 +3,21 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen 1.4 — Detection Coverage, Output Quality & Reach
+# Praxen 2.1 — Detection Coverage, Output Quality & Reach
+
+> **Renumbered 1.4 → 2.1 on 2026-08-17** when threat modeling was promoted to
+> the next release as **2.0** (`RELEASE_2.0_PLAN.md`, per
+> `DESIGN_THREAT_MODEL.md`) — a pure, scoring-neutral feature release. This
+> plan keeps everything score-moving under its organizing identity: **one
+> release, one freeze** — the batch of changes that share a single
+> re-baseline campaign. It now grades **`v2.1-opus5` vs `v1.3-opus5`** and
+> branches from `dev` after the 2.0 promotion. **2.0-era additions to this
+> batch:** scanner/scoring defects **#248–#252**; baseline corrections
+> **#253, #254, #256, #257** (fix at re-freeze, never edit frozen
+> artifacts); detection pattern **#255** (client-side call sites vs declared
+> routes); **#198 stays the opener** and now takes threat-model boundary
+> structure as an input (2.0 ships first for exactly this reason).
+> Historical references to "1.4" in earlier plans point at this document.
 
 > **Formerly `RELEASE_1.3_PLAN.md` — renumbered 2026-08-10** when Thinking Modes
 > (#197) was promoted to its own minor release ahead of this one: **1.3 = the
@@ -18,7 +32,7 @@
 > **Re-triaged 2026-08-11:** 1.3 stopped being score-inert — #195 passed its
 > gates and 1.3 now ends in a **`v1.3-opus5`** re-freeze, taking a batch of this
 > plan's pre-freeze items with it (struck below, per `RELEASE_1.3_PLAN.md`).
-> **1.4 therefore grades `v1.4-opus5` vs `v1.3-opus5`.**
+> **This release therefore grades `v2.1-opus5` vs `v1.3-opus5`.**
 >
 > **`v1.2.0` shipped 2026-08-03; `v1.2.1` shipped 2026-08-10** (score-inert, per
 > `RELEASE_1.2.1_PLAN.md` — now STATUS: SHIPPED). 1.2.1 absorbed the docs/CI tail
@@ -31,7 +45,7 @@
 
 With scans reliable and scores stable (1.2), widen what Praxen *finds* and
 polish what it *emits*. Detection additions move numbers → 1.4 re-freezes
-**`v1.4-opus5`**, graded vs **`v1.2-opus5`**. That freeze is why the detection
+**`v2.1-opus5`**, graded vs **`v1.2-opus5`**. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
 ## ~~Arrived from 1.2 — #48~~ (resolved in 1.3, 2026-08-11)
@@ -167,7 +181,7 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 
 #198-then-regenerate + remaining A (#104) + #113 + #65 item 3 (everything that
 changes findings, scoring calibration, or model prose) → C/D in any order →
-**one re-freeze `v1.4-opus5`, graded vs `v1.3-opus5`, last.** Same
+**one re-freeze `v2.1-opus5`, graded vs `v1.3-opus5`, last.** Same
 discipline as 1.2: nothing that moves numbers lands after the freeze; a stressed
 schedule drops whole buckets by dated plan amendment, not by silent descope.
 

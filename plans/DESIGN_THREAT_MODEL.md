@@ -5,11 +5,12 @@
 
 # Design — Praxen Threat Modeling (visual, evidence-derived)
 
-> **STATUS: EXPLORATORY DESIGN — not scheduled, not public.** Drafted
-> 2026-08-16 on a quiet side branch while 1.3 is in release mechanics. No
-> issue number yet; nothing here is committed scope for 1.4 (which remains
-> the detection-coverage release). Earliest realistic slot: **1.5**, with a
-> zero-code Phase 0 probe possible any time after the 1.3 tag.
+> **STATUS: SCHEDULED — ships as release 2.0** (decided 2026-08-17;
+> `RELEASE_2.0_PLAN.md`). Drafted 2026-08-16 as an exploratory design;
+> Phase-0 probe complete same week (`RESULTS_THREAT_MODEL_PROBE.md` — 4
+> rounds, 18 extraction runs, verdict PASS; probe artifacts in
+> `plans/threat-model-probe/`). The former 1.4 detection/re-baseline plan
+> renumbered to 2.1 and follows 2.0.
 
 ## 1. Purpose
 
