@@ -417,11 +417,9 @@ document.querySelectorAll('[data-tip]').forEach(el => {{
   el.addEventListener('mouseleave', () => tt.style.opacity = 0);
 }});
 const lblOf = e => document.querySelector('.elbl[data-ei="' + e.dataset.ei + '"]');
-document.querySelectorAll('.edge').forEach(e => {{
-  const l = lblOf(e);
-  e.addEventListener('mouseenter', () => l && l.classList.add('show'));
-  e.addEventListener('mouseleave', () => l && l.classList.remove('show'));
-}});
+// Single-edge hover: tooltip only (it carries the label + endpoints + data).
+// On-canvas labels appear only on NODE hover, where they annotate the whole
+// fan of connected flows at once — something the one-at-a-time tooltip can't.
 document.querySelectorAll('.node').forEach(n => {{
   const id = n.dataset.id;
   const mine = [...document.querySelectorAll('.edge')].filter(e => e.dataset.from === id || e.dataset.to === id);
