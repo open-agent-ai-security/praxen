@@ -90,8 +90,11 @@ Three distinct phenomena, in decreasing severity:
 
 Coverage statuses copied by rule-text match without incident on both
 targets. uagents' supply-chain boundary legitimately attached **zero**
-governing remit rules — rendered as "candidate for #198", which is exactly
-the remit-generator feed the design hoped for.
+governing remit rules. *(The probe first rendered that as "candidate for
+#198" — wrong framing, corrected per Steve 2026-08-16: a remit is a job
+description, not a security model, so an untouched boundary is normal and
+its threats stand on the RAISE/OWASP calibration alone. The renderer now
+says so neutrally; see the design doc's corrected §5.)*
 
 ### 4. Does the 5-lane model survive? — YES, WITH KNOWN STRAINS
 
@@ -129,8 +132,8 @@ reports:
 
 **Phase 0 PASSES.** The deliverable exists (4 rendered, evidence-cited,
 self-contained diagrams), the deterministic lane renderer works on real
-output with zero layout intervention, remit attachment and the #198 feed
-work, and the instability that exists is (a) id coinage — mitigated by the
+output with zero layout intervention, remit attachment works, and the
+instability that exists is (a) id coinage — mitigated by the
 same diff-by-content rule we already use for remits, (b) granularity —
 mitigated by a spec convention, (c) ASI forcing — a spec bug, not a model
 limitation. Semantic convergence on boundaries (the security-meaningful
@@ -198,9 +201,12 @@ skill is the policy surface), and produced SOC-native attack paths — both
 runs' top path is the same one: **planted benign content in adversary
 sighted logs manufactures the analyst's yes / a production suppression**
 (r1 also surfaced unattended-run suppression and the defanging gap).
-Boundary set: 8/8 identical archetypes. Remit attachment surfaced 3
-boundaries with **zero governing remit rules** (secret-material,
-supply-chain, telemetry-egress) — direct #198-style feed on a real remit.
+Boundary set: 8/8 identical archetypes. Remit attachment: 14–15 of 15
+rules landed on boundaries; three boundaries (secret-material,
+supply-chain, telemetry-egress) attached none — which is the *expected*
+shape, not a gap: the remit is a job description, and those surfaces are
+governed by the RAISE/OWASP calibration, not by declared intent (framing
+corrected per Steve, 2026-08-16).
 Both runs correctly resolved the **2025→2026 OWASP renumbering** skew
 between the old findings JSON and current KBs, tagging per current KB and
 logging the divergence.

@@ -127,10 +127,17 @@ would.
   — no change to the canonical findings schema for v1. Folding a
   `threat_model` block into the canonical JSON rides #118 (the same
   deferred-schema-change bus as `scan_mode`).
-- **Feeds #198 (remit generator, 1.4's opener):** boundaries with no
-  governing remit rule are exactly what the generator should propose rules
-  for. The threat model becomes the generator's skeleton — a clean 1.4→1.5
-  arc if the probe pans out.
+- **Remit overlay semantics (corrected — Steve, 2026-08-16):** a remit is a
+  **job description, not a security model**. Boundaries the remit doesn't
+  touch are *normal*, not remit defects — their threats stand on the
+  RAISE/OWASP calibration alone, and the rendering must say so neutrally.
+  The overlay's value is where declared intent *does* touch a boundary
+  (e.g. socxen's "never move data off the Exabeam surface" governing
+  telemetry-egress): showing that rule's verification status in place.
+  Do NOT treat ungoverned boundaries as rule candidates by default — that
+  re-inflates the remit over-reach the #200/#201 audits pruned. Any #198
+  (remit generator) connection is limited to informing the generator about
+  what the agent's *job* actually touches, not one-rule-per-boundary.
 
 ## 6. Risks
 
@@ -164,7 +171,7 @@ would.
    standalone HTML page; docs. No schema, score, or baseline impact.
 3. **Phase 2 — integration.** Report section (rides #118), residual-threat
    matrix, attack-path rendering from `escalation` chains, MAESTRO lens,
-   #198 hookup, ATT&CK/ATLAS export.
+   ATT&CK/ATLAS export; #198 only per the corrected §5 semantics.
 
 ## 8. Non-goals (v1)
 
