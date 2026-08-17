@@ -58,7 +58,9 @@ STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "residual": "#C039
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
                   "vague": "#6C757D", "enp": "#6C757D"}
 
-COL_W, COL_GAP, MARGIN_X, TOP_Y = 250, 110, 30, 70
+COL_W, COL_GAP, MARGIN_X, TOP_Y = 250, 110, 30, 158
+BAND_TOP, BAND_ROW = 16, 26   # boundary badges live in a reserved strip
+                              # above the lanes so nothing paints over them
 NODE_GAP = 22
 
 def wrap(text, width=30):
@@ -200,12 +202,12 @@ def main(graph_path, out_path):
             x = MARGIN_X + (gap + 1) * COL_W + gap * COL_GAP + COL_GAP / 2 + (j - (len(blist)-1)/2) * 16
             c = STATUS_COLOR[worst]
             num = bnd_num[b["id"]]
-            # numbered badge at a staggered height instead of a text label:
-            # full name lives in the tooltip and the B<n> panel below.
-            by = TOP_Y - 22 + (j % 4) * 26
+            # numbered badge in the reserved top band — never under content;
+            # full name lives in the boundary key table and the tooltip.
+            by = BAND_TOP + (j % 4) * BAND_ROW + 11
             btip = f'{num} — {b["name"]} · {len(b.get("threats",[]))} threats · {len(b.get("remit_rules",[]))} remit rules (details below)'
             svg.append(f'<g class="bnd" data-tip="{esc(btip)}">')
-            svg.append(f'<line x1="{x}" y1="{TOP_Y-30}" x2="{x}" y2="{total_h-20}" stroke="{c}" stroke-width="2" stroke-dasharray="7 5" opacity="0.75"/>')
+            svg.append(f'<line x1="{x}" y1="{by+11}" x2="{x}" y2="{total_h-20}" stroke="{c}" stroke-width="2" stroke-dasharray="7 5" opacity="0.75"/>')
             svg.append(f'<circle cx="{x}" cy="{by}" r="11" fill="{c}"/>'
                        f'<text x="{x}" y="{by+4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">{esc(num)}</text>')
             svg.append('</g>')
@@ -255,6 +257,8 @@ def main(graph_path, out_path):
             dirn = 1 if x2 >= x1 else -1
             dip = 55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1)
             cy1, cy2 = fy + dip, ty + dip
+            floor_y = TOP_Y - 22   # keep arcs below the badge band
+            cy1, cy2 = max(cy1, floor_y), max(cy2, floor_y)
             d = f"M{x1} {fy} C {x1 + 90 * dirn} {cy1}, {x2 - 90 * dirn} {cy2}, {x2} {ty}"
         else:
             d = f"M{x1} {fy} C {mx} {fy}, {mx} {ty}, {x2} {ty}"
