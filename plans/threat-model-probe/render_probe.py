@@ -58,9 +58,12 @@ def icon_svg(kind, color, size=18):
 # proves it, ID cited) / potential (amber — hypothesis the model derived;
 # no finding covers it, no control answers it) / mitigated (green —
 # control cited). Legacy probe-graph synonyms normalized below.
-STATUS_COLOR = {"confirmed": "#C0392B", "potential": "#E67E00", "partial": "#D4A017",
+# potential is deliberately OFF the red/yellow/green assessment ladder —
+# blue = "not yet judged" (tracker-triage convention), so it can't be
+# confused with partial's gold at a glance.
+STATUS_COLOR = {"confirmed": "#C0392B", "potential": "#006BFF", "partial": "#D4A017",
                 "mitigated": "#009D00",
-                "finding": "#C0392B", "open": "#E67E00", "residual": "#E67E00"}
+                "finding": "#C0392B", "open": "#006BFF", "residual": "#006BFF"}
 def norm_status(st):
     return {"finding": "confirmed", "open": "potential", "residual": "potential"}.get(st, st)
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
@@ -363,7 +366,7 @@ def main(graph_path, out_path):
                    for k in kinds_present)
     row3 = "".join([
         '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat: confirmed</span>',
-        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— potential (unanswered hypothesis)</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#006BFF"></i>— potential (unanswered hypothesis)</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#D4A017"></i>— partial (control covers part; remainder stated)</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
         '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
@@ -402,9 +405,10 @@ def main(graph_path, out_path):
     inventory_html = ('<table><tr><th>Component</th><th>Kind</th><th>Lane</th><th>Description</th>'
                       '<th>Evidence</th></tr>' + "".join(inv_rows) + '</table>')
     mh_logo, ft_logo = load_brand()
-    n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "open")
+    n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "potential")
     n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "confirmed")
-    n_mit = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "mitigated")
+    n_mit = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "mitigated")
+    n_par = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "partial")
     doc = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Praxen Threat Model — {esc(g["target"]["slug"])}</title>
@@ -425,7 +429,7 @@ def main(graph_path, out_path):
  .mh-metric {{ text-align:center; }}
  .mh-metric > b {{ display:block; font-size:30px; font-weight:800; line-height:1; color:#FFF; }}
  .mh-metric > span {{ display:block; font-size:10px; letter-spacing:0.09em; text-transform:uppercase; color:#8BAFC8; margin-top:6px; }}
- .mh-metric.mh-fin > b {{ color:#FF7A6B; }} .mh-metric.mh-res > b {{ color:#FFB066; }} .mh-metric.mh-mit > b {{ color:#4CDB00; }}
+ .mh-metric.mh-fin > b {{ color:#FF7A6B; }} .mh-metric.mh-res > b {{ color:#27B2FF; }} .mh-metric.mh-par > b {{ color:#F2CD5A; }} .mh-metric.mh-mit > b {{ color:#4CDB00; }}
  .content {{ padding:28px 32px; max-width:1100px; margin:0 auto; }}
  .section {{ margin-bottom:40px; }}
  .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
@@ -485,6 +489,7 @@ def main(graph_path, out_path):
       <div class="mh-metric"><b>{len(g.get("trust_boundaries",[]))}</b><span>Boundaries</span></div>
       <div class="mh-metric mh-fin"><b>{n_fin}</b><span>Confirmed</span></div>
       <div class="mh-metric mh-res"><b>{n_res}</b><span>Potential</span></div>
+      <div class="mh-metric mh-par"><b>{n_par}</b><span>Partial</span></div>
       <div class="mh-metric mh-mit"><b>{n_mit}</b><span>Mitigated</span></div>
     </div>
   </div>
