@@ -54,8 +54,11 @@ def icon_svg(kind, color, size=18):
     return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" '
             f'stroke="{color}" stroke-width="1.8" stroke-linecap="round" '
             f'stroke-linejoin="round" aria-hidden="true">{p}</svg>')
-STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "open": "#C0392B",
-                "residual": "#C0392B"}  # legacy synonym in pre-v1 probe graphs
+# Status ladder: red = confirmed (a finding proves it), amber = open
+# (unverified exposure, nothing covers it), green = mitigated (control
+# cited). Matches the analysis report's severity semantics.
+STATUS_COLOR = {"finding": "#C0392B", "mitigated": "#009D00", "open": "#E67E00",
+                "residual": "#E67E00"}  # legacy synonym in pre-v1 probe graphs
 def norm_status(st): return "open" if st == "residual" else st
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
                   "vague": "#6C757D", "enp": "#6C757D"}
@@ -193,8 +196,8 @@ def main(graph_path, out_path):
         gap = max(set(gaps), key=gaps.count) if gaps else 1
         worst = "mitigated"
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "open": worst = "open"; break
-            if norm_status(t.get("status")) == "finding": worst = "finding"
+            if norm_status(t.get("status")) == "finding": worst = "finding"; break
+            if norm_status(t.get("status")) == "open": worst = "open"
         bnd_at_gap.setdefault(gap, []).append((b, worst))
     bnd_num = {}  # boundary id -> B<n>, in declaration order
     for i, b in enumerate(g.get("trust_boundaries", []), 1):
@@ -354,8 +357,8 @@ def main(graph_path, out_path):
     row2 = "".join(f'<span class="lg">{icon_svg(k, KIND_COLOR.get(k, "#666"), 16)}{esc(k.replace("_", " "))}</span>'
                    for k in kinds_present)
     row3 = "".join([
-        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat open</span>',
-        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— finding</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat: finding (confirmed)</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— open (unverified)</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
         '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
         '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
@@ -370,8 +373,8 @@ def main(graph_path, out_path):
     for b in g.get("trust_boundaries", []):
         worst = "mitigated"
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "open": worst = "open"; break
-            if norm_status(t.get("status")) == "finding": worst = "finding"
+            if norm_status(t.get("status")) == "finding": worst = "finding"; break
+            if norm_status(t.get("status")) == "open": worst = "open"
         c = STATUS_COLOR[worst]
         bk_rows.append(f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num_pre[b["id"]]}</b></td>'
                        f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
@@ -414,7 +417,7 @@ def main(graph_path, out_path):
  .mh-metric {{ text-align:center; }}
  .mh-metric > b {{ display:block; font-size:30px; font-weight:800; line-height:1; color:#FFF; }}
  .mh-metric > span {{ display:block; font-size:10px; letter-spacing:0.09em; text-transform:uppercase; color:#8BAFC8; margin-top:6px; }}
- .mh-metric.mh-res > b {{ color:#FF7A6B; }} .mh-metric.mh-fin > b {{ color:#FFB066; }} .mh-metric.mh-mit > b {{ color:#4CDB00; }}
+ .mh-metric.mh-fin > b {{ color:#FF7A6B; }} .mh-metric.mh-res > b {{ color:#FFB066; }} .mh-metric.mh-mit > b {{ color:#4CDB00; }}
  .content {{ padding:28px 32px; max-width:1100px; margin:0 auto; }}
  .section {{ margin-bottom:40px; }}
  .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
