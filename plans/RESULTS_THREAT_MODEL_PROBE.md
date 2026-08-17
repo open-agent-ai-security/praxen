@@ -357,3 +357,48 @@ treat **boundaries + threats as the stable contract** and edges as
 rendering detail. Next optional hardening before Phase 1: an x-high-style
 adjudicated pair (union two runs, adjudicate splits) if we want a single
 canonical graph per target rather than picking one run.
+
+---
+
+# Round 4 — spec v0.4 confirmation pair (2026-08-17): SPEC-FREEZE GATE PASS
+
+Socxen ×2, Opus 5, spec v0.4 (control-lane rule, named-construct/family
+prefixes, heading-shaped remit ruling, KB-over-stored-tags precedence,
+mitigation-check sweep). Both runs `0.4-probe`-stamped, 0 validator
+warnings, every `mitigated` threat citation-backed in both — the sweep is
+enforced, not advisory.
+
+**Against the three gate criteria (`RELEASE_2.0_PLAN.md`):**
+
+1. **Boundary agreement ≥ 0.9 — PASS**: 8/8 identical archetypes, third
+   consecutive perfect round on this target. The contract layer is stable.
+2. **Same-file ID convergence — improved, plateau confirmed**: nodes 0.52
+   raw / 0.73 fuzzy (v3: 0.44/0.70). The v0.4 prefix rules converge where
+   they bind; both runs independently surfaced the same *new* margin
+   cases (below). Confirms the standing conclusion: diff by content.
+3. **Status agreement — measurably tightened**: mitigated-share gap
+   between runs closed from 11 pts (v3: 36% vs 25%) to 3 pts (32% vs
+   35%), with citation-backed credit now mandatory. On
+   conservatively-matched threat pairs, status agreement is 100% (6/6;
+   v3: 9/9) — the precise matched-pair ≥90% metric awaits the semantic
+   comparator that is already 2.0 build scope (the probe's token matcher
+   under-matches, as predicted in round 1).
+
+**v0.4 rules observed working:** the dismiss/close gate decomposed across
+its three enforcing surfaces exactly per the control-lane rule (harness
+ask / in-prompt ask / write tools) — both runs, same decomposition; KB
+precedence generated complete divergence logs against the 2025-numbered
+stored tags (nearly the whole tag set on this older-schema input — a
+known property of old inputs, not a defect).
+
+**v1-contract polish items (documentation clarifications, no re-run
+needed; both runs independently hit the same set):** leading-dot
+basenames (drop the dot); two splits under one heading = one node;
+directory-shaped families fold into the orchestrator's evidence;
+one finding may back threats at multiple boundaries (bless explicitly);
+edgeless-archetype list is guidance, fold-to-consequence otherwise.
+
+**Verdict: freeze the spec as the 2.0 v1 contract** with the five polish
+clarifications applied in the productized copy. Remaining measurement
+(4-target pre-ship stability gate incl. one cold target) is 2.0 release
+scope, not probe scope. Phase 0 closes here.
