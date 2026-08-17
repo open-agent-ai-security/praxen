@@ -70,8 +70,10 @@ as input, so the generator work is *better* after this ships.
    the only carrier of information.** Concretely: printed legend (6
    component families + kind icon key + mark key), static boundary key
    table resolving every B-badge, kind ICONS on nodes carrying meaning
-   alongside (reduced, 6-family) color, the primary attack path drawn as
-   a bold static route through the flow graph, a component-inventory
+   alongside (reduced, 6-family) color, the primary attack path told by
+   numbered step badges (connective route ink was tried twice and rejected
+   — it sprays across the canvas; badges alone read cleanly), a
+   component-inventory
    appendix carrying every node's evidence citations, and print CSS
    (labels shown, tooltip hidden, diagram scaled). Hover behaviors
    (highlighting, fan labels, tooltips) stay — as additive polish.

@@ -250,9 +250,12 @@ def main(graph_path, out_path):
         if span >= 2:
             # lane-skipper: bow the curve vertically so it arcs around the
             # intermediate columns instead of plowing through them.
+            # Control points must extend in the direction of travel — a
+            # right-to-left edge otherwise launches backwards into its box.
+            dirn = 1 if x2 >= x1 else -1
             dip = 55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1)
             cy1, cy2 = fy + dip, ty + dip
-            d = f"M{x1} {fy} C {x1 + 90} {cy1}, {x2 - 90} {cy2}, {x2} {ty}"
+            d = f"M{x1} {fy} C {x1 + 90 * dirn} {cy1}, {x2 - 90 * dirn} {cy2}, {x2} {ty}"
         else:
             d = f"M{x1} {fy} C {mx} {fy}, {mx} {ty}, {x2} {ty}"
         fn = esc(nodes[e["from"]]["name"]); tn = esc(nodes[e["to"]]["name"])
@@ -300,33 +303,6 @@ def main(graph_path, out_path):
     # static overlay: the badged (first) attack path drawn as a bold route so
     # the meaningful connections read without any interaction; other edges
     # recede. Consecutive steps with no direct edge are left to the badges.
-    if ap:
-        adj = {}
-        for (a0, b0) in edge_d:
-            adj.setdefault(a0, set()).add(b0); adj.setdefault(b0, set()).add(a0)
-        def route(a, b, cap=4):
-            # BFS through the flow graph: consecutive attack-path steps often
-            # connect via a hub (harness, bridge) rather than a direct edge.
-            from collections import deque
-            q, seen = deque([[a]]), {a}
-            while q:
-                path = q.popleft()
-                if len(path) > cap: continue
-                for nx in adj.get(path[-1], ()):
-                    if nx == b: return path + [b]
-                    if nx not in seen:
-                        seen.add(nx); q.append(path + [nx])
-            return None
-        steps = [st.get("node") for st in ap[0].get("steps", []) if st.get("node") in pos]
-        hop_pairs = set()
-        for a, b in zip(steps, steps[1:]):
-            r = route(a, b)
-            if r:
-                for h1, h2 in zip(r, r[1:]): hop_pairs.add((h1, h2))
-        for (a, b) in hop_pairs:
-            d_ab = edge_d.get((a, b)) or edge_d.get((b, a))
-            if d_ab:
-                svg.append(f'<path d="{d_ab}" fill="none" stroke="#C0392B" stroke-width="2.6" opacity="0.8" marker-end="url(#arr-path)"/>')
     svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
     # --- HTML panels below the diagram ---
@@ -375,8 +351,7 @@ def main(graph_path, out_path):
         '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat residual</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— finding</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
-        '<span class="lg"><i style="background:none;border-top:3px solid #C0392B;height:0;border-radius:0"></i>attack-path route</span>',
-        '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step</span>',
+        '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
         '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
     ])
     legend_html = (f'<div class="lg-row"><span class="lg-cap">Families</span>{row1}</div>'
