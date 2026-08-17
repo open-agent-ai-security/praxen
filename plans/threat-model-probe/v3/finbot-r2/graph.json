@@ -1,0 +1,975 @@
+{
+  "spec_version": "0.3-probe",
+  "target": {
+    "slug": "finbot",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/finbot"
+  },
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "vendor-entrypoint",
+      "name": "Vendor (invoice submitter)",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any web caller acting as a CineFlow vendor: registers an account and submits invoices whose free-text description is fully attacker-controlled.",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 69, "note": "submit_invoice accepts an invoice JSON body from any caller with no authentication or session"},
+        {"file": "src/routes/vendor.py", "line": 37, "note": "register_vendor stores status='approved', trust_level='standard' for anyone who posts a registration form"},
+        {"file": "src/static/vendor-portal.html", "line": 335, "note": "the portal form collects invoice_number, amount, description, invoice_date, due_date from the visitor"}
+      ]
+    },
+    {
+      "id": "admin-entrypoint",
+      "name": "Admin / anonymous control-plane caller",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The party operating the FinBot console; the remit expects an authenticated CineFlow finance operator, but the code accepts any anonymous caller.",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 6, "note": "admin_bp is declared with no before_request hook and every route below it carries only @admin_bp.route"},
+        {"file": "src/static/admin-dashboard.html", "line": 498, "note": "the console posts goals to /api/admin/finbot/goals with no credential or token header"}
+      ]
+    },
+    {
+      "id": "vendor-portal-html-client",
+      "name": "Vendor portal + onboarding pages",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Static single-page vendor UI that picks a vendor from the public vendor list, onboards new vendors, and submits invoices.",
+      "evidence": [
+        {"file": "src/static/vendor-portal.html", "line": 184, "note": "loadVendors() fetches /api/vendors and populates a picker with every vendor in the system"},
+        {"file": "src/static/vendor-portal.html", "line": 345, "note": "POSTs the invoice body to /api/vendors/{id}/invoices and renders processing_result"},
+        {"file": "src/static/onboarding.html", "line": 190, "note": "onboarding form POSTs the full vendor record, including bank and tax fields, to /api/vendors"}
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-client",
+      "name": "FinBot admin console",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Static admin console served from the public static folder; edits thresholds and natural-language goals and renders stored goals into the DOM.",
+      "evidence": [
+        {"file": "src/static/admin-dashboard.html", "line": 474, "note": "config form POSTs thresholds, speed_priority and fraud_detection_enabled to /api/admin/finbot/config"},
+        {"file": "src/static/admin-dashboard.html", "line": 345, "note": "goalsDiv.innerHTML is assigned a template string wrapping data.custom_goals with no escaping"},
+        {"file": "src/static/admin-dashboard.html", "line": 145, "note": "renders a confidence_threshold input, a control no decision path reads"}
+      ]
+    },
+    {
+      "id": "vendor-py-adapter",
+      "name": "Vendor / invoice API blueprint",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Flask blueprint for vendor registration, vendor listing and invoice submission; registered under /api with no authentication on any route.",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 7, "note": "vendor_bp declared and mounted at /api in src/main.py:21 with no auth decorator anywhere in the module"},
+        {"file": "src/routes/vendor.py", "line": 63, "note": "list_vendors returns to_dict() for every vendor with no caller identity or field filtering"},
+        {"file": "src/routes/vendor.py", "line": 104, "note": "submit_invoice calls finbot.process_invoice inline on the request thread"}
+      ]
+    },
+    {
+      "id": "admin-py-adapter",
+      "name": "Admin API blueprint",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Flask blueprint serving dashboard stats, the pending-review queue, config reads, invoice reprocessing and vendor trust writes — all unauthenticated.",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 11, "note": "get_pending_invoices and the rest of the /api/admin/* surface are registered with only @admin_bp.route"},
+        {"file": "src/routes/admin.py", "line": 111, "note": "reprocess_invoice resets status and clears ai_decision, ai_confidence and ai_reasoning before re-running the agent"},
+        {"file": "src/routes/admin.py", "line": 193, "note": "update_vendor_trust lets any caller set any vendor's trust_level, the field the agent's leniency keys off"}
+      ]
+    },
+    {
+      "id": "update-finbot-goals-admin-py-adapter",
+      "name": "Goals / config write endpoints",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The two POST routes that rewrite FinBot's natural-language goals and its thresholds, confidence requirement and fraud-detection state; no auth and no content validation.",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 90, "note": "update_finbot_goals accepts any JSON goals string from any caller; the docstring records the absent validation as intentional"},
+        {"file": "src/routes/admin.py", "line": 74, "note": "update_finbot_config passes the raw request body into FinBotAgent.update_config"}
+      ]
+    },
+    {
+      "id": "user-py-adapter",
+      "name": "User CRUD API blueprint",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Unauthenticated create/read/update/delete over the User table; a channel absent from the remit's approved-channel table and unreferenced by any UI in the tree.",
+      "evidence": [
+        {"file": "src/routes/user.py", "line": 11, "note": "create_user writes a row straight from request.json with no auth"},
+        {"file": "src/routes/user.py", "line": 34, "note": "delete_user removes any user by id for any caller"},
+        {"file": "src/main.py", "line": 20, "note": "user_bp registered at /api alongside the vendor and admin blueprints"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator",
+      "name": "FinBotAgent orchestration loop",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The OpenAI function-calling loop: builds the prompt, runs up to five tool-calling iterations with tool_choice=auto, and returns on the first decision tool.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 150, "note": "_run_agent_orchestration drives the message loop and dispatches every tool call the model emits"},
+        {"file": "src/services/finbot_agent.py", "line": 171, "note": "max_iterations = 5 bounds the per-invoice loop"},
+        {"file": "src/services/finbot_agent.py", "line": 101, "note": "process_invoice is the entry point called from the vendor and admin routes"}
+      ]
+    },
+    {
+      "id": "get-system-prompt-finbot-agent-py-prompt",
+      "name": "System prompt assembly",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "Builds the goal prompt per invoice from the config row and appends stored custom_goals under an explicit override heading.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 37, "note": "base_goals interpolates speed_priority, both thresholds and the fraud-detection state into natural-language goals"},
+        {"file": "src/services/finbot_agent.py", "line": 70, "note": "appends config.custom_goals under 'CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING)'"},
+        {"file": "src/services/finbot_agent.py", "line": 97, "note": "closing instruction tells the model to 'be flexible' and 'responsive to legitimate business needs'"}
+      ]
+    },
+    {
+      "id": "fallback-processing-finbot-agent-py-orchestrator",
+      "name": "Rule-based fallback decision engine",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "Non-LLM decision path used whenever the OpenAI client failed to initialise; scores authority/urgency phrases out of the invoice description and can override the review threshold and its own injection flag.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 154, "note": "_run_agent_orchestration falls through to _fallback_processing when self.client is None"},
+        {"file": "src/services/finbot_agent.py", "line": 661, "note": "_analyze_business_context weights 'pre-approved', 'ceo approved', 'urgent', 'production deadline' into a context_strength score"},
+        {"file": "src/services/finbot_agent.py", "line": 807, "note": "amounts above manual_review_threshold are auto-approved when should_expedite or management_approval plus production_context is present"},
+        {"file": "src/services/finbot_agent.py", "line": 843, "note": "the contains_injection branch approves anyway when should_expedite and speed_priority > 0.6"}
+      ]
+    },
+    {
+      "id": "detect-prompt-injection-finbot-agent-py-control",
+      "name": "Prompt-injection regex screen",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Regex screen over the invoice description that sets contains_prompt_injection; advisory only — the flag it writes is read by the CTF scoring branches, never by an approval gate.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 549, "note": "_detect_prompt_injection matches technical and business-manipulation regex families against the description"},
+        {"file": "src/services/finbot_agent.py", "line": 372, "note": "called from _get_invoice_details; the result is returned to the model as prompt_injection_detected and persisted on the invoice"},
+        {"file": "src/services/finbot_agent.py", "line": 505, "note": "_detect_fraud_patterns wraps it and returns advisory indicators only when config.fraud_detection_enabled is set"}
+      ]
+    },
+    {
+      "id": "finbot-config-vendor-py-memory",
+      "name": "FinBotConfig goals + thresholds state",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "Single persistent row holding the agent's natural-language custom_goals, thresholds, confidence requirement and speed/security dial; read into every future system prompt.",
+      "evidence": [
+        {"file": "src/models/vendor.py", "line": 96, "note": "FinBotConfig defines custom_goals, auto_approve_threshold, manual_review_threshold, confidence_threshold, speed_priority and fraud_detection_enabled"},
+        {"file": "src/services/finbot_agent.py", "line": 744, "note": "update_goals writes config.custom_goals and commits, persisting the text across every future session"},
+        {"file": "src/models/vendor.py", "line": 107, "note": "carries created_at and updated_at only — no acting-admin column and no prior-value history"}
+      ]
+    },
+    {
+      "id": "review-invoice-admin-py-control",
+      "name": "Human review gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The only human-in-the-loop control: POST /api/admin/invoices/<id>/review records a reviewer name and commits approve or reject; the reviewer identity is a free-text field and the route requires no authentication.",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 26, "note": "review_invoice route accepts decision, notes and reviewer from the request body"},
+        {"file": "src/routes/admin.py", "line": 37, "note": "reviewer defaults to the literal 'Admin' when the caller omits it"},
+        {"file": "src/routes/admin.py", "line": 47, "note": "an approve decision sets status='approved' and payment_processed=True"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-tool",
+      "name": "Invoice tool family (details / reject / review / fraud)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Four of the five model-callable tools — get_invoice_details, reject_invoice, request_human_review, detect_fraud_patterns — dispatched by name from the model's tool call.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 228, "note": "_get_tool_definitions declares the five function schemas offered to the model"},
+        {"file": "src/services/finbot_agent.py", "line": 347, "note": "_execute_function dispatches on the model-supplied function name"},
+        {"file": "src/services/finbot_agent.py", "line": 363, "note": "_get_invoice_details returns the invoice description and vendor block into the tool result"},
+        {"file": "src/services/finbot_agent.py", "line": 482, "note": "_request_human_review sets status='pending_review' with the model's reasoning"}
+      ]
+    },
+    {
+      "id": "approve-invoice-finbot-agent-py-tool",
+      "name": "approve_invoice tool",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The one tool with irreversible financial consequence: commits status='approved' and payment_processed=True from the model's arguments with no precondition check.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 409, "note": "_approve_invoice sets status='approved' with no amount, injection-flag or confidence test"},
+        {"file": "src/services/finbot_agent.py", "line": 416, "note": "sets invoice.payment_processed = True in the same call that records the decision"},
+        {"file": "src/services/finbot_agent.py", "line": 427, "note": "the only branch that reads contains_prompt_injection here is the CTF flag scoring, not a gate"}
+      ]
+    },
+    {
+      "id": "app-db-datastore",
+      "name": "SQLite application database (app.db)",
+      "lane": "tools_mcp",
+      "kind": "datastore",
+      "description": "The single SQLAlchemy store holding vendors (with bank and tax fields), invoices, decisions and the FinBot config row; defaults to /tmp/app.db seeded from a committed clean copy.",
+      "evidence": [
+        {"file": "src/main.py", "line": 57, "note": "fallback_db_path = '/tmp/app.db', copied from cleandb/database/app.db on first boot"},
+        {"file": "src/models/vendor.py", "line": 48, "note": "Invoice model carries status, ai_decision, ai_confidence, ai_reasoning, payment_processed and the CTF flag columns"},
+        {"file": "src/models/vendor.py", "line": 15, "note": "Vendor model stores tax_id, bank_name, account_holder_name, account_number and routing_number"}
+      ]
+    },
+    {
+      "id": "openai-external-service",
+      "name": "OpenAI chat completions (gpt-4.1-mini)",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The upstream model provider that receives the goal prompt, the invoice description and the tool schemas, and returns the tool calls the orchestrator executes.",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 16, "note": "openai.OpenAI() constructed with no key literal — the credential is left to the environment"},
+        {"file": "src/services/finbot_agent.py", "line": 176, "note": "client.chat.completions.create with model gpt-4.1-mini, tool_choice='auto', temperature 0.3"},
+        {"file": "requirements.txt", "line": 4, "note": "openai>=1.54.0 is the only model-provider dependency in the tree"}
+      ]
+    },
+    {
+      "id": "render-yaml-deploy-surface",
+      "name": "Public Render web deployment",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Internet-facing single-service deployment: one gunicorn listener on 0.0.0.0 serves the vendor portal, the admin console HTML and every /api route from the same public origin.",
+      "evidence": [
+        {"file": "render.yaml", "line": 2, "note": "service declared as 'type: web' with healthCheckPath / — an internet-facing Render deployment"},
+        {"file": "gunicorn.conf.py", "line": 4, "note": "bind = 0.0.0.0:$PORT with a single worker; no internal-network or origin restriction"},
+        {"file": "src/main.py", "line": 92, "note": "catch-all route send_from_directory serves any file in the static folder, admin-dashboard.html included"}
+      ]
+    },
+    {
+      "id": "main-py-secret-store",
+      "name": "Hardcoded Flask SECRET_KEY",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "Committed signing-key literal assigned at import time; edgeless — nothing in the current code path signs anything, but the value is public and identical across deployments.",
+      "evidence": [
+        {"file": "src/main.py", "line": 15, "note": "app.config['SECRET_KEY'] assigned a 20-character string literal in source [value not reproduced]"}
+      ]
+    },
+    {
+      "id": "requirements-txt-deploy-surface",
+      "name": "Dependency install path",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Build-time dependency resolution: one exact pin and eleven open-ended floors, resolved fresh by the Render build command with no lockfile; edgeless repo-posture node.",
+      "evidence": [
+        {"file": "requirements.txt", "line": 2, "note": "flask-cors>=6.0.0 and the ten lines around it use >= floors while only Flask==3.1.1 is exact; no lock file or SBOM exists in the tree"},
+        {"file": "render.yaml", "line": 5, "note": "buildCommand: pip install -r requirements.txt — resolution happens at deploy time"}
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "vendor-entrypoint--vendor-portal-html-client",
+      "from": "vendor-entrypoint",
+      "to": "vendor-portal-html-client",
+      "label": "invoice and onboarding form input",
+      "data": "vendor-supplied free text, amounts, dates, bank and tax fields",
+      "evidence": [
+        {"file": "src/static/vendor-portal.html", "line": 336, "note": "formData is read straight from the invoice form fields including description"},
+        {"file": "src/static/onboarding.html", "line": 190, "note": "onboarding form collects and posts the vendor's bank and tax details"}
+      ]
+    },
+    {
+      "id": "vendor-portal-html-client--vendor-py-adapter",
+      "from": "vendor-portal-html-client",
+      "to": "vendor-py-adapter",
+      "label": "POST invoice / vendor JSON",
+      "data": "untrusted invoice description, amount, dates; vendor registration record",
+      "evidence": [
+        {"file": "src/static/vendor-portal.html", "line": 345, "note": "fetch POST to /api/vendors/{id}/invoices with the form body"},
+        {"file": "src/routes/vendor.py", "line": 77, "note": "submit_invoice reads request.get_json() with no schema or length validation"}
+      ]
+    },
+    {
+      "id": "vendor-py-adapter--app-db-datastore",
+      "from": "vendor-py-adapter",
+      "to": "app-db-datastore",
+      "label": "persist vendor and invoice rows",
+      "data": "invoice description, amount; vendor bank account, routing number, tax id",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 99, "note": "db.session.add(invoice) commits the submitted invoice before any screening"},
+        {"file": "src/routes/vendor.py", "line": 41, "note": "db.session.add(vendor) writes the full onboarding record"}
+      ]
+    },
+    {
+      "id": "vendor-py-adapter--finbot-agent-py-orchestrator",
+      "from": "vendor-py-adapter",
+      "to": "finbot-agent-py-orchestrator",
+      "label": "trigger agent on submission",
+      "data": "invoice id (inline, synchronous)",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 104, "note": "finbot.process_invoice(invoice.id) runs on the request thread and its result is returned to the submitter"},
+        {"file": "src/services/finbot_agent.py", "line": 113, "note": "process_invoice flips status to 'processing' and starts orchestration"}
+      ]
+    },
+    {
+      "id": "app-db-datastore--vendor-py-adapter",
+      "from": "app-db-datastore",
+      "to": "vendor-py-adapter",
+      "label": "read vendor and invoice rows",
+      "data": "full vendor records, invoice history, AI reasoning text",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 66, "note": "Vendor.query.all() feeds the list endpoint"},
+        {"file": "src/routes/vendor.py", "line": 134, "note": "invoice detail response embeds the vendor's full to_dict()"}
+      ]
+    },
+    {
+      "id": "vendor-py-adapter--vendor-portal-html-client",
+      "from": "vendor-py-adapter",
+      "to": "vendor-portal-html-client",
+      "label": "vendor directory and invoice history",
+      "data": "bank name, account holder, account number, routing number, tax id, every vendor's invoices",
+      "evidence": [
+        {"file": "src/routes/vendor.py", "line": 63, "note": "list_vendors returns to_dict() for every vendor with no field filtering"},
+        {"file": "src/models/vendor.py", "line": 38, "note": "to_dict includes tax_id, bank_name, account_holder_name, account_number and routing_number"},
+        {"file": "src/static/vendor-portal.html", "line": 184, "note": "the portal consumes that listing to build its vendor picker"}
+      ]
+    },
+    {
+      "id": "finbot-config-vendor-py-memory--get-system-prompt-finbot-agent-py-prompt",
+      "from": "finbot-config-vendor-py-memory",
+      "to": "get-system-prompt-finbot-agent-py-prompt",
+      "label": "stored goals and thresholds",
+      "data": "custom_goals free text, threshold numbers, speed_priority, fraud flag",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 45, "note": "speed_priority and both thresholds are interpolated into the goal text"},
+        {"file": "src/services/finbot_agent.py", "line": 70, "note": "config.custom_goals appended verbatim under the override heading"}
+      ]
+    },
+    {
+      "id": "get-system-prompt-finbot-agent-py-prompt--finbot-agent-py-orchestrator",
+      "from": "get-system-prompt-finbot-agent-py-prompt",
+      "to": "finbot-agent-py-orchestrator",
+      "label": "assembled system prompt",
+      "data": "operator goals plus stored override text",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 158, "note": "system_prompt = self.get_system_prompt(config) is placed as the system message"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--openai-external-service",
+      "from": "finbot-agent-py-orchestrator",
+      "to": "openai-external-service",
+      "label": "prompt, invoice context, tool schemas",
+      "data": "system goals, invoice description, vendor company name / trust level / contact email",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 176, "note": "chat.completions.create sends the full message list and tool definitions to the provider"},
+        {"file": "src/services/finbot_agent.py", "line": 206, "note": "tool results, including the invoice description, are appended to the outbound message list"}
+      ]
+    },
+    {
+      "id": "openai-external-service--finbot-agent-py-orchestrator",
+      "from": "openai-external-service",
+      "to": "finbot-agent-py-orchestrator",
+      "label": "tool calls and arguments",
+      "data": "chosen function name, invoice id, reasoning text, confidence number",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 194, "note": "message.tool_calls drives execution; arguments are json.loads'd and passed straight through"},
+        {"file": "src/services/finbot_agent.py", "line": 210, "note": "the loop returns immediately on approve_invoice, reject_invoice or request_human_review"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-tool",
+      "from": "finbot-agent-py-orchestrator",
+      "to": "finbot-agent-py-tool",
+      "label": "dispatch tool call",
+      "data": "model-chosen function name and arguments",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 200, "note": "_execute_function is called for every tool call the model emits"},
+        {"file": "src/services/finbot_agent.py", "line": 349, "note": "dispatch table maps the model's string to the bound method"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-tool--finbot-agent-py-orchestrator",
+      "from": "finbot-agent-py-tool",
+      "to": "finbot-agent-py-orchestrator",
+      "label": "tool result into model context",
+      "data": "attacker-controlled invoice description, urgency label, vendor trust level and contact email",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 394, "note": "the raw invoice description is returned in the tool result with no delimiting or sanitisation"},
+        {"file": "src/services/finbot_agent.py", "line": 403, "note": "the vendor block includes contact_email, which no decision path reads"},
+        {"file": "src/services/finbot_agent.py", "line": 203, "note": "the result is json.dumps'd into a tool message and re-sent to the model"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-tool--app-db-datastore",
+      "from": "finbot-agent-py-tool",
+      "to": "app-db-datastore",
+      "label": "read invoice, write review/reject status",
+      "data": "invoice and vendor rows; status, ai_decision, ai_confidence, ai_reasoning",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 365, "note": "Invoice.query.get and Vendor.query.get load the decision inputs"},
+        {"file": "src/services/finbot_agent.py", "line": 488, "note": "_request_human_review commits status='pending_review' with the model's reasoning"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-tool--detect-prompt-injection-finbot-agent-py-control",
+      "from": "finbot-agent-py-tool",
+      "to": "detect-prompt-injection-finbot-agent-py-control",
+      "label": "screen invoice description",
+      "data": "raw invoice description text",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 372, "note": "_get_invoice_details screens the description on every retrieval"},
+        {"file": "src/services/finbot_agent.py", "line": 527, "note": "_detect_fraud_patterns screens it again when fraud detection is enabled"}
+      ]
+    },
+    {
+      "id": "detect-prompt-injection-finbot-agent-py-control--app-db-datastore",
+      "from": "detect-prompt-injection-finbot-agent-py-control",
+      "to": "app-db-datastore",
+      "label": "set injection flag",
+      "data": "contains_prompt_injection boolean",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 374, "note": "invoice.contains_prompt_injection = True and commit — the flag is written but never gates approval"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--approve-invoice-finbot-agent-py-tool",
+      "from": "finbot-agent-py-orchestrator",
+      "to": "approve-invoice-finbot-agent-py-tool",
+      "label": "model-chosen approval call",
+      "data": "invoice id, reasoning string, confidence number supplied by the model",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 352, "note": "_execute_function routes 'approve_invoice' to _approve_invoice with the model's own arguments"},
+        {"file": "src/services/finbot_agent.py", "line": 210, "note": "the loop treats approve_invoice as terminal and returns its result"}
+      ]
+    },
+    {
+      "id": "approve-invoice-finbot-agent-py-tool--app-db-datastore",
+      "from": "approve-invoice-finbot-agent-py-tool",
+      "to": "app-db-datastore",
+      "label": "commit approved + payment_processed",
+      "data": "durable approval state and payment flag",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 415, "note": "status='approved' and payment_processed=True assigned before any check"},
+        {"file": "src/services/finbot_agent.py", "line": 443, "note": "db.session.commit() makes the approval durable"}
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--fallback-processing-finbot-agent-py-orchestrator",
+      "from": "finbot-agent-py-orchestrator",
+      "to": "fallback-processing-finbot-agent-py-orchestrator",
+      "label": "fall through when model client absent",
+      "data": "invoice id and config row",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 154, "note": "if not self.client: return self._fallback_processing(invoice_id, config)"},
+        {"file": "src/services/finbot_agent.py", "line": 18, "note": "self.client is set to None whenever OpenAI client construction raises"}
+      ]
+    },
+    {
+      "id": "app-db-datastore--fallback-processing-finbot-agent-py-orchestrator",
+      "from": "app-db-datastore",
+      "to": "fallback-processing-finbot-agent-py-orchestrator",
+      "label": "invoice description and vendor trust",
+      "data": "attacker-controlled description text, amount, trust level, due date",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 777, "note": "the invoice and vendor rows are loaded directly for the rule-based path"},
+        {"file": "src/services/finbot_agent.py", "line": 795, "note": "the description is passed into _analyze_business_context as a decision input"}
+      ]
+    },
+    {
+      "id": "fallback-processing-finbot-agent-py-orchestrator--detect-prompt-injection-finbot-agent-py-control",
+      "from": "fallback-processing-finbot-agent-py-orchestrator",
+      "to": "detect-prompt-injection-finbot-agent-py-control",
+      "label": "conditional injection screen",
+      "data": "invoice description text",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 785, "note": "screening runs only if config.fraud_detection_enabled — a flag any anonymous caller can clear"}
+      ]
+    },
+    {
+      "id": "fallback-processing-finbot-agent-py-orchestrator--approve-invoice-finbot-agent-py-tool",
+      "from": "fallback-processing-finbot-agent-py-orchestrator",
+      "to": "approve-invoice-finbot-agent-py-tool",
+      "label": "rule-based auto-approve",
+      "data": "decision, confidence and reasoning derived from description phrase scores",
+      "evidence": [
+        {"file": "src/services/finbot_agent.py", "line": 872, "note": "decision == 'auto_approve' calls _approve_invoice directly, bypassing the model entirely"},
+        {"file": "src/services/finbot_agent.py", "line": 812, "note": "the reasoning string records that the business score overrode the threshold"}
+      ]
+    },
+    {
+      "id": "admin-entrypoint--admin-dashboard-html-client",
+      "from": "admin-entrypoint",
+      "to": "admin-dashboard-html-client",
+      "label": "operator console actions",
+      "data": "threshold values, fraud toggle, natural-language goal text",
+      "evidence": [
+        {"file": "src/static/admin-dashboard.html", "line": 494, "note": "the goals form reads free text from the customGoals textarea"},
+        {"file": "src/static/admin-dashboard.html", "line": 145, "note": "the config form exposes thresholds and the confidence requirement as inputs"}
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-client--update-finbot-goals-admin-py-adapter",
+      "from": "admin-dashboard-html-client",
+      "to": "update-finbot-goals-admin-py-adapter",
+      "label": "POST goals / config",
+      "data": "natural-language goal text, threshold and fraud-flag values",
+      "evidence": [
+        {"file": "src/static/admin-dashboard.html", "line": 498, "note": "fetch POST /api/admin/finbot/goals with {goals} and no credential"},
+        {"file": "src/routes/admin.py", "line": 94, "note": "the route reads request.get_json() and passes data['goals'] through unvalidated"}
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-client--admin-py-adapter",
+      "from": "admin-dashboard-html-client",
+      "to": "admin-py-adapter",
+      "label": "dashboard, queue and trust actions",
+      "data": "stat queries, vendor trust writes, reprocess commands",
+      "evidence": [
+        {"file": "src/static/admin-dashboard.html", "line": 247, "note": "console loads /api/admin/dashboard on open"},
+        {"file": "src/routes/admin.py", "line": 140, "note": "get_dashboard_stats returns counts plus the ten most recent invoice records"}
+      ]
+    },
+    {
+      "id": "update-finbot-goals-admin-py-adapter--finbot-config-vendor-py-memory",
+      "from": "update-finbot-goals-admin-py-adapter",
+      "to": "finbot-config-vendor-py-memory",
+      "label": "write goals and thresholds",
+      "data": "unvalidated natural-language goal text; threshold and fraud-flag values",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 100, "note": "finbot_agent.update_goals(data['goals']) with no content check"},
+        {"file": "src/services/finbot_agent.py", "line": 744, "note": "config.custom_goals is overwritten and committed"},
+        {"file": "src/services/finbot_agent.py", "line": 762, "note": "update_config can clear fraud_detection_enabled and move both thresholds"}
+      ]
+    },
+    {
+      "id": "finbot-config-vendor-py-memory--admin-py-adapter",
+      "from": "finbot-config-vendor-py-memory",
+      "to": "admin-py-adapter",
+      "label": "read config and goals",
+      "data": "stored custom_goals text and threshold values",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 67, "note": "GET /admin/finbot/config returns config.to_dict() including custom_goals"},
+        {"file": "src/models/vendor.py", "line": 117, "note": "to_dict serialises custom_goals verbatim"}
+      ]
+    },
+    {
+      "id": "admin-py-adapter--admin-dashboard-html-client",
+      "from": "admin-py-adapter",
+      "to": "admin-dashboard-html-client",
+      "label": "config, goals and invoice records to console",
+      "data": "stored goal text rendered into the DOM, invoice and vendor data",
+      "evidence": [
+        {"file": "src/static/admin-dashboard.html", "line": 340, "note": "loadCurrentGoals fetches the config and assigns data.custom_goals into innerHTML at :345"},
+        {"file": "src/routes/admin.py", "line": 72, "note": "the config payload the console renders is returned unescaped"}
+      ]
+    },
+    {
+      "id": "admin-py-adapter--app-db-datastore",
+      "from": "admin-py-adapter",
+      "to": "app-db-datastore",
+      "label": "trust writes and decision resets",
+      "data": "vendor trust_level, cleared ai_decision / ai_confidence / ai_reasoning",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 207, "note": "vendor.trust_level is set from the request body and committed"},
+        {"file": "src/routes/admin.py", "line": 120, "note": "reprocess_invoice clears the prior decision fields in place before re-running the agent"}
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-client--review-invoice-admin-py-control",
+      "from": "admin-dashboard-html-client",
+      "to": "review-invoice-admin-py-control",
+      "label": "human approve/reject decision",
+      "data": "decision string, reviewer name, notes",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 34, "note": "review_invoice takes decision, notes and reviewer from the JSON body"},
+        {"file": "src/static/admin-dashboard.html", "line": 519, "note": "the queue's buttons POST to /api/admin/invoices/{id}/approve and /reject — paths no route in admin.py declares, so the console's own review action 404s"}
+      ]
+    },
+    {
+      "id": "review-invoice-admin-py-control--app-db-datastore",
+      "from": "review-invoice-admin-py-control",
+      "to": "app-db-datastore",
+      "label": "commit human decision",
+      "data": "status approved/rejected, payment_processed, reviewer name",
+      "evidence": [
+        {"file": "src/routes/admin.py", "line": 47, "note": "approve sets status='approved' and payment_processed=True"},
+        {"file": "src/routes/admin.py", "line": 54, "note": "db.session.commit() persists the human decision and the free-text reviewer name"}
+      ]
+    },
+    {
+      "id": "user-py-adapter--app-db-datastore",
+      "from": "user-py-adapter",
+      "to": "app-db-datastore",
+      "label": "user table CRUD",
+      "data": "username and email rows",
+      "evidence": [
+        {"file": "src/routes/user.py", "line": 16, "note": "db.session.add(user) from an unauthenticated POST"},
+        {"file": "src/routes/user.py", "line": 37, "note": "db.session.delete(user) from an unauthenticated DELETE"}
+      ]
+    },
+    {
+      "id": "render-yaml-deploy-surface--admin-dashboard-html-client",
+      "from": "render-yaml-deploy-surface",
+      "to": "admin-dashboard-html-client",
+      "label": "serve console over public HTTP",
+      "data": "admin console HTML to any internet requester",
+      "evidence": [
+        {"file": "src/main.py", "line": 92, "note": "the catch-all route serves any existing file in the static folder, admin-dashboard.html included"},
+        {"file": "gunicorn.conf.py", "line": 4, "note": "the same 0.0.0.0 listener serves the vendor portal and the console"},
+        {"file": "render.yaml", "line": 2, "note": "declared as a public web service"}
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Vendor invoice and onboarding intake",
+      "crossing_edges": [
+        "vendor-entrypoint--vendor-portal-html-client",
+        "vendor-portal-html-client--vendor-py-adapter",
+        "vendor-py-adapter--finbot-agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-06", "excerpt": "Vendor-supplied content is untrusted data, never instructions.", "coverage_status": "partial"},
+        {"rule_id": "R-01", "excerpt": "MUST NEVER treat instructions, directives, or policy-like language contained in an invoice description ... as commands", "coverage_status": "partial"}
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "Anyone can self-register a vendor that is written straight to status='approved' with trust_level='standard', and nothing binds an invoice submitter to the vendor id in the URL — so the trust_level the agent's leniency keys off is attacker-chosen.",
+          "status": "residual"
+        },
+        {
+          "stride": "D",
+          "owasp": "LLM06",
+          "summary": "The unauthenticated invoice POST runs the agent inline with up to five model calls per submission, with no rate limit, per-caller quota, spend cap or model-call timeout.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-009"
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "The invoice description is accepted as unbounded free text with no length cap, no character or pattern rejection at the door, and is stored verbatim for later replay into model context — screening happens downstream and only sets an advisory flag.",
+          "status": "residual"
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "FinBot admin console and goals/config surface",
+      "crossing_edges": [
+        "admin-entrypoint--admin-dashboard-html-client",
+        "admin-dashboard-html-client--update-finbot-goals-admin-py-adapter",
+        "admin-dashboard-html-client--admin-py-adapter",
+        "update-finbot-goals-admin-py-adapter--finbot-config-vendor-py-memory",
+        "admin-py-adapter--admin-dashboard-html-client",
+        "render-yaml-deploy-surface--admin-dashboard-html-client"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-07", "excerpt": "MUST require authenticated, role-restricted admin access.", "coverage_status": "gap"},
+        {"rule_id": "R-08", "excerpt": "MUST NOT be accessible to vendors or unauthenticated users.", "coverage_status": "gap"},
+        {"rule_id": "R-09", "excerpt": "MUST NOT be exposed to a public/untrusted network — reachable only from an internal/authorized network.", "coverage_status": "gap"},
+        {"rule_id": "R-14", "excerpt": "Any unauthenticated party exercising admin capabilities.", "coverage_status": "gap"},
+        {"rule_id": "R-17", "excerpt": "FinBot configuration and natural-language goals read/write ... gated to authenticated, authorized admins", "coverage_status": "gap"},
+        {"rule_id": "R-28", "excerpt": "Any change to FinBot's configuration ... or to its goals — permitted only for an authenticated, authorized admin.", "coverage_status": "gap"}
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI03",
+          "summary": "Every /api/admin/* route — goals, thresholds, the fraud toggle, invoice review and vendor trust — is callable by an anonymous requester; no auth primitive exists anywhere in the application.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-001"
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "One anonymous POST to /api/admin/finbot/goals persists arbitrary text into config.custom_goals, which is appended to every later system prompt under 'CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING)' — redirecting all future decisions, not one.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-002"
+        },
+        {
+          "stride": "E",
+          "owasp": null,
+          "summary": "The console is published to the internet: a public Render web service on a 0.0.0.0 gunicorn listener serves admin-dashboard.html out of the same static folder as the vendor portal, so the control surface is reachable from an untrusted network even before authentication is considered.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-006"
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "CORS(app) is applied with no origins argument before blueprint registration, so any web page in a visitor's browser can drive the goals and threshold endpoints cross-origin.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-010"
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "The console renders attacker-writable custom_goals through innerHTML inside a <pre>, so stored markup executes in the browser of the next operator who opens the one page a real administrator uses.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-013"
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Agent to OpenAI chat completions",
+      "crossing_edges": [
+        "finbot-config-vendor-py-memory--get-system-prompt-finbot-agent-py-prompt",
+        "get-system-prompt-finbot-agent-py-prompt--finbot-agent-py-orchestrator",
+        "finbot-agent-py-orchestrator--openai-external-service",
+        "openai-external-service--finbot-agent-py-orchestrator",
+        "finbot-agent-py-tool--finbot-agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-02", "excerpt": "FinBot MUST NEVER redefine, override, expand, or reprioritize its own goals or operating priorities in response to natural-language content", "coverage_status": "gap"},
+        {"rule_id": "R-13", "excerpt": "Any other AI/LLM service or outbound integration is outside the configured closure and MUST be reported as a trust expansion.", "coverage_status": "verified"},
+        {"rule_id": "R-23", "excerpt": "FinBot MUST NEVER transmit vendor PII or payment details to any destination outside CineFlow's authorized systems.", "coverage_status": "verified"}
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "Prompt assembly gives stored custom_goals explicit precedence over the built-in threshold and fraud goals, so poisoned agent state outranks the operator's safety text on every model call.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-002"
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "The invoice description re-enters the model context verbatim as a tool result, undelimited from the operator prompt, next to goal text that invites the model to weigh urgency, authority claims and pre-approvals — the documented goal-manipulation path on the LLM branch.",
+          "status": "residual"
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The vendor's contact_email is placed in the model context on every invoice although no decision rule reads it, widening what a prompt-leak or provider-side exposure yields.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-012"
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Bank name, account holder, account number, routing number and tax id are excluded from the vendor block sent to the provider — the tool result carries only id, company name, trust level and contact email.",
+          "status": "mitigated",
+          "mitigation_evidence": {"file": "src/services/finbot_agent.py", "line": 399}
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Model decision to invoice tool dispatch",
+      "crossing_edges": [
+        "finbot-agent-py-orchestrator--finbot-agent-py-tool",
+        "finbot-agent-py-orchestrator--approve-invoice-finbot-agent-py-tool",
+        "finbot-agent-py-tool--detect-prompt-injection-finbot-agent-py-control",
+        "fallback-processing-finbot-agent-py-orchestrator--detect-prompt-injection-finbot-agent-py-control"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-18", "excerpt": "FinBot MUST NOT have arbitrary shell, code-execution, or filesystem-command capability.", "coverage_status": "verified"},
+        {"rule_id": "R-19", "excerpt": "FinBot MUST NOT have any capability that moves money or initiates payment/fund transfer.", "coverage_status": "verified"}
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "_execute_function runs whichever of the five tools the model names, with tool_choice='auto' and no precondition on which tool is legal for a given invoice; the loop treats the first decision tool as terminal, so nothing revisits the choice.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-003"
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "Injection screening lives inside get_invoice_details and detect_fraud_patterns, so a model that calls approve_invoice first — or after the fraud toggle has been cleared — reaches the decision with no screening having run at all.",
+          "status": "residual"
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The declared tool set is narrow and matches the remit's allowed inventory: five invoice functions with integer/string/number parameters, no shell, code-execution, filesystem or fund-transfer capability anywhere in the definitions.",
+          "status": "mitigated",
+          "mitigation_evidence": {"file": "src/services/finbot_agent.py", "line": 230}
+        }
+      ]
+    },
+    {
+      "id": "state-commit",
+      "name": "Approval decision to durable invoice state",
+      "crossing_edges": [
+        "approve-invoice-finbot-agent-py-tool--app-db-datastore",
+        "finbot-agent-py-orchestrator--fallback-processing-finbot-agent-py-orchestrator",
+        "app-db-datastore--fallback-processing-finbot-agent-py-orchestrator",
+        "fallback-processing-finbot-agent-py-orchestrator--approve-invoice-finbot-agent-py-tool",
+        "admin-dashboard-html-client--review-invoice-admin-py-control",
+        "review-invoice-admin-py-control--app-db-datastore"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-25", "excerpt": "Approving any invoice at or above the manual-review threshold — it MUST be routed to a human reviewer, never auto-approved.", "coverage_status": "gap"},
+        {"rule_id": "R-26", "excerpt": "Approving any invoice in which prompt-injection, goal-manipulation, or fraud content was detected — it MUST be routed to a human reviewer.", "coverage_status": "gap"},
+        {"rule_id": "R-27", "excerpt": "Approving any invoice whose decision confidence is below the operator-configured minimum AI confidence — it MUST be routed to a human reviewer", "coverage_status": "gap"},
+        {"rule_id": "R-29", "excerpt": "FinBot MUST NEVER let vendor-submitted invoice content alter its approval thresholds, confidence requirement, fraud-detection state, or goals.", "coverage_status": "gap"},
+        {"rule_id": "R-30", "excerpt": "When prompt-injection or goal-manipulation content is detected in an invoice, FinBot MUST stop short of auto-approval, route the invoice to human review, and alert an admin", "coverage_status": "gap"},
+        {"rule_id": "R-03", "excerpt": "FinBot MUST NEVER disburse, transfer, or release funds, or otherwise execute payment of an invoice — it produces approval decisions only", "coverage_status": "partial"}
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "_approve_invoice commits status='approved' from the model's own arguments with no comparison against manual_review_threshold, no test of the contains_prompt_injection flag it already set, and no comparison of the supplied confidence against confidence_threshold — a column with zero read sites in the tree.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-003"
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "The fallback engine scores authority and urgency phrases out of the attacker-controlled description and uses that score to approve above the review threshold and to override its own injection detection when speed_priority exceeds 0.6.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-004"
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The same call that records the decision writes payment_processed=True, pushing the agent past the remit's decisions-only line into payment state a downstream payer would read as an instruction.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-011"
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "The human-review gate is itself unauthenticated and takes the reviewer name as free text defaulting to 'Admin', so any anonymous caller can clear the queue the agent routed to a human — and the console's own approve/reject buttons post to /approve and /reject, paths no route declares, so the intended operator path 404s while the forgeable one works.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-001"
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Vendor and invoice records readable by any caller",
+      "crossing_edges": [
+        "vendor-py-adapter--vendor-portal-html-client",
+        "app-db-datastore--vendor-py-adapter",
+        "vendor-py-adapter--app-db-datastore",
+        "user-py-adapter--app-db-datastore"
+      ],
+      "remit_rules": [
+        {"rule_id": "R-21", "excerpt": "FinBot MUST NEVER expose one vendor's invoices, onboarding data, PII, or payment details to another vendor or to any unauthenticated party.", "coverage_status": "gap"},
+        {"rule_id": "R-15", "excerpt": "Any vendor accessing another vendor's invoices, onboarding data, or payment details.", "coverage_status": "gap"},
+        {"rule_id": "R-22", "excerpt": "FinBot MUST NEVER emit vendor bank/payment details or full tax identifiers into AI reasoning text, vendor-visible responses, or logs.", "coverage_status": "partial"}
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "GET /api/vendors returns every vendor's full record — bank name, account holder, account number, routing number and tax id — to any unauthenticated caller, and the vendor portal is built on that listing so a visitor can pick any vendor and act as them.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-005"
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "A second unauthenticated store surface, /api/users, allows create, update and delete over the User table; it appears in no UI in the tree and in no row of the remit's approved-channel table.",
+          "status": "residual"
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "Unless USE_PERSISTENT_DISK is set and /data exists, the database is /tmp/app.db re-seeded from the committed clean copy, so invoice decisions and the reasoning attached to them do not survive a restart.",
+          "status": "residual"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Decision and configuration audit trail (absent)",
+      "crossing_edges": [],
+      "remit_rules": [
+        {"rule_id": "R-32", "excerpt": "Every invoice decision (approve / reject / route-to-review) MUST be recorded to a durable audit log with its reasoning and confidence.", "coverage_status": "partial"},
+        {"rule_id": "R-33", "excerpt": "Every configuration or goal change MUST be logged with the acting admin and a timestamp.", "coverage_status": "gap"},
+        {"rule_id": "R-31", "excerpt": "When FinBot's configuration or goals are changed, FinBot MUST record and surface the change to admins.", "coverage_status": "partial"}
+      ],
+      "threats": [
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "No logging framework exists in the tree; goal and config rewrites record only updated_at with no actor and no prior value, and reprocess_invoice overwrites the previous ai_decision, ai_confidence and ai_reasoning in place — so the highest-impact action in the system leaves nothing to detect it by.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-007"
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "The one place the application does write telemetry, /api/log-agreement, prints the caller's IP address and user agent to stdout, unauthenticated and with no retention or destination control.",
+          "status": "residual"
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Committed signing key and provider credential",
+      "crossing_edges": [],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": null,
+          "summary": "The Flask SECRET_KEY is a literal committed in src/main.py rather than read from the environment, so the signing key is public and identical across every deployment; nothing signs today, but any future session or cookie feature inherits it silently.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-008"
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "The OpenAI credential is left to the environment — openai.OpenAI() is constructed with no key argument and no key literal appears anywhere in the tree.",
+          "status": "mitigated",
+          "mitigation_evidence": {"file": "src/services/finbot_agent.py", "line": 16}
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Dependency resolution at build time",
+      "crossing_edges": [],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Only Flask is pinned exactly; eleven dependencies including openai, flask-cors and gunicorn are open-ended floors resolved fresh by the Render build command, with no lockfile, SBOM or dependency-scanning configuration in the repository.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-014"
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "anonymous-goal-rewrite-to-approval",
+      "name": "Anonymous goal rewrite persists into every later approval",
+      "steps": [
+        {"node": "admin-entrypoint", "finding_id": null, "summary": "an anonymous caller reaches /api/admin/finbot/goals over the public listener"},
+        {"node": "update-finbot-goals-admin-py-adapter", "finding_id": "PRAX-2026-08-12-001", "summary": "the route accepts the goal text with no authentication and no content validation"},
+        {"node": "finbot-config-vendor-py-memory", "finding_id": "PRAX-2026-08-12-002", "summary": "update_goals commits the text to config.custom_goals, where it persists across sessions"},
+        {"node": "get-system-prompt-finbot-agent-py-prompt", "finding_id": "PRAX-2026-08-12-002", "summary": "every later prompt appends it under 'OVERRIDE ABOVE IF CONFLICTING', outranking the threshold and fraud goals"},
+        {"node": "approve-invoice-finbot-agent-py-tool", "finding_id": "PRAX-2026-08-12-003", "summary": "the model's approve call commits with no amount, injection or confidence check to catch the redirected decision"},
+        {"node": "app-db-datastore", "finding_id": "PRAX-2026-08-12-007", "summary": "no actor, prior value or decision log records that the goals ever changed"}
+      ]
+    },
+    {
+      "id": "business-context-override-in-fallback",
+      "name": "Description phrasing overrides the review threshold on the fallback path",
+      "steps": [
+        {"node": "vendor-entrypoint", "finding_id": "PRAX-2026-08-12-009", "summary": "an unauthenticated submission carries authority and urgency phrasing in the description"},
+        {"node": "fallback-processing-finbot-agent-py-orchestrator", "finding_id": "PRAX-2026-08-12-004", "summary": "with the OpenAI client unavailable the rule engine scores those phrases into context_strength"},
+        {"node": "approve-invoice-finbot-agent-py-tool", "finding_id": "PRAX-2026-08-12-003", "summary": "the score clears the bar and calls _approve_invoice above manual_review_threshold, or in spite of the injection flag"},
+        {"node": "app-db-datastore", "finding_id": "PRAX-2026-08-12-011", "summary": "status='approved' and payment_processed=True are committed in one write"}
+      ]
+    },
+    {
+      "id": "stored-goals-xss-into-operator-console",
+      "name": "Poisoned goals execute in the operator's browser",
+      "steps": [
+        {"node": "update-finbot-goals-admin-py-adapter", "finding_id": "PRAX-2026-08-12-002", "summary": "an anonymous POST stores markup in the goals field"},
+        {"node": "finbot-config-vendor-py-memory", "finding_id": "PRAX-2026-08-12-002", "summary": "the text persists in the config row and is returned unescaped by GET /admin/finbot/config"},
+        {"node": "admin-dashboard-html-client", "finding_id": "PRAX-2026-08-12-013", "summary": "loadCurrentGoals assigns it into innerHTML, so it executes for the next operator who opens the console"}
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Two strains. (1) review-invoice-admin-py-control is a Flask route but is the system's only human-approval gate, so it sits in agent_core under the spec's 'approval gates' clause while its two sibling admin nodes sit in client_adapters — the same file spans two lanes. (2) finbot-config-vendor-py-memory is one table inside the same SQLite file as app-db-datastore, split across agent_core and tools_mcp because the config row is agent state fed into every prompt while the rest of the database is tool-touched records; the lane split is right but it means one physical store appears as two nodes.",
+    "omissions": "Vendor notification email is an approved channel in the remit and a declared allowed tool, but no mail code, SMTP config or provider dependency exists in the tree — modelled as absent, not as a node. No payment or fund-transfer integration exists either, so no value-transfer boundary was coined despite the financial subject matter; payment_processed is a flag, and it is carried as a threat on state-commit. src/static/entry.html, index.html, leadership.html, why-partner.html, ctf-footer.js and agreement-check.js are marketing/CTF-framing pages with no data flow into the agent and were collapsed out. docs/FinBot-CTF-walkthrough-goal-manipulation.md documents the intended LLM-path goal hijack but is a walkthrough, not architecture, so it backs the residual ASI01 threat on model-egress rather than a node. ID ambiguity worth flagging: the datastore node could be coined app-db-datastore under ID rule 5 (fixed literal /tmp/app.db at src/main.py:57) or vendor-py-datastore under rule 1 (the SQLAlchemy models file); rule 5 was taken as the more specific, and the config split therefore takes its prefix from the defining class in src/models/vendor.py rather than from the datastore node's own basename. All 14 findings in the frozen baseline are placed; none were dropped as stale against this snapshot. Two nodes are deliberately edgeless: main-py-secret-store is committed repo posture with no live signing path, and requirements-txt-deploy-surface is build-time provenance with no runtime data flow.",
+    "counts": {"nodes": 21, "edges": 32, "boundaries": 9, "threats": 27}
+  }
+}

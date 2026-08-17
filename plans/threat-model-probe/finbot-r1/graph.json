@@ -1,0 +1,650 @@
+{
+  "spec_version": "0.1-probe",
+  "target": {
+    "slug": "finbot",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/finbot"
+  },
+  "model_identity": "You are powered by the model named Fable 5. The exact model ID is claude-fable-5.",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "vendor-portal-html-vendor-submitter",
+      "name": "Vendor / public submitter",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Untrusted origin submitting invoice descriptions (the primary injection surface) and onboarding PII through the public vendor portal; registration auto-approves and no auth binds a caller to a vendor identity.",
+      "evidence": [
+        { "file": "src/static/vendor-portal.html", "line": 184, "note": "portal fetches /api/vendors and lets any visitor pick any vendor id to act as" },
+        { "file": "src/routes/vendor.py", "line": 37, "note": "register_vendor stores submissions with status='approved' auto-approve, no identity check" }
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-anon-admin",
+      "name": "Anonymous admin actor",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any anonymous caller reaching the admin surface; the remit names an unauthenticated party exercising admin capabilities as explicitly forbidden.",
+      "evidence": [
+        { "file": "src/routes/admin.py", "line": 90, "note": "update_finbot_goals accepts a goals string from any caller with no auth" },
+        { "file": "src/routes/admin.py", "line": 193, "note": "update_vendor_trust lets any caller set any vendor's trust_level" }
+      ]
+    },
+    {
+      "id": "vendor-portal-html-web-client",
+      "name": "Vendor portal (web)",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Static vendor-facing UI (portal, onboarding, entry) that drives the /api/vendors endpoints from the browser.",
+      "evidence": [
+        { "file": "src/static/vendor-portal.html", "line": 262, "note": "posts invoices to /api/vendors/{id}/invoices" },
+        { "file": "src/static/onboarding.html", "line": 190, "note": "posts onboarding PII to /api/vendors" }
+      ]
+    },
+    {
+      "id": "admin-dashboard-html-web-console",
+      "name": "Admin console (web)",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Operator console for config/goals/review, served from the public static folder; renders attacker-writable custom_goals into the page via innerHTML (stored XSS sink).",
+      "evidence": [
+        { "file": "src/static/admin-dashboard.html", "line": 345, "note": "goalsDiv.innerHTML interpolates data.custom_goals with no escaping" },
+        { "file": "src/static/admin-dashboard.html", "line": 144, "note": "confidence_threshold rendered as a configurable field the operator can set" }
+      ]
+    },
+    {
+      "id": "vendor-py-vendor-api",
+      "name": "Vendor API blueprint",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Flask blueprint for vendor registration, invoice submission, and vendor/invoice listing; every route is unauthenticated and list/detail routes return full vendor records.",
+      "evidence": [
+        { "file": "src/routes/vendor.py", "line": 63, "note": "list_vendors returns to_dict() for every vendor with no authz or field filtering" },
+        { "file": "src/routes/vendor.py", "line": 69, "note": "submit_invoice is an unauthenticated POST that invokes process_invoice inline" }
+      ]
+    },
+    {
+      "id": "admin-py-admin-api",
+      "name": "Admin API blueprint",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Flask blueprint for config, goals, invoice review/approve, reprocess, and vendor-trust writes; registered with no authentication, session, or role check of any kind.",
+      "evidence": [
+        { "file": "src/routes/admin.py", "line": 74, "note": "update_finbot_config decorated only with @admin_bp.route; no auth anywhere in module" },
+        { "file": "src/routes/admin.py", "line": 47, "note": "review_invoice sets status='approved' and payment_processed=True directly" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator",
+      "name": "FinBotAgent orchestrator",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "process_invoice / _run_agent_orchestration drives OpenAI function-calling over five invoice tools, bounded by max_iterations=5, returning on the first terminal decision tool.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 101, "note": "process_invoice entry point and CTF flag scoring on approval" },
+        { "file": "src/services/finbot_agent.py", "line": 171, "note": "max_iterations=5 tool loop; no per-caller or spend bound" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-system-prompt",
+      "name": "System prompt builder",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "get_system_prompt assembles goals per invoice from the config row and appends config.custom_goals under 'CUSTOM GOALS (OVERRIDE ABOVE IF CONFLICTING)', giving stored text precedence over the built-in threshold and fraud goals.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 70, "note": "custom_goals appended under an explicit override-above heading" },
+        { "file": "src/services/finbot_agent.py", "line": 45, "note": "speed/threshold/fraud goals are prompt text, not enforced code" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-fallback-engine",
+      "name": "Rule-based fallback engine",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "_fallback_processing / _analyze_business_context runs whenever the OpenAI client fails to initialize; it scores authority/urgency phrases from the attacker-controlled description and uses them to auto-approve past the review threshold and past its own injection detection.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 807, "note": "amounts above manual_review_threshold auto-approved when business context is strong" },
+        { "file": "src/services/finbot_agent.py", "line": 841, "note": "contains_injection branch approves anyway when should_expedite and speed_priority>0.6" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-injection-detector",
+      "name": "Injection / fraud detector",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Detection-only control: _detect_prompt_injection and detect_fraud_patterns run regex over the description and set invoice.contains_prompt_injection, but that flag has no read site in any enforcement path — it is a control that only records.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 549, "note": "_detect_prompt_injection regex patterns; sets a flag only" },
+        { "file": "src/services/finbot_agent.py", "line": 505, "note": "detect_fraud_patterns short-circuits to empty when fraud_detection_enabled is off" }
+      ]
+    },
+    {
+      "id": "main-py-cors-control",
+      "name": "CORS control (wildcard)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "In-process origin control applied app-wide as CORS(app) with no origins argument, so every origin — including /api/admin/* — is permitted (open/misconfigured control).",
+      "evidence": [
+        { "file": "src/main.py", "line": 18, "note": "CORS(app) with no origins/methods/resources restriction, before blueprint registration" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-get-invoice-details",
+      "name": "get_invoice_details tool",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Context-assembly tool that returns the raw attacker-controlled invoice description plus vendor contact_email into the model context; bank and tax identifiers are correctly excluded.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 390, "note": "returns description and days/urgency into the tool result that becomes model context" },
+        { "file": "src/services/finbot_agent.py", "line": 403, "note": "vendor block includes contact_email that no decision path reads" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-approve-invoice",
+      "name": "approve_invoice tool (missing gate)",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "The approval-commit point and the place a deterministic gate should live; it writes status='approved' and payment_processed=True from the model's arguments with no amount, injection-flag, or confidence check — a structurally absent control.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 409, "note": "_approve_invoice commits approval with no manual_review_threshold, contains_prompt_injection, or confidence_threshold test" },
+        { "file": "src/services/finbot_agent.py", "line": 416, "note": "sets payment_processed=True in the same call, crossing into payment state" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-review-reject-tools",
+      "name": "reject / request_human_review tools",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The safe terminal decision tools that write status='rejected' or 'pending_review' with reasoning and confidence; reachable only if the model or fallback chooses them.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 460, "note": "_reject_invoice writes rejected status" },
+        { "file": "src/services/finbot_agent.py", "line": 482, "note": "_request_human_review writes pending_review status" }
+      ]
+    },
+    {
+      "id": "vendor-py-invoice-vendor-datastore",
+      "name": "Invoice + vendor datastore",
+      "lane": "tools_mcp",
+      "kind": "datastore",
+      "description": "SQLAlchemy/SQLite store holding vendor records (bank name, account/routing number, tax_id) and invoice rows with ai_decision/confidence/reasoning; to_dict serialises the full vendor row unfiltered.",
+      "evidence": [
+        { "file": "src/models/vendor.py", "line": 38, "note": "Vendor.to_dict includes tax_id, bank_name, account_number, routing_number" },
+        { "file": "src/models/vendor.py", "line": 59, "note": "Invoice stores ai_decision, ai_confidence, ai_reasoning, payment_processed" }
+      ]
+    },
+    {
+      "id": "vendor-py-finbot-config-store",
+      "name": "FinBotConfig store (goals/thresholds)",
+      "lane": "tools_mcp",
+      "kind": "memory",
+      "description": "Persistent agent-state row carrying thresholds, speed_priority, fraud toggle, confidence_threshold (zero read sites), and free-text custom_goals; it holds only updated_at with no actor or prior value.",
+      "evidence": [
+        { "file": "src/models/vendor.py", "line": 105, "note": "custom_goals free-text column persisted across sessions" },
+        { "file": "src/models/vendor.py", "line": 102, "note": "confidence_threshold column defined but read nowhere; only created_at/updated_at for history" }
+      ]
+    },
+    {
+      "id": "finbot-agent-py-openai-model",
+      "name": "OpenAI model provider",
+      "lane": "external_deploy",
+      "kind": "model",
+      "description": "Upstream LLM (gpt-4.1-mini, pinned string) invoked with credentials taken from the environment; the one operator-approved integration in the trusted closure.",
+      "evidence": [
+        { "file": "src/services/finbot_agent.py", "line": 16, "note": "openai.OpenAI() built with no inline key; model pinned to a concrete release" },
+        { "file": "src/services/finbot_agent.py", "line": 176, "note": "chat.completions.create with tools and no timeout or spend cap" }
+      ]
+    },
+    {
+      "id": "render-yaml-public-web-deploy",
+      "name": "Render public web deploy",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Internet-facing Render 'type: web' service behind gunicorn bound to 0.0.0.0, serving the vendor portal and the admin console from the same public origin (live URL advertised in README).",
+      "evidence": [
+        { "file": "render.yaml", "line": 2, "note": "service declared type: web with healthCheckPath /, internet-facing" },
+        { "file": "gunicorn.conf.py", "line": 4, "note": "bind 0.0.0.0:$PORT — one public listener for portal and admin console" }
+      ]
+    },
+    {
+      "id": "main-py-hardcoded-secret-key",
+      "name": "Hardcoded Flask SECRET_KEY",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "Flask signing key assigned as a committed string literal at import time rather than read from the environment; public to anyone with repo access and identical across deployments (no data-flow edge — evidence-only node).",
+      "evidence": [
+        { "file": "src/main.py", "line": 15, "note": "hardcoded secret pattern at src/main.py:15; OpenAI credential by contrast left to the environment" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "vendor-portal-html-vendor-submitter--vendor-portal-html-web-client",
+      "from": "vendor-portal-html-vendor-submitter", "to": "vendor-portal-html-web-client",
+      "label": "invoice + onboarding input",
+      "data": "user text, vendor PII",
+      "evidence": [ { "file": "src/static/onboarding.html", "line": 190, "note": "onboarding form collects and posts PII" } ]
+    },
+    {
+      "id": "vendor-portal-html-web-client--vendor-py-vendor-api",
+      "from": "vendor-portal-html-web-client", "to": "vendor-py-vendor-api",
+      "label": "HTTP submit",
+      "data": "invoice description, PII",
+      "evidence": [ { "file": "src/static/vendor-portal.html", "line": 345, "note": "portal POSTs invoice to /api/vendors/{id}/invoices" } ]
+    },
+    {
+      "id": "admin-dashboard-html-anon-admin--admin-dashboard-html-web-console",
+      "from": "admin-dashboard-html-anon-admin", "to": "admin-dashboard-html-web-console",
+      "label": "admin writes",
+      "data": "goals, thresholds, trust",
+      "evidence": [ { "file": "src/static/admin-dashboard.html", "line": 346, "note": "console writes custom_goals value into the goals textarea/form" } ]
+    },
+    {
+      "id": "admin-dashboard-html-web-console--admin-py-admin-api",
+      "from": "admin-dashboard-html-web-console", "to": "admin-py-admin-api",
+      "label": "HTTP admin writes",
+      "data": "config + goal text",
+      "evidence": [ { "file": "src/static/admin-dashboard.html", "line": 340, "note": "console fetches/writes /api/admin/finbot/config and goals" } ]
+    },
+    {
+      "id": "vendor-py-vendor-api--vendor-py-invoice-vendor-datastore",
+      "from": "vendor-py-vendor-api", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "persist invoice/vendor",
+      "data": "invoice + vendor records",
+      "evidence": [ { "file": "src/routes/vendor.py", "line": 99, "note": "submit_invoice adds and commits an invoice row" } ]
+    },
+    {
+      "id": "vendor-py-vendor-api--finbot-agent-py-orchestrator",
+      "from": "vendor-py-vendor-api", "to": "finbot-agent-py-orchestrator",
+      "label": "process_invoice trigger",
+      "data": "invoice id",
+      "evidence": [ { "file": "src/routes/vendor.py", "line": 104, "note": "submit_invoice calls finbot.process_invoice inline" } ]
+    },
+    {
+      "id": "admin-py-admin-api--vendor-py-finbot-config-store",
+      "from": "admin-py-admin-api", "to": "vendor-py-finbot-config-store",
+      "label": "config / goal write",
+      "data": "goal text, thresholds",
+      "evidence": [ { "file": "src/routes/admin.py", "line": 100, "note": "update_finbot_goals -> update_goals persists custom_goals" } ]
+    },
+    {
+      "id": "admin-py-admin-api--vendor-py-invoice-vendor-datastore",
+      "from": "admin-py-admin-api", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "review-approve / trust write",
+      "data": "invoice status, trust level",
+      "evidence": [ { "file": "src/routes/admin.py", "line": 207, "note": "update_vendor_trust writes vendor.trust_level; review_invoice writes approved status at :48" } ]
+    },
+    {
+      "id": "admin-py-admin-api--finbot-agent-py-orchestrator",
+      "from": "admin-py-admin-api", "to": "finbot-agent-py-orchestrator",
+      "label": "reprocess trigger",
+      "data": "invoice id",
+      "evidence": [ { "file": "src/routes/admin.py", "line": 128, "note": "reprocess_invoice clears ai_* fields then re-runs process_invoice" } ]
+    },
+    {
+      "id": "vendor-py-invoice-vendor-datastore--vendor-py-vendor-api",
+      "from": "vendor-py-invoice-vendor-datastore", "to": "vendor-py-vendor-api",
+      "label": "full vendor records",
+      "data": "bank / routing / tax_id",
+      "evidence": [ { "file": "src/routes/vendor.py", "line": 66, "note": "list_vendors reads every vendor row via to_dict()" } ]
+    },
+    {
+      "id": "vendor-py-vendor-api--vendor-portal-html-vendor-submitter",
+      "from": "vendor-py-vendor-api", "to": "vendor-portal-html-vendor-submitter",
+      "label": "PII response (leak)",
+      "data": "bank / routing / tax_id",
+      "evidence": [ { "file": "src/routes/vendor.py", "line": 61, "note": "get_vendor returns full to_dict() to any caller" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-system-prompt",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-system-prompt",
+      "label": "build prompt from config",
+      "data": "config values",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 158, "note": "orchestration builds system_prompt = get_system_prompt(config)" } ]
+    },
+    {
+      "id": "vendor-py-finbot-config-store--finbot-agent-py-system-prompt",
+      "from": "vendor-py-finbot-config-store", "to": "finbot-agent-py-system-prompt",
+      "label": "custom_goals into prompt",
+      "data": "stored goal text",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 70, "note": "config.custom_goals appended under the override heading" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-openai-model",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-openai-model",
+      "label": "messages + tool outputs",
+      "data": "system prompt + untrusted description",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 176, "note": "chat.completions.create sends messages including tool results" } ]
+    },
+    {
+      "id": "finbot-agent-py-openai-model--finbot-agent-py-orchestrator",
+      "from": "finbot-agent-py-openai-model", "to": "finbot-agent-py-orchestrator",
+      "label": "tool-call decisions",
+      "data": "decision tool calls + args",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 194, "note": "message.tool_calls drive _execute_function" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-get-invoice-details",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-get-invoice-details",
+      "label": "tool call",
+      "data": "invoice id",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 349, "note": "_execute_function dispatches get_invoice_details" } ]
+    },
+    {
+      "id": "finbot-agent-py-get-invoice-details--vendor-py-invoice-vendor-datastore",
+      "from": "finbot-agent-py-get-invoice-details", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "read invoice/vendor",
+      "data": "invoice + vendor row",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 365, "note": "Invoice.query.get / Vendor.query.get reads" } ]
+    },
+    {
+      "id": "finbot-agent-py-get-invoice-details--finbot-agent-py-orchestrator",
+      "from": "finbot-agent-py-get-invoice-details", "to": "finbot-agent-py-orchestrator",
+      "label": "invoice context",
+      "data": "raw description + contact_email",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 403, "note": "returns raw description and contact_email into model context" } ]
+    },
+    {
+      "id": "finbot-agent-py-get-invoice-details--finbot-agent-py-injection-detector",
+      "from": "finbot-agent-py-get-invoice-details", "to": "finbot-agent-py-injection-detector",
+      "label": "run detection",
+      "data": "invoice description",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 372, "note": "calls _detect_prompt_injection on the description" } ]
+    },
+    {
+      "id": "finbot-agent-py-injection-detector--vendor-py-invoice-vendor-datastore",
+      "from": "finbot-agent-py-injection-detector", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "set injection flag",
+      "data": "contains_prompt_injection (unread)",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 374, "note": "writes invoice.contains_prompt_injection; no enforcement path reads it" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-approve-invoice",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-approve-invoice",
+      "label": "approve tool call",
+      "data": "invoice id, reasoning, confidence",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 351, "note": "_execute_function dispatches approve_invoice from model args" } ]
+    },
+    {
+      "id": "finbot-agent-py-approve-invoice--vendor-py-invoice-vendor-datastore",
+      "from": "finbot-agent-py-approve-invoice", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "commit approval",
+      "data": "status=approved, payment_processed=True",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 415, "note": "writes approved status and payment_processed with no gate" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-review-reject-tools",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-review-reject-tools",
+      "label": "reject / route decision",
+      "data": "invoice id, reasoning",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 353, "note": "_execute_function dispatches reject_invoice / request_human_review" } ]
+    },
+    {
+      "id": "finbot-agent-py-review-reject-tools--vendor-py-invoice-vendor-datastore",
+      "from": "finbot-agent-py-review-reject-tools", "to": "vendor-py-invoice-vendor-datastore",
+      "label": "status write",
+      "data": "rejected / pending_review",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 488, "note": "request_human_review writes pending_review status" } ]
+    },
+    {
+      "id": "finbot-agent-py-orchestrator--finbot-agent-py-fallback-engine",
+      "from": "finbot-agent-py-orchestrator", "to": "finbot-agent-py-fallback-engine",
+      "label": "on OpenAI init failure",
+      "data": "invoice id, config",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 154, "note": "if not self.client -> _fallback_processing" } ]
+    },
+    {
+      "id": "finbot-agent-py-fallback-engine--finbot-agent-py-approve-invoice",
+      "from": "finbot-agent-py-fallback-engine", "to": "finbot-agent-py-approve-invoice",
+      "label": "auto_approve decision",
+      "data": "reasoning, confidence",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 873, "note": "fallback returns _approve_invoice on auto_approve" } ]
+    },
+    {
+      "id": "finbot-agent-py-fallback-engine--finbot-agent-py-review-reject-tools",
+      "from": "finbot-agent-py-fallback-engine", "to": "finbot-agent-py-review-reject-tools",
+      "label": "flag_review / reject decision",
+      "data": "reasoning, confidence",
+      "evidence": [ { "file": "src/services/finbot_agent.py", "line": 874, "note": "fallback routes to _request_human_review / _reject_invoice" } ]
+    },
+    {
+      "id": "render-yaml-public-web-deploy--admin-dashboard-html-web-console",
+      "from": "render-yaml-public-web-deploy", "to": "admin-dashboard-html-web-console",
+      "label": "public exposure",
+      "data": "network reachability",
+      "evidence": [ { "file": "render.yaml", "line": 2, "note": "public web service serves admin-dashboard.html from the static folder" } ]
+    },
+    {
+      "id": "main-py-cors-control--admin-py-admin-api",
+      "from": "main-py-cors-control", "to": "admin-py-admin-api",
+      "label": "wildcard CORS applied",
+      "data": "cross-origin permission",
+      "evidence": [ { "file": "src/main.py", "line": 22, "note": "admin blueprint registered under app that has wildcard CORS" } ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "public-admin-control-plane",
+      "name": "Public internet -> admin control plane",
+      "crossing_edges": [
+        "admin-dashboard-html-anon-admin--admin-dashboard-html-web-console",
+        "admin-dashboard-html-web-console--admin-py-admin-api",
+        "admin-py-admin-api--vendor-py-finbot-config-store",
+        "admin-py-admin-api--vendor-py-invoice-vendor-datastore",
+        "render-yaml-public-web-deploy--admin-dashboard-html-web-console",
+        "main-py-cors-control--admin-py-admin-api"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-07", "excerpt": "MUST require authenticated, role-restricted admin access.", "coverage_status": "gap" },
+        { "rule_id": "R-08", "excerpt": "MUST NOT be accessible to vendors or unauthenticated users.", "coverage_status": "gap" },
+        { "rule_id": "R-28", "excerpt": "Any change to FinBot's configuration ... permitted only for an authenticated, authorized admin.", "coverage_status": "gap" },
+        { "rule_id": "R-09", "excerpt": "MUST NOT be exposed to a public/untrusted network.", "coverage_status": "gap" },
+        { "rule_id": "R-12", "excerpt": "Only the operator-configured CineFlow domains ... any domain outside that configured closure MUST be reported as a trust expansion.", "coverage_status": "gap" },
+        { "rule_id": "R-33", "excerpt": "Every configuration or goal change MUST be logged with the acting admin and a timestamp.", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "asi": "ASI03",
+          "summary": "Any anonymous caller exercises the full admin capability set — rewrite goals, change thresholds, disable fraud detection, approve pending invoices, raise vendor trust — with no authentication on any /api/admin/* route.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-001"
+        },
+        {
+          "stride": "T",
+          "asi": "ASI06",
+          "summary": "An anonymous goal write persists into config.custom_goals and is appended to every future system prompt under 'OVERRIDE ABOVE IF CONFLICTING', redirecting all subsequent invoice decisions from one request.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-002"
+        },
+        {
+          "stride": "E",
+          "asi": "ASI03",
+          "summary": "The admin console is published to the public internet from the same 0.0.0.0 listener as the vendor portal, reachable by URL from any network rather than an internal one.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-006"
+        },
+        {
+          "stride": "E",
+          "asi": "ASI03",
+          "summary": "Wildcard CORS lets any web origin drive the admin config and goals endpoints from a visitor's browser, a trust expansion beyond the configured CineFlow closure.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-010"
+        },
+        {
+          "stride": "R",
+          "asi": "ASI06",
+          "summary": "A goal or config change records only updated_at with no actor and no prior value, so the highest-impact action in the system — a goal rewrite — leaves no attributable trace (STRIDE-Repudiation; OWASP maps this to RAISE Monitor-Continuously, no clean ASI, tagged ASI06 for the chain it repudiates).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-007"
+        },
+        {
+          "stride": "E",
+          "asi": "ASI06",
+          "summary": "Attacker-writable custom_goals is rendered into the admin console via innerHTML, giving stored XSS that executes in the next operator's browser (web-layer vuln; no clean ASI, tagged ASI06 for the poisoned-goals store it rides on).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-013"
+        }
+      ]
+    },
+    {
+      "id": "vendor-content-to-agent-decision",
+      "name": "Untrusted vendor content -> agent decision",
+      "crossing_edges": [
+        "vendor-portal-html-vendor-submitter--vendor-portal-html-web-client",
+        "vendor-portal-html-web-client--vendor-py-vendor-api",
+        "vendor-py-vendor-api--finbot-agent-py-orchestrator",
+        "finbot-agent-py-get-invoice-details--finbot-agent-py-orchestrator",
+        "finbot-agent-py-orchestrator--finbot-agent-py-openai-model",
+        "finbot-agent-py-fallback-engine--finbot-agent-py-approve-invoice"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-01", "excerpt": "MUST NEVER treat instructions ... in an invoice description ... as commands — such content is data to be evaluated.", "coverage_status": "partial" },
+        { "rule_id": "R-06", "excerpt": "Vendor-supplied content is untrusted data, never instructions.", "coverage_status": "partial" },
+        { "rule_id": "R-29", "excerpt": "MUST NEVER let vendor-submitted invoice content alter its approval thresholds, confidence requirement, fraud-detection state, or goals.", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "asi": "ASI01",
+          "summary": "The fallback engine scores authority/urgency phrases out of the attacker-controlled description and uses them to auto-approve past the manual-review threshold and past its own injection detection whenever the OpenAI client fails to initialize.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-004"
+        },
+        {
+          "stride": "I",
+          "asi": "ASI06",
+          "summary": "Vendor contact_email, a remit-declared PII class, is placed in the model context on every invoice although no decision rule consults it — extractable in any prompt-leakage scenario (OWASP LLM02; no clean agentic code, tagged for the context store it enters).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-012"
+        }
+      ]
+    },
+    {
+      "id": "model-decision-to-approval-commit",
+      "name": "Model/fallback decision -> approval commit",
+      "crossing_edges": [
+        "finbot-agent-py-openai-model--finbot-agent-py-orchestrator",
+        "finbot-agent-py-orchestrator--finbot-agent-py-approve-invoice",
+        "finbot-agent-py-approve-invoice--vendor-py-invoice-vendor-datastore",
+        "finbot-agent-py-fallback-engine--finbot-agent-py-approve-invoice"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-25", "excerpt": "Approving any invoice at or above the manual-review threshold ... MUST be routed to a human reviewer.", "coverage_status": "gap" },
+        { "rule_id": "R-26", "excerpt": "Approving any invoice in which prompt-injection ... was detected ... MUST be routed to a human reviewer.", "coverage_status": "gap" },
+        { "rule_id": "R-27", "excerpt": "Approving any invoice whose decision confidence is below the operator-configured minimum ... MUST be routed to a human reviewer.", "coverage_status": "gap" },
+        { "rule_id": "R-30", "excerpt": "When prompt-injection ... is detected ... FinBot MUST stop short of auto-approval, route ... and alert an admin.", "coverage_status": "gap" },
+        { "rule_id": "R-03", "excerpt": "MUST NEVER disburse, transfer, or release funds, or otherwise execute payment ... it produces approval decisions only.", "coverage_status": "partial" }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "asi": "ASI10",
+          "summary": "_approve_invoice commits status=approved from the model's arguments with no amount, injection-flag, or confidence check, and confidence_threshold has zero read sites — a deterministic approval gate is structurally absent, so the agent's decisions run standing-autonomous (OWASP LLM03 Excessive Agency primary; ASI10 co-tag per the outlive test).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-003"
+        },
+        {
+          "stride": "T",
+          "asi": "ASI02",
+          "summary": "The same approve call sets payment_processed=True, taking the agent past its decisions-only remit into payment state that a downstream process would read as a payment instruction.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-011"
+        }
+      ]
+    },
+    {
+      "id": "vendor-pii-exposure",
+      "name": "Datastore PII -> unauthenticated caller",
+      "crossing_edges": [
+        "vendor-py-invoice-vendor-datastore--vendor-py-vendor-api",
+        "vendor-py-vendor-api--vendor-portal-html-vendor-submitter"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-15", "excerpt": "Any vendor accessing another vendor's invoices, onboarding data, or payment details.", "coverage_status": "gap" },
+        { "rule_id": "R-21", "excerpt": "MUST NEVER expose one vendor's invoices, onboarding data, PII, or payment details to another vendor or to any unauthenticated party.", "coverage_status": "gap" },
+        { "rule_id": "R-22", "excerpt": "MUST NEVER emit vendor bank/payment details or full tax identifiers into ... vendor-visible responses, or logs.", "coverage_status": "partial" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "asi": "ASI03",
+          "summary": "GET /api/vendors returns every vendor's full record — bank name, account number, routing number, tax_id — to any anonymous caller, and the portal picker built on that listing lets any visitor select and act as any vendor.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-005"
+        }
+      ]
+    },
+    {
+      "id": "deploy-supply-consumption-surface",
+      "name": "Deployment, supply-chain & consumption surface",
+      "crossing_edges": [
+        "finbot-agent-py-orchestrator--finbot-agent-py-openai-model",
+        "vendor-py-vendor-api--finbot-agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-13", "excerpt": "Any other AI/LLM service or outbound integration is outside the configured closure and MUST be reported as a trust expansion.", "coverage_status": "verified" },
+        { "rule_id": "R-23", "excerpt": "MUST NEVER transmit vendor PII or payment details to any destination outside CineFlow's authorized systems.", "coverage_status": "verified" }
+      ],
+      "threats": [
+        {
+          "stride": "D",
+          "asi": "ASI06",
+          "summary": "The unauthenticated invoice endpoint has no rate limit or spend cap and each submission drives up to five model calls, so a single script can run unbounded model spend and grow the database (OWASP LLM06 Unbounded Consumption; no clean agentic code — ASI forced, see notes).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-009"
+        },
+        {
+          "stride": "I",
+          "asi": "ASI03",
+          "summary": "The Flask SECRET_KEY is a committed string literal identical across deployments; unused today but must be treated as compromised for any future signing (OWASP LLM02/supply-chain; no clean agentic code — ASI forced, see notes).",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-008"
+        },
+        {
+          "stride": "T",
+          "asi": "ASI04",
+          "summary": "Only Flask is version-pinned; every other dependency is an open-ended >= floor with no lockfile or SBOM, so two builds of one commit can resolve different code with no inventory to audit.",
+          "status": "finding",
+          "finding_id": "PRAX-2026-08-12-014"
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "anonymous-goal-override-chain",
+      "name": "Anonymous goal override redirects all future decisions",
+      "steps": [
+        { "node": "admin-dashboard-html-anon-admin", "finding_id": "PRAX-2026-08-12-001", "summary": "anonymous POST to /api/admin/finbot/goals, no auth" },
+        { "node": "admin-py-admin-api", "finding_id": "PRAX-2026-08-12-002", "summary": "update_goals accepts unvalidated free text" },
+        { "node": "vendor-py-finbot-config-store", "finding_id": "PRAX-2026-08-12-002", "summary": "custom_goals persisted across sessions" },
+        { "node": "finbot-agent-py-system-prompt", "finding_id": "PRAX-2026-08-12-002", "summary": "appended under override-above heading into every prompt" },
+        { "node": "finbot-agent-py-approve-invoice", "finding_id": "PRAX-2026-08-12-003", "summary": "redirected decision commits approval through the gateless approve tool" },
+        { "node": "vendor-py-invoice-vendor-datastore", "finding_id": "PRAX-2026-08-12-007", "summary": "no actor or prior value recorded, leaving no trace" }
+      ]
+    },
+    {
+      "id": "fallback-business-context-override",
+      "name": "Fallback business-context override auto-approves injected invoice",
+      "steps": [
+        { "node": "vendor-portal-html-vendor-submitter", "finding_id": "PRAX-2026-08-12-004", "summary": "invoice description carrying authority/urgency phrases" },
+        { "node": "finbot-agent-py-fallback-engine", "finding_id": "PRAX-2026-08-12-004", "summary": "reachable by making the OpenAI client fail; scores phrases and overrides threshold + injection flag" },
+        { "node": "finbot-agent-py-approve-invoice", "finding_id": "PRAX-2026-08-12-003", "summary": "commits approval with no amount/injection/confidence gate" },
+        { "node": "vendor-py-invoice-vendor-datastore", "finding_id": "PRAX-2026-08-12-011", "summary": "status=approved and payment_processed=True written" }
+      ]
+    },
+    {
+      "id": "unauth-vendor-pii-harvest",
+      "name": "Unauthenticated harvest of vendor bank details",
+      "steps": [
+        { "node": "vendor-portal-html-vendor-submitter", "finding_id": "PRAX-2026-08-12-005", "summary": "anonymous GET /api/vendors" },
+        { "node": "vendor-py-vendor-api", "finding_id": "PRAX-2026-08-12-005", "summary": "list_vendors returns unfiltered records" },
+        { "node": "vendor-py-invoice-vendor-datastore", "finding_id": "PRAX-2026-08-12-005", "summary": "to_dict serialises bank, account, routing, tax_id for every vendor" }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Mostly clean, with two strains. (1) STRIDE x ASI forces awkward tags on this target's several pure-web / infrastructure findings: the audit-log gap (007), stored XSS (013), hardcoded secret (008), and unbounded consumption (009) have no honest Agentic-Top-10 primary under the KB arbitration (007 is RAISE Monitor-only, 009 is OWASP LLM06 with an explicit no-ASI note, 008 is supply-chain, 013 is a browser-layer vuln); each is tagged with the ASI of the chain it rides rather than a native mapping, flagged in-summary. (2) The agent_core vs tools_mcp split strains on the decision tools: approve_invoice is simultaneously an LLM-invoked tool (tools_mcp) and the app's one enforcement point (a control that belongs conceptually in agent_core) — placed in tools_mcp with kind=control and noted here.",
+    "omissions": "Vendor notification email (an approved remit channel, R-10 verified) has no implementation in the tree — no outbound-email code exists — so it is not a node; recorded as expected-but-absent. The user.py blueprint (generic /api/users CRUD) is live and unauthenticated but is CTF scaffolding unrelated to the remit, so it is not modelled. The hardcoded-secret node (008) carries no data-flow edge — it is an evidence-only node. detect_fraud_patterns is folded into the injection-detector node rather than modelled as a separate tool.",
+    "counts": { "nodes": 19, "edges": 29, "boundaries": 5, "threats": 14 }
+  }
+}

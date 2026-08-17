@@ -5,10 +5,11 @@
 
 # Results — Threat-Model Phase-0 Probe
 
-> **STATUS: PROBE COMPLETE 2026-08-16 — quiet branch, local artifacts.**
+> **STATUS: PROBE COMPLETE 2026-08-16.**
 > Design under test: `DESIGN_THREAT_MODEL.md`. Artifacts (graph JSONs,
-> rendered diagrams, comparison outputs, spec, prompt) live in gitignored
-> `local/threat-model-probe/` — open `index.html` there. Verdict:
+> comparison outputs, spec, prompt, probe scripts) are checked in at
+> `plans/threat-model-probe/`; rendered HTML is generated output —
+> rebuild with `render_probe.py` (see its README). Verdict:
 > **PASS with spec revisions** — the concept works end-to-end; two spec
 > defects and one measurement lesson found, all fixable.
 
