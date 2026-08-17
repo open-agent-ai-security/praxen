@@ -28,16 +28,20 @@ Why it earns a major version: Praxen stops being only a findings report and
 becomes findings + architecture view. Why it ships before the detection
 release: it is score-inert and freeze-independent (cheap and fast to ship
 by Praxen standards), it needs nothing from the detection batch (missed
-detections surface honestly as `open` threats — the probe turned three
+detections surface honestly as `potential` threats — the probe turned three
 of those into filed issues), and #198 wants threat-model boundary structure
 as input, so the generator work is *better* after this ships.
 
 ## Contents (Phase 1 of the design doc, productized)
 
-1. **Graph spec freeze.** Probe spec v0.4.1 → the v1 contract (v0.4.1 =
-   the `residual`→`open` status rename, Steve 2026-08-17: "residual risk"
-   is ISO/NIST post-control vocabulary and would mislead the
-   security-literate reader; `open` is SOC-native for this state). Gate: the
+1. **Graph spec freeze.** Probe spec v0.4.2 → the v1 contract. Threat
+   status triad settled with Steve (2026-08-17) after two vocabulary
+   collisions: **confirmed / potential / mitigated** — `confirmed` = a
+   scan finding proves it (ID cited); `potential` = an unanswered
+   hypothesis (no finding covers it, no control answers it, the
+   mitigation sweep looked); `mitigated` = control cited. Rejected:
+   `residual` (ISO/NIST post-control meaning), `open` (tracker meaning =
+   filed-and-unaddressed, which is our `confirmed`). Gate: the
    v0.4 confirmation pair (socxen ×2, in flight at drafting time) holds
    boundary agreement and moves same-file ID convergence and threat-status
    agreement the right way. One extraction = one graph (multi-run stays a

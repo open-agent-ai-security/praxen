@@ -54,12 +54,14 @@ def icon_svg(kind, color, size=18):
     return (f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" '
             f'stroke="{color}" stroke-width="1.8" stroke-linecap="round" '
             f'stroke-linejoin="round" aria-hidden="true">{p}</svg>')
-# Status ladder: red = confirmed (a finding proves it), amber = open
-# (unverified exposure, nothing covers it), green = mitigated (control
-# cited). Matches the analysis report's severity semantics.
-STATUS_COLOR = {"finding": "#C0392B", "mitigated": "#009D00", "open": "#E67E00",
-                "residual": "#E67E00"}  # legacy synonym in pre-v1 probe graphs
-def norm_status(st): return "open" if st == "residual" else st
+# Status triad (Steve, 2026-08-17): confirmed (red — a scan finding
+# proves it, ID cited) / potential (amber — hypothesis the model derived;
+# no finding covers it, no control answers it) / mitigated (green —
+# control cited). Legacy probe-graph synonyms normalized below.
+STATUS_COLOR = {"confirmed": "#C0392B", "mitigated": "#009D00", "potential": "#E67E00",
+                "finding": "#C0392B", "open": "#E67E00", "residual": "#E67E00"}
+def norm_status(st):
+    return {"finding": "confirmed", "open": "potential", "residual": "potential"}.get(st, st)
 COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
                   "vague": "#6C757D", "enp": "#6C757D"}
 
@@ -196,8 +198,8 @@ def main(graph_path, out_path):
         gap = max(set(gaps), key=gaps.count) if gaps else 1
         worst = "mitigated"
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "finding": worst = "finding"; break
-            if norm_status(t.get("status")) == "open": worst = "open"
+            if norm_status(t.get("status")) == "confirmed": worst = "confirmed"; break
+            if norm_status(t.get("status")) == "potential": worst = "potential"
         bnd_at_gap.setdefault(gap, []).append((b, worst))
     bnd_num = {}  # boundary id -> B<n>, in declaration order
     for i, b in enumerate(g.get("trust_boundaries", []), 1):
@@ -357,8 +359,8 @@ def main(graph_path, out_path):
     row2 = "".join(f'<span class="lg">{icon_svg(k, KIND_COLOR.get(k, "#666"), 16)}{esc(k.replace("_", " "))}</span>'
                    for k in kinds_present)
     row3 = "".join([
-        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat: finding (confirmed)</span>',
-        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— open (unverified)</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#C0392B"></i>boundary — worst threat: confirmed</span>',
+        '<span class="lg"><i class="lg-dash" style="border-color:#E67E00"></i>— potential (unanswered hypothesis)</span>',
         '<span class="lg"><i class="lg-dash" style="border-color:#009D00"></i>— mitigated</span>',
         '<span class="lg"><b class="lg-b" style="background:#C0392B">1</b>attack-path step (follow 1→2→3…)</span>',
         '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
@@ -373,8 +375,8 @@ def main(graph_path, out_path):
     for b in g.get("trust_boundaries", []):
         worst = "mitigated"
         for t in b.get("threats", []):
-            if norm_status(t.get("status")) == "finding": worst = "finding"; break
-            if norm_status(t.get("status")) == "open": worst = "open"
+            if norm_status(t.get("status")) == "confirmed": worst = "confirmed"; break
+            if norm_status(t.get("status")) == "potential": worst = "potential"
         c = STATUS_COLOR[worst]
         bk_rows.append(f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num_pre[b["id"]]}</b></td>'
                        f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
@@ -395,7 +397,7 @@ def main(graph_path, out_path):
                       '<th>Evidence</th></tr>' + "".join(inv_rows) + '</table>')
     mh_logo, ft_logo = load_brand()
     n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "open")
-    n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "finding")
+    n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if norm_status(t.get("status")) == "confirmed")
     n_mit = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "mitigated")
     doc = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -475,8 +477,8 @@ def main(graph_path, out_path):
       <div class="mh-metric"><b>{len(g["nodes"])}</b><span>Components</span></div>
       <div class="mh-metric"><b>{len(g["edges"])}</b><span>Flows</span></div>
       <div class="mh-metric"><b>{len(g.get("trust_boundaries",[]))}</b><span>Boundaries</span></div>
-      <div class="mh-metric mh-fin"><b>{n_fin}</b><span>Findings</span></div>
-      <div class="mh-metric mh-res"><b>{n_res}</b><span>Open</span></div>
+      <div class="mh-metric mh-fin"><b>{n_fin}</b><span>Confirmed</span></div>
+      <div class="mh-metric mh-res"><b>{n_res}</b><span>Potential</span></div>
       <div class="mh-metric mh-mit"><b>{n_mit}</b><span>Mitigated</span></div>
     </div>
   </div>

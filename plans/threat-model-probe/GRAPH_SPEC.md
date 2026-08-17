@@ -1,4 +1,4 @@
-# Threat-Model Graph JSON — probe spec v0.4.1
+# Threat-Model Graph JSON — probe spec v0.4.2
 
 One JSON object per target. This is the Phase-0 probe shape, not a product
 contract. Everything is evidence-derived: **no node, edge, boundary, or
@@ -26,7 +26,7 @@ tolerance, prompt-shaped targets.
 
 ```json
 {
-  "spec_version": "0.4.1-probe",
+  "spec_version": "0.4.2-probe",
   "target": { "slug": "<slug>", "source_root": "<abs path scanned>" },
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
@@ -159,8 +159,8 @@ dominant direction.
       "stride": "S | T | R | I | D | E",
       "owasp": "ASI01".."ASI10" | "LLM01".."LLM10" | null,
       "summary": "<one sentence, specific to THIS target>",
-      "status": "finding | mitigated | open",
-      "finding_id": "<finding id from the findings JSON, when status=finding>",
+      "status": "confirmed | potential | mitigated",
+      "finding_id": "<finding id from the findings JSON, when status=confirmed>",
       "mitigation_evidence": { "file": "...", "line": 123 }
     }
   ]
@@ -219,23 +219,24 @@ distinguish in `name`.
   status.** For each enumerated threat, actively look for the control that
   would mitigate it (the lane table's control locations, plus config and
   deploy artifacts) before writing the status: `mitigated` requires a
-  citation to the enforcing code/config; `open` asserts you LOOKED and
+  citation to the enforcing code/config; `potential` asserts you LOOKED and
   found none — record where you looked when non-obvious. Never assign
-  `open` as a default for not having checked.
+  `potential` as a default for not having checked.
 - `threats`: enumerate per crossing via STRIDE. `owasp` is the primary
   OWASP code under the KB's arbitration conventions: an ASI code when an
   agentic primary honestly applies, an LLM code when only the LLM Top 10
   applies, **null when neither does** (RAISE-only observability gaps,
   browser-layer vulns, generic web hygiene). Never force a code — a wrong
   tag is worse than a null. `status`:
-  - `finding` — an existing finding in the findings JSON addresses it (cite the id)
+  - `confirmed` — an existing finding in the findings JSON proves it (cite the id)
   - `mitigated` — a control demonstrably handles it (cite code)
-  - `open` — neither: the mitigation-check sweep looked for a control and
-    found none, and no finding covers it. (Renamed from `residual` in
-    v0.4.1 — "residual risk" is ISO/NIST vocabulary for the *post-control
-    remainder*, the opposite end of the process; `open` is what SOC
-    tooling calls this state. Probe graphs written before the rename use
-    `residual` as a legacy synonym.)
+  - `potential` — neither: the mitigation-check sweep looked for a
+    control and found none, and no finding covers it — an unanswered
+    hypothesis. (Naming history: `residual` collided with ISO/NIST
+    post-control vocabulary; `open` collided with tracker vocabulary
+    (filed-and-unaddressed = our `confirmed`). Triad settled 2026-08-17:
+    confirmed / potential / mitigated. Probe graphs written earlier use
+    `finding`/`residual`/`open` as legacy synonyms.)
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
 
 ## Attack paths
