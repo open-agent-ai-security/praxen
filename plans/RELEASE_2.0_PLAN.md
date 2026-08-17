@@ -50,10 +50,21 @@ as input, so the generator work is *better* after this ships.
    (the #217 lesson: a second large exact-format model-written artifact
    ships with a real validator from day one, not mental validation).
 4. **Production renderer** — port `plans/threat-model-probe/render_probe.py`
-   to a shipped `render_threatmodel.py`: deterministic lane layout, report
-   branding/masthead, numbered boundary badges, hover/tooltip UX,
-   barycenter ordering, port fan-out, corridor-bowed lane-skippers.
-   Byte-stable render tests.
+   to a shipped `render_threatmodel.py`: deterministic lane layout,
+   numbered boundary badges, hover/tooltip UX, barycenter ordering, port
+   fan-out, corridor-bowed lane-skippers. Byte-stable render tests.
+   **Visual-alignment requirement (Steve, 2026-08-17): the threat-model
+   report must read as the same product as the analysis report** — same
+   masthead lockup and navy/orange chrome, same `:root` palette and
+   Lausanne/Arial stack, same section-title treatment, same footer
+   (GitHub + sponsor + legal). Concretely: share the design tokens with
+   `report_template.html` rather than copying them (single source — a
+   shared CSS block or extraction, so a template restyle can't strand the
+   threat model), keep the template's color discipline (orange is chrome
+   only, never data; severity colors are semantic), and hover/interaction
+   color is brand blue. The probe renderer's brand re-skin (2026-08-17)
+   is the visual reference; the product port replaces its
+   extract-at-render hack with a proper shared source.
 5. **Semantic comparator** (test tooling, not user-facing): boundary/threat
    content matching for pair diffing and future baseline comparison —
    explicitly not raw-id or edge-topology matching.

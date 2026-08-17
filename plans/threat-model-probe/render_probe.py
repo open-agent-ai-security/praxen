@@ -14,16 +14,20 @@ LANE_TITLES = {
     "tools_mcp": "Tools / MCP",
     "external_deploy": "External / Deploy",
 }
+# Praxen report brand palette (mirrors report_template.html :root).
+# Orange is chrome-only (masthead/footer rules), never data — same rule as
+# the analysis report. Severity semantics: residual=red, finding=amber,
+# mitigated=green.
 KIND_COLOR = {
-    "entrypoint": "#7c5cbf", "client": "#4a7fb5", "adapter": "#4a7fb5",
-    "orchestrator": "#2e6f6c", "model": "#2e6f6c", "prompt": "#8a6d3b",
-    "memory": "#8a6d3b", "datastore": "#8a6d3b", "tool": "#3d7a46",
-    "mcp_server": "#3d7a46", "control": "#b0762a", "external_service": "#6d6d6d",
-    "deploy_surface": "#a04848", "secret_store": "#a04848", "log_sink": "#6d6d6d",
+    "entrypoint": "#8D00FF", "client": "#006BFF", "adapter": "#006BFF",
+    "orchestrator": "#003FCC", "model": "#003FCC", "prompt": "#3A4A6B",
+    "memory": "#3A4A6B", "datastore": "#3A4A6B", "tool": "#009D00",
+    "mcp_server": "#106D00", "control": "#D4A017", "external_service": "#6C757D",
+    "deploy_surface": "#C0392B", "secret_store": "#C0392B", "log_sink": "#6C757D",
 }
-STATUS_COLOR = {"finding": "#c9542c", "mitigated": "#3d7a46", "residual": "#b03030"}
-COVERAGE_COLOR = {"verified": "#3d7a46", "partial": "#b0762a", "gap": "#b03030",
-                  "vague": "#8a6d3b", "enp": "#6d6d6d"}
+STATUS_COLOR = {"finding": "#E67E00", "mitigated": "#009D00", "residual": "#C0392B"}
+COVERAGE_COLOR = {"verified": "#009D00", "partial": "#D4A017", "gap": "#C0392B",
+                  "vague": "#6C757D", "enp": "#6C757D"}
 
 COL_W, COL_GAP, MARGIN_X, TOP_Y = 250, 110, 30, 70
 NODE_GAP = 22
@@ -39,6 +43,27 @@ def wrap(text, width=30):
     return lines[:3]
 
 def esc(s): return html.escape(str(s), quote=True)
+
+def load_brand():
+    """Extract the masthead/footer logo lockups from the shipping report
+    template so the threat model wears the same chrome. Falls back to a text
+    wordmark when the template isn't found (standalone use)."""
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    for up in ("../..", "../../..", "."):
+        p = os.path.join(here, up, "skills/behavior-verifier/report_template.html")
+        if os.path.exists(p):
+            t = open(p).read()
+            def block(start):
+                i = t.find(start)
+                if i < 0: return None
+                j = t.find("</svg></div>", i)
+                return t[i:j + len("</svg></div>")] if j > 0 else None
+            mh = block('<div class="masthead-logo">')
+            ft = block('<div class="footer-logo">')
+            if mh and ft: return mh, ft
+    w = '<div class="masthead-logo" style="color:#fff;font-weight:800;font-size:26px">PRAXEN</div>'
+    return w, w.replace("masthead-logo", "footer-logo")
 
 def main(graph_path, out_path):
     g = json.load(open(graph_path))
@@ -116,8 +141,8 @@ def main(graph_path, out_path):
     # lane backgrounds + titles
     for ln in LANES:
         x = lane_x[ln]
-        svg.append(f'<rect x="{x-10}" y="{TOP_Y-30}" width="{COL_W+20}" height="{total_h-TOP_Y+10}" rx="10" fill="#f2f0ec" stroke="#ddd8d0"/>')
-        svg.append(f'<text x="{x+COL_W/2}" y="{TOP_Y-8}" text-anchor="middle" font-size="13" font-weight="700" fill="#555">{esc(LANE_TITLES[ln])}</text>')
+        svg.append(f'<rect x="{x-10}" y="{TOP_Y-30}" width="{COL_W+20}" height="{total_h-TOP_Y+10}" rx="10" fill="#FFFFFF" stroke="#E1E4E8"/>')
+        svg.append(f'<text x="{x+COL_W/2}" y="{TOP_Y-8}" text-anchor="middle" font-size="13" font-weight="700" fill="#3A4A6B">{esc(LANE_TITLES[ln])}</text>')
 
     # boundary lines: place at the modal lane-gap crossed by its edges
     def gap_of_edge(e):
@@ -160,8 +185,8 @@ def main(graph_path, out_path):
     # easy hovering, visible path, and a label that appears only on hover.
     # Tooltip carries the full from -> to story. data-from/data-to feed the
     # node-hover highlighting script.
-    svg.append('<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7a756d"/></marker>'
-               '<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#b03030"/></marker></defs>')
+    svg.append('<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3A4A6B"/></marker>'
+               '<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#006BFF"/></marker></defs>')
     loop_count = {}
     for e in g["edges"]:
         f, t = pos.get(e["from"]), pos.get(e["to"])
@@ -182,8 +207,8 @@ def main(graph_path, out_path):
             tip0 = f'{fnn} → {tnn}: {lbl0}' + (f' [{esc(e["data"])}]' if e.get("data") else "")
             svg.append(f'<g class="edge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip0}">')
             svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
-            svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#7a756d" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"/>')
-            svg.append(f'<text class="elbl" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#b03030" paint-order="stroke" stroke="#faf9f7" stroke-width="3.5">{lbl0}</text>')
+            svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"/>')
+            svg.append(f'<text class="elbl" x="{mx+6}" y="{(fy+ty)/2}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">{lbl0}</text>')
             svg.append('</g>')
             continue
         mx = (x1 + x2) / 2
@@ -201,10 +226,10 @@ def main(graph_path, out_path):
         dim = ' style="opacity:.35"' if span >= 2 else ''
         svg.append(f'<g class="edge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" data-tip="{tip}">')
         svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="14"/>')
-        svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#7a756d" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"{dim}/>')
+        svg.append(f'<path class="vis" d="{d}" fill="none" stroke="#3A4A6B" stroke-width="1.4" marker-end="url(#arr)" opacity="0.55"{dim}/>')
         # cross-lane labels rotate 90° to run along the (narrow) lane gap
         ly_mid = (fy + ty) / 2 + (55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1) * 0.75 if span >= 2 else 0)
-        svg.append(f'<text class="elbl" x="{mx - 4}" y="{ly_mid}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#b03030" paint-order="stroke" stroke="#faf9f7" stroke-width="3.5" transform="rotate(-90 {mx - 4} {ly_mid})">{lbl}</text>')
+        svg.append(f'<text class="elbl" x="{mx - 4}" y="{ly_mid}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#003FCC" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5" transform="rotate(-90 {mx - 4} {ly_mid})">{lbl}</text>')
         svg.append('</g>')
 
     # attack-path badges (first path only, numbered)
@@ -224,10 +249,10 @@ def main(graph_path, out_path):
         svg.append(f'<rect x="{x}" y="{y}" width="{COL_W}" height="{h}" rx="8" fill="#fff" stroke="{c}" stroke-width="1.6"/>')
         svg.append(f'<rect x="{x}" y="{y}" width="5" height="{h}" rx="2.5" fill="{c}"/>')
         for li, line in enumerate(lines):
-            svg.append(f'<text x="{x+14}" y="{y+20+14*li}" font-size="12" font-weight="600" fill="#2b2823">{esc(line)}</text>')
+            svg.append(f'<text x="{x+14}" y="{y+20+14*li}" font-size="12" font-weight="600" fill="#0D1B2A">{esc(line)}</text>')
         svg.append(f'<text x="{x+14}" y="{y+h-8}" font-size="9.5" fill="{c}" font-weight="600">{esc(n.get("kind","?").upper())}</text>')
         if n["id"] in badge_at:
-            svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+14}" r="10" fill="#b03030"/>'
+            svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+14}" r="10" fill="#C0392B"/>'
                        f'<text x="{x+COL_W-14}" y="{y+18}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{badge_at[n["id"]]}</text>')
         svg.append('</g>')
 
@@ -264,33 +289,92 @@ def main(graph_path, out_path):
     notes = g.get("notes", {})
     warn_html = "".join(f"<li>{esc(w)}</li>" for w in warnings) or "<li>none — all refs resolve, all nodes cited</li>"
 
-    doc = f"""<!doctype html><html><head><meta charset="utf-8">
-<title>Threat model (probe) — {esc(g["target"]["slug"])}</title>
+    mh_logo, ft_logo = load_brand()
+    n_res = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "residual")
+    n_fin = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "finding")
+    n_mit = sum(1 for b in g.get("trust_boundaries", []) for t in b.get("threats", []) if t.get("status") == "mitigated")
+    doc = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Praxen Threat Model — {esc(g["target"]["slug"])}</title>
 <style>
- body{{font-family:-apple-system,Segoe UI,sans-serif;background:#faf9f7;color:#2b2823;margin:24px;max-width:{total_w+40}px}}
- h1{{font-size:20px}} .sub{{color:#777;font-size:12.5px;margin-bottom:14px}}
- .svgwrap{{overflow-x:auto;border:1px solid #e2ddd5;border-radius:10px;background:#faf9f7;padding:8px}}
- details{{background:#fff;border:1px solid #e2ddd5;border-radius:8px;padding:10px 14px;margin:10px 0}}
- summary{{cursor:pointer}} table{{border-collapse:collapse;margin-top:8px;font-size:12.5px;width:100%}}
- th,td{{border:1px solid #e6e1d9;padding:4px 8px;text-align:left;vertical-align:top}}
- th{{background:#f2f0ec}} .remits{{margin:8px 0;font-size:12.5px;line-height:2}}
- .rx{{color:#6a655d;font-size:11.5px}} .fid{{color:#c9542c;font-weight:600;font-size:11.5px}}
- .ap{{background:#fff;border:1px solid #e2ddd5;border-left:4px solid #b03030;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px}}
- .diag{{font-size:12px;color:#6a655d}} h2{{font-size:15px;margin-top:26px}}
- .edge .elbl{{opacity:0;pointer-events:none;transition:opacity .1s}}
- .edge:hover .elbl, .edge.hi .elbl{{opacity:1}}
- .edge:hover .vis, .edge.hi .vis{{stroke:#b03030;stroke-width:2.6;opacity:1 !important;marker-end:url(#arr-hi)}}
- .node:hover rect:first-of-type{{filter:drop-shadow(0 0 4px rgba(176,48,48,.5));cursor:default}}
- .bnd:hover line{{opacity:1;stroke-width:3}}
- #tt{{position:fixed;background:#2b2823;color:#faf9f7;padding:7px 11px;border-radius:7px;font-size:12.5px;line-height:1.45;max-width:380px;pointer-events:none;opacity:0;z-index:10;box-shadow:0 3px 10px rgba(0,0,0,.25);transition:opacity .08s}}
+ :root {{ --orange:#FF7A2E; --orange-2:#FF9D4D; --navy:#0D1B2A; --text:#0D1B2A; --text-muted:#3A4A6B;
+   --bg:#FFFFFF; --surface:#F5F7FA; --surface-alt:#F0F4FF; --border:#E1E4E8; --border-alt:#C8D4F0;
+   --blue:#006BFF; --blue-dark:#003FCC; --green:#009D00;
+   --sev-critical:#C0392B; --sev-high:#E67E00; --sev-medium:#D4A017; --sev-low:#6C757D; }}
+ * {{ box-sizing:border-box; margin:0; padding:0; }}
+ body {{ font-family:'Lausanne',Arial,'Helvetica Neue',Helvetica,sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; }}
+ .masthead {{ background:var(--navy); border-top:4px solid var(--orange); border-bottom:2px solid var(--border-alt); padding:18px 32px 22px; }}
+ .masthead-logo svg {{ height:44px; width:auto; display:block; }}
+ .masthead-main {{ display:flex; justify-content:space-between; align-items:flex-start; gap:24px; flex-wrap:wrap; }}
+ .masthead-agent {{ color:#FFF; font-size:19px; font-weight:800; line-height:1.1; letter-spacing:0.01em; margin-top:18px; }}
+ .masthead-kind {{ color:var(--orange-2); font-size:11px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; margin-top:8px; }}
+ .masthead-date {{ color:#8BAFC8; font-size:13px; margin-top:6px; }}
+ .masthead-metrics {{ display:flex; gap:24px; justify-content:flex-end; margin-top:6px; }}
+ .mh-metric {{ text-align:center; }}
+ .mh-metric > b {{ display:block; font-size:30px; font-weight:800; line-height:1; color:#FFF; }}
+ .mh-metric > span {{ display:block; font-size:10px; letter-spacing:0.09em; text-transform:uppercase; color:#8BAFC8; margin-top:6px; }}
+ .mh-metric.mh-res > b {{ color:#FF7A6B; }} .mh-metric.mh-fin > b {{ color:#FFB066; }} .mh-metric.mh-mit > b {{ color:#4CDB00; }}
+ .content {{ padding:28px 32px; max-width:1100px; margin:0 auto; }}
+ .section {{ margin-bottom:40px; }}
+ .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
+ .section-desc {{ color:#555; font-size:13px; margin:0 0 18px; line-height:1.6; }}
+ .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
+ .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
+ details {{ background:#FFF; border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:10px 0; }}
+ summary {{ cursor:pointer; }} summary b {{ color:var(--navy); }}
+ table {{ border-collapse:collapse; margin-top:8px; font-size:12.5px; width:100%; }}
+ th,td {{ border:1px solid var(--border); padding:5px 9px; text-align:left; vertical-align:top; }}
+ th {{ background:var(--surface); font-size:11px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }}
+ .remits {{ margin:8px 0; font-size:12.5px; line-height:2; }}
+ .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
+ .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; font-size:13px; }}
+ .diag {{ font-size:12px; color:var(--text-muted); }} .diag ul {{ margin:6px 0 0 18px; }}
+ .edge .elbl {{ opacity:0; pointer-events:none; transition:opacity .1s; }}
+ .edge:hover .elbl, .edge.hi .elbl {{ opacity:1; }}
+ .edge:hover .vis, .edge.hi .vis {{ stroke:var(--blue); stroke-width:2.6; opacity:1 !important; marker-end:url(#arr-hi); }}
+ .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.55)); cursor:default; }}
+ .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:default; }}
+ #tt {{ position:fixed; background:var(--navy); color:#F5F7FA; padding:7px 11px; border-radius:7px; font-size:12.5px; line-height:1.45; max-width:380px; pointer-events:none; opacity:0; z-index:10; box-shadow:0 3px 10px rgba(13,27,42,.35); transition:opacity .08s; }}
+ .footer {{ background:var(--navy); border-top:4px solid var(--orange); margin-top:40px; padding:18px 32px; color:#8BAFC8; }}
+ .footer .rf-row {{ display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap; }}
+ .footer .footer-logo svg {{ height:34px; width:auto; display:block; }}
+ .footer .rf-gh {{ display:inline-flex; align-items:center; gap:8px; color:#CDD8E4; text-decoration:none; font-size:13.5px; font-weight:600; border:1px solid #2A3D57; border-radius:8px; padding:7px 13px; }}
+ .footer .rf-gh:hover {{ border-color:var(--orange); color:#FFF; }}
+ .footer .rf-legal {{ font-size:11.5px; color:#6E7F92; line-height:1.6; text-align:right; }}
 </style></head><body>
-<h1>Threat model (probe v0.1) — {esc(g["target"]["slug"])}</h1>
-<div class="sub">evidence-derived from {esc(g["target"].get("source_root",""))} · {len(g["nodes"])} components · {len(g["edges"])} flows · {len(g.get("trust_boundaries",[]))} trust boundaries · hover nodes for evidence citations · PROBE ARTIFACT, not a product report</div>
+<div class="masthead"><div class="masthead-main">
+  <div>{mh_logo}
+    <div class="masthead-agent">{esc(g["target"]["slug"])}</div>
+    <div class="masthead-kind">Threat Model · probe</div>
+    <div class="masthead-date">evidence-derived · spec {esc(g.get("spec_version","?"))}</div>
+  </div>
+  <div class="masthead-summary">
+    <div class="masthead-metrics">
+      <div class="mh-metric"><b>{len(g["nodes"])}</b><span>Components</span></div>
+      <div class="mh-metric"><b>{len(g["edges"])}</b><span>Flows</span></div>
+      <div class="mh-metric"><b>{len(g.get("trust_boundaries",[]))}</b><span>Boundaries</span></div>
+      <div class="mh-metric mh-fin"><b>{n_fin}</b><span>Findings</span></div>
+      <div class="mh-metric mh-res"><b>{n_res}</b><span>Residual</span></div>
+      <div class="mh-metric mh-mit"><b>{n_mit}</b><span>Mitigated</span></div>
+    </div>
+  </div>
+</div></div>
+<div class="content">
+<div class="section section-fullbleed">
+<div class="section-title">Architecture &amp; Trust Boundaries</div>
+<div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Every component, flow, and boundary cites evidence — hover nodes for citations, edges for what flows, and B-badges for boundary detail. Dimmed long arcs span multiple lanes. PROBE ARTIFACT, not a product report.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
-<h2>Attack paths</h2>{"".join(appanels) or "<div class='diag'>none grounded in findings</div>"}
-<h2>Trust boundaries — threats &amp; governing remit rules</h2>{"".join(panels)}
-<h2>Probe diagnostics</h2>
-<div class="diag">lane_fit: {esc(notes.get("lane_fit",""))}<br>omissions: {esc(notes.get("omissions",""))}<br>model: {esc(g.get("model_identity",""))}<ul>{warn_html}</ul></div>
+</div>
+<div class="section"><div class="section-title">Attack Paths</div>{"".join(appanels) or "<div class='diag'>none grounded in findings</div>"}</div>
+<div class="section"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
+<div class="section"><div class="section-title">Probe Diagnostics</div>
+<div class="diag">lane_fit: {esc(notes.get("lane_fit",""))}<br>omissions: {esc(notes.get("omissions",""))}<br>model: {esc(g.get("model_identity",""))}<ul>{warn_html}</ul></div></div>
+</div>
+<div class="footer"><div class="rf-row">
+  {ft_logo}
+  <a class="rf-gh" href="https://github.com/open-agent-ai-security/praxen"><span>github.com/open-agent-ai-security/praxen</span></a>
+  <div class="rf-legal">Praxen threat model — evidence-derived; every element cites source.<br>Probe renderer; not a released Praxen artifact.</div>
+</div></div>
 <div id="tt"></div>
 <script>
 const tt = document.getElementById('tt');
