@@ -226,7 +226,9 @@ distinguish in `name`.
   it (the lane table's control locations, plus config and deploy
   artifacts): `mitigated`/`partial` require a citation to the enforcing
   code/config; `potential` asserts you LOOKED and found none — record
-  where you looked when non-obvious. Never assign `potential` as a default
+  where you looked, when non-obvious, as a trailing clause of the threat's
+  `summary` (e.g. "… (checked: agent.py:509 — no gate found)");
+  `mitigation_evidence` stays null on `potential`, always. Never assign `potential` as a default
   for not having checked.
 - `threats`: enumerate per crossing via STRIDE. `owasp` is the primary
   OWASP code under the KB's arbitration conventions: an ASI code when an
