@@ -80,3 +80,42 @@ Contract remedies are cheap and precisely targeted; re-gating the three
 warm pairs after a contract amendment costs ~6 extractions. Decision on
 amend-and-regate vs. re-scoping the gates belongs to Steve and is recorded
 in the release plan when made.
+
+---
+
+# Run 2 — contract v1.1 re-gate (2026-08-17, Steve: "amend and re-gate")
+
+Eight fresh v1.1 extractions (all four targets re-paired — craftbot was
+re-run too so no v1.0-vintage number survives in the table). Comparator
+fixed mid-gate (kind tokens no longer dilute component identity matching —
+found live on uagents, regression-tested, disclosed; run-1 numbers were
+re-measured under the fixed instrument and did not change). All eight
+graphs first-pass valid and render-clean; `partial` calibration and
+`stored-state` archetype observed in live use.
+
+| pair | boundary ≥0.9 | status ~90% | component ≥0.7 |
+|---|---|---|---|
+| finbot | 0.91 ✓ | 0.91 ✓ | 0.83 ✓ |
+| socxen | 0.90 ✓ | 1.00 ✓ | 0.81 ✓ |
+| uagents | 0.91 ✓ | 1.00 ✓ | 0.63 ✗ |
+| craftbot | 0.83 ✗ | 0.94 ✓ | 0.56 ✗ |
+| **mean** | **0.888** | **0.962** | **0.709** |
+
+**Deltas vs run 1 (means): boundary 0.85→0.89, status 0.89→0.96,
+component 0.67→0.71.** Every v1.0 diagnosis was cured where it was
+targeted: the stored-state coinage divergence is gone from all three warm
+pairs (boundary 0.90–0.91 each), and socxen's partial-wobble went to a
+perfect 1.00. What remains is different in kind: **enumeration-granularity
+sampling** — craftbot r1 drew a notably deeper sample (12 boundaries / 34
+threats) than its partner (10 / 25), and the two big-workspace targets
+(uagents, craftbot) carry real decomposition wobble in component identity
+(rule-6-vs-rule-1 overlap on file-backed external services; single-node
+files and emitted-vs-file collision scope — all recorded by the runs
+themselves as candidate v1.2 clarifications).
+
+**Verdict against the letter of the gates: status passes decisively;
+component passes by 0.009; boundary misses by 0.012.** One
+boundary-granularity call in one run accounts for the entire boundary
+shortfall. n=2 per target makes each pair a two-sample estimate; the
+numbers above are reported without adjustment. Ship disposition is
+Steve's call and is recorded in the release plan when made.

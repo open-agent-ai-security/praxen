@@ -1,0 +1,1056 @@
+{
+  "spec_version": "1.1",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "craftbot",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/craftbot"
+  },
+  "analysis_ref": "craftbot-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "owner-entrypoint",
+      "name": "Owner-operator",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The single self-hosting user, the only authorized counterparty, who drives the agent from the local browser chat or the CLI.",
+      "evidence": [
+        { "file": "craftbot-remit.md", "line": 17, "note": "Identity table names the owner/operator as the individual self-hosting user in a single-user deployment" },
+        { "file": "app/main.py", "line": 289, "note": "interface_mode resolves to 'browser' or 'cli' — the two surfaces the owner talks to" }
+      ]
+    },
+    {
+      "id": "third-party-entrypoint",
+      "name": "Third-party platform senders",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Anyone other than the owner who reaches the agent over a connected messaging platform; the code classifies these as external_event and is explicitly forbidden as a counterparty.",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2370, "note": "'Rule 1: Third-party external message' — the routing branch that names this actor class" },
+        { "file": "craftos_integrations/manager.py", "line": 7, "note": "payload contract (contactId, contactName, messageBody, is_self_message) for messages arriving from platform accounts" }
+      ]
+    },
+    {
+      "id": "browser-adapter-py-adapter",
+      "name": "Owner interface adapters (browser + CLI)",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The owner-facing interfaces: an aiohttp/WebSocket browser UI bound to localhost:7926 that also hosts OAuth connect flows and Living UI management, plus the terminal CLI adapter.",
+      "evidence": [
+        { "file": "app/ui_layer/adapters/browser_adapter.py", "line": 993, "note": "BrowserAdapter host defaults to 'localhost', port 7926 overridable by BROWSER_PORT" },
+        { "file": "app/ui_layer/adapters/browser_adapter.py", "line": 1273, "note": "web.TCPSite binds the WebSocket/HTTP server for the browser UI" },
+        { "file": "app/ui_layer/adapters/cli_adapter.py", "line": 1, "note": "the parallel terminal adapter for the same controller — same role, folded into this family node" }
+      ]
+    },
+    {
+      "id": "craftos-integrations-manager-py-adapter",
+      "name": "CraftOS platform connector",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Bidirectional channel connector for 26 platform integrations — starts per-platform listeners that hand inbound messages to the agent, and fronts the outbound send facade the send actions call.",
+      "evidence": [
+        { "file": "craftos_integrations/manager.py", "line": 34, "note": "ExternalCommsManager.start() autoloads every registered client and calls start_listening for each one holding credentials" },
+        { "file": "craftos_integrations/service.py", "line": 48, "note": "send_message facade dispatching outbound traffic to the resolved platform handler" },
+        { "file": "craftos_integrations/registry.py", "line": 123, "note": "autoload_integrations() enumerates the integration family — this node stands for that whole set" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator",
+      "name": "AgentBase react loop",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The 4,078-line agent loop: routes triggers and chat, assembles context, asks the model to choose actions, dispatches them through the action manager, and spawns in-process sub-agents.",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 476, "note": "react() — the per-trigger entry into the workflow dispatch" },
+        { "file": "app/agent_base.py", "line": 1173, "note": "_select_action asks the LLM which action to run next" },
+        { "file": "app/agent_base.py", "line": 1360, "note": "_execute_actions runs the model's chosen actions" },
+        { "file": "agent_core/core/impl/action/manager.py", "line": 255, "note": "action dispatch — the idempotency guard is the only pre-execution interposition on the path" },
+        { "file": "agent_core/core/impl/action/executor.py", "line": 558, "note": "action bodies are exec()'d in-process by the executor this loop calls" },
+        { "file": "app/data/action/action_set_management.py", "line": 12, "note": "add_action_sets is registered into the always-available core set, so the loop can widen its own action inventory mid-task" },
+        { "file": "app/agent_base.py", "line": 1619, "note": "_check_agent_limits pauses the task behind a Continue/Abort choice at the action or token cap" },
+        { "file": "agent_core/core/impl/context/engine.py", "line": 37, "note": "ContextEngine prompt assembly — framework plumbing folded into this node" }
+      ]
+    },
+    {
+      "id": "interface-py-model",
+      "name": "LLM interface",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "Multi-provider model call layer (OpenAI, Anthropic, Gemini, BytePlus, Ollama) carrying a consecutive-failure circuit breaker that terminates after five failures.",
+      "evidence": [
+        { "file": "agent_core/core/impl/llm/interface.py", "line": 111, "note": "LLMInterface — the single model-call surface for the agent" },
+        { "file": "agent_core/core/impl/llm/interface.py", "line": 167, "note": "_consecutive_failures / _max_consecutive_failures = 5 circuit breaker" },
+        { "file": "agent_core/core/embedding_interface.py", "line": 28, "note": "the same provider set is used for embeddings feeding the memory index" }
+      ]
+    },
+    {
+      "id": "external-event-agent-base-py-control",
+      "name": "Third-party routing gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Deterministic code gate: a message flagged external_event and not is_self_message is routed to a notification only — no session, no trigger, no action-selection LLM.",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2370, "note": "the external_event branch that returns before any routing or session work" },
+        { "file": "app/agent_base.py", "line": 2111, "note": "_post_third_party_notification builds the notification-only path the gate diverts to" }
+      ]
+    },
+    {
+      "id": "prompt-sanitizer-py-control",
+      "name": "PromptSanitizer (stub)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Stub control: seven injection regexes with no call site anywhere in the tree, and a sanitize path that logs a warning and returns the matched text unchanged.",
+      "evidence": [
+        { "file": "app/security/prompt_sanitizer.py", "line": 22, "note": "INJECTION_PATTERNS defined with no consumer outside this module" },
+        { "file": "app/security/prompt_sanitizer.py", "line": 71, "note": "on a pattern match the method emits logger.warning and returns the original text" },
+        { "file": "app/security/error_handler.py", "line": 17, "note": "SecureErrorHandler, the sibling module under app/security/, is likewise never called" }
+      ]
+    },
+    {
+      "id": "policy-prompt-context-py-control",
+      "name": "POLICY_PROMPT guardrails",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Instruction-level control, not code: the static policy block telling the model to confirm before irreversible operations and to ignore instructions embedded in files, URLs and tool outputs.",
+      "evidence": [
+        { "file": "agent_core/core/prompts/context.py", "line": 133, "note": "POLICY_PROMPT — clause 7 requires confirmation before irreversible actions" },
+        { "file": "agent_core/core/prompts/context.py", "line": 142, "note": "clause 8 — prompt-injection defense applied to files, URLs, tool outputs and pasted text" },
+        { "file": "agent_core/core/impl/context/engine.py", "line": 172, "note": "the engine returns POLICY_PROMPT into the assembled system context" }
+      ]
+    },
+    {
+      "id": "agent-md-prompt",
+      "name": "Agent operating manual",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "The session-loaded instruction corpus — a 4,574-line AGENT.md plus SOUL.md and PROACTIVE.md, and the 11 enabled Skills of 195 bundled — that defines the agent's documented permission tiers and file-handling rules.",
+      "evidence": [
+        { "file": "agent_file_system/AGENT.md", "line": 861, "note": "'you MUST NOT edit MEMORY.md directly' — a governance rule that exists only as prompt text" },
+        { "file": "agent_file_system/PROACTIVE.md", "line": 1, "note": "defines the four permission tiers the documented approval architecture rests on" },
+        { "file": "agent_core/core/impl/context/engine.py", "line": 241, "note": "SOUL.md is read and formatted into a system message each session" },
+        { "file": "app/config/skills_config.json", "line": 3, "note": "enabled_skills — 11 of the 195 bundled skill directories load their markdown instructions into context" }
+      ]
+    },
+    {
+      "id": "memory-md-memory",
+      "name": "Agent memory and conversation state",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "The persistent state that re-enters every session: MEMORY.md and CONVERSATION_HISTORY.md in the agent file system, indexed into a ChromaDB collection that a file watcher re-indexes on change and memory_search retrieves from.",
+      "evidence": [
+        { "file": "agent_file_system/MEMORY.md", "line": 3, "note": "'Agent DO NOT edit this file.' — the only protection on the distilled memory store is this line of prose" },
+        { "file": "agent_core/core/impl/memory/manager.py", "line": 180, "note": "MemoryManager indexes the agent file system markdown into ChromaDB with incremental re-indexing" },
+        { "file": "agent_core/core/impl/memory/manager.py", "line": 1103, "note": "collection.add — the ingest call, with no validation or provenance field on what is embedded" },
+        { "file": "agent_core/core/impl/memory/memory_file_watcher.py", "line": 121, "note": "_on_file_change re-indexes automatically whenever a watched file is written" },
+        { "file": "app/state/state_manager.py", "line": 210, "note": "_append_to_conversation_history appends to CONVERSATION_HISTORY.md inside the indexed tree" }
+      ]
+    },
+    {
+      "id": "run-shell-py-tool",
+      "name": "run_shell host execution",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Executes a model-authored command string through the host shell with shell=True, inheriting the full parent environment; registered default=True in the always-included core set on all three platforms.",
+      "evidence": [
+        { "file": "app/data/action/run_shell.py", "line": 112, "note": "env = os.environ.copy() then Popen(command, shell=True, env=env) at :119 background and :149 foreground, with no approval check or command filtering" },
+        { "file": "app/data/action/run_shell.py", "line": 4, "note": "registered three times (:4 linux, :202 windows, :450 darwin), each default=True with action_sets=['core']" }
+      ]
+    },
+    {
+      "id": "read-file-py-tool",
+      "name": "File read actions",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The read family — read_file, grep_files, find_files, list_folder — each accepting an absolute host path with no workspace confinement and no exclusion list.",
+      "evidence": [
+        { "file": "app/data/action/read_file.py", "line": 134, "note": "only os.path.isfile() guards the open(); the schema at :10-13 documents the parameter as an absolute path with no root restriction" },
+        { "file": "app/data/action/grep_files.py", "line": 120, "note": "content search over caller-supplied paths, same family, same absence of confinement" },
+        { "file": "app/data/action/find_files.py", "line": 4, "note": "filename search over caller-supplied roots" }
+      ]
+    },
+    {
+      "id": "write-file-py-tool",
+      "name": "File write actions",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "write_file and stream_edit take a file path verbatim, create parent directories, and write — no containment check and no protected-path denylist.",
+      "evidence": [
+        { "file": "app/data/action/write_file.py", "line": 91, "note": "open(file_path, file_mode) after os.makedirs on the parent, with the path taken straight from model output" },
+        { "file": "app/data/action/stream_edit.py", "line": 86, "note": "stream_edit follows the same pattern on an unrestricted file_path" }
+      ]
+    },
+    {
+      "id": "web-fetch-py-tool",
+      "name": "web_fetch",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Fetches any http(s) URL and returns extracted page text into the model context with no provenance label; overflow is written to a temp file the agent reads back.",
+      "evidence": [
+        { "file": "app/data/action/web_fetch.py", "line": 4, "note": "registered into the core action set; returns cleaned page text for any URL" },
+        { "file": "app/data/action/web_fetch.py", "line": 204, "note": "the only URL handling is an HTTP-to-HTTPS upgrade — no trust tier, no labeling, no destination check" }
+      ]
+    },
+    {
+      "id": "http-request-py-tool",
+      "name": "http_request",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Issues GET, POST, PUT, PATCH or DELETE with an arbitrary body to any public http(s) URL, with no destination allowlist and no approval step.",
+      "evidence": [
+        { "file": "app/data/action/http_request.py", "line": 186, "note": "method allowlist {GET,POST,PUT,PATCH,DELETE}; no bound on the destination host" },
+        { "file": "app/data/action/http_request.py", "line": 410, "note": "requests.request issues the call with no approval or allowlist check ahead of it" }
+      ]
+    },
+    {
+      "id": "blocked-hosts-http-request-py-control",
+      "name": "SSRF destination filter",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "Real code control inside http_request: resolves the target hostname and blocks cloud-metadata, private and link-local addresses, permitting loopback only for ports of a registered Living UI project.",
+      "evidence": [
+        { "file": "app/data/action/http_request.py", "line": 220, "note": "_BLOCKED_HOSTS covering 169.254.169.254 and the metadata hostnames" },
+        { "file": "app/data/action/http_request.py", "line": 208, "note": "the private/link-local resolution check that fronts the request" }
+      ]
+    },
+    {
+      "id": "send-message-py-tool",
+      "name": "Outbound send actions",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The 77 actions flagged irreversible=True — send_message plus the per-platform senders such as send_gmail — each taking an arbitrary external recipient.",
+      "evidence": [
+        { "file": "app/data/action/send_message.py", "line": 4, "note": "the generic sender, declared irreversible=True at :6" },
+        { "file": "app/data/action/integrations/google_workspace/gmail_actions.py", "line": 9, "note": "send_gmail declares irreversible=True at :11 and takes an arbitrary 'to' recipient" },
+        { "file": "agent_core/core/impl/action/manager.py", "line": 260, "note": "the irreversible flag is consumed only by the idempotency guard — there is no approval consumer" }
+      ]
+    },
+    {
+      "id": "mcp-config-json-mcp-server",
+      "name": "Enabled MCP servers",
+      "lane": "tools_mcp",
+      "kind": "mcp_server",
+      "description": "Two of 157 catalogued servers are enabled — a filesystem server scoped to '.' and the Playwright browser server — each launched by npx against an unpinned upstream package, their tools registered as agent actions.",
+      "evidence": [
+        { "file": "app/config/mcp_config.json", "line": 4, "note": "filesystem server, args ['-y', '@modelcontextprotocol/server-filesystem', '.'], enabled at :14" },
+        { "file": "app/config/mcp_config.json", "line": 1168, "note": "playwright-mcp, args ['@playwright/mcp@latest'], enabled at :1176" },
+        { "file": "agent_core/core/impl/mcp/client.py", "line": 111, "note": "_connect_enabled_servers launches each enabled server at boot" },
+        { "file": "agent_core/core/impl/mcp/adapter.py", "line": 237, "note": "register_mcp_tools turns discovered MCP tools into actions the model can call" }
+      ]
+    },
+    {
+      "id": "living-ui-manager-py-tool",
+      "name": "Living UI subsystem",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Scaffolds, runs and publishes local Living UI applications; starts a sidecar proxy and generated backends that listen on all interfaces, and downloads a cloudflared binary to expose one publicly.",
+      "evidence": [
+        { "file": "app/data/action/living_ui_actions.py", "line": 6, "note": "the action surface through which the model creates and operates Living UI projects" },
+        { "file": "app/living_ui/manager.py", "line": 3412, "note": "_CLOUDFLARED_URLS point at cloudflare releases/latest/download; _ensure_cloudflared at :3433 downloads and runs it with no hash or signature check" },
+        { "file": "app/data/living_ui_sidecar/proxy.py", "line": 233, "note": "the sidecar proxy runs uvicorn on host='0.0.0.0' with CORS allow_origins=['*'] at :126 and no auth dependency" },
+        { "file": "app/data/living_ui_template/backend/main.py", "line": 137, "note": "every scaffolded backend inherits host='0.0.0.0' from the template" }
+      ]
+    },
+    {
+      "id": "llm-provider-external-service",
+      "name": "Configured LLM provider",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The owner-configured BYOK model endpoint (OpenAI, Anthropic, Google, BytePlus, OpenRouter or a remote Ollama) that receives the assembled prompt and returns the action choice.",
+      "evidence": [
+        { "file": "app/config.py", "line": 254, "note": "get_api_key(provider) resolves the operator's key per provider from settings.json" },
+        { "file": "app/main.py", "line": 186, "note": "provider choices openai, gemini, byteplus, anthropic, remote" },
+        { "file": "agent_core/core/impl/llm/interface.py", "line": 238, "note": "client constructed with api_key and base_url for the configured provider" }
+      ]
+    },
+    {
+      "id": "docker-compose-yml-deploy-surface",
+      "name": "Docker deployment stack",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The documented three-service deployment: the agent container mounts the host Docker socket and takes provider keys from .env, and the GUI desktop service runs seccomp-unconfined with a literal default password on a published port.",
+      "evidence": [
+        { "file": "docker-compose.yml", "line": 77, "note": "agent service bind-mounts /var/run/docker.sock alongside ./workspace and ./config.json, with env_file .env supplying provider keys at :71" },
+        { "file": "docker-compose.yml", "line": 11, "note": "desktop service security_opt seccomp:unconfined" },
+        { "file": "docker-compose.yml", "line": 17, "note": "PASSWORD set to a literal default (value not reproduced) with CUSTOM_USER=agent at :16" },
+        { "file": "docker-compose.yml", "line": 26, "note": "ports '3001:3000' — Docker binds this on all host interfaces absent an address" }
+      ]
+    },
+    {
+      "id": "embedded-credentials-py-secret-store",
+      "name": "Embedded OAuth credentials",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "A module-level registry of live third-party client_id/client_secret values for five providers plus Telegram api_id and api_hash, stored as base64 fragments joined at runtime; values not reproduced.",
+      "evidence": [
+        { "file": "agent_core/core/credentials/embedded_credentials.py", "line": 28, "note": "_EMBEDDED_CREDENTIALS registry — base64-split literals for google, slack, notion, linkedin, hubspot and telegram; values not reproduced" },
+        { "file": "agent_core/core/credentials/embedded_credentials.py", "line": 5, "note": "module docstring states the values are split to prevent GitHub scanning" }
+      ]
+    },
+    {
+      "id": "credentials-store-py-secret-store",
+      "name": "Local credential and settings stores",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "At-rest secrets on the owner's disk: .credentials/<platform>.json written 0600 inside a 0700 directory, and app/config/settings.json holding provider API keys and OAuth client entries.",
+      "evidence": [
+        { "file": "craftos_integrations/credentials_store.py", "line": 44, "note": "the credential directory is chmod'ed to owner-only (S_IRWXU) on creation" },
+        { "file": "craftos_integrations/credentials_store.py", "line": 81, "note": "each credential file is chmod'ed 0600 on write" },
+        { "file": "app/config.py", "line": 62, "note": "SETTINGS_CONFIG_PATH — settings.json is the store for api_keys and oauth client entries" },
+        { "file": "agent_file_system/AGENT.md", "line": 956, "note": "the manual names .credentials/<platform>.json as holding OAuth tokens, bot tokens and API keys, and settings.json at :949" }
+      ]
+    },
+    {
+      "id": "logger-py-log-sink",
+      "name": "Local observability stack",
+      "lane": "external_deploy",
+      "kind": "log_sink",
+      "description": "Structured loguru sinks with per-run directories, rotation and retention, plus SQLite stores and the INTENT/DONE/FAILED irreversible-action ledger — all written to local disk with diagnose enabled and no redaction or exporter.",
+      "evidence": [
+        { "file": "app/logger.py", "line": 56, "note": "main.log sink with backtrace=True and diagnose=True; the all.log sink at :70 repeats it and no sink installs a redaction filter" },
+        { "file": "app/logger.py", "line": 29, "note": "define_log_level writes only to PROJECT_ROOT/logs/<timestamp>/ with 14-day retention — no remote sink" },
+        { "file": "app/triggers/activity_log.py", "line": 10, "note": "INTENT/DONE/FAILED rows per irreversible side effect with the provider reference retained for audit; the module exposes no alert hook" },
+        { "file": "app/usage/storage.py", "line": 73, "note": "SQLite usage stores under APP_DATA_PATH/.usage for actions, LLM calls, sessions and tasks" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "owner-entrypoint--browser-adapter-py-adapter",
+      "from": "owner-entrypoint",
+      "to": "browser-adapter-py-adapter",
+      "label": "owner chat and commands",
+      "data": "user text",
+      "evidence": [
+        { "file": "app/ui_layer/adapters/browser_adapter.py", "line": 1273, "note": "the WebSocket site the owner's browser connects to" }
+      ]
+    },
+    {
+      "id": "browser-adapter-py-adapter--agent-base-py-orchestrator",
+      "from": "browser-adapter-py-adapter",
+      "to": "agent-base-py-orchestrator",
+      "label": "chat payload into react loop",
+      "data": "user text",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2313, "note": "_handle_chat_message receives the adapter's payload and routes it to a session" }
+      ]
+    },
+    {
+      "id": "third-party-entrypoint--craftos-integrations-manager-py-adapter",
+      "from": "third-party-entrypoint",
+      "to": "craftos-integrations-manager-py-adapter",
+      "label": "inbound platform message",
+      "data": "third-party message text",
+      "evidence": [
+        { "file": "craftos_integrations/manager.py", "line": 56, "note": "start_listening(self._handle_platform_message) on every credentialed platform client" }
+      ]
+    },
+    {
+      "id": "craftos-integrations-manager-py-adapter--agent-base-py-orchestrator",
+      "from": "craftos-integrations-manager-py-adapter",
+      "to": "agent-base-py-orchestrator",
+      "label": "owner's own platform messages",
+      "data": "message payload",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2500, "note": "_handle_external_event consumes the normalized platform payload" }
+      ]
+    },
+    {
+      "id": "craftos-integrations-manager-py-adapter--external-event-agent-base-py-control",
+      "from": "craftos-integrations-manager-py-adapter",
+      "to": "external-event-agent-base-py-control",
+      "label": "third-party message to gate",
+      "data": "third-party message payload",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2371, "note": "external_event and not is_self_message diverts to the notification-only path and returns" }
+      ]
+    },
+    {
+      "id": "external-event-agent-base-py-control--memory-md-memory",
+      "from": "external-event-agent-base-py-control",
+      "to": "memory-md-memory",
+      "label": "500-char sender preview",
+      "data": "third-party message text",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 2119, "note": "preview truncated to 500 characters of message_body" },
+        { "file": "app/agent_base.py", "line": 2134, "note": "_append_to_conversation_history('agent', notification) puts that prose into conversation state" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--interface-py-model",
+      "from": "agent-base-py-orchestrator",
+      "to": "interface-py-model",
+      "label": "assembled prompt and action list",
+      "data": "system prompt, history, retrieved content",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 1173, "note": "_select_action hands the assembled context to the model" },
+        { "file": "agent_core/core/impl/context/engine.py", "line": 37, "note": "ContextEngine composes the message blocks passed to the call" }
+      ]
+    },
+    {
+      "id": "interface-py-model--llm-provider-external-service",
+      "from": "interface-py-model",
+      "to": "llm-provider-external-service",
+      "label": "prompt to provider endpoint",
+      "data": "prompt text including retrieved file and page contents",
+      "evidence": [
+        { "file": "agent_core/core/impl/llm/interface.py", "line": 238, "note": "provider client constructed with api_key and base_url and used for the completion call" }
+      ]
+    },
+    {
+      "id": "llm-provider-external-service--interface-py-model",
+      "from": "llm-provider-external-service",
+      "to": "interface-py-model",
+      "label": "completion response",
+      "data": "model output",
+      "evidence": [
+        { "file": "agent_core/core/impl/llm/interface.py", "line": 167, "note": "responses are counted for the consecutive-failure breaker before being returned" }
+      ]
+    },
+    {
+      "id": "interface-py-model--agent-base-py-orchestrator",
+      "from": "interface-py-model",
+      "to": "agent-base-py-orchestrator",
+      "label": "action selection",
+      "data": "model-authored action name and parameters",
+      "evidence": [
+        { "file": "app/agent_base.py", "line": 1313, "note": "_retrieve_and_prepare_actions turns the model's choice into the executable action list" }
+      ]
+    },
+    {
+      "id": "agent-md-prompt--agent-base-py-orchestrator",
+      "from": "agent-md-prompt",
+      "to": "agent-base-py-orchestrator",
+      "label": "operating manual into context",
+      "data": "instruction text",
+      "evidence": [
+        { "file": "agent_core/core/impl/context/engine.py", "line": 241, "note": "SOUL.md read and formatted into a system message; AGENT.md and the enabled Skills load the same way" }
+      ]
+    },
+    {
+      "id": "policy-prompt-context-py-control--agent-base-py-orchestrator",
+      "from": "policy-prompt-context-py-control",
+      "to": "agent-base-py-orchestrator",
+      "label": "static policy block",
+      "data": "instruction text",
+      "evidence": [
+        { "file": "agent_core/core/impl/context/engine.py", "line": 172, "note": "the engine returns POLICY_PROMPT into the assembled system context" }
+      ]
+    },
+    {
+      "id": "memory-md-memory--agent-base-py-orchestrator",
+      "from": "memory-md-memory",
+      "to": "agent-base-py-orchestrator",
+      "label": "memory and history replay",
+      "data": "stored notes, retrieved chunks, conversation history",
+      "evidence": [
+        { "file": "agent_core/core/impl/memory/manager.py", "line": 351, "note": "retrieve() returns relevance-ranked chunks into the model's context" },
+        { "file": "app/data/action/memory_search.py", "line": 47, "note": "memory_search is the action that surfaces those chunks with no provenance field" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--run-shell-py-tool",
+      "from": "agent-base-py-orchestrator",
+      "to": "run-shell-py-tool",
+      "label": "model-authored shell command",
+      "data": "command string",
+      "evidence": [
+        { "file": "agent_core/core/impl/action/manager.py", "line": 255, "note": "action dispatch reaches run_shell with no gate other than the idempotency guard, which run_shell does not trigger" },
+        { "file": "app/data/action/run_shell.py", "line": 119, "note": "Popen(command, shell=True, env=env) executes the string on the host" }
+      ]
+    },
+    {
+      "id": "credentials-store-py-secret-store--read-file-py-tool",
+      "from": "credentials-store-py-secret-store",
+      "to": "read-file-py-tool",
+      "label": "credential and settings file contents",
+      "data": "OAuth tokens, bot tokens, API keys",
+      "evidence": [
+        { "file": "app/data/action/read_file.py", "line": 134, "note": "any absolute path that exists is opened, including .credentials/ and app/config/settings.json" },
+        { "file": "agent_file_system/AGENT.md", "line": 956, "note": "the manual names those files and their contents as reachable persistent state" }
+      ]
+    },
+    {
+      "id": "read-file-py-tool--agent-base-py-orchestrator",
+      "from": "read-file-py-tool",
+      "to": "agent-base-py-orchestrator",
+      "label": "file contents into context",
+      "data": "file contents",
+      "evidence": [
+        { "file": "app/data/action/read_file.py", "line": 146, "note": "the file's lines are returned as the action output that lands in the model's context" }
+      ]
+    },
+    {
+      "id": "web-fetch-py-tool--agent-base-py-orchestrator",
+      "from": "web-fetch-py-tool",
+      "to": "agent-base-py-orchestrator",
+      "label": "extracted page text",
+      "data": "untrusted web content",
+      "evidence": [
+        { "file": "app/data/action/web_fetch.py", "line": 4, "note": "returns cleaned page text with no provenance label or trust tier" },
+        { "file": "app/data/action/web_fetch.py", "line": 389, "note": "overflow is written to a content_file the agent then reads back through read_file or grep_files" }
+      ]
+    },
+    {
+      "id": "mcp-config-json-mcp-server--agent-base-py-orchestrator",
+      "from": "mcp-config-json-mcp-server",
+      "to": "agent-base-py-orchestrator",
+      "label": "MCP tool results",
+      "data": "tool output from upstream servers",
+      "evidence": [
+        { "file": "agent_core/core/impl/mcp/client.py", "line": 237, "note": "call_tool returns the upstream server's output" },
+        { "file": "agent_core/core/impl/mcp/adapter.py", "line": 106, "note": "the generated handler feeds that output back as an action result" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--write-file-py-tool",
+      "from": "agent-base-py-orchestrator",
+      "to": "write-file-py-tool",
+      "label": "model-authored path and content",
+      "data": "file path and file contents",
+      "evidence": [
+        { "file": "app/data/action/write_file.py", "line": 63, "note": "file_path and content are taken verbatim from the action input" }
+      ]
+    },
+    {
+      "id": "write-file-py-tool--memory-md-memory",
+      "from": "write-file-py-tool",
+      "to": "memory-md-memory",
+      "label": "writes session-loaded state files",
+      "data": "instruction and memory text",
+      "evidence": [
+        { "file": "app/data/action/write_file.py", "line": 91, "note": "the write proceeds against any path, including MEMORY.md, SOUL.md and AGENT.md" },
+        { "file": "agent_core/core/impl/memory/memory_file_watcher.py", "line": 121, "note": "the watcher re-indexes the changed file into ChromaDB automatically" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--send-message-py-tool",
+      "from": "agent-base-py-orchestrator",
+      "to": "send-message-py-tool",
+      "label": "recipient and body",
+      "data": "message content and destination address",
+      "evidence": [
+        { "file": "agent_core/core/impl/action/manager.py", "line": 260, "note": "irreversible actions pass through the idempotency guard and then execute" }
+      ]
+    },
+    {
+      "id": "send-message-py-tool--craftos-integrations-manager-py-adapter",
+      "from": "send-message-py-tool",
+      "to": "craftos-integrations-manager-py-adapter",
+      "label": "outbound send to external recipient",
+      "data": "message content",
+      "evidence": [
+        { "file": "craftos_integrations/service.py", "line": 48, "note": "send_message facade dispatches to the platform handler" },
+        { "file": "app/data/action/integrations/google_workspace/gmail_actions.py", "line": 39, "note": "send_gmail delivers to an arbitrary 'to' address" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--http-request-py-tool",
+      "from": "agent-base-py-orchestrator",
+      "to": "http-request-py-tool",
+      "label": "method, URL and body",
+      "data": "arbitrary request body, potentially local file contents",
+      "evidence": [
+        { "file": "app/data/action/http_request.py", "line": 180, "note": "the body is taken from the action input and forwarded unchanged" }
+      ]
+    },
+    {
+      "id": "http-request-py-tool--blocked-hosts-http-request-py-control",
+      "from": "http-request-py-tool",
+      "to": "blocked-hosts-http-request-py-control",
+      "label": "destination checked before send",
+      "data": "resolved hostname and port",
+      "evidence": [
+        { "file": "app/data/action/http_request.py", "line": 208, "note": "the hostname is parsed and resolved, then tested against metadata and private-range blocks" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--living-ui-manager-py-tool",
+      "from": "agent-base-py-orchestrator",
+      "to": "living-ui-manager-py-tool",
+      "label": "build, run and share commands",
+      "data": "project spec and generated app code",
+      "evidence": [
+        { "file": "app/data/action/living_ui_actions.py", "line": 6, "note": "the model drives Living UI creation and operation through these actions" },
+        { "file": "app/living_ui/manager.py", "line": 3433, "note": "_ensure_cloudflared downloads and runs the tunnel binary when a project is shared" }
+      ]
+    },
+    {
+      "id": "agent-base-py-orchestrator--logger-py-log-sink",
+      "from": "agent-base-py-orchestrator",
+      "to": "logger-py-log-sink",
+      "label": "action, LLM-call and ledger records",
+      "data": "action inputs and outputs, exception locals",
+      "evidence": [
+        { "file": "agent_core/core/impl/action/manager.py", "line": 465, "note": "every action execution emits an action_end event-stream record that the sinks capture" },
+        { "file": "app/logger.py", "line": 56, "note": "the file sinks that receive them, with diagnose=True rendering local variables on exceptions" }
+      ]
+    },
+    {
+      "id": "embedded-credentials-py-secret-store--craftos-integrations-manager-py-adapter",
+      "from": "embedded-credentials-py-secret-store",
+      "to": "craftos-integrations-manager-py-adapter",
+      "label": "shipped client credentials for connect",
+      "data": "OAuth client_id and client_secret, Telegram api_id/api_hash",
+      "evidence": [
+        { "file": "agent_core/core/credentials/embedded_credentials.py", "line": 28, "note": "the registry the connect flow reads when no environment override is set" },
+        { "file": "craftos_integrations/oauth_flow.py", "line": 399, "note": "OAuthFlow composes the client credentials and localhost callback for the owner's consent" }
+      ]
+    },
+    {
+      "id": "credentials-store-py-secret-store--craftos-integrations-manager-py-adapter",
+      "from": "credentials-store-py-secret-store",
+      "to": "craftos-integrations-manager-py-adapter",
+      "label": "stored tokens loaded for platform calls",
+      "data": "OAuth refresh tokens, bot tokens",
+      "evidence": [
+        { "file": "craftos_integrations/credentials_store.py", "line": 75, "note": "credential records are serialized to and loaded from .credentials/<platform>.json" },
+        { "file": "craftos_integrations/manager.py", "line": 49, "note": "clients without credentials are skipped, so the store gates which listeners start" }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Untrusted content into the model context",
+      "crossing_edges": [
+        "third-party-entrypoint--craftos-integrations-manager-py-adapter",
+        "craftos-integrations-manager-py-adapter--external-event-agent-base-py-control",
+        "external-event-agent-base-py-control--memory-md-memory",
+        "web-fetch-py-tool--agent-base-py-orchestrator",
+        "mcp-config-json-mcp-server--agent-base-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "content retrieved from external sources — web pages, emails, chat or integration messages, file contents, tool or MCP outputs — as trusted instructions; such content is data to be processed",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-02",
+          "excerpt": "MUST NOT accept or act on instructions from anyone other than its single owner-operator",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "A stranger messaging the agent over a connected platform gets a session opened and their text treated as a task — answered in code by the external_event gate, which returns before any session, trigger or action-selection LLM, with third-party as the default classification for unlabeled inbound.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "app/agent_base.py", "line": 2370 }
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "The notification the gate posts still carries a 500-character preview of the stranger's message into CONVERSATION_HISTORY.md, so attacker-authored prose is in the model's context on the owner's next turn.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-015",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Page text from web_fetch, file contents and MCP tool output enter the context with no provenance label or trust tier; the one module named for input sanitization has no call site and returns matched text unchanged (checked: app/security/prompt_sanitizer.py:71, agent_core/core/impl/context/engine.py — no labeling or quarantine step).",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Agent to LLM provider",
+      "crossing_edges": [
+        "interface-py-model--llm-provider-external-service",
+        "llm-provider-external-service--interface-py-model"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-14",
+          "excerpt": "Stored credentials, OAuth/bot tokens, and LLM API keys MUST NEVER be printed to chat, written to logs, or transmitted to any destination.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Because the file actions accept any absolute path, the contents of .credentials/<platform>.json and settings.json can be read into the prompt and transmitted verbatim to the provider endpoint — no redaction or exclusion runs on the context-assembly path.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "D",
+          "owasp": "LLM06",
+          "summary": "An unbounded action or retry loop burns the owner's provider spend — answered by the per-task action and token caps that pause the task behind a Continue/Abort choice, and by the five-failure circuit breaker in the LLM interface.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "app/agent_base.py", "line": 1619 }
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Model decision to side-effecting tool",
+      "crossing_edges": [
+        "agent-base-py-orchestrator--run-shell-py-tool",
+        "agent-base-py-orchestrator--write-file-py-tool",
+        "agent-base-py-orchestrator--http-request-py-tool",
+        "agent-base-py-orchestrator--living-ui-manager-py-tool"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-22",
+          "excerpt": "Host command and code execution MUST be gated by owner approval and MUST NOT inherit the parent process environment containing provider API keys or other credentials",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-11",
+          "excerpt": "sandboxed code and shell execution; web search and fetch; document reading and generation; memory search; the actions exposed by external integrations the owner has connected",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-23",
+          "excerpt": "The agent MUST NOT auto-approve, self-grant, or downgrade the approval requirement for any action above its declared permission tier.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "Model output travels one hop from unlabeled retrieved content to run_shell, which passes the string to the host shell with shell=True and env=os.environ.copy(), handing the inherited provider API keys to whatever the command does.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "No approval mechanism exists anywhere on the dispatch path: permission_tier is range-validated at app/proactive/parser.py:321 and displayed but never read before an action runs, and add_action_sets is itself a core action the model uses to widen its own inventory mid-task.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI03",
+          "summary": "In the documented Docker deployment the agent container that runs those shell commands has /var/run/docker.sock bind-mounted, so a model-authored command controls the host daemon and the container boundary confines nothing.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "value-transfer",
+      "name": "Irreversible and externally-visible actions",
+      "crossing_edges": [
+        "agent-base-py-orchestrator--send-message-py-tool",
+        "send-message-py-tool--craftos-integrations-manager-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-20",
+          "excerpt": "Any irreversible or externally-visible action — sending a message, email, or post to an external recipient; deleting data; making a purchase or payment; or changing configuration or credentials — requires explicit owner approval before execution.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-15",
+          "excerpt": "The owner's local memory, personal data, and file-system contents MUST NEVER be sent to any destination the owner has not explicitly authorized.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "R",
+          "owasp": "LLM03",
+          "summary": "All 77 actions flagged irreversible=True — send_message plus the per-platform senders — execute against an arbitrary external recipient with no confirmation; the flag drives only the idempotency ledger, which deduplicates a repeat but never asks the owner.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "http_request will POST an arbitrary body to any public host, so local file and memory contents can leave for a destination the owner never connected; the SSRF filter bounds only private, loopback and metadata addresses and places no limit on public destinations.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Persisted state re-entering the agent's reasoning",
+      "crossing_edges": [
+        "write-file-py-tool--memory-md-memory",
+        "memory-md-memory--agent-base-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-25",
+          "excerpt": "The agent MUST NOT directly edit harness-managed state files — distilled memory, the append-only event log, conversation history, task history, and the memory index",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-03",
+          "excerpt": "MUST NOT redefine, expand, or weaken its own governance — its goals, permission tiers, approval gates, or safety decision rubric",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "write_file and stream_edit accept any absolute path with no protected-path denylist, so SOUL.md, AGENT.md and MEMORY.md — loaded into context at the start of every session — can be rewritten, making an injected instruction persist into every future session; the only protection is prose in AGENT.md:861 and the MEMORY.md header.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-017",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM09",
+          "summary": "The ChromaDB index re-ingests agent-written markdown whenever the file watcher sees a change, with no validation, no hidden-content screening and no provenance field, so fetched external text can be retrieved by memory_search in a later session and read as the agent's own remembered knowledge.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Local stores readable into model context",
+      "crossing_edges": [
+        "credentials-store-py-secret-store--read-file-py-tool",
+        "read-file-py-tool--agent-base-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-13",
+          "excerpt": "credential and configuration stores MUST be excluded from indexing, retrieval, and summarization by default",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-16",
+          "excerpt": "Credentials and tokens at rest MUST be stored with owner-only access and MUST NOT be world-readable.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "read_file, grep_files and find_files take absolute host paths and check only that the file exists, so the OAuth tokens in .credentials/<platform>.json and the API keys in app/config/settings.json read straight into the model's context (checked: app/data/action/read_file.py:134 — no containment check, no exclusion list).",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "A separate reader reaches the same files: the default-enabled filesystem MCP server is launched with a '.' scope covering the whole repository, so its tools serve the configuration and credential paths as well as the workspace.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "Another local account reads the stored tokens off disk — answered by the credential store, which chmods its directory 0700 and each credential file 0600 on write.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "craftos_integrations/credentials_store.py", "line": 81 }
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Secrets shipped and injected",
+      "crossing_edges": [
+        "embedded-credentials-py-secret-store--craftos-integrations-manager-py-adapter",
+        "credentials-store-py-secret-store--craftos-integrations-manager-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-17",
+          "excerpt": "No user-data token, bot token, or server-side API key may be embedded or shipped in the distributed code.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-14",
+          "excerpt": "Stored credentials, OAuth/bot tokens, and LLM API keys MUST NEVER be printed to chat, written to logs, or transmitted to any destination.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Live client_id and client_secret values for five providers plus Telegram api_id and api_hash ship in the distributed source as base64 fragments joined at runtime, with the module docstring stating they are split to evade GitHub scanning and build helpers provided to make more.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Provider API keys supplied at start-up (env_file .env in the documented compose stack) cross into every shell child, because run_shell hands each command a full copy of the parent environment.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Dependency and component provenance",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-08",
+          "excerpt": "Any server or skill enabled without an explicit owner action MUST be named here and version-pinned; a server whose launch resolves an unpinned upstream package on each start is outside this closure",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Both default-enabled MCP servers resolve unpinned upstream packages on every start — npx -y @modelcontextprotocol/server-filesystem with no version and @playwright/mcp@latest — with no lockfile, hash or signed manifest, and their tools register directly as agent actions.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "requirements.txt declares 55 packages with zero exact pins and no lockfile anywhere in the tree, so two installs can resolve different LLM SDK, vector-store and browser-automation code with no inventory to check a disclosed CVE against.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Sharing a Living UI fetches the cloudflared binary from a mutable GitHub 'latest' URL and executes it with no checksum, signature or version pin.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-013",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Network surfaces the deployment exposes",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-26",
+          "excerpt": "Any server or listener the agent starts (OAuth callback server, Living UI applications, integration bridges) MUST bind to loopback/localhost and MUST NOT be exposed to the public network without explicit owner approval.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI07",
+          "summary": "The Living UI sidecar proxy binds 0.0.0.0 with wildcard CORS and no auth dependency, and every scaffolded backend inherits the same bind from the template, so anyone on the same LAN can reach the bridge the agent uses to read and act on Living UI data.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI03",
+          "summary": "The GUI desktop service publishes port 3001 on all host interfaces with a literal default password and seccomp:unconfined, handing anyone who reaches it a graphical session on the machine the agent operates.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": null,
+          "summary": "The OAuth callback listener is the one server that answers this boundary in code — it binds 127.0.0.1 explicitly for the consent round-trip.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "craftos_integrations/oauth_flow.py", "line": 236 }
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Recording, retention and alerting",
+      "crossing_edges": ["agent-base-py-orchestrator--logger-py-log-sink"],
+      "remit_rules": [
+        {
+          "rule_id": "R-30",
+          "excerpt": "Routine actions and decisions MUST be recorded to the durable event/action log for audit, without interrupting the owner.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-14",
+          "excerpt": "Stored credentials, OAuth/bot tokens, and LLM API keys MUST NEVER be printed to chat, written to logs, or transmitted to any destination.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Every loguru sink is added with backtrace=True and diagnose=True, so a propagating exception renders local variables — including provider keys and OAuth tokens on the integration and LLM call paths — into the log file, and no sink installs a redaction filter.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-014",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "Recording is strong but nothing notifies: the irreversible-action ledger and the structured logs stay on local disk with no alert hook and no exporter, and a compromise holding host shell access can edit the same files it would be detected by.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-016",
+          "mitigation_evidence": null
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "fetched-content-to-host-shell",
+      "name": "Fetched page text to host shell with inherited keys",
+      "steps": [
+        { "node": "web-fetch-py-tool", "finding_id": "PRAX-2026-08-12-001", "summary": "a fetched page returns text into the context with no provenance label" },
+        { "node": "agent-base-py-orchestrator", "finding_id": "PRAX-2026-08-12-005", "summary": "nothing labels, quarantines or filters it — the sanitizer module has no call site" },
+        { "node": "run-shell-py-tool", "finding_id": "PRAX-2026-08-12-001", "summary": "the model's next action reaches the host shell with shell=True and no approval check" },
+        { "node": "credentials-store-py-secret-store", "finding_id": "PRAX-2026-08-12-001", "summary": "env=os.environ.copy() hands the command the provider API keys the agent was started with" }
+      ]
+    },
+    {
+      "id": "injection-to-persistent-instructions",
+      "name": "Injected instruction persisted into every future session",
+      "steps": [
+        { "node": "web-fetch-py-tool", "finding_id": "PRAX-2026-08-12-001", "summary": "external content enters the context unlabeled" },
+        { "node": "agent-base-py-orchestrator", "finding_id": "PRAX-2026-08-12-003", "summary": "no approval checkpoint stands between that content and a state-changing action" },
+        { "node": "write-file-py-tool", "finding_id": "PRAX-2026-08-12-017", "summary": "write_file accepts the path of a session-loaded identity file with no protected-path list" },
+        { "node": "memory-md-memory", "finding_id": "PRAX-2026-08-12-010", "summary": "the rewritten file is re-indexed and reloaded, carrying the instruction into later sessions" }
+      ]
+    },
+    {
+      "id": "local-read-to-external-send",
+      "name": "Unrestricted local read to unconnected destination",
+      "steps": [
+        { "node": "credentials-store-py-secret-store", "finding_id": "PRAX-2026-08-12-006", "summary": "credential and settings files sit within reach of the unrestricted readers" },
+        { "node": "read-file-py-tool", "finding_id": "PRAX-2026-08-12-006", "summary": "read_file opens any absolute path and returns the contents into context" },
+        { "node": "http-request-py-tool", "finding_id": "PRAX-2026-08-12-007", "summary": "http_request POSTs that content to any public host with no allowlist and no approval" }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Two placements strained. The Living UI subsystem is one capability with two faces — an agent tool and a set of 0.0.0.0 listeners — and was kept in tools_mcp as the tool the model drives, with its network exposure carried on the control-plane-exposure boundary rather than split into a second external_deploy node. The CraftOS platform connector is genuinely bidirectional (inbound listeners and the outbound send facade live in the same package) and sits in client_adapters as a channel connector for both directions.",
+    "omissions": "Arbitration divergences from the stored tags, KB-first. Substantive: PRAX-2026-08-12-007 is stored ASI02 (Tool Misuse) but no wrongful use is evidenced — under the Agentic KB's arbitration the ungated-approval half is LLM03 (Excessive Agency) and the unbounded-destination half is LLM02 (Sensitive Information Disclosure), so its two threats are tagged that way here. Precedence-only: PRAX-2026-08-12-003 carries both LLM03 and ASI10 in the findings JSON; the compound row makes LLM03 primary with ASI10 riding as a co-tag, so the single owasp field takes LLM03. Two threats are tagged null (the observability gap at telemetry-egress and the file-permission threat at data-at-rest) because neither Top 10 honestly applies. Size discipline (12-25 nodes) meant three cited artifacts are represented only as boundary threats rather than as nodes of their own: requirements.txt (PRAX-2026-08-12-012), the cloudflared download URL table (PRAX-2026-08-12-013, cited on the Living UI node), and the app/usage SQLite stores (folded into the observability node's evidence). Two nodes are deliberately edgeless: the PromptSanitizer stub (dead code, no call site to draw an edge from) and the Docker deployment stack (deploy posture). Sub-agents were checked and are in-process only (app/subagent/runner.py, spawn_subagent), with no network agent-to-agent protocol, so no peer-a2a boundary was raised. The remit's R-13 names prewarm_all_drives as the whole-machine indexing feature; no such symbol exists anywhere in this snapshot, so the drive-prewarm mechanism could not be cited and no node was created for it.",
+    "counts": { "nodes": 25, "edges": 28, "boundaries": 10, "threats": 25 }
+  }
+}
