@@ -9,6 +9,55 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [1.3.0] — unreleased
+
+**Thinking modes, and scores that come from evidence you can check.** Two features that turn out to depend on each other: the **high** and **x-high** thinking modes (#197), and a structural fix to how RAISE scores are formed (#195). **This is a scoring release, not a score-inert one** — it ships a fresh frozen baseline, **`v1.3-opus5`**, and its numbers are not comparable to `v1.2-opus5` scan-for-scan. `schema_version` stays **3.0**; nothing serialised changed.
+
+**What #195 does and does not do.** It removes a systematic bias — the old pipeline counted capability as posture on immature targets and could not see maturity on mature ones — and it makes every score re-derivable from evidence committed to disk. It does **not** reduce run-to-run spread: across the 12-target freeze, 3× spread ran 0.00–0.55 (median 0.20), statistically unchanged from v1.2. The measured cause is that scoring was never the unstable step. Given identical evidence, scorers agree; what varies between runs is *what evidence a scan gathers*, and Step 8b makes that deterministic for maturity (M1–M12) only, not for finding discovery. **Thinking modes are the lever that damps spread** — see below. Treat 1.3 as an accuracy release, not a precision one.
+
+> **Soak note for anything landing before release.** The baseline is already frozen against this skill. **Any further change that can move a score — scoring rules, Step 8b searches, KB anchors, remits, detection — invalidates `v1.3-opus5` and requires a re-freeze.** Score-inert work (docs, rendering, CI, tooling that does not ship) folds in freely. Two known score-moving items are deliberately deferred to 1.4 for exactly this reason (#248, and scanner evidence-path consistency).
+
+### Scoring — the score is derived from committed evidence (#195)
+- **Scores are assigned from committed evidence, not working memory.** Previously they were set at SKILL.md **Step 5**, from a workspace read held in context, *before* findings were decomposed or drafted; Step 9.4 only transcribed them. Step 5 now gathers evidence, and **Step 9.4 assigns** the scores from the committed set.
+- **New Step 8b — maturity evidence sweep.** An enumerated **M1–M12** lookup with fixed search patterns, where *verified absence* is recorded with the same weight as a hit ("none — searched `<patterns>`"). A findings list alone cannot see a red-team programme or a telemetry pipeline, so a mature project and a bare one looked identical to the score. An open-ended sweep was tried first and **failed its gate** — it relocated the variance instead of removing it.
+- **Boundary rules and the provenance test**, consolidated into `KB_RAISE_SCANNING.md`: the dominant-path ladder (nothing on the dominant path → cap 1; prompt-only → cap 2; operative code → uncapped), opt-in/default-off controls as *capability, not posture*, and adversarial material counting only where a project attacks **its own** defences — a CTF's shipped exploits are its product, not evidence of a testing programme.
+- Validated before shipping: **blind adjudication upheld the new pipeline 22 of 24** category calls, with judges naming the old bias as "capability counted as posture". Two structural alternatives were measured and discarded first; a checklist rubric was tested and **killed** (higher variance, and it averaged a deliberately-vulnerable target's disqualifying failure away).
+
+### Thinking modes (#197)
+- **`high`** — a context-unaware auditor re-reads every finding at its cited location and tries to refute it, then checks the remit's own rules against the target's documentation. Costs **~1.4× tokens and ~1.3–1.6× the clock** — and under concurrency the time multiple stretches toward 1.8× while the token cost holds, so estimate duration from the clock figure, not the token one.
+- **`x-high`** — three independent scans, unioned and adjudicated into one **super-run**. Two principles that are explicitly *not* voting: **evidence decides membership, run-count decides nothing** (a finding one run caught survives if it verifies; one all three agreed on dies if it does not), and **scores are re-derived, never blended**.
+- Modes are selected in natural language per invocation. The standard path is unchanged.
+
+### What the modes actually buy — measured
+- **Discovery.** A single scan misses roughly **1 in 6 High-severity findings**; x-high finds them. Across four x-high adjudications on two targets, **~half of every super-run's findings came from exactly one scan of three — and not one was refuted.** Under-detection, not over-claiming, is the dominant failure mode on large targets.
+- **Score stability, but only in combination.** The August test found **no damping** and correctly diagnosed why: the residual delta was a single band-edge call x-high *inherited* from #195. With #195 fixed, a re-test on the two widest-variance targets gave **pair delta 0.00 against 6-run raw ranges of 0.70**, with identical category vectors — Hermes 2.30/2.30, Deep Agents 1.85/1.85. **Claim the combined stack only:** x-high alone did not stabilise scores, and #195 alone does not eliminate raw spread.
+- **Remit quality.** On a mature scanner the audit's measurable yield is not FP removal — across four 1.3 high-mode audits it was **48 findings, 48 confirmed, 0 killed, but 9 rule-level remit defects surfaced**, four of them in a remit authored twenty minutes earlier.
+
+### Baseline — `v1.3-opus5`
+- 12 targets, **36 standard runs** (median-of-3) plus 3 high-mode runs, Claude Opus 5, on the **same pinned sources** as v1.2. Mean weighted RAISE **1.49** (v1.2: 1.671); frozen entirely at medians it would be **1.45**. Three targets are frozen at a high-mode run by maintainer decision — a **deliberately mixed method**, recorded as a caveat in `BASELINE.md`.
+- **Attribution caveat:** **7 of 12** targets are a clean like-for-like comparison. For the other five (aider, autogen, craftbot, helperbot, uagents) the #200/#201 remit cleanups landed in the same release, so their movement mixes the scoring change with a changed standard. The numbers stand; the attribution to #195 alone does not, for those five.
+- Movement is **bounded and two-directional**: 2 targets up, 1 flat, 9 down, none beyond −0.45. Supply Chain is the dominant mover; **Red Team moves both ways** — down on demo/CTF targets via the provenance test, *up* on one target, and held at 3 where the maturity sweep found a real advisory→fix→regression-test loop.
+- **Every run cleared a dual provenance gate**, checked on disk rather than self-reported: `praxen_version == "1.3.0"` **and** a `MATURITY (M1-M12)` block in the evidence checkpoint — the second catches a run that stamps the right version while having followed an older process.
+
+### Detection and calibration
+- **External-value → filesystem-path** pattern (#41); IaC/deployment artifacts are first-class scan inputs (#65 item 4); confidence calibration for absence-based scores (#65 item 8).
+- Decomposition: a distinct **fix-point** is now required to break a finding out (#196).
+- Tagging: phantom/inert controls carry the ungated-capability code (#173); the outlive test distinguishes a **structurally absent** approval layer from a **default-off** one (#174).
+- Remit over-reach cleanup on six targets (#200, #201) — driven by cold audits, and one target's catalogued items were **rejected** after the audit found them miscatalogued.
+- **#48 closes** against the #195 work.
+
+### Report rendering *(re-render only — no findings JSON touched)*
+- **RAISE scores render as five discrete pills** instead of a continuous bar. A category score is an ordinal band, not a percentage, so pills are an *exact* representation and let a reader count the value without reading the number; empty pills keep a ghost outline so the "out of 5" denominator stays visible. Only the masthead's weighted overall — which genuinely is fractional — carries a partial fill. An N/A category now renders five ghost pills, visually distinct from a real 0.
+- Placeholder-aware secret redaction (#243): `${VAR}`, `$VAR`, `{{var}}`, `%VAR%` and `<placeholder>` render verbatim instead of being redacted as literals.
+- `suite_health.py` uses the full maturity label scale and a data-driven y-axis (#176).
+
+### Documentation
+- **"Advanced — hardening a new remit"** in [Writing Worker Remits](docs/writing-remits.md) — the practice behind the measurement above. Run the first scan in high mode; read the **adjudication file**, because the remit feedback is deliberately *not* in the HTML report; fix the rules and then re-check your own fixes, since replacing an over-reach with an undocumented *mechanism* is a common second error; and an optional independent-review brief. Closes with human review as the gate, not an afterthought: where the docs are silent the answer is policy, and an agent that "resolves" it is inventing the maintainer's intent.
+- [Thinking Modes](docs/thinking-modes.md) documents both tiers, their cost, and what lands on disk.
+
+### Tooling *(repo-only — not shipped in the plugin)*
+- **`tests/scan_diff.py` evidence matching is now suffix-aware.** On a multi-root workspace, runs disagree about whether an evidence path carries the root prefix (`agent/x.py` vs `pkg/agent/x.py`); comparing raw strings drove the *strongest* match signal to zero and silently collapsed good matches. Measured on the runs that exposed it, join rates roughly doubled. Distinct from the documented 0.40-threshold limit, which stands.
+
 ## [1.2.1] — 2026-08-10
 
 **Fast-follow patch: docs, CI/supply-chain hardening, report polish.** Deliberately **score-inert**: no change to detection, scoring, remits, or any frozen finding — ships against the existing `v1.2-opus5` baseline with no re-scan, `schema_version` stays **3.0**. The one skill-prose change (below) was gated by a blind re-scan of a baseline target, which landed exactly on its frozen median.

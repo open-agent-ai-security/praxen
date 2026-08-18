@@ -1,0 +1,163 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    uAgents (Fetch.ai uAgent)
+Analysis: August 12, 2026, 17:03 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The framework's one strong control — ECDSA signing and verification of every
+inter-agent envelope — is surrounded by a default posture that never enforces
+the rest of the declared trust model. The signature is checked but its
+freshness is not: expires and nonce are folded into the signed digest in
+envelope.py and read by no one, so a captured envelope replays indefinitely; a
+sender that simply calls itself user... skips verification altogether, and a
+sync response carrying no signature at all is accepted and dispatched. The
+sharper edge is the control plane. The agent inspector is enabled by default
+and its endpoints share the 0.0.0.0 socket with the agent protocol, guarded
+only by a client-IP test that forwarded_allow_ips hands to the caller, while
+wildcard CORS makes the same endpoints reachable from any web origin —
+exposing the full cached message history through /messages and the agent's
+Agentverse registration through /connect.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 6   Medium: 6   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 11   Gap: 13   Partial: 7   Vague: 0   Enforcement-not-possible: 1   (of 32 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   5
+  LLM03  Excessive Agency                                   1
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       5
+  ASI04  Agentic Supply Chain Vulnerabilities               2
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 3
+  ASI08  Cascading Failures                                 1
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  The agent inspector's REST endpoints are reachable by
+            any remote or cross-origin caller because the only guard is a
+            client IP the caller supplies.
+      Action 1: Stop deriving authorization from the peer address in asgi.py —
+                remove forwarded_allow_ips="*", require a locally-issued
+                bearer token for /messages, /connect and /disconnect, and move
+                /agent_info inside the guarded set.
+      Action 2: Scope the CORS headers set in ASGIServer.serve() to the
+                /submit path or an operator-configured origin list, so a web
+                origin cannot read or invoke the inspector endpoints from the
+                operator's browser.
+
+  PRAX-2026-08-12-002  The Helm chart ships a literal agent seed phrase as its
+            default value, giving every unmodified deployment a publicly known
+            identity and wallet key.
+      Action 1: Remove the seed default from values.yaml and make the chart
+                fail template rendering when agent.seed is unset, or source it
+                from an existing Kubernetes Secret reference rather than a
+                chart value.
+      Action 2: Treat the committed value as compromised: any agent ever
+                deployed with the default must be re-seeded and any wallet
+                funds under its derived address moved.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-003  The agent inspector is enabled by default, so debug
+            endpoints and in-memory retention of every message payload are on
+            unless the operator opts out.
+      Action 1: Flip enable_agent_inspector to default False in Agent.__init__
+                and require an explicit opt-in, so the production posture is
+                the default rather than the exception.
+      Action 2: Decouple message-history caching from the inspector flag so an
+                operator can keep the inspector off without losing session
+                history, and vice versa.
+
+  PRAX-2026-08-12-004  Envelope expiry and nonce are signed but never checked
+            on receipt, so any captured signed envelope can be replayed
+            against a handler indefinitely.
+      Action 1: Reject envelopes whose expires is absent or in the past at the
+                ingress point in asgi.py and mailbox.py, before
+                dispatcher.dispatch_msg.
+      Action 2: Populate nonce on outbound envelopes in Context.send_raw and
+                keep a bounded seen-nonce or (sender, session, nonce) set on
+                receipt so a replayed envelope is dropped.
+
+  PRAX-2026-08-12-005  A synchronous response envelope that carries no
+            signature skips verification entirely and is delivered to the
+            waiting caller as a legitimate reply.
+      Action 1: Treat a missing signature as a verification failure in
+                send_exchange_envelope, and require the response envelope's
+                sender to equal the address that was resolved for the request.
+      Action 2: Add the same verification to
+                uagents_core.utils.messages.send_message_to_agent before
+                returning a parsed sync response to the caller.
+
+  PRAX-2026-08-12-006  The default inbound path applies no counterparty
+            allowlist and no rate limit, so any agent on the open network can
+            drive a handler at will.
+      Action 1: Give Agent an optional operator-supplied peer allowlist that
+                _process_single_message checks before dispatch, so the
+                closed-counterparty model the remit assumes can be expressed
+                without subclassing a protocol.
+      Action 2: Apply a conservative default quota to the ingress path in
+                asgi.py (per sender address and per remote address), leaving
+                QuotaProtocol for finer per-handler policy.
+
+  PRAX-2026-08-12-007  Every handler receives an unrestricted wallet and
+            ledger client, and the framework ships no approval hook for
+            spending them.
+      Action 1: Add an operator-supplied authorization callback to Agent that
+                any value-moving path must clear, and route the registration
+                fee through it as a pre-approved exemption so the gate has a
+                single choke point.
+      Action 2: Emit a distinct log record (and, once an alert path exists, an
+                alert) whenever a transaction other than Almanac registration
+                is broadcast from the agent's wallet.
+
+  PRAX-2026-08-12-008  Identity and wallet private keys are written to a
+            plaintext JSON file in the working directory, and the wallet key
+            persisted is not the one the agent uses.
+      Action 1: Create private_keys.json with owner-only permissions (os.open
+                with mode 0o600) and support an operator-supplied key source —
+                environment or an external secret store — as the documented
+                default.
+      Action 2: Fix get_or_create_private_keys to persist the same wallet_key
+                it returns, and document the recovery path for agents already
+                running on an unpersisted wallet key.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

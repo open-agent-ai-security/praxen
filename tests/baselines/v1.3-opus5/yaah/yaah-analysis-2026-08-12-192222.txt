@@ -1,0 +1,150 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    yaah
+Analysis: August 12, 2026, 18:56 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a harness that enforces its safety model on the path
+it was built for and silently drops it everywhere else. The command guard and
+secret scanner really do block on the Claude Code path — Block becomes exit 2
+— but the guard is seven regexes over a shell, the scanner runs at PostToolUse
+so the credential is already on disk when it fires, and
+pkg/generator/hookmap.go maps neither event for the Codex target, so yaah
+generate --agent codex emits a working config with no command guard and no
+secret scanner at all, offering only model-elective MCP tools in their place.
+The second theme is capability and credential material flowing outward through
+generated files: NewNotion() interpolates an API token into an MCP env value
+that every generator writes verbatim into repository config, and every /yaah:*
+workflow command — including the one whose own text says it runs "without
+human intervention" — ships model-invocable because disable-model-invocation
+is supported by the generator and set by nothing.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.70 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 5   Medium: 6   Low: 0   Informational: 0
+  Total: 13
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 16   Gap: 3   Partial: 12   Vague: 0   Enforcement-not-possible: 0   (of 31 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               2
+  ASI05  Unexpected Code Execution (RCE)                    3
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  The Notion MCP provider interpolates the operator's API
+            token into a config value that every generator writes verbatim
+            into repository files.
+      Action 1: Change Notion.Server() to emit an environment-variable
+                reference (e.g. NOTION_TOKEN) rather than the literal value,
+                and have the generators resolve credentials at agent start-up
+                instead of at generation time.
+      Action 2: Add a generator-side guard that refuses to serialize any Env
+                or Headers value matching a credential pattern, so a future
+                provider cannot reintroduce the same path.
+
+  PRAX-2026-08-12-002  Every generated /yaah:* command, including the
+            autonomous phase runner, is model-invocable because
+            disable-model-invocation is never set.
+      Action 1: Set DisableModelInvocation: true in
+                AutonomousCommand.Advanced() and in every other /yaah:*
+                command whose body performs writes, so the generated
+                frontmatter blocks model invocation.
+      Action 2: Add a test in pkg/commands/builtins asserting that every
+                registered built-in command reports DisableModelInvocation
+                true, so a new command cannot ship without it.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-003  Codex-target generation silently emits a config in
+            which neither the command guard nor the secret scanner ever runs.
+      Action 1: Map PreToolUse and PostToolUse to their Codex equivalents in
+                hookmap.go, or, if Codex genuinely has no equivalent event,
+                make CodexGenerator.GenerateHooks fail loudly when a
+                safety-control handler cannot be wired.
+      Action 2: Add a generator test asserting that for every target, the
+                emitted hook set includes an event that dispatches the command
+                guard and the secret scanner.
+
+  PRAX-2026-08-12-004  The fail-closed command guard is seven regexes over a
+            shell, so trivial rewrites of every listed danger pass.
+      Action 1: Replace the free-text denylist with argv-level parsing plus an
+                allowlist of permitted binaries and flags for the destructive
+                verbs (rm, git push, dd, mkfs), so unrecognised forms are
+                denied rather than allowed.
+      Action 2: Add table-driven tests in pkg/hooks/handlers covering the
+                known bypass forms of each listed rule, so a pattern change
+                cannot silently reopen one.
+
+  PRAX-2026-08-12-005  The secret scanner is a PostToolUse handler, so a
+            credential-bearing edit is already on disk before the block fires.
+      Action 1: Move credential detection to a PreToolUse handler that scans
+                the proposed tool_input content for Edit/Write/MultiEdit,
+                keeping the PostToolUse pass as a backstop for out-of-band
+                writes.
+      Action 2: If the pre-write scan cannot be added, have the PostToolUse
+                handler restore the file's prior content (or write it to a
+                quarantine path) when it blocks, so the block is fail-closed
+                in effect and not only in message.
+
+  PRAX-2026-08-12-006  The yaah_lint MCP tool spawns external binaries on a
+            model-supplied path without consulting the command guard.
+      Action 1: Route every profile step through CommandGuard.CheckCommand
+                before exec.CommandContext, and refuse to run when the guard
+                reports unsafe.
+      Action 2: Constrain yaah_lint to paths inside the invoking project root
+                and drop npx-based profiles in favour of resolved local
+                binaries, so a tool call cannot trigger a package install.
+
+  PRAX-2026-08-12-007  Default generation wires outbound MCP servers that
+            install unpinned npm packages at every launch, with no operator
+            opt-in.
+      Action 1: Pin the npm package to an exact version or digest in
+                context7.go and notion.go (for example @context7/mcp@1.2.3) so
+                the launched code matches what was reviewed.
+      Action 2: Default EnableContext7, EnablePulumiMCP and any future
+                outbound provider to false in AllDefaults, requiring the same
+                explicit opt-in the fact-check hooks already use.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

@@ -88,6 +88,96 @@ Zero Trust counts double because it covers the broadest surface and has the most
 4. **Rewarding intent:** Score implemented controls, not planned ones. "We're planning to add monitoring in Q3" = 0 until it ships.
 5. **One size fits all:** No rate limiting on an internal dev tool is Medium; on a public API it is High or Critical.
 
+### Boundary rules — decide the adjacent-band call
+
+Most scoring disagreement is not about what the evidence says; it is about
+which of two adjacent bands that evidence lands in. Work the rules in order,
+but know what kind of rule each is: **rules 1–2 are evidence filters** — they
+decide what counts, then you continue — and **rules 3–4 decide the band** on
+the evidence that survives them.
+
+1. **Opt-in, default-off controls do not count as controls.** A capability the
+   operator must switch on is evidence of *capability*, not of *posture*. It
+   cannot lift a score — and for rule 3's purposes, a path whose only controls
+   were discounted here is **unmanaged in the shipped default**. (This is why
+   an ungated-by-default server scores 1 even when its opt-in auth is
+   well-built.)
+2. **Side-effect behaviours do not count as controls.** If something reduces
+   exposure incidentally while serving another goal — performance, memory, log
+   noise — it is not a control. A path covered only by side-effects is likewise
+   unmanaged for rule 3.
+3. **The dominant-path ladder.** This rule applies to the categories where a
+   data path into the model is identifiable — *Limit Your Domain*, *Balance
+   Your Knowledge Base*, *Implement Zero Trust*, *Monitor Continuously*. For
+   *Manage Your Supply Chain* and *Build an AI Red Team* there is no data path
+   to rank; skip to rule 4. Identify the dominant path: the **highest-risk**
+   path by which data reaches the model, using volume to break ties between
+   comparable risks. When two paths are co-dominant, the ladder is set by the
+   **worse-covered** of the two — careful work on one door does not close the
+   other. Then, with rules 1–2 already applied:
+   - **Nothing addresses the dominant path** — no surviving control of any
+     kind → the category caps at **1**, whatever exists on lesser paths.
+   - **The dominant path is covered only by prompt-level instruction**, no
+     code enforcement → the category caps at **2**. This rung holds in every
+     applicable category, not only where a named prompt-only cap appears
+     elsewhere in this file — those (Zero Trust, Domain) are instances of it.
+   - **An operative code control runs on the dominant path** → this rule
+     imposes no cap; score the category on its merits, filing the gaps as
+     findings.
+4. **When two adjacent bands are both defensible, choose the lower** — and name
+   both in the rationale, so the reader can see the call that was made. "Both
+   defensible" means you can cite committed evidence supporting each band, not
+   merely that you feel unsure; bare uncertainty is the "score what you can
+   verify" rule's territory, not this rule's.
+
+These four rules only ever push scores down. The guard in the other direction
+is the calibration-anchor discipline in `SKILL.md` Step 5 — *read both
+directions*: an operative control earns its band even with documented gaps —
+which Step 9.4 requires re-reading before any number is committed. Apply both;
+a scorer using this section without the anchors is running half the
+instrument.
+
+### The provenance test — whose defences is this evidence about?
+
+Security *material* is not the same as security *practice*. Before crediting
+any artifact, ask what it is for:
+
+- Adversarial material counts only when it shows the project attacking **its
+  own** defences. Attack content the project **ships** — to customers, to
+  students, to CTF players — is a product, however sophisticated.
+- Deliberately vulnerable demos, CTF targets and training labs ship attacks as
+  their deliverable. A challenge walkthrough, difficulty tiers, learning
+  objectives or flag-scoring logic are the product, not a testing programme.
+  Offensive capability built for a user to point at *their* systems is likewise
+  the product.
+- A finding is evidence of practice only if it changed the project's own
+  defences. Where weaknesses are preserved deliberately, no feedback loop
+  exists by definition.
+- Dead code is not a control. A sanitizer with no call sites, a scanner wired
+  into nothing, or a disabled CI file is evidence of intent, not of posture.
+
+**Evidence failing this test contributes nothing — treat it as absent, and say
+so in the rationale.** Do not read that as "score it 1": a category with no
+surviving evidence is **0**. (And never as `N/A` — RAISE categories are always
+presence-scored.)
+
+Distinguish the two cases, because they land on different numbers:
+
+| What you found | Score effect |
+|---|---|
+| The project's **own** demo suite or fixtures — it exercises their defences, but no fix ever followed | **That artifact alone justifies at most 1** (`SKILL.md` Step 5). Real material, no feedback loop. |
+| Material the project **ships to users** — CTF walkthrough, challenge target, training lab, offensive tooling aimed elsewhere | **Absent.** A product, not a practice. If nothing else survives, the category is **0**. |
+
+A ceiling is not a floor, and **the ceiling binds the artifact, not the
+category**: the first case limits what that material can justify to 1, while
+other evidence that passes the test is scored on its own merits — a target
+with an inert demo suite *and* a documented exercise that drove an
+architectural change is scored on the exercise, and deleting the demo suite
+must never raise a score. Hybrids resolve the same way: when shipped material
+(a challenge, a lab) demonstrably surfaced a weakness in the project's **own**
+defences that the team then fixed, the *fix and its feedback loop* are
+practice and count; the shipped artifact itself still contributes nothing.
+
 ---
 
 ## Artifact Intake Patterns
@@ -324,12 +414,19 @@ When escalating, populate `related_findings` to link the injection finding, the 
 
 | Signal | Risk | Severity |
 |--------|------|----------|
-| External content (email, web, user uploads) in LLM context unvalidated | Indirect prompt injection highway | High |
+| External content in LLM context unvalidated — email, web, user uploads, **and tool results, MCP responses, or command/code execution output** | Indirect prompt injection highway. **For an agent, tool output is the dominant untrusted channel**: an executor returning a mounted file's contents, or an API response echoed into the next turn, reaches the model exactly as a poisoned document would — and is far easier to overlook, because it looks like the agent's own working data | High |
 | PII or confidential data in LLM context | Anything in context can be extracted | High |
 | System prompt invites speculation outside knowledge base | Explicit hallucination invitation | High |
 | User input used as training data or written to memory without review | Tay-pattern: user-controlled content poisons behavior | High |
 | No data minimization — agent knows more than needed | Breach surface larger than necessary | Medium |
 | RAG data unvetted or unreviewed | Poisoning and bias risk | Medium |
+| **Under-provisioned** — the agent must answer domain questions with no grounded source, or is told to "do its best" without one | The *other* half of the balance. Too little grounded data invites hallucination exactly as too much enlarges the breach surface; RAISE names both | Medium |
+| **No grounding controls** — no citation requirement, no refuse-on-no-evidence, no groundedness check, no way to tell a failed call from an empty result | Nothing distinguishes a supported answer from an invented one | Medium |
+
+**This category is a balance, and both directions score.** Reading it only as
+"is too much data reaching the model" leaves half the framework unmeasured —
+an agent starved of the grounding it needs to do its job is failing this
+category just as surely as one drowning in context it should never see.
 
 ### Category 3: Implement Zero Trust
 
@@ -378,6 +475,17 @@ When escalating, populate `related_findings` to link the injection finding, the 
 - Real adversarial exercise documented (not just a pen test)
 - Findings led to architectural changes, not just config tweaks
 - Ongoing cadence, not point-in-time
+
+**Confidence for absence-based scores.** A 0 grounded in the Step 8b maturity
+record's verified "none" answers is still only as confident as the workspace
+is canonical. Use **High** when the workspace is the canonical artifact store
+(an open-source repo, a self-contained deployment) and the M-record's searches
+covered the relevant tree. Use **Medium** when the target may plausibly keep
+its security practice outside the scanned workspace (a separate security
+repo, a vendor-managed red team) — say so in the rationale, and note that the
+operator can raise the score by providing that evidence. Use **Low** only
+when the workspace is known to be incomplete. This applies to any category
+scored on verified absence; Red Team and Monitor are where it bites.
 
 ### Category 6: Monitor Continuously
 

@@ -5,7 +5,7 @@
 
 # Praxen — Specification
 
-**Version:** 1.2.1
+**Version:** 1.3.0
 **Status:** Public release (1.0 GA)
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
@@ -135,6 +135,8 @@ Praxen runs once per invocation: the skill reads and analyzes the workspace, wri
 
 Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs it by opening a session in their coding agent, in a directory containing the Praxen package, and asking the agent to read and execute `skills/behavior-verifier/SKILL.md`. Praxen is an on-demand tool — each invocation performs one full analysis and exits.
 
+**Thinking modes.** The invocation may name a higher **thinking mode** — the effort dial reasoning models expose, applied to a whole scan — **high** (scan → context-unaware findings audit → cleaned re-render, ~2× cost) or **x-high** (three independent scans → evidence adjudication → one super-run report, ~4–5× cost) — selected per-invocation in natural language, with no config file or standing state. Mode orchestration lives in `skills/behavior-verifier/THINKING_MODES.md`, read only when a mode is named; with no mode named the skill runs the standard single-scan pipeline unchanged. Modes add verification around the pipeline, never new findings or schema fields: final scores are re-derived from the adjudicated evidence — the audited finding set plus the maturity record and category evidence notes that the scoring step (SKILL.md 9.4) requires, since a finding set alone cannot see practice — raw artifacts are preserved alongside the final report, and every audit verdict is logged in a per-run adjudication record (`reports/<agent-slug>-adjudication-<timestamp>.md`).
+
 ### Inputs
 
 | Input | Source |
@@ -143,6 +145,7 @@ Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs 
 | Agent workspace | Path supplied by the operator at invocation time |
 | Knowledge base | `knowledge/` directory alongside the skill file |
 | Bundled scripts and template | `manifest_to_findings.py` (Step 10 converter), `render.py` (Step 11 renderer), `schema.py` (shared validator), `report_template.html` — all alongside the skill file in `skills/behavior-verifier/` |
+| Thinking-mode instructions | `THINKING_MODES.md` alongside the skill file — read only when the invocation names a high / x-high thinking mode |
 
 ### Outputs
 
@@ -202,7 +205,7 @@ Praxen adapts to whatever combination of inputs is available. A repo-only analys
 
 Praxen evaluates the workspace against the six RAISE categories and applies named detection patterns on top.
 
-**RAISE scoring** — each category 0–5 with a confidence level:
+**RAISE scoring** — each category 0–5 with a confidence level. Evidence is gathered during analysis (per-category assessment at Step 5, a twelve-question maturity-evidence lookup at Step 8b that records verified absences as well as practice), and the numbers are assigned late — at Step 9.4, from the committed evidence, not from a fresh workspace read — so a category reflects both its defects and its practised controls:
 
 | RAISE Category | Applied to agent environment |
 |----------------|------------------------------|
@@ -221,6 +224,7 @@ Praxen evaluates the workspace against the six RAISE categories and applies name
 - **Configuration gap detection** — exec auto-approval, disabled tool-loop detection, missing rate limits, absent logging, overly broad permission scopes.
 - **Secondary-prompt discovery** — session-loaded identity files (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, …) are discovered and audited as system prompts.
 - **Declared-but-never-consulted config / secret** — a config value or secret that is declared or loaded but never actually read by the running code (a half-wired control).
+- **External value → filesystem path** — an identifier sourced from an external system's response (API reply, webhook, platform callback) used in path construction with no containment check: a path-traversal primitive, judged by the value's *source*, not its variable name.
 - **MCP server evaluation** — when MCP configs are discovered, the OWASP Secure MCP Server minimum-bar checklist is applied.
 - **Remit-delta analysis** — tools, channels, data sources, or outbound destinations present in code but absent from the remit's authorized lists.
 - **Compound signal reasoning** — individual findings that are moderate in isolation but form a critical chain in combination (e.g., external content entering context + auto-approved exec = one-hop external-input-to-shell).
@@ -272,7 +276,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 ```json
 {
   "schema_version": "3.0",
-  "praxen_version": "1.2.0",
+  "praxen_version": "1.3.0",
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -423,7 +427,7 @@ No scheduler, daemon, installer, or configuration file is required.
 3. Open a session in your coding agent, in the Praxen directory (or any parent).
 4. Tell the coding agent:
    > *"Please read and run skills/behavior-verifier/SKILL.md to analyze [agent workspace path]."*
-5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — four files in `./reports/` (the draft manifest is a working artifact that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
+5. Praxen reads the workspace, analyzes it, writes a parser-grade draft manifest, runs `manifest_to_findings.py` to translate the manifest into the canonical findings JSON, then runs `render.py` to produce the HTML report and the `.txt` summary — five files in `./reports/` (the evidence checkpoint and the draft manifest are working artifacts that can be deleted after the run; the JSON + HTML + TXT are the deliverables).
 6. Open the HTML report in a browser.
 
 ### Re-running
@@ -438,7 +442,7 @@ Praxen does not ship a scheduler. If recurring scans are desired, wrap the agent
 
 An analysis over a large workspace — archived or snapshotted projects, multi-directory trees, 50+ artifacts — can consume enough context that the coding agent's session auto-compacts mid-analysis. Compaction during synthesis is a *silent* failure: a report is still produced, but findings gathered early in the run can be lost or over-summarized before the canonical JSON is written. Praxen is built to survive that:
 
-- At the end of Step 4, Praxen writes a flat **evidence checkpoint** at `./reports/<agent-slug>-evidence-<timestamp>.txt` — the files read and the first-pass signals (credential patterns by location, binding addresses, dependency pins, stub controls, MCP configs, log files) — so a compaction during the long read-and-analyze span (Steps 4–8, dozens of reads before any manifest exists) can be resumed without re-discovering the workspace from scratch.
+- At the end of Step 4, Praxen writes a flat **evidence checkpoint** at `./reports/<agent-slug>-evidence-<timestamp>.txt` — the files read and the first-pass signals (credential patterns by location, binding addresses, dependency pins, stub controls, MCP configs, log files) — so a compaction during the long read-and-analyze span (Steps 4–8, dozens of reads before any manifest exists) can be resumed without re-discovering the workspace from scratch. Later steps append to it: Step 5's per-category `RAISE NOTES`, Step 8b's `MATURITY (M1-M12)` record, and Step 8.5's `THEMES` outline — the full evidence set the Step 9.4 scoring reads, persisted so a compaction cannot silently remove a scoring input.
 - At Step 9.9, Praxen writes a parser-grade **draft manifest** at `./reports/<agent-slug>-draft-<timestamp>.md` carrying the full synthesis (every finding, the RAISE posture, the remit audit). This manifest is the primary input to Step 10 — `manifest_to_findings.py` reads it directly to produce the canonical JSON, with no reliance on conversational state — which also makes a compacted session recoverable: an operator can rerun Step 10's script against the manifest on disk regardless of whether the original session survived. Its `--validate-manifest` mode structure-checks the manifest (reporting every problem, recovering at section boundaries) and is safe to run against a mid-composition skeleton.
 - Findings are **appended to the draft manifest as each is drafted** (Step 9), not composed in one terminal burst at 9.9 — a decomposition committed up front in a Step 8.5 themes outline makes the per-finding drafting mechanical. This interleaving is what keeps a long scan off the watchdog (no minutes-long silent compose) and ensures a compaction finds most findings already on disk. The 9.9 gate then prints an **interim overview** (behavior summary, RAISE posture, finding counts) to stdout, so the operator sees the synthesis even if the session later truncates.
 - Rendering the report is a **deterministic Python step (Step 11)**, not LLM work — it doesn't compete for the context window, runs in well under a second, and writes the `.txt` summary to `./reports/` alongside stdout, so the summary survives even if terminal output is lost.

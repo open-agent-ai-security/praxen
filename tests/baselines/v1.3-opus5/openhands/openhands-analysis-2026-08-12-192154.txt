@@ -1,0 +1,137 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenHands
+Analysis: August 12, 2026, 18:56 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a well-built set of per-resource controls sitting
+behind a front door with no lock. Session-key validation, running-state
+enforcement, cross-user ownership checks, JWE algorithm pinning,
+argument-injection-hardened git invocation, and a wired secret-redaction log
+filter are all genuine, code-level, and on the request path — but every one of
+the twelve /api/v1 routers derives its authentication from get_dependencies(),
+which returns nothing at all unless an environment variable is set, and the
+middleware the code comments credit with "actual protection" does not exist in
+this source tree. The second theme is a divergence between two sandbox
+implementations that should share a trust model: the Docker path forwards a
+deliberate two-prefix allowlist into the agent container, while the
+host-direct ProcessSandboxService copies the entire ambient environment into a
+child that runs model-generated code — handing an injected agent every
+provider token, JWT secret, and cloud credential the server holds.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.60 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 3   Medium: 7   Low: 0   Informational: 0
+  Total: 12
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 14   Gap: 4   Partial: 4   Vague: 0   Enforcement-not-possible: 9   (of 31 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   5
+  LLM03  Excessive Agency                                   2
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       4
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Eleven of the thirteen V1 API routers ship with no
+            authentication dependency unless an optional environment variable
+            is set, so any caller is served as the operator.
+      Action 1: Make authentication the default rather than the opt-in: have
+                get_dependencies() in
+                openhands/app_server/utils/dependencies.py fail closed when no
+                auth mechanism is configured, refusing to start or returning
+                401, instead of returning an empty dependency list.
+      Action 2: Delete or correct the stale SetAuthCookieMiddleware comments
+                in user_router.py, sandbox_router.py, git_router.py,
+                event_router.py and config_router.py so the OSS deployment
+                posture is not misread as protected.
+
+  PRAX-2026-08-12-002  The host-direct sandbox copies the app server's entire
+            environment into the agent-server child, handing model-generated
+            code every credential the server holds.
+      Action 1: In _start_agent_process, replace os.environ.copy() with the
+                same bounded construction the Docker service uses — start from
+                get_agent_server_env() and sandbox_spec.initial_env only, so
+                the child receives the prefix-allowlisted variables rather
+                than the whole process environment.
+      Action 2: Add a regression test alongside
+                tests/unit/app_server/test_agent_server_env_override.py
+                asserting that a sentinel credential-shaped variable present
+                in the parent environment is absent from the process-sandbox
+                child's env.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-003  When no CORS origins are configured — the shipped
+            default — the middleware reflects every origin back while still
+            allowing credentials.
+      Action 1: Change the empty-allowlist branch in middleware.py to permit
+                only localhost and 127.0.0.1 origins as the class docstring
+                already describes, and reject other origins instead of
+                reflecting them.
+      Action 2: If a wide-open development mode must remain, gate it behind an
+                explicit opt-in variable and force allow_credentials=False
+                whenever the allowlist is empty.
+
+  PRAX-2026-08-12-004  The default secrets store writes git provider tokens
+            and user custom secrets to disk as unencrypted JSON.
+      Action 1: Encrypt provider tokens and custom secret values in
+                FileSecretsStore.store using JwtService.encrypt_value,
+                decrypting on load, so the at-rest file matches the protection
+                the enterprise database store already applies.
+      Action 2: Create secrets.json with mode 0600 in the LocalFileStore write
+                path so the file is not world-readable inside the bind-mounted
+                persistence directory.
+
+  PRAX-2026-08-12-005  The Tavily MCP proxy is mounted as a top-level route
+            rather than under the V1 router, so it is never covered by the
+            auth dependency even when one is configured.
+      Action 1: Apply the same dependency the V1 routers use to the /mcp mount
+                — wrap it in an APIRouter carrying get_dependencies(), or add
+                an ASGI middleware that enforces the session key on the /mcp
+                path prefix in openhands/app_server/app.py.
+      Action 2: Skip mounting the proxy entirely when no Tavily key is
+                configured, so an unkeyed deployment does not advertise an MCP
+                endpoint at all.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

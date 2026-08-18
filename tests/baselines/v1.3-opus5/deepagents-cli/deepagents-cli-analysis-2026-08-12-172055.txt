@@ -1,0 +1,186 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Deep Agents Code
+Analysis: August 12, 2026, 17:20 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a safety model that exists almost entirely on the
+interactive path and thins to nothing on the headless one. In the TUI the
+approval gate is real and well built — every side-effecting tool is registered
+in agent._add_interrupt_on, Auto mode's classifier fails closed to human
+review, and tools.py carries a genuine SSRF guard with DNS pinning — but
+client/non_interactive.py resolves every non-shell action to {"type":
+"approve"}, and the one control that does apply to shell,
+config.is_shell_command_allowed, inspects only the first token of each command
+segment and skips every check under the all sentinel. Those two gaps meet an
+ingress the project has documented but not closed:
+local_context.build_detect_script appends the working directory's Makefile and
+file listing to the system prompt on every turn, and tool results re-enter
+context with no provenance labeling — so a hostile repository can steer a
+headless run into file writes, outbound fetches and allow-listed interpreter
+execution with no human in the loop.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.85 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           2/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 6   Medium: 6   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 12   Gap: 8   Partial: 16   Vague: 0   Enforcement-not-possible: 0   (of 36 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       2
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    3
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 1
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Hostile repository content reaches the model as
+            system-prompt text and can drive file writes and shell execution
+            with no human in the loop under headless runs.
+      Action 1: Label untrusted spans before they enter the prompt: wrap the
+                LocalContextMiddleware detect-script output and every
+                ToolMessage body in an explicit untrusted-content delimiter in
+                local_context._get_modified_request, and stop appending
+                Makefile contents by default.
+      Action 2: Require the sandbox backend (or an explicit operator
+                acknowledgement per run) whenever headless mode is combined
+                with a shell allow-list, so untrusted project content cannot
+                reach host execution unattended.
+
+  PRAX-2026-08-12-002  Headless mode approves every non-shell side-effecting
+            tool unconditionally — file writes, deletes, web fetches and
+            sub-agent delegation all run with no gate.
+      Action 1: Extend the headless decision handler in
+                client/non_interactive.py so file-mutating, outbound and
+                delegation tools are rejected by default and admitted only
+                through explicit per-tool operator allow-lists, mirroring the
+                shell path rather than bypassing it.
+      Action 2: Until that lands, make the unrestricted posture visible and
+                deliberate: require an explicit acknowledgement flag before a
+                headless run may execute write_file, edit_file, delete or the
+                async sub-agent tools.
+
+  PRAX-2026-08-12-003  The shell allow-list is not an execution boundary — the
+            `all` sentinel skips every check, and normal lists validate only
+            each segment's first token.
+      Action 1: Remove the all sentinel from parse_shell_allow_list, or gate
+                it behind the same versioned acknowledgement that YOLO mode
+                requires, so the out-of-bounds setting cannot be reached by a
+                flag alone.
+      Action 2: Document the allow-list in ui.show_help() and the help screen
+                as an ergonomic auto-approve heuristic rather than a security
+                control, and reject known interpreter and wrapper names from
+                allow-lists unless the operator passes an explicit override.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-004  Untrusted content enters the model context with no
+            provenance labeling — tool results verbatim, and working-directory
+            files appended to the system prompt each turn.
+      Action 1: Introduce a provenance wrapper for untrusted spans and apply
+                it to the LocalContextMiddleware output and to every
+                ToolMessage body, so the model receives an explicit
+                trusted/untrusted boundary rather than undifferentiated text.
+      Action 2: Make the Makefile section of build_detect_script opt-in, and
+                strip instruction-shaped lines from what it emits.
+
+  PRAX-2026-08-12-005  The local agent-runtime API runs with authentication
+            disabled, so any same-user process that finds the port can read
+            thread state or inject messages.
+      Action 1: Generate a per-session bearer token in ServerProcess.start,
+                pass it to the server and require it in RemoteAgent's requests
+                — the token never leaves the process pair, so it costs the
+                user nothing while closing the same-user injection path.
+      Action 2: If the noop default is retained, narrow the exposure by
+                binding a Unix domain socket instead of a TCP loopback port
+                where the platform allows it.
+
+  PRAX-2026-08-12-006  The full process environment, including provider API
+            keys, is copied into the runtime server subprocess, and MCP stdio
+            servers receive an unfiltered env dict.
+      Action 1: Build the server subprocess environment from an explicit
+                allowlist of the variables the server actually needs, and pass
+                the selected provider credential rather than inheriting every
+                key, reusing config_manifest._is_secret_env as the filter
+                basis.
+      Action 2: Reject or warn on interpreter-hijacking keys (PATH,
+                LD_PRELOAD, DYLD_*, PYTHONPATH, NODE_OPTIONS) in
+                mcp_tools._validate_server_config's env handling.
+
+  PRAX-2026-08-12-007  MCP tools exempt themselves from the approval gate
+            through a server-declared readOnlyHint, so a trusted server
+            decides which of its own tools need review.
+      Action 1: Treat the read-only annotation as a display hint rather than a
+                gate decision: keep every MCP tool in the interrupt map by
+                default and let the operator opt specific named tools out
+                through [mcp] configuration they control.
+      Action 2: Record the tool-definition fingerprint alongside the existing
+                server-definition fingerprint in model_config's approval
+                store, and re-prompt when an approved server's tool set or
+                annotations change.
+
+  PRAX-2026-08-12-008  A configured `class_path` provider imports its module
+            before any validation, so module-level code executes ahead of the
+            BaseChatModel type check.
+      Action 1: Resolve the provider class through an explicit registry of
+                known module paths, or verify the target against a declared
+                entry-point group, so an arbitrary module path is never
+                imported purely because it appeared in config.toml.
+      Action 2: Surface the configured class_path to the operator on first use
+                with a one-time confirmation, matching the trust prompt
+                already used for project MCP servers.
+
+  PRAX-2026-08-12-009  No durable structured record of side-effecting tool
+            executions or approval decisions exists by default — every audit
+            surface is opt-in or in-memory.
+      Action 1: Write an always-on append-only JSONL action log under the
+                state directory recording tool name, arguments digest,
+                approval decision, decision source (manual, auto-classifier,
+                allow-list, YOLO) and outcome, reusing the redaction already
+                implemented in hooks/transcript.py.
+      Action 2: Make the headless auto-approval decisions in
+                _make_hitl_decision emit to that log rather than to console
+                output alone, so a CI run leaves an artifact that can be
+                reviewed after the fact.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

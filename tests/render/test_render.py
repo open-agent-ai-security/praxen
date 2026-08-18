@@ -525,6 +525,35 @@ def main():
     check("no secret warning on a clean (redacted) snippet", "WARNING" not in rc.stderr,
           f"stderr: {rc.stderr!r}")
 
+    # #243 — interpolation/placeholder references are NOT secret values. A snippet
+    # quoting auth_token="${TOKEN}" (or $VAR / {{var}} / %VAR% / <VAR>) must render
+    # verbatim: the "value" is a reference token with no secret content. A real
+    # literal in the same assignment shape must still redact.
+    ph = json.loads(json.dumps(data))
+    ph["findings"][0]["evidence"][0]["snippet"] = (
+        'ENV auth_token="${TOKEN}" api_key="$API_KEY" passwd="{{vault_pw}}" secret="%SECRET%" client_secret="<CLIENT_SECRET>"')
+    ph_path = os.path.join(tmp, "ph.json")
+    ph_html = os.path.join(tmp, "ph.html")
+    dump_json(ph_path, ph)
+    rph = run_render(["--findings", ph_path, "--template", TEMPLATE,
+                      "--out-html", ph_html, "--out-txt", os.path.join(tmp, "ph.txt")])
+    phh = text_or_empty(ph_html)
+    check("#243: placeholder references (${VAR} et al.) are not redacted",
+          rph.returncode == 0 and "WARNING" not in rph.stderr
+          and "${TOKEN}" in phh and "%SECRET%" in phh,
+          f"stderr: {rph.stderr!r}")
+    lit = json.loads(json.dumps(data))
+    lit["findings"][0]["evidence"][0]["snippet"] = 'auth_token="hunter2secret" # literal'
+    lit_path = os.path.join(tmp, "lit.json")
+    lit_html = os.path.join(tmp, "lit.html")
+    dump_json(lit_path, lit)
+    rlit = run_render(["--findings", lit_path, "--template", TEMPLATE,
+                       "--out-html", lit_html, "--out-txt", os.path.join(tmp, "lit.txt")])
+    lith = text_or_empty(lit_html)
+    check("#243 guard: a real credential literal in the same shape still redacts",
+          rlit.returncode == 0 and "hunter2secret" not in lith and "[REDACTED" in lith,
+          "literal credential leaked after the placeholder exemption")
+
     # 5. negative cases — each must exit non-zero with a useful message
     def _first_ruled(d):
         """Index of the first finding that cites remit rules (policy_rule_ids
@@ -663,19 +692,26 @@ def main():
         except ValueError:
             pv = (0,)
         slug = bdata.get("scan", {}).get("agent_slug") or os.path.basename(bdir)
-        remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
+        # Prefer the freeze-pinned remit copy in the baseline dir: the invariant
+        # is "findings quote the remit they were SCANNED against", and the live
+        # tests/remits/<slug>.md may legitimately evolve between freezes
+        # (pre-freeze cleanup riders). Fall back to the live remit when no
+        # pinned copy exists (pre-1.3 layout).
+        remit_path = os.path.join(bdir, f"{slug}-remit.md")
+        if not os.path.isfile(remit_path):
+            remit_path = os.path.join(REPO_ROOT, "tests", "remits", f"{slug}.md")
         if pv < (0, 6, 0):
             check(f"baseline {rel}: praxen_version < 0.6.0 — remit-quote check skipped", True)
         elif set_name != CURRENT_BASELINE:
             check(f"baseline {rel}: archival set ({set_name}) — remit-verbatim not re-checked against current remits (only {CURRENT_BASELINE} is gated)", True)
         elif not os.path.isfile(remit_path):
-            check(f"baseline {rel}: has a matching tests/remits/{slug}.md", False)
+            check(f"baseline {rel}: has a matching remit ({slug}-remit.md pinned or tests/remits/{slug}.md)", False)
         else:
             if slug not in remit_cache:
                 remit_cache[slug] = read_text(remit_path)
             remit = remit_cache[slug]
             missing = _remit_quote_violations(bdata, remit)
-            check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from tests/remits/{slug}.md",
+            check(f"baseline {rel}: every rule_text / policy_rule_text is quoted verbatim from {os.path.relpath(remit_path, REPO_ROOT)}",
                   not missing,
                   "; ".join(f"{kind} of {who}: {txt[:60]!r}" for kind, who, txt in missing[:3]))
 
@@ -719,7 +755,7 @@ def main():
                   read_bytes(c_txt) == read_bytes(r_txt),
                   "committed TXT differs from a fresh render of the committed JSON")
 
-    # 8. N/A (null-score) categories — KB Step B3 all-N/A exclusion.
+    # 8. N/A (null-score) categories — schema.py all-N/A exclusion.
     #    A vector-scored category may be null (excluded, weights renormalized);
     #    presence-scored categories (Red Team, Monitor) may not; the declared
     #    weighted_overall must use the renormalized formula.

@@ -525,13 +525,16 @@ def _log_row_ctx(row, _idx):
 def _raise_card_ctx(cat, _idx):
     score, weight = cat["score"], cat["weight"]
     if score is None:
-        # N/A category (KB Step B3 all-N/A): excluded from the weighted overall.
+        # N/A category (see schema.py NA_ELIGIBLE_KEYS): excluded from the weighted overall.
         # Reuses the mid-tone score class so no template change is needed.
         return {
             "SCORE_CLASS": _SCORE_CLASS[2],
             "CATEGORY_NAME": esc(cat["name"]),
             "SCORE": "N/A",
-            "SCORE_PCT": "0",
+            # An N/A category is excluded from the weighted score, so no pill is
+            # lit. Its five ghosts are identical to a real 0's; the "N/A" label
+            # and its score class — not the pills — are what tell the two apart.
+            "SCORE_PIPS": _score_pips(0),
             "CONFIDENCE": esc(cat["confidence"]),
             "WEIGHT_PCT": str(round(weight * 100)),
             "WEIGHTED_CONTRIBUTION": "excluded",
@@ -541,12 +544,37 @@ def _raise_card_ctx(cat, _idx):
         "SCORE_CLASS": _SCORE_CLASS[score],
         "CATEGORY_NAME": esc(cat["name"]),
         "SCORE": str(score),
-        "SCORE_PCT": str(score * 20),
+        "SCORE_PIPS": _score_pips(score),
         "CONFIDENCE": esc(cat["confidence"]),
         "WEIGHT_PCT": str(round(weight * 100)),
         "WEIGHTED_CONTRIBUTION": f"{score * weight:.2f}",
         "RATIONALE": render_rich(cat["rationale"], allow=_RICH_FIELDS["raise_rationale"]),
     }
+
+
+def _score_pips(value, *, fractional=False):
+    """Render a 0-5 RAISE score as five discrete pills.
+
+    A RAISE score is an ordinal band, not a percentage, so the readout is
+    segmented: the reader counts lit pills instead of eyeballing a fill width.
+    Category scores are integers and light whole pills only. The weighted
+    overall IS fractional, so with fractional=True the first partial pill
+    carries a --fill percentage and the remainder stay ghosted.
+    """
+    full = int(value)
+    out = []
+    for i in range(5):
+        if i < full:
+            out.append('<i class="on"></i>')
+        elif fractional and i == full:
+            frac = value - full
+            if frac <= 0:
+                out.append("<i></i>")
+            else:
+                out.append(f'<i class="part" style="--fill: {round(frac * 100)}%"></i>')
+        else:
+            out.append("<i></i>")
+    return "".join(out)
 
 
 # ── OWASP coverage grid ─────────────────────────────────────────────────────
@@ -682,7 +710,7 @@ def _global_ctx(data):
         "N_LOW": str(sc["low"]),
         "N_INFO": str(sc["info"]),
         "WEIGHTED_SCORE": f"{wo:.2f}",
-        "RAISE_PCT": str(round(wo / 5 * 100)),
+        "RAISE_PIPS": _score_pips(wo, fractional=True),
         "MATURITY_BAND_CLASS": _maturity_band_class(wo),
         "MATURITY_LABEL": maturity_label(wo),
         "WEIGHTED_RATIONALE": render_rich(posture["weighted_rationale"], allow=_RICH_FIELDS["weighted_rationale"]),
@@ -900,9 +928,20 @@ _SECRET_PATTERNS = [
     ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b")),
     ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
+    # The negative lookahead exempts interpolation/placeholder references whose
+    # entirety is the quoted "value" — ${VAR}, $VAR, {{var}}, %VAR%, <VAR> —
+    # a reference token carries no secret content to leak (#243).
     ("assigned credential literal", re.compile(
         r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)\b"
-        r"\s*[:=]\s*['\"][^'\"\s]{6,}['\"]")),
+        r"\s*[:=]\s*['\"]"
+        # Placeholder exemption is CASE-RESTRICTED on the bare-token forms: an
+        # interpolation name is conventionally SCREAMING_SNAKE, while a real
+        # secret that merely starts with '$' (e.g. "$ecretPassw0rd") is not.
+        # Without this, the exemption itself becomes a redaction bypass.
+        # (?-i:...) is required — the (?i) at the head of the pattern would
+        # otherwise silently case-fold these classes.
+        r"(?!(?-i:\$\{[A-Z0-9_]{1,64}\}|\$[A-Z][A-Z0-9_]{0,64}|\{\{[^'\"]{1,64}\}\}|%[A-Z0-9_]{1,64}%|<[A-Z0-9_]{1,64}>)['\"])"
+        r"[^'\"\s]{6,}['\"]")),
 ]
 
 

@@ -14,9 +14,11 @@
 > Drafted 2026-07-15 alongside the revised `RELEASE_1.2_PLAN.md`; **re-triaged at
 > the 1.2 close-out (2026-07-30)** now that 1.2 has frozen (shipped to `dev`).
 > Holds everything cut from 1.2, plus what 1.2 pushed (#48) or newly surfaced (the
-> remit-generator / over-reach class below). **Reference model is now Opus 5** —
-> 1.4 grades vs **`v1.2-opus5`**, not `v1.2-claude48` (1.3 is score-inert by
-> construction and freezes nothing, so `v1.2-opus5` remains the current set).
+> remit-generator / over-reach class below). **Reference model is now Opus 5.**
+> **Re-triaged 2026-08-11:** 1.3 stopped being score-inert — #195 passed its
+> gates and 1.3 now ends in a **`v1.3-opus5`** re-freeze, taking a batch of this
+> plan's pre-freeze items with it (struck below, per `RELEASE_1.3_PLAN.md`).
+> **1.4 therefore grades `v1.4-opus5` vs `v1.3-opus5`.**
 >
 > **`v1.2.0` shipped 2026-08-03; `v1.2.1` shipped 2026-08-10** (score-inert, per
 > `RELEASE_1.2.1_PLAN.md` — now STATUS: SHIPPED). 1.2.1 absorbed the docs/CI tail
@@ -32,16 +34,12 @@ polish what it *emits*. Detection additions move numbers → 1.4 re-freezes
 **`v1.4-opus5`**, graded vs **`v1.2-opus5`**. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
-## Arrived from 1.2 — #48 (Stage-2.5 PUSH — confirmed 2026-07-30)
+## ~~Arrived from 1.2 — #48~~ (resolved in 1.3, 2026-08-11)
 
-1.2's Stage-2.5 decision was **PUSH**: the scoring rework was reverted to
-shipped-state (Steve, 2026-07-28 — the headline pivoted to OWASP 2026), so **#48
-lands here**, sequenced **before** bucket A's detection additions so its
-before/after grading window isn't contaminated by new findings. It rides this
-release's re-freeze at no extra freeze cost. The clean "before" is the frozen
-**`v1.2-opus5`** baseline (single-scan reproducibility is the target, on the
-Opus-5 stack); the earlier `tests/runs/v1.2-stage2.5/` characterization was on
-Opus 4.8 and is now historical only.
+**#48 closed against the 1.3 scoring work** (#195): its control-ledger,
+boundary decision rules, anchors, and themes-gate asks all shipped as part of
+the Step 5/8b/9.4 restructure — see `RELEASE_1.3_PLAN.md` and
+`plans/RESULTS_SCORING_BENCH.md`. Nothing remains here.
 
 ## New from the 1.2 baseline experience — remit-generator quality & over-reach cleanup
 
@@ -53,16 +51,19 @@ during 1.2; deferred on the rest. The durable fix is generation-side — do it
 **before** re-scanning the deferred targets, not by hand-editing each remit.
 
 - **#198** — remit generator authors well-formed, docs-grounded, non-over-reaching
-  statements (heading-as-rule + fabrication/over-scope). **The durable fix — first.**
-- **#201** (helperbot, craftbot, autogen, uagents) + **#200** (aider) — remit
-  over-reach cleanup on the targets still carrying it; regenerate on the
-  #198-improved generator, then re-scan + re-freeze. (The helperbot showcase
-  example carries this over-reach too — it refreshes with the re-freeze.)
-- **#195** — sharpen RAISE category band anchors (band-edge variance on
-  mid-maturity targets; drove the autogen/uagents wide bands).
-- **#196** — tighten the Step-8.5 fold-vs-break-out decomposition rule
-  (finding-count variance). Same axis as #48 and the decomposition-independence
-  generalization below — land them together.
+  statements (heading-as-rule + fabrication/over-scope). **The durable fix.**
+  Still 1.4: regenerate the remits on the improved generator and diff against
+  the 1.3 hand-cleaned versions — the hand-cleanup is the acceptance fixture.
+- ~~**#201** + **#200** — remit over-reach cleanup.~~ **Moved to 1.3**
+  (pre-freeze riders): the enumerated hand-fixes land there and ride the
+  `v1.3-opus5` freeze; #198's regeneration here must not re-introduce what 1.3
+  cleaned.
+- ~~**#195** — band-edge scoring variance.~~ **Resolved in 1.3** — the
+  headline of that release (`plans/RESULTS_SCORING_BENCH.md`).
+- ~~**#196** — Step-8.5 fold-vs-break-out tightening.~~ **Moved to 1.3**
+  (one-clause change riding the freeze). The broader
+  decomposition-independence generalization below **stays here** — it is the
+  suite-wide-blast-radius half.
 - ~~**#197** — Thinking Modes.~~ **Promoted out of this release entirely: ships
   as release 1.3** (`RELEASE_1.3_PLAN.md` / `DESIGN_THINKING_MODES.md`),
   deliberately **before** this one — so the #200/#201 re-scrubs run as
@@ -95,14 +96,13 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 
 ### A · Detection additions *(the re-baseline justification — land all before the freeze)*
 
-- **#65 item 4** — IaC/deployment artifacts as first-class Step-4 discovery
-  surfaces (Helm values, K8s manifests, Terraform, docker-compose). The
-  uAgents committed-Helm-seed Critical was found by manual luck; this makes it
-  systematic. Cheap, high-yield.
-- **#41** — named detection pattern: external API response → filesystem write
-  (path-traversal class; the missed Hermes CVE-2026-7396 is the proof case).
+- ~~**#65 item 4** — IaC/deployment artifacts in Step-4 discovery.~~ **Moved
+  to 1.3** (pre-freeze rider).
+- ~~**#41** — path-traversal detection pattern.~~ **Moved to 1.3** (pre-freeze
+  rider).
 - **#104** — entropy-based secret detection in `render.py`'s redaction
   backstop (catch high-entropy credentials the pattern list doesn't know).
+  Stays here — render-byte churn wants its own freeze window.
 
 ### B · Coverage & roster
 
@@ -145,9 +145,9 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
   on the 1.3 satellite is the natural slot).
 - ~~**#65 items 6–7** — code-first warning block, mechanism-vs-property rule
   note.~~ **Done in 1.2.1.** **#65 item 8** (absence-of-evidence confidence
-  calibration in `KB_RAISE_SCANNING.md`) does **not** belong in this bucket:
-  that KB is scanner-read primary calibration — **it can move scores** (per the
-  1.2.1 plan's own exclusion) — so it rides **pre-freeze with bucket A**.
+  calibration in `KB_RAISE_SCANNING.md`): **being dispositioned in 1.3** —
+  Step 8b's verified-absence record likely delivers it; 1.3 verifies and
+  records the outcome on the issue.
   **#65 item 3** (25-word summary cap breaks down for compound findings) is
   model-output prose — schedule with #113, pre-freeze.
 - ~~**#106** — Out-of-Scope coverage as boundary-rule checks.~~ **Done in 1.2.1.**
@@ -165,8 +165,9 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 
 ## Sequencing
 
-A + #113 + #65 items 3/8 (everything that changes findings, scoring calibration,
-or model prose) → C/D in any order → **one re-freeze `v1.4-opus5`, last.** Same
+#198-then-regenerate + remaining A (#104) + #113 + #65 item 3 (everything that
+changes findings, scoring calibration, or model prose) → C/D in any order →
+**one re-freeze `v1.4-opus5`, graded vs `v1.3-opus5`, last.** Same
 discipline as 1.2: nothing that moves numbers lands after the freeze; a stressed
 schedule drops whole buckets by dated plan amendment, not by silent descope.
 

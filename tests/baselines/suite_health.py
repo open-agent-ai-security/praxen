@@ -88,7 +88,10 @@ SHORT = {
 
 
 def maturity_label(w):
-    return "Absent" if w < 1 else "Ad hoc" if w < 2 else "Partial" if w < 3 else "Established"
+    # Full RAISE scale (docs/RAISE.md): 0 Absent, 1 Ad hoc, 2 Partial,
+    # 3 Established, 4 Strong, 5 Exemplary.
+    return ("Absent" if w < 1 else "Ad hoc" if w < 2 else "Partial" if w < 3
+            else "Established" if w < 4 else "Strong" if w < 5 else "Exemplary")
 
 
 def read_maturity(baseline_dir: Path, slug: str):
@@ -110,7 +113,8 @@ def fresh_pill(f):
 
 
 def mat_pill(label):
-    cls = {"Absent": "mat-absent", "Ad hoc": "mat-adhoc", "Partial": "mat-partial", "Established": "mat-est"}.get(label, "")
+    cls = {"Absent": "mat-absent", "Ad hoc": "mat-adhoc", "Partial": "mat-partial",
+           "Established": "mat-est", "Strong": "mat-est", "Exemplary": "mat-est"}.get(label, "")
     return f'<span class="pill {cls}">{html.escape(label)}</span>'
 
 
@@ -149,37 +153,37 @@ def rows_table(rows, out_dir: Path, baseline_dir: Path):
     return "\n".join(body)
 
 
-def _y_pct(w):
-    return 9.0 + min(w, 3.0) / 3.0 * 82.0  # inset 9%..91% so top/bottom dots aren't clipped
+def _y_pct(w, y_max):
+    return 9.0 + min(w, y_max) / y_max * 82.0  # inset 9%..91% so top/bottom dots aren't clipped
 
 
-def _dot(slug, disp, stars, fresh, w, mat, x, radius):
+def _dot(slug, disp, stars, fresh, w, mat, x, radius, y_max):
     return (
-        f'<div class="pt" style="left:{x:.1f}%; bottom:{_y_pct(w):.1f}%" '
+        f'<div class="pt" style="left:{x:.1f}%; bottom:{_y_pct(w, y_max):.1f}%" '
         f'title="{html.escape(disp)} — ★{stars:,}, freshness {fresh:.1f}, RAISE {w:.2f} ({html.escape(mat)})">'
         f'<span class="dot" style="width:{2*radius:.0f}px;height:{2*radius:.0f}px"></span>'
         f'<span class="lbl">{html.escape(SHORT.get(slug, slug))}</span></div>'
     )
 
 
-def dots_activity(rows):
+def dots_activity(rows, y_max):
     # x = development freshness (0-5), inset 7%..93%; dot size ∝ stars
     out = []
     for slug, disp, repo, stars, fresh, cad, note, w, mat in rows:
         x = 7.0 + min(fresh, 5.0) / 5.0 * 86.0
         r = 5.0 + min(stars, 220000) ** 0.5 / 100.0
-        out.append(_dot(slug, disp, stars, fresh, w, mat, x, r))
+        out.append(_dot(slug, disp, stars, fresh, w, mat, x, r, y_max))
     return "\n".join(out)
 
 
-def dots_popularity(rows):
+def dots_popularity(rows, y_max):
     # x = GitHub stars on a log10 scale (domain 10 .. ~316k), inset 7%..93%; dot size ∝ freshness
     out = []
     for slug, disp, repo, stars, fresh, cad, note, w, mat in rows:
         lx = (math.log10(max(stars, 10)) - 1.0) / 4.5
         x = 7.0 + max(0.0, min(1.0, lx)) * 86.0
         r = 5.0 + fresh * 1.9
-        out.append(_dot(slug, disp, stars, fresh, w, mat, x, r))
+        out.append(_dot(slug, disp, stars, fresh, w, mat, x, r, y_max))
     return "\n".join(out)
 
 
@@ -212,7 +216,7 @@ SUITE_CSS = """
   .plot { grid-row: 1; grid-column: 2; position: relative; height: 460px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); overflow: hidden; }
   .qline { position: absolute; background: var(--border); }
   .qline.v { width: 1px; top: 0; bottom: 0; }                   /* left set inline per plot */
-  .qline.h { height: 1px; left: 0; right: 0; bottom: 63.7%; }   /* RAISE weighted = 2.0 */
+  .qline.h { height: 1px; left: 0; right: 0; }                  /* RAISE weighted = 2.0; bottom set inline (data-driven axis) */
   .qlabel { position: absolute; font-family: var(--mono); font-size: 10px; color: var(--muted-2); padding: 4px 6px; text-transform: uppercase; letter-spacing: .04em; }
   .pt { position: absolute; transform: translate(-50%, 50%); display: flex; flex-direction: column; align-items: center; }
   .pt .dot { border-radius: 50%; background: linear-gradient(135deg, var(--orange-2), var(--orange-deep)); border: 1px solid rgba(0,0,0,0.35); box-shadow: 0 2px 6px -1px rgba(0,0,0,0.5); }
@@ -235,6 +239,12 @@ def build_html(baseline_dir: Path, out_dir: Path):
     n = len(rows)
     total_stars = sum(r[3] for r in rows)
     live = sum(1 for r in rows if r[4] >= 3.0)
+    # Data-driven y axis (#176): the 0–3 zoom is deliberate while the roster
+    # lives below 3.0; if any target clears it, widen to the next integer so
+    # nothing clips or mislabels. The RAISE=2 divider tracks the chosen scale.
+    max_w = max(r[7] for r in rows)
+    y_max = max(3.0, math.ceil(max_w))
+    hline_pct = _y_pct(2.0, y_max)
     theme_css = load_theme_css()
     generated = datetime.date.today().isoformat()
     baseline_name = baseline_dir.name
@@ -278,16 +288,16 @@ def build_html(baseline_dir: Path, out_dir: Path):
 
   <section>
     <h2>Activity × maturity <span class="scope">freshness vs. RAISE posture</span></h2>
-    <p class="intro">Each dot is a target (size ∝ stars). <strong>x = development freshness (0–5)</strong>, <strong>y = RAISE maturity (0–3)</strong>. Dividers: live/dormant at freshness 3, Partial+/weaker at RAISE 2. The high-value cell for a security suite is <em>bottom-right</em> — live but under-enforced.</p>
+    <p class="intro">Each dot is a target (size ∝ stars). <strong>x = development freshness (0–5)</strong>, <strong>y = RAISE maturity (0–{y_max:g})</strong>. Dividers: live/dormant at freshness 3, Partial+/weaker at RAISE 2. The high-value cell for a security suite is <em>bottom-right</em> — live but under-enforced.</p>
     <div class="plot-wrap">
       <div class="y-axis">RAISE maturity →</div>
       <div class="plot">
-        <div class="qline v" style="left:58.6%"></div><div class="qline h"></div>
+        <div class="qline v" style="left:58.6%"></div><div class="qline h" style="bottom:{hline_pct:.1f}%"></div>
         <div class="qlabel" style="left:0; top:0">live · weaker</div>
         <div class="qlabel" style="right:0; top:0; text-align:right">live · stronger</div>
         <div class="qlabel" style="left:0; bottom:0">dormant · weaker</div>
         <div class="qlabel" style="right:0; bottom:0; text-align:right">dormant · stronger</div>
-{dots_activity(rows)}
+{dots_activity(rows, y_max)}
       </div>
       <div class="x-axis">development freshness →</div>
     </div>
@@ -295,16 +305,16 @@ def build_html(baseline_dir: Path, out_dir: Path):
 
   <section>
     <h2>Popularity × maturity <span class="scope">stars (log) vs. RAISE posture</span></h2>
-    <p class="intro">Each dot is a target (size ∝ freshness). <strong>x = GitHub stars, log scale</strong> (10 → ~300k), <strong>y = RAISE maturity (0–3)</strong>. Divider at 10k stars. As before, <em>bottom-right</em> — popular but weak — is the highest real-world blast radius.</p>
+    <p class="intro">Each dot is a target (size ∝ freshness). <strong>x = GitHub stars, log scale</strong> (10 → ~300k), <strong>y = RAISE maturity (0–{y_max:g})</strong>. Divider at 10k stars. As before, <em>bottom-right</em> — popular but weak — is the highest real-world blast radius.</p>
     <div class="plot-wrap">
       <div class="y-axis">RAISE maturity →</div>
       <div class="plot">
-        <div class="qline v" style="left:64.3%"></div><div class="qline h"></div>
+        <div class="qline v" style="left:64.3%"></div><div class="qline h" style="bottom:{hline_pct:.1f}%"></div>
         <div class="qlabel" style="left:0; top:0">niche · stronger</div>
         <div class="qlabel" style="right:0; top:0; text-align:right">mainstream · stronger</div>
         <div class="qlabel" style="left:0; bottom:0">niche · weaker</div>
         <div class="qlabel" style="right:0; bottom:0; text-align:right">mainstream · weaker</div>
-{dots_popularity(rows)}
+{dots_popularity(rows, y_max)}
       </div>
       <div class="x-axis">GitHub stars (log) →</div>
     </div>
