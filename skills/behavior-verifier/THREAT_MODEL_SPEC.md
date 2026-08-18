@@ -76,7 +76,9 @@ runs on the same code MUST coin the same id:
 1. **File-backed node:** `id = <basename of primary evidence file,
    lowercase, dots AND underscores→dashes, extension kept>-<kind>`.
    Examples: `agent-py-orchestrator`, `values-yaml-deploy-surface`,
-   `finbot-agent-py-orchestrator` (from `finbot_agent.py`). No role words,
+   `finbot-agent-py-orchestrator` (from `finbot_agent.py`). The kind
+   suffix also normalizes underscores to dashes (`mcp_server` →
+   `-mcp-server`, `secret_store` → `-secret-store`). No role words,
    adjectives, or directory names. **Leading-dot basenames drop the dot:**
    `.mcp.json` → `mcp-json-deploy-surface`, `.exabeam-mcp.env` →
    `exabeam-mcp-env-secret-store`.
@@ -298,3 +300,7 @@ Prompt-file instructions ARE architecture: model the skill file as the
 and treat instruction-level controls ("never do X", approval gates written
 in prose) as `control` nodes with the markdown file:line as evidence —
 noting in `description` that enforcement is instruction-level, not code.
+A prose control that sits on a live data path (a canonicalization or
+redaction instruction the flow passes through) may appear inline in that
+path's edges; the edgeless allowance is for stubs, secrets, and posture
+evidence, not for live controls.
