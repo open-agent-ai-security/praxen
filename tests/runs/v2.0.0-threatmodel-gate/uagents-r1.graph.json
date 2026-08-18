@@ -1,0 +1,1146 @@
+{
+  "spec_version": "1.0",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "uagents",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/uagents"
+  },
+  "analysis_ref": "uagents-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "peer-agent-entrypoint",
+      "name": "Peer agents / inbound senders",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any agent or client on the open Fetch.ai network that POSTs an envelope to the agent's /submit endpoint, answers one of its synchronous requests, or claims a user-prefixed address.",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 316, "note": "the only agent-protocol path is /submit; anything else 404s, so this is the inbound envelope surface" },
+        { "file": "python/src/uagents/asgi.py", "line": 348, "note": "the request body is parsed straight into an Envelope whose sender is whatever the caller claims" },
+        { "file": "python/src/uagents/communication.py", "line": 156, "note": "the same peers answer synchronous requests with a response envelope the agent consumes" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint",
+      "name": "Operator / owner",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The human who deploys the agent, supplies its seed, name, network and endpoint through environment or constructor arguments, and drives the inspector endpoints from a browser.",
+      "evidence": [
+        { "file": "python/deployment/hello-agent/agent.py", "line": 5, "note": "lines 5-20 — the shipped sample takes UAGENT_NAME, UAGENT_SEED, UAGENT_TYPE, UAGENT_NETWORK and UAGENT_ENDPOINT from the operator's environment" },
+        { "file": "python/src/uagents/agent.py", "line": 288, "note": "lines 288-317 — every trust-relevant default (seed, network, enable_agent_inspector, publish_agent_details) is an operator-set constructor argument" }
+      ]
+    },
+    {
+      "id": "asgi-py-adapter",
+      "name": "ASGI HTTP server",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The uvicorn-hosted ASGI application bound to 0.0.0.0 that serves the /submit envelope path, the REST handler map and the reserved inspector paths, with wildcard CORS headers on every response.",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 23, "note": "HOST = \"0.0.0.0\" — the server binds every interface, not loopback" },
+        { "file": "python/src/uagents/asgi.py", "line": 179, "note": "lines 179-198 — uvicorn.Config sets forwarded_allow_ips=\"*\" and attaches Access-Control-Allow-Origin \"*\" to every response" },
+        { "file": "python/src/uagents/asgi.py", "line": 281, "note": "lines 281-320 — __call__ routes OPTIONS (204), REST endpoints and /submit, and 404s everything else" }
+      ]
+    },
+    {
+      "id": "reserved-endpoints-asgi-py-control",
+      "name": "Reserved-endpoint client guard",
+      "lane": "client_adapters",
+      "kind": "control",
+      "description": "The only access control on the inspector paths: a membership test for \"127.0.0.1\" in the ASGI scope's client value, with /agent_info subtracted from the guarded set.",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 25, "note": "RESERVED_ENDPOINTS enumerates the paths the guard turns on" },
+        { "file": "python/src/uagents/asgi.py", "line": 304, "note": "lines 304-311 — the request is refused only when \"127.0.0.1\" is absent from scope[\"client\"], and /agent_info is excluded from the guarded set" },
+        { "file": "python/src/uagents/asgi.py", "line": 184, "note": "forwarded_allow_ips=\"*\" means the client value the guard reads is taken from any peer's X-Forwarded-For header" }
+      ]
+    },
+    {
+      "id": "enable-agent-inspector-agent-py-entrypoint",
+      "name": "Agent-inspector REST endpoints",
+      "lane": "client_adapters",
+      "kind": "entrypoint",
+      "description": "The four debug/administrative endpoints registered when enable_agent_inspector is set — /agent_info, /messages, /connect, /disconnect — enabled by default.",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 305, "note": "enable_agent_inspector: bool = True — the constructor default that registers the block" },
+        { "file": "python/src/uagents/agent.py", "line": 474, "note": "lines 474-533 — the four endpoints are registered under the flag; /messages returns the whole cached history and /connect performs an Agentverse registration" }
+      ]
+    },
+    {
+      "id": "communication-py-adapter",
+      "name": "Envelope dispenser / outbound HTTP",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The queue and HTTP client that POST signed envelopes to resolved peer endpoints and receive synchronous response envelopes back.",
+      "evidence": [
+        { "file": "python/src/uagents/communication.py", "line": 25, "note": "lines 25-100 — Dispenser queues envelopes and drains them one at a time through send_exchange_envelope" },
+        { "file": "python/src/uagents/communication.py", "line": 145, "note": "lines 145-174 — each endpoint is POSTed in turn; on a sync request the reply body is parsed back into an Envelope" },
+        { "file": "python/src/uagents/communication.py", "line": 404, "note": "lines 404-432 — enclose_response_raw builds the agent's own sync response envelope and never signs it" }
+      ]
+    },
+    {
+      "id": "messages-py-adapter",
+      "name": "uagents-core send helper",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The standalone uagents-core message helper used outside the Agent runtime: resolves, signs, POSTs, reports the interaction to Agentverse and parses the sync reply.",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 183, "note": "lines 183-243 — send_message_to_agent resolves endpoints and POSTs the signed envelope" },
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 195, "note": "the signature declares track_interaction: bool = True, so interaction reporting is on unless the caller opts out" },
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 283, "note": "lines 283-289 — the sync response is parsed with parse_envelope_raw and never verified" }
+      ]
+    },
+    {
+      "id": "mailbox-py-adapter",
+      "name": "Agentverse mailbox client",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The optional inbound channel that polls the Agentverse mailbox under an agent attestation, dispatches stored envelopes, and performs Agentverse register/unregister calls.",
+      "evidence": [
+        { "file": "python/src/uagents/mailbox.py", "line": 218, "note": "lines 218-252 — a poll loop GETs /agents/{address}/mailbox every second under an Agent attestation header" },
+        { "file": "python/src/uagents/mailbox.py", "line": 254, "note": "lines 254-290 — stored envelopes are verified (agent senders only) and dispatched, then deleted from the server" },
+        { "file": "python/src/uagents/mailbox.py", "line": 92, "note": "lines 92-191 — register_in_agentverse / unregister_in_agentverse carry the caller's bearer token to the Agentverse identity and agents APIs" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator",
+      "name": "Agent runtime",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The Agent class: constructor wiring of identity, wallet, storage and server; the schema-digest handler registries; the message queue and typed dispatch; interval, startup and shutdown tasks. Context, Protocol, Dispatcher and Bureau plumbing folds in here.",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 288, "note": "lines 288-535 — __init__ wires identity, wallet, ledger, storage, resolver, registration policy, ASGI server and the handler registries" },
+        { "file": "python/src/uagents/agent.py", "line": 1373, "note": "lines 1373-1491 — _process_single_message looks up the model by schema digest, builds the handler context and invokes the handler" },
+        { "file": "python/src/uagents/agent.py", "line": 97, "note": "lines 97-128 — _run_interval drives scheduled handlers, logging only exceptions" },
+        { "file": "python/src/uagents/dispatch.py", "line": 133, "note": "lines 133-145 — the global Dispatcher routes an envelope to the registered sink for the target address" },
+        { "file": "python/src/uagents/context.py", "line": 246, "note": "lines 246-330 — InternalContext hands storage, ledger, resolver and dispenser to every handler" }
+      ]
+    },
+    {
+      "id": "envelope-py-control",
+      "name": "Envelope signature control",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "ECDSA signing and verification of inter-agent envelopes — the framework's one default-on security control. Incomplete in two ways: expires and nonce are folded into the signed digest but never checked on receipt, and verification is skipped entirely when the sender string begins with \"user\".",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/envelope.py", "line": 76, "note": "lines 76-91 — verify() recovers the sender address from the signature over the digest" },
+        { "file": "python/uagents-core/uagents_core/envelope.py", "line": 93, "note": "lines 93-111 — _digest() folds expires and nonce into the signed bytes; nothing reads them back" },
+        { "file": "python/uagents-core/uagents_core/identity.py", "line": 33, "note": "is_user_address is a four-character prefix test on the sender string, with no key material behind it" },
+        { "file": "python/src/uagents/asgi.py", "line": 363, "note": "lines 363-371 — the HTTP ingress calls env.verify() only when is_user_address(env.sender) is false" },
+        { "file": "python/src/uagents/context.py", "line": 519, "note": "outbound envelopes are signed with the agent identity before being queued" }
+      ]
+    },
+    {
+      "id": "quota-py-control",
+      "name": "QuotaProtocol ACL and rate limit",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Stub / unwired control: an access-control list and per-sender request quota exist as an optional Protocol subclass, documented as not rate limited by default, defaulting to allow-all, and constructed by no Agent code path.",
+      "evidence": [
+        { "file": "python/src/uagents/protocol/quota.py", "line": 9, "note": "module docstring states \"Default: Not rate limited\"" },
+        { "file": "python/src/uagents/protocol/quota.py", "line": 181, "note": "lines 181-183 — wrap() falls back to AccessControlList(default=True), i.e. allow every sender" },
+        { "file": "python/src/uagents/protocol/quota.py", "line": 189, "note": "lines 189-213 — the ACL and quota gate only runs for handlers registered through a QuotaProtocol the operator built themselves" }
+      ]
+    },
+    {
+      "id": "types-py-memory",
+      "name": "Envelope history cache",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "In-memory (and optionally on-disk) retention of full message payloads for inbound and delivered envelopes, bounded by a 1000-message limit and a 24-hour retention sweep.",
+      "evidence": [
+        { "file": "python/src/uagents/types.py", "line": 105, "note": "lines 105-158 — EnvelopeHistory keeps a cache list and/or a storage-backed session log of full payloads" },
+        { "file": "python/src/uagents/types.py", "line": 203, "note": "lines 203-227 — apply_retention_policy trims by age and message limit" },
+        { "file": "python/src/uagents/agent.py", "line": 399, "note": "lines 399-408 — the history is constructed with use_cache=enable_agent_inspector, so the inspector default turns retention on" },
+        { "file": "python/src/uagents/config.py", "line": 49, "note": "lines 49-50 — MESSAGE_HISTORY_MESSAGE_LIMIT 1000, MESSAGE_HISTORY_RETENTION_SECONDS 86400" }
+      ]
+    },
+    {
+      "id": "storage-init-py-memory",
+      "name": "Agent key-value store",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "The agent's working state: a JSON key-value file named for the agent, created in the process working directory and rewritten on every set.",
+      "evidence": [
+        { "file": "python/src/uagents/storage/__init__.py", "line": 54, "note": "lines 54-69 — the store path is os.getcwd()/{name}_data.json" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 90, "note": "lines 90-96 — _load and _save read and rewrite the whole file with default file permissions" },
+        { "file": "python/src/uagents/agent.py", "line": 389, "note": "the store is constructed per agent and handed to every handler through the context" }
+      ]
+    },
+    {
+      "id": "build-registration-profile-agent-py-control",
+      "name": "Public profile / metadata filter",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Restricts what leaves for the public registry: the Agentverse profile carries only description, readme, avatar and banner, and Almanac attestation metadata is validated and reduced to geolocation.",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 537, "note": "lines 537-546 — _build_registration_profile emits only description, readme, avatar_url and banner_url, and an empty profile when publish_agent_details is false" },
+        { "file": "python/src/uagents/agent.py", "line": 606, "note": "lines 606-626 — _initialize_metadata validates against AgentMetadata and rejects anything else" },
+        { "file": "python/src/uagents/registration.py", "line": 70, "note": "lines 70-76 — extract_geo_metadata reduces the published metadata to geolocation before attestation" }
+      ]
+    },
+    {
+      "id": "wallet-agent-py-tool",
+      "name": "Wallet and ledger client",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The LocalWallet holding the agent's spending key and the LedgerClient able to broadcast transactions, exposed as public Agent properties and handed unrestricted to every message, interval and REST handler.",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 658, "note": "lines 658-676 — wallet and ledger are public properties returning the signing wallet and a transaction-capable ledger client" },
+        { "file": "python/src/uagents/context.py", "line": 280, "note": "lines 280-282 — the same LedgerClient is exposed on Context.ledger to every handler, with no approval or threshold interposed" },
+        { "file": "python/src/uagents/agent.py", "line": 593, "note": "lines 593-602 — the seed string alone derives both the ECDSA identity and the ledger wallet key" }
+      ]
+    },
+    {
+      "id": "registration-py-tool",
+      "name": "Almanac / Agentverse registration",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The registration policies that publish the agent's address, endpoints, protocols and metadata — a signed attestation to the Almanac API and a fee-paying transaction to the on-chain Almanac contract, with a testnet faucet call when funds are short.",
+      "evidence": [
+        { "file": "python/src/uagents/registration.py", "line": 130, "note": "lines 130-166 — the API policy signs an attestation and POSTs it to {almanac_api}/agents" },
+        { "file": "python/src/uagents/registration.py", "line": 314, "note": "lines 314-387 — the ledger policy checks balance against the registration fee and broadcasts the on-chain registration" },
+        { "file": "python/src/uagents/registration.py", "line": 613, "note": "lines 613-620 — update_agent_status posts the active/inactive status inside contextlib.suppress(Exception)" },
+        { "file": "python/src/uagents/agent.py", "line": 849, "note": "lines 849-877 — the registration loop runs at startup and on a retry schedule" }
+      ]
+    },
+    {
+      "id": "resolver-py-tool",
+      "name": "Address resolver",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Turns a peer agent identifier into the endpoint URLs the agent will POST to, reading them from the Almanac API and falling back to the on-chain Almanac contract.",
+      "evidence": [
+        { "file": "python/src/uagents/resolver.py", "line": 179, "note": "lines 179-197 — GlobalResolver picks the Almanac API or name-service resolver by prefix" },
+        { "file": "python/src/uagents/resolver.py", "line": 287, "note": "lines 287-302 — the resolver GETs {almanac_api}/agents/{address} over HTTPS" },
+        { "file": "python/src/uagents/resolver.py", "line": 308, "note": "lines 308-317 — the returned endpoint URLs and weights are consumed as-is, with no validation beyond presence" },
+        { "file": "python/src/uagents/resolver.py", "line": 211, "note": "lines 211-233 — the contract resolver queries the Almanac record on-chain when the API misses" }
+      ]
+    },
+    {
+      "id": "agentverse-external-service",
+      "name": "Agentverse platform APIs",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The agentverse.ai hosted surfaces the runtime talks to by default: Almanac API, agents API (registration, mailbox, interactions), identity API, proxy and search.",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/config.py", "line": 3, "note": "lines 3-11 — a single default host, agentverse.ai, with almanac, registration, identity, mailbox, proxy, storage and search paths" },
+        { "file": "python/src/uagents/config.py", "line": 34, "note": "ALMANAC_API_URL is derived from that default Agentverse configuration" },
+        { "file": "python/src/uagents/mailbox.py", "line": 113, "note": "lines 113-160 — the identity-challenge and agent-registration calls go to the same host under a bearer token" }
+      ]
+    },
+    {
+      "id": "ledger-external-service",
+      "name": "Fetch.ai ledger and Almanac contract",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The mainnet/testnet blockchain the agent holds a balance on and broadcasts transactions to, including the Almanac smart contract that stores registration records.",
+      "evidence": [
+        { "file": "python/src/uagents/network.py", "line": 46, "note": "lines 46-47 — module-level testnet and mainnet LedgerClients are constructed at import" },
+        { "file": "python/src/uagents/network.py", "line": 213, "note": "lines 213-256 — AlmanacContract is a LedgerContract wrapping the on-chain registry" },
+        { "file": "python/src/uagents/config.py", "line": 15, "note": "lines 15-25 — the mainnet and testnet Almanac and name-service contract addresses are hardcoded defaults" }
+      ]
+    },
+    {
+      "id": "faucet-external-service",
+      "name": "Fetch.ai testnet faucet",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "A faucet client constructed at module import in every agent process and called automatically when a testnet registration finds the wallet short of the fee.",
+      "evidence": [
+        { "file": "python/src/uagents/network.py", "line": 45, "note": "_faucet_api = FaucetApi(NetworkConfig.fetchai_stable_testnet()) — created at import time, so the client exists in every process" },
+        { "file": "python/src/uagents/network.py", "line": 139, "note": "lines 139-148 — add_testnet_funds posts a faucet claim for the wallet address" }
+      ]
+    },
+    {
+      "id": "private-keys-json-secret-store",
+      "name": "private_keys.json",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "Cleartext JSON file in the process working directory holding the identity and wallet private keys of every named agent that was created without a seed.",
+      "evidence": [
+        { "file": "python/src/uagents/storage/__init__.py", "line": 113, "note": "lines 113-127 — save_private_keys writes identity_key and wallet_key as cleartext JSON to os.getcwd()/private_keys.json with no mode restriction" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 146, "note": "lines 146-150 — the wallet key returned to the caller is not the one persisted; a second freshly generated key is written instead" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 106, "note": "load_all_keys reads the same fixed path back on restart" }
+      ]
+    },
+    {
+      "id": "values-yaml-deploy-surface",
+      "name": "Helm chart values",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The shipped Kubernetes chart. Its agent.seed default is a literal working seed committed to the repository and base64-encoded into a UAGENT_SEED Secret by the template; the chart's deployment template does not itself reference that Secret.",
+      "evidence": [
+        { "file": "python/deployment/helm/uagent/values.yaml", "line": 16, "note": "agent.seed carries a committed literal seed phrase [REDACTED — seed phrase at python/deployment/helm/uagent/values.yaml:16]" },
+        { "file": "python/deployment/helm/uagent/templates/secrets.yaml", "line": 9, "note": "lines 9-11 — the value is b64-encoded into a UAGENT_SEED key of the chart's Secret" },
+        { "file": "python/deployment/helm/uagent/templates/deployment.yaml", "line": 35, "note": "lines 35-62 — the container spec declares no env or envFrom, so the Secret is created but never mounted by the shipped template" }
+      ]
+    },
+    {
+      "id": "pyproject-toml-deploy-surface",
+      "name": "Published distributions and CI",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The install path for downstream users: both packages declare floor-only dependency ranges, and the repository's workflows run tests and lint with no dependency, container or code scanning and no SBOM.",
+      "evidence": [
+        { "file": "python/pyproject.toml", "line": 16, "note": "lines 16-20 — \"uagents-core (>=0.4.8)\" and \"cosmpy (>=0.12.1)\" carry no upper bound" },
+        { "file": "python/uagents-core/pyproject.toml", "line": 17, "note": "lines 17-21 — ecdsa, httpx and requests are declared the same way" },
+        { "file": ".github/workflows/ci-tests.yml", "line": 63, "note": "CI installs with uv sync --locked, which protects the project's own runs but not a downstream install; no scanning job exists in any workflow" }
+      ]
+    },
+    {
+      "id": "uagents-core-log-log-sink",
+      "name": "Process logs (stdout and uagents_core.log)",
+      "lane": "external_deploy",
+      "kind": "log_sink",
+      "description": "Free-form text logging: a uvicorn-formatted stdout handler for the uagents package and a file handler writing uagents_core.log in the working directory, with no structured fields and no alert path.",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/logger.py", "line": 30, "note": "lines 30-33 — a FileHandler on the fixed path uagents_core.log is attached to every core logger by default" },
+        { "file": "python/src/uagents/utils.py", "line": 9, "note": "lines 9-19 — get_logger attaches a uvicorn DefaultFormatter to stdout, format \"%(levelprefix)s [%(name)5s]: %(message)s\"" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "peer-agent-entrypoint--asgi-py-adapter",
+      "from": "peer-agent-entrypoint",
+      "to": "asgi-py-adapter",
+      "label": "POST /submit envelope",
+      "data": "envelope JSON from an unauthenticated network peer",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 316, "note": "/submit is the agent-protocol path; all other paths 404" },
+        { "file": "python/src/uagents/asgi.py", "line": 337, "note": "lines 337-355 — the body is read and parsed into an Envelope before any trust decision" }
+      ]
+    },
+    {
+      "id": "asgi-py-adapter--envelope-py-control",
+      "from": "asgi-py-adapter",
+      "to": "envelope-py-control",
+      "label": "envelope handed to signature check",
+      "data": "envelope plus the sender address it claims",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 363, "note": "lines 363-371 — env.verify() runs unless the sender names itself user..." }
+      ]
+    },
+    {
+      "id": "envelope-py-control--agent-py-orchestrator",
+      "from": "envelope-py-control",
+      "to": "agent-py-orchestrator",
+      "label": "envelope dispatched to handler",
+      "data": "decoded message payload and session id",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 379, "note": "lines 379-385 — dispatch_msg is called immediately after the verify block, with no expiry, nonce or replay check between them" },
+        { "file": "python/src/uagents/dispatch.py", "line": 133, "note": "lines 133-145 — the dispatcher routes to the Agent sink registered for the target address" }
+      ]
+    },
+    {
+      "id": "agentverse-external-service--mailbox-py-adapter",
+      "from": "agentverse-external-service",
+      "to": "mailbox-py-adapter",
+      "label": "stored envelopes polled",
+      "data": "stored envelopes from the Agentverse mailbox",
+      "evidence": [
+        { "file": "python/src/uagents/mailbox.py", "line": 222, "note": "lines 222-235 — the poll loop GETs the mailbox and validates each item into a StoredEnvelope" }
+      ]
+    },
+    {
+      "id": "mailbox-py-adapter--envelope-py-control",
+      "from": "mailbox-py-adapter",
+      "to": "envelope-py-control",
+      "label": "mailbox envelope signature check",
+      "data": "envelope plus the sender address it claims",
+      "evidence": [
+        { "file": "python/src/uagents/mailbox.py", "line": 268, "note": "lines 268-275 — the same is_user_address-gated verify block as the HTTP ingress" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--types-py-memory",
+      "from": "agent-py-orchestrator",
+      "to": "types-py-memory",
+      "label": "payload written to history",
+      "data": "full message payload, sender, target, session",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 1400, "note": "lines 1400-1411 — every dispatched message is added to the history before the handler runs" },
+        { "file": "python/src/uagents/types.py", "line": 136, "note": "lines 136-158 — add_entry appends to the cache and, when enabled, to the key-value store" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--storage-init-py-memory",
+      "from": "agent-py-orchestrator",
+      "to": "storage-init-py-memory",
+      "label": "handler state read and write",
+      "data": "arbitrary handler-chosen values",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 389, "note": "the store is constructed per agent from the first 16 characters of its address" },
+        { "file": "python/src/uagents/context.py", "line": 276, "note": "lines 276-278 — Context.storage exposes the store to every handler" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 77, "note": "lines 77-96 — each set rewrites the whole JSON file" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--wallet-agent-py-tool",
+      "from": "agent-py-orchestrator",
+      "to": "wallet-agent-py-tool",
+      "label": "handler-initiated ledger operations",
+      "data": "transaction construction and signing requests",
+      "evidence": [
+        { "file": "python/src/uagents/context.py", "line": 280, "note": "lines 280-282 — the ledger client reaches every message, interval and REST handler through the context" },
+        { "file": "python/src/uagents/agent.py", "line": 658, "note": "lines 658-676 — wallet and ledger are public properties of the Agent" }
+      ]
+    },
+    {
+      "id": "wallet-agent-py-tool--ledger-external-service",
+      "from": "wallet-agent-py-tool",
+      "to": "ledger-external-service",
+      "label": "signed transaction broadcast",
+      "data": "value-moving ledger transactions",
+      "evidence": [
+        { "file": "python/src/uagents/network.py", "line": 116, "note": "lines 116-126 — get_ledger returns the mainnet or testnet LedgerClient the wallet transacts through" },
+        { "file": "python/src/uagents/registration.py", "line": 362, "note": "lines 362-376 — the ledger client and wallet are passed together to broadcast an on-chain transaction" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--communication-py-adapter",
+      "from": "agent-py-orchestrator",
+      "to": "communication-py-adapter",
+      "label": "outbound envelope queued",
+      "data": "signed envelope and endpoint list",
+      "evidence": [
+        { "file": "python/src/uagents/context.py", "line": 509, "note": "lines 509-524 — the envelope is built, signed with the agent identity and queued on the dispenser" },
+        { "file": "python/src/uagents/communication.py", "line": 33, "note": "lines 33-49 — add_envelope puts the envelope and its endpoints on the dispenser queue" }
+      ]
+    },
+    {
+      "id": "communication-py-adapter--peer-agent-entrypoint",
+      "from": "communication-py-adapter",
+      "to": "peer-agent-entrypoint",
+      "label": "envelope POSTed to resolved endpoint",
+      "data": "signed envelope with encoded payload",
+      "evidence": [
+        { "file": "python/src/uagents/communication.py", "line": 145, "note": "lines 145-152 — each resolved endpoint URL is POSTed in turn until one returns 200" }
+      ]
+    },
+    {
+      "id": "peer-agent-entrypoint--communication-py-adapter",
+      "from": "peer-agent-entrypoint",
+      "to": "communication-py-adapter",
+      "label": "synchronous response envelope",
+      "data": "response envelope whose signature is optional",
+      "evidence": [
+        { "file": "python/src/uagents/communication.py", "line": 155, "note": "lines 155-167 — \"if env.signature:\" guards the verify call, so an unsigned response is dispatched to the waiting caller" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--resolver-py-tool",
+      "from": "agent-py-orchestrator",
+      "to": "resolver-py-tool",
+      "label": "destination identifier to resolve",
+      "data": "peer agent address or name",
+      "evidence": [
+        { "file": "python/src/uagents/context.py", "line": 489, "note": "send_raw resolves the destination before any envelope leaves the process" },
+        { "file": "python/src/uagents/resolver.py", "line": 179, "note": "lines 179-197 — GlobalResolver selects the Almanac API or name-service path" }
+      ]
+    },
+    {
+      "id": "resolver-py-tool--agentverse-external-service",
+      "from": "resolver-py-tool",
+      "to": "agentverse-external-service",
+      "label": "Almanac API lookup",
+      "data": "peer agent address",
+      "evidence": [
+        { "file": "python/src/uagents/resolver.py", "line": 287, "note": "lines 287-302 — GET {almanac_api}/agents/{address}" }
+      ]
+    },
+    {
+      "id": "agentverse-external-service--resolver-py-tool",
+      "from": "agentverse-external-service",
+      "to": "resolver-py-tool",
+      "label": "endpoint URL list returned",
+      "data": "registry-supplied endpoint URLs and weights",
+      "evidence": [
+        { "file": "python/src/uagents/resolver.py", "line": 308, "note": "lines 308-317 — the URLs are taken from the registry response and sampled by weight with no further validation" }
+      ]
+    },
+    {
+      "id": "resolver-py-tool--ledger-external-service",
+      "from": "resolver-py-tool",
+      "to": "ledger-external-service",
+      "label": "Almanac contract record query",
+      "data": "peer agent address",
+      "evidence": [
+        { "file": "python/src/uagents/resolver.py", "line": 211, "note": "lines 211-233 — the contract resolver queries the on-chain record when the API misses" },
+        { "file": "python/src/uagents/resolver.py", "line": 70, "note": "query_record reads the agent record from the Almanac contract" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--build-registration-profile-agent-py-control",
+      "from": "agent-py-orchestrator",
+      "to": "build-registration-profile-agent-py-control",
+      "label": "profile fields and metadata",
+      "data": "description, readme, avatar, banner and operator metadata",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 437, "note": "metadata is validated at construction before it can reach a registry" },
+        { "file": "python/src/uagents/agent.py", "line": 438, "note": "lines 438-450 — readme, description, avatar and banner are read from operator configuration" }
+      ]
+    },
+    {
+      "id": "build-registration-profile-agent-py-control--registration-py-tool",
+      "from": "build-registration-profile-agent-py-control",
+      "to": "registration-py-tool",
+      "label": "filtered public profile",
+      "data": "non-sensitive public profile fields and geo-only metadata",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 537, "note": "lines 537-546 — only description, readme, avatar and banner reach the registration payload" },
+        { "file": "python/src/uagents/registration.py", "line": 143, "note": "the attestation carries coerce_metadata_to_str(extract_geo_metadata(metadata)), not the raw metadata" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--registration-py-tool",
+      "from": "agent-py-orchestrator",
+      "to": "registration-py-tool",
+      "label": "registration request",
+      "data": "agent identifier, endpoints, protocol digests",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 831, "note": "lines 831-847 — register() hands identity, protocols, endpoints and metadata to the policy" },
+        { "file": "python/src/uagents/registration.py", "line": 130, "note": "lines 130-147 — the policy builds and signs the attestation" }
+      ]
+    },
+    {
+      "id": "registration-py-tool--agentverse-external-service",
+      "from": "registration-py-tool",
+      "to": "agentverse-external-service",
+      "label": "signed registration attestation",
+      "data": "address, endpoints, protocols, geo metadata, signature",
+      "evidence": [
+        { "file": "python/src/uagents/registration.py", "line": 150, "note": "lines 150-156 — POST {almanac_api}/agents with the signed attestation" },
+        { "file": "python/src/uagents/registration.py", "line": 613, "note": "lines 613-620 — the active/inactive status update posts to the same API" }
+      ]
+    },
+    {
+      "id": "registration-py-tool--ledger-external-service",
+      "from": "registration-py-tool",
+      "to": "ledger-external-service",
+      "label": "fee-paying registration transaction",
+      "data": "on-chain Almanac registration and its fee",
+      "evidence": [
+        { "file": "python/src/uagents/registration.py", "line": 330, "note": "the wallet balance is checked against the registration fee before the transaction is built" },
+        { "file": "python/src/uagents/registration.py", "line": 362, "note": "lines 362-376 — the registration is broadcast through the ledger client with the agent's wallet" }
+      ]
+    },
+    {
+      "id": "registration-py-tool--faucet-external-service",
+      "from": "registration-py-tool",
+      "to": "faucet-external-service",
+      "label": "automatic testnet faucet claim",
+      "data": "the agent's wallet address",
+      "evidence": [
+        { "file": "python/src/uagents/registration.py", "line": 349, "note": "lines 349-353 — on insufficient funds the testnet path calls add_testnet_funds with no operator involvement" },
+        { "file": "python/src/uagents/network.py", "line": 139, "note": "lines 139-148 — the claim is posted through the module-level faucet client" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint--asgi-py-adapter",
+      "from": "operator-entrypoint",
+      "to": "asgi-py-adapter",
+      "label": "REST call to an inspector path",
+      "data": "HTTP request, optionally an Agentverse bearer token",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 300, "note": "lines 300-313 — REST handler lookup happens before the reserved-path check" }
+      ]
+    },
+    {
+      "id": "asgi-py-adapter--reserved-endpoints-asgi-py-control",
+      "from": "asgi-py-adapter",
+      "to": "reserved-endpoints-asgi-py-control",
+      "label": "reserved path plus client address",
+      "data": "request path and the ASGI client tuple",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 304, "note": "lines 304-311 — the guard reads scope[\"client\"]" },
+        { "file": "python/src/uagents/asgi.py", "line": 184, "note": "that client value is rewritten from the caller's own X-Forwarded-For header" }
+      ]
+    },
+    {
+      "id": "reserved-endpoints-asgi-py-control--enable-agent-inspector-agent-py-entrypoint",
+      "from": "reserved-endpoints-asgi-py-control",
+      "to": "enable-agent-inspector-agent-py-entrypoint",
+      "label": "admitted REST request",
+      "data": "inspector request body (endpoint URL, user token)",
+      "evidence": [
+        { "file": "python/src/uagents/asgi.py", "line": 312, "note": "the request proceeds to _handle_rest once the guard passes" },
+        { "file": "python/src/uagents/agent.py", "line": 474, "note": "lines 474-533 — the inspector handlers are the registered REST sinks" }
+      ]
+    },
+    {
+      "id": "types-py-memory--enable-agent-inspector-agent-py-entrypoint",
+      "from": "types-py-memory",
+      "to": "enable-agent-inspector-agent-py-entrypoint",
+      "label": "cached history returned",
+      "data": "every retained message payload with sender, target and session",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 488, "note": "lines 488-494 — GET /messages returns the whole cached EnvelopeHistory" },
+        { "file": "python/src/uagents/types.py", "line": 177, "note": "lines 177-186 — get_cached_messages returns the entire cache list" }
+      ]
+    },
+    {
+      "id": "enable-agent-inspector-agent-py-entrypoint--agentverse-external-service",
+      "from": "enable-agent-inspector-agent-py-entrypoint",
+      "to": "agentverse-external-service",
+      "label": "caller-driven Agentverse registration",
+      "data": "caller-supplied endpoint URL and bearer token, agent profile",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 496, "note": "lines 496-519 — POST /connect registers the agent with request.endpoint and request.user_token" },
+        { "file": "python/src/uagents/mailbox.py", "line": 80, "note": "lines 80-89 — the token becomes the Authorization bearer header on the Agentverse calls" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint--agent-py-orchestrator",
+      "from": "operator-entrypoint",
+      "to": "agent-py-orchestrator",
+      "label": "seed and configuration",
+      "data": "seed phrase, agent name, network, endpoints",
+      "evidence": [
+        { "file": "python/deployment/hello-agent/agent.py", "line": 5, "note": "lines 5-20 — the seed arrives from the UAGENT_SEED environment variable" },
+        { "file": "python/src/uagents/agent.py", "line": 585, "note": "lines 585-602 — the seed (or the agent name) determines identity and wallet key material" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--private-keys-json-secret-store",
+      "from": "agent-py-orchestrator",
+      "to": "private-keys-json-secret-store",
+      "label": "generated keys persisted",
+      "data": "identity and wallet private keys in cleartext",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 590, "note": "a named agent with no seed calls get_or_create_private_keys" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 113, "note": "lines 113-127 — the keys are written as cleartext JSON to the working directory" },
+        { "file": "python/src/uagents/storage/__init__.py", "line": 146, "note": "lines 146-150 — the persisted wallet key is a different key from the one returned to the caller" }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--uagents-core-log-log-sink",
+      "from": "agent-py-orchestrator",
+      "to": "uagents-core-log-log-sink",
+      "label": "warnings and exceptions only",
+      "data": "free-form log lines",
+      "evidence": [
+        { "file": "python/src/uagents/agent.py", "line": 1392, "note": "lines 1392-1394 — an unrecognised schema digest logs a warning; a successfully handled message logs nothing" },
+        { "file": "python/src/uagents/utils.py", "line": 9, "note": "lines 9-19 — the formatter emits unstructured text with no session, sender or event-type field" },
+        { "file": "python/uagents-core/uagents_core/logger.py", "line": 30, "note": "lines 30-33 — core module logs additionally land in uagents_core.log" }
+      ]
+    },
+    {
+      "id": "messages-py-adapter--peer-agent-entrypoint",
+      "from": "messages-py-adapter",
+      "to": "peer-agent-entrypoint",
+      "label": "envelope POSTed to resolved endpoint",
+      "data": "signed envelope with encoded payload",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 241, "note": "lines 241-243 — each resolved endpoint is POSTed until one succeeds" },
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 68, "note": "lines 68-96 — send_message performs the HTTP POST of the envelope" }
+      ]
+    },
+    {
+      "id": "peer-agent-entrypoint--messages-py-adapter",
+      "from": "peer-agent-entrypoint",
+      "to": "messages-py-adapter",
+      "label": "sync response parsed",
+      "data": "response envelope, never verified",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 283, "note": "lines 283-289 — parse_envelope_raw returns the response to the caller with no env.verify() anywhere on the path" }
+      ]
+    },
+    {
+      "id": "messages-py-adapter--agentverse-external-service",
+      "from": "messages-py-adapter",
+      "to": "agentverse-external-service",
+      "label": "interaction reported by default",
+      "data": "target address, source address, session id",
+      "evidence": [
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 254, "note": "lines 254-263 — on each successful send an Interaction record is posted unless track_interaction was turned off" },
+        { "file": "python/uagents-core/uagents_core/utils/messages.py", "line": 99, "note": "lines 99-127 — record_agent_interaction POSTs to {agents_api}/interactions under an agent attestation" }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Inbound envelopes from the open agent network",
+      "crossing_edges": [
+        "peer-agent-entrypoint--asgi-py-adapter",
+        "asgi-py-adapter--envelope-py-control",
+        "envelope-py-control--agent-py-orchestrator",
+        "agentverse-external-service--mailbox-py-adapter",
+        "mailbox-py-adapter--envelope-py-control"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "Counterparty-supplied content is data to be processed, never commands to be obeyed.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-09",
+          "excerpt": "The operator-configured allowlist of authorized peer agent addresses is a closed set",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-13",
+          "excerpt": "A message sender whose identity signature does not verify is not a trusted counterparty for state-changing or privileged actions",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-17",
+          "excerpt": "Signature-verified inbound messages, queries, and broadcasts from peer agents.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-24",
+          "excerpt": "The agent MUST NOT act on an unsigned or signature-unverified message when performing a state-changing or privileged action.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-31",
+          "excerpt": "Alert on repeated inbound messages from senders whose signatures fail verification",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "A sender that simply names itself user... skips ECDSA verification on both the HTTP and mailbox ingress paths, because the trust test is a four-character prefix on an attacker-chosen string.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009"
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI07",
+          "summary": "expires and nonce are folded into the signed envelope digest but read by no ingress path, so a signed envelope captured once replays against a handler indefinitely.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004"
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI07",
+          "summary": "Handler selection turns only on the schema digest and the user/agent prefix, so any agent on the open network can drive a registered handler at will, with no allowlist and no quota on the shipped path.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006"
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "Counterparty-supplied payload content reaches an operator handler with no provenance marker distinguishing it from operator-originated data.",
+          "status": "partial",
+          "mitigation_evidence": { "file": "python/src/uagents/agent.py", "line": 1442 },
+          "remainder": "the schema check bounds the payload's shape but nothing labels or bounds its provenance once the shape matches"
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Agent-inspector debug endpoints",
+      "crossing_edges": [
+        "operator-entrypoint--asgi-py-adapter",
+        "asgi-py-adapter--reserved-endpoints-asgi-py-control",
+        "reserved-endpoints-asgi-py-control--enable-agent-inspector-agent-py-entrypoint",
+        "types-py-memory--enable-agent-inspector-agent-py-entrypoint",
+        "enable-agent-inspector-agent-py-entrypoint--agentverse-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-05",
+          "excerpt": "The server the agent binds to receive envelopes; must serve only the agent's declared endpoints.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-26",
+          "excerpt": "The agent-inspector and other debug/administrative REST endpoints MUST be disabled in production.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-27",
+          "excerpt": "the agent MUST NOT expose them unless they sit behind operator-configured protection (authentication / network restriction)",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "The inspector endpoints are reachable by any remote or cross-origin caller: the sole guard is a client address uvicorn rewrites from the caller's own X-Forwarded-For header, and wildcard CORS extends the same reach to any web page the operator's browser visits.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001"
+        },
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "The inspector is on unless the operator opts out, and /agent_info is exempted from the guard outright, so the agent's address, endpoints, protocols, metadata and port are served to any caller even where the guard behaves as intended.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003"
+        }
+      ]
+    },
+    {
+      "id": "peer-a2a",
+      "name": "Outbound agent-to-agent exchange",
+      "crossing_edges": [
+        "agent-py-orchestrator--communication-py-adapter",
+        "communication-py-adapter--peer-agent-entrypoint",
+        "peer-agent-entrypoint--communication-py-adapter",
+        "agent-py-orchestrator--resolver-py-tool",
+        "resolver-py-tool--agentverse-external-service",
+        "agentverse-external-service--resolver-py-tool",
+        "resolver-py-tool--ledger-external-service",
+        "messages-py-adapter--peer-agent-entrypoint",
+        "peer-agent-entrypoint--messages-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-07",
+          "excerpt": "Outbound envelopes to other agents' resolved endpoints | Yes | No | Peer agents reached by address via the resolver.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI07",
+          "summary": "A synchronous response envelope carrying no signature bypasses verification entirely and is delivered to the waiting caller as a legitimate reply; the uagents-core helper never verifies a response at all.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005"
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI04",
+          "summary": "The endpoint URLs the agent POSTs to come from an Almanac registry record rather than operator configuration, so a tampered or impersonated registry entry silently redirects the agent's outbound traffic.",
+          "status": "potential",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "state-commit",
+      "name": "Almanac / Agentverse registration record",
+      "crossing_edges": [
+        "agent-py-orchestrator--build-registration-profile-agent-py-control",
+        "build-registration-profile-agent-py-control--registration-py-tool",
+        "agent-py-orchestrator--registration-py-tool",
+        "registration-py-tool--agentverse-external-service",
+        "registration-py-tool--ledger-external-service",
+        "enable-agent-inspector-agent-py-entrypoint--agentverse-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-04",
+          "excerpt": "The agent MUST NOT autonomously register, advertise, or impersonate identities, addresses, or protocols other than its own configured identity.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-20",
+          "excerpt": "Data published to the public Almanac / Agentverse profile ... MUST be limited to non-sensitive information intended for public discovery.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-21",
+          "excerpt": "Registering the agent on the Almanac / Agentverse with its intended public metadata, and resolving peer addresses.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-30",
+          "excerpt": "Alert on Almanac / Agentverse registration failure rather than silently continuing.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI03",
+          "summary": "POST /connect performs a real Agentverse registration using an endpoint URL and API token supplied in the request body, so a caller who reaches the inspector can rewrite where the agent is published.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001"
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "The publicly readable registration record could carry operator configuration or key material alongside the address and endpoints.",
+          "status": "mitigated",
+          "mitigation_evidence": { "file": "python/src/uagents/agent.py", "line": 537 }
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "The active/inactive status update is wrapped in contextlib.suppress(Exception), so a failed registration or silent deregistration leaves no record at all.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-013"
+        }
+      ]
+    },
+    {
+      "id": "value-transfer",
+      "name": "Wallet spends and ledger transactions",
+      "crossing_edges": [
+        "agent-py-orchestrator--wallet-agent-py-tool",
+        "wallet-agent-py-tool--ledger-external-service",
+        "registration-py-tool--ledger-external-service",
+        "registration-py-tool--faucet-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-06",
+          "excerpt": "On-chain transactions — gated per Action Boundaries.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-15",
+          "excerpt": "Any capability that moves value on the ledger or spends wallet funds — see Action Boundaries.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-22",
+          "excerpt": "The framework ships no operator authorization policy for wallet spends, so the deployment MUST supply the gating policy",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-25",
+          "excerpt": "the agent MUST NOT move value to any counterparty other than the Almanac / Agentverse registration contract unless the operator has explicitly authorized value transfers",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Every message, interval and REST handler receives the agent's spending wallet and a transaction-capable ledger client, and the runtime offers no approval primitive a deployment could hang a spend policy on.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007"
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "A testnet registration that finds the wallet short of the fee posts a faucet claim for the wallet address automatically, an outbound destination the approved-channel table never authorizes.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010"
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Seed and private key material",
+      "crossing_edges": [
+        "operator-entrypoint--agent-py-orchestrator",
+        "agent-py-orchestrator--private-keys-json-secret-store"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-18",
+          "excerpt": "Seed phrases, identity keys, and wallet keys MUST NEVER leave the host",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-19",
+          "excerpt": "Credentials, API keys, and seed material ... MUST NOT be hardcoded in source or committed to the repository.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "The Helm chart's agent.seed default is a working seed committed to the repository, and the seed alone derives both the ECDSA identity and the ledger wallet key, so any unmodified deployment has publicly reproducible private keys.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002"
+        },
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "A named agent created without a seed writes its identity and wallet private keys as cleartext JSON to the process working directory with default permissions, and persists a different wallet key from the one it uses.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008"
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Agent state and message history on the host",
+      "crossing_edges": [
+        "agent-py-orchestrator--types-py-memory",
+        "agent-py-orchestrator--storage-init-py-memory",
+        "types-py-memory--enable-agent-inspector-agent-py-entrypoint"
+      ],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Turning on the inspector also turns on retention of up to a thousand full message payloads for a day, readable in one request through GET /messages.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003"
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "The key-value store and the optional message-history file are written as plain JSON into the process working directory with default permissions and no encryption, readable by any local account that can reach the directory.",
+          "status": "potential",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Logging, alerting and interaction reporting",
+      "crossing_edges": [
+        "agent-py-orchestrator--uagents-core-log-log-sink",
+        "messages-py-adapter--agentverse-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-28",
+          "excerpt": "Halt and alert if the agent is about to transmit or log seed / identity / wallet key material.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-29",
+          "excerpt": "Halt and alert if the agent attempts a value transfer that exceeds the approval threshold or lacks operator authorization.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-32",
+          "excerpt": "Log only — do not alert — on routine signature-verified message handling and scheduled interval task runs; these events MUST leave a log record.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "A successfully handled message and a completed interval run write nothing at all, and what is written is free-form text with no session, sender or event-type field.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012"
+        },
+        {
+          "stride": "D",
+          "owasp": null,
+          "summary": "No alert or halt primitive exists anywhere in either package, so every escalation condition the remit declares — key material in flight, an unauthorized spend, repeated verification failures — degrades to a log line or to silence.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-013"
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The core send helper reports the target address, sender address and session id of every message to the Agentverse agents API by default, a side channel describing who the agent talks to.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011"
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Published distributions and install path",
+      "crossing_edges": [],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Both published packages declare floor-only dependency ranges, so a downstream install may resolve an untested major of uagents-core, cosmpy, ecdsa or requests, and no dependency, container or code scanning and no SBOM exists anywhere in the repository.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-014"
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "remote-inspector-control-plane",
+      "name": "Remote caller reaches the default-on control plane",
+      "steps": [
+        {
+          "node": "peer-agent-entrypoint",
+          "finding_id": null,
+          "summary": "any remote host reaches the agent's port, which is bound to 0.0.0.0"
+        },
+        {
+          "node": "asgi-py-adapter",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "uvicorn rewrites the client address from the caller's own X-Forwarded-For header because forwarded_allow_ips is \"*\""
+        },
+        {
+          "node": "reserved-endpoints-asgi-py-control",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "the loopback test passes on the spoofed client value, and /agent_info is exempt regardless"
+        },
+        {
+          "node": "enable-agent-inspector-agent-py-entrypoint",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "the four inspector endpoints are registered because the flag defaults to true"
+        },
+        {
+          "node": "types-py-memory",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "GET /messages returns every retained message payload from the cache the same flag enabled"
+        },
+        {
+          "node": "agentverse-external-service",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "POST /connect re-registers the agent in Agentverse at an endpoint of the caller's choosing"
+        }
+      ]
+    },
+    {
+      "id": "unverified-sender-to-wallet",
+      "name": "Unverified sender to ungated wallet",
+      "steps": [
+        {
+          "node": "peer-agent-entrypoint",
+          "finding_id": "PRAX-2026-08-12-009",
+          "summary": "a sender naming itself user... is dispatched without signature verification"
+        },
+        {
+          "node": "envelope-py-control",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "for signed senders the same handler is reachable by replaying a captured envelope, since expiry and nonce are never checked"
+        },
+        {
+          "node": "agent-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-006",
+          "summary": "no allowlist or quota consults the sender before the handler registered for that schema runs"
+        },
+        {
+          "node": "wallet-agent-py-tool",
+          "finding_id": "PRAX-2026-08-12-007",
+          "summary": "that handler holds an unrestricted wallet and ledger client with no approval gate to pass"
+        }
+      ]
+    },
+    {
+      "id": "default-seed-to-wallet-compromise",
+      "name": "Committed chart seed to wallet compromise",
+      "steps": [
+        {
+          "node": "values-yaml-deploy-surface",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "the chart ships a literal working seed as the default value of agent.seed"
+        },
+        {
+          "node": "agent-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "Identity.from_seed and derive_key_from_seed derive the signing identity and the wallet key deterministically from that string"
+        },
+        {
+          "node": "wallet-agent-py-tool",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "the derived key is the agent's spending key, so anyone reading the repository holds it"
+        },
+        {
+          "node": "ledger-external-service",
+          "finding_id": null,
+          "summary": "transactions can be signed and broadcast as that agent, and its balance moved"
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Strained but usable. uAgents is one Python process, so the adapter/core split is by module role rather than by process: the ASGI server, dispenser, mailbox client and uagents-core send helper are placed in client_adapters as channel connectors even though they run in-process with agent_core. tools_mcp holds the agent's own declared capabilities (wallet/ledger, registration, resolution) although there is no MCP server and no tool-calling model anywhere in the subject. The agent-inspector endpoints are file-backed by agent.py but placed in client_adapters because they are an API surface a caller talks to, not orchestration.",
+    "omissions": "Arbitration divergences (substantive, KB wins): PRAX-2026-08-12-007 is stored with owasp_agentic ASI02 — the Agentic KB's compound table routes a missing approval gate on a consequential action to LLM03 (Excessive Agency) and explicitly forbids ASI02 for the gate itself (ASI02 only when a tool is shown used wrongly), so this graph tags it LLM03. PRAX-2026-08-12-010 is stored ASI04 — ASI04 is runtime tool/agent composition (poisoned descriptions, swapped definitions, compromised registries) and the faucet is a hardcoded first-party endpoint with no provenance defect, so this graph tags it null rather than force a code. PRAX-2026-08-12-013 is stored ASI08 — nothing propagates beyond the initial action, so the spread test fails and the KB's 'pure observability gap: RAISE only, no OWASP code' row applies; this graph tags it null. No numbering-only shifts: the findings and the KB both use the 2026 LLM/ASI numbering. Edgeless nodes: quota-py-control (an unwired optional control, no default data path), pyproject-toml-deploy-surface (repo and install posture), values-yaml-deploy-surface (a committed secret in a chart whose deployment template declares no env or envFrom, so no in-repo injection path is citable — the repository-exposure claim in PRAX-2026-08-12-002 still holds at values.yaml:16). No model, prompt or model-egress boundary: the base runtime contains no LLM call, and the only LLM surface in the tree, src/uagents/experimental/chat_agent, is excluded by the scan scope along with uagents-adapter, uagents-ai-engine and examples/. experimental/dialogues, experimental/mobility and experimental/search were read and folded away — no trust consequence distinct from the orchestrator could be cited. Bureau (agent.py:1525-1841) folds into the orchestrator node. Secret values are never reprinted: the chart seed is referenced by path and pattern only.",
+    "counts": { "nodes": 24, "edges": 33, "boundaries": 9, "threats": 21 }
+  }
+}
