@@ -119,3 +119,14 @@ boundary-granularity call in one run accounts for the entire boundary
 shortfall. n=2 per target makes each pair a two-sample estimate; the
 numbers above are reported without adjustment. Ship disposition is
 Steve's call and is recorded in the release plan when made.
+
+---
+
+# Run 3 — pre-declaration (2026-08-17, BEFORE any r3 extraction ran)
+
+Steve's disposition: third runs with an all-pairs estimate. Declared ahead
+of data: one fresh v1.1 extraction per target (r3); per-target score =
+the mean of all three pairwise comparisons (r1–r2, r1–r3, r2–r3) on each
+measure; gate = the mean of the four per-target scores against the
+unchanged thresholds (boundary ≥0.9, status ~90%, component ≥0.7).
+Whatever the numbers say, they ship in this file unadjusted.
