@@ -3,14 +3,15 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen Threat-Model Graph — contract v1.1
+# Praxen Threat-Model Graph — contract v1.2
 
 One JSON object per analyzed agent. This is the published contract for the
 threat-model graph that the extraction pass writes and `render_threatmodel.py`
 renders; the runtime validator enforces it. Frozen from probe spec v0.4.3
 (2026-08-17) after four validation rounds; **v1.1 (2026-08-17)** folds in
 the pre-ship gate's findings — the `stored-state` archetype, `partial`
-calibration, and coinage rules — see
+calibration, and coinage rules; **v1.2 (2026-08-17)** makes attack paths
+run untrusted-origin → consequence (the report's headline rule) — see
 `plans/RESULTS_THREAT_MODEL_PROBE.md` and
 `tests/runs/v2.0.0-threatmodel-gate/GATE.md` for the evidence.
 
@@ -22,7 +23,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 
 ```json
 {
-  "spec_version": "1.1",
+  "spec_version": "1.2",
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
@@ -36,8 +37,8 @@ cannot cite it, leave it out and record the omission in `notes`.
 }
 ```
 
-`spec_version` is exactly `"1.1"`. Legacy probe statuses
-(`finding`/`residual`/`open`) are not valid in v1.0 documents — emit only
+`spec_version` is exactly `"1.2"`. Legacy probe statuses
+(`finding`/`residual`/`open`) are not valid — emit only
 the canonical status set below.
 
 ## Lanes (fixed, all five always present)
@@ -287,19 +288,57 @@ distinguish in `name`.
 
 ## Attack paths
 
-Only chains grounded in the findings JSON (`escalation`,
-`related_findings`) or in an explicit multi-step mechanism you can cite
-end-to-end:
+Attack paths are the report's headline. They exist to answer one operator
+question — *"how do I actually get owned, and what do I fix first?"* — not
+to catalogue connectivity. A path is a chain grounded in the findings JSON
+(`escalation`, `related_findings`) or in an explicit multi-step mechanism
+you can cite end-to-end:
 
 ```json
 {
   "id": "<kebab>",
-  "name": "<short name>",
+  "name": "<origin → consequence, in plain words>",
   "steps": [ { "node": "<node id>", "finding_id": "<or null>", "summary": "<one clause>" } ]
 }
 ```
 
-Zero attack paths is a valid answer.
+**A path MUST run from an untrusted ORIGIN to a CONSEQUENCE (v1.2 — the
+load-bearing rule).** This is what separates an attack from the agent
+simply doing its job.
+
+- **Step 1 is the untrusted origin — where attacker-influenceable content
+  or action ENTERS**, across an ingress/untrusted boundary: a
+  `user_inputs` entrypoint that is *not* the trusted owner/operator (a
+  third-party sender, an anonymous caller); external content the agent
+  ingests (a fetched web page, a tool/MCP result, an integration message);
+  a peer message. The step's `summary` must name *what makes it untrusted*
+  (unauthenticated, attacker-authored, unlabeled provenance). **Do NOT
+  start a path at an internal mechanism** — a tool, the orchestrator, the
+  model — when that mechanism is merely acting under injected influence.
+  The dangerous `run_shell` call is not the origin; the untrusted content
+  that *directed* it is. Trace back to where control entered and start
+  there.
+- **The trusted owner/operator path is not an attack.** Owner →
+  client → loop is normal use; it is an origin only if the owner's own
+  channel is the injection vector (rare — say why).
+- **The last step is the consequence — a durable, irreversible, or
+  high-impact effect**: host command/code execution, credential or data
+  egress off the trusted surface, a state-commit / value-transfer, or
+  persistent memory/goal poisoning that outlives the session. A path that
+  ends at an internal read with no onward damage is not yet a path.
+- **The middle is the hijack** — how the untrusted influence reaches the
+  model's decisions and is granted the consequence (the missing gate, the
+  absent provenance check, the over-broad tool). Cite the finding at each
+  step that proves that link.
+- **Name the path origin→consequence in plain words** ("Stranger's chat
+  message reaches the host shell", not "run_shell to Docker"). The name is
+  what a hurried operator reads first.
+
+Prefer a few complete origin→consequence chains over many fragments.
+Every distinct untrusted origin that can reach a distinct consequence is
+worth one path; do not enumerate internal hops as separate paths. **Zero
+attack paths is a valid — and good — answer**: it means no untrusted
+origin was shown to reach a consequence.
 
 ## Notes
 

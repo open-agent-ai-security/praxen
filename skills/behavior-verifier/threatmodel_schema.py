@@ -26,7 +26,7 @@ import schema as _s
 from schema import SchemaError  # re-exported: callers catch one error type
 
 # ── version ──────────────────────────────────────────────────────────────────
-SPEC_VERSION = "1.1"
+SPEC_VERSION = "1.2"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 LANES = [
