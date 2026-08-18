@@ -301,11 +301,20 @@ def render(graph, template_text):
             ey -= ARROW_LEN * dy / L
         return f"M{sx} {sy} C {c1x} {c1y}, {c2x} {c2y}, {ex} {ey}"
 
+    # markerUnits="userSpaceOnUse" pins the head to a fixed ARROW_LEN px
+    # regardless of stroke width. Without it markers default to scaling with
+    # strokeWidth, so on highlight (stroke 1.2 -> 2.6) the head would balloon
+    # and its tip would shoot ARROW_LEN*2+ px past the trim, deep into the box.
+    # Both heads are ARROW_LEN long so the tip lands on the node edge in both
+    # states; the highlight reads through the blue fill and thicker line, not a
+    # bigger head.
     svg.append(f'<defs><marker id="arr" viewBox="0 0 10 10" refX="0" refY="5" '
-               f'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+               f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
+               f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="{arrow_grey}"/></marker>'
                f'<marker id="arr-hi" viewBox="0 0 10 10" refX="0" refY="5" '
-               f'markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
+               f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
+               f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="{arrow_blue}"/></marker></defs>')
     loop_count, elbls, ei = {}, [], 0
     for e in g["edges"]:
