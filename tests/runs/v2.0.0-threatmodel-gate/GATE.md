@@ -159,3 +159,31 @@ none blocks the contract as shipped.
 Twelve v1.1 extractions total across runs 2–3: 12/12 validator-clean (11
 first-pass; the run-1 era repair predates v1.1), 12/12 render-clean,
 every finding of every target cited in every graph that claims it.
+
+---
+
+# Open design question — hub-and-spoke edge congestion (2026-08-17, Steve)
+
+Human review of the best example (craftbot r3) flagged the orchestrator
+fan-out as an unshippable ratsnest: a react-loop agent calls every tool /
+store / model, so one-bezier-per-flow yields 8+ near-parallel curves
+crossing a narrow lane gap. Structural mismatch between the layout and what
+agents ARE, not a routing tweak. Consistent with the gate finding that
+edges are the least-valuable, lowest-agreement layer (boundaries + threats
+are the contract; edges are illustrative). Candidate directions, to
+prototype before the 2.0 renderer freeze:
+
+- **A. Demote flows to a faint arrowhead-less substrate; bold+arrowed only
+  for attack-path chains.** Cheapest; reader traces the attack, not every
+  flow.
+- **B. Bus/trunk routing for the hub** (orchestrator→tools as one branching
+  trunk, subway/PCB style). Targets the exact ugliness.
+- **C. Orthogonal channel routing** — right-angle traces packed into
+  per-lane-gap tracks. Cleanest, most effort, nearest to reinventing a
+  layout engine (deliberately avoided so far).
+- **D. Collapse the tool lane to one "Tools (N)" node**; per-tool detail
+  stays in the inventory + boundary tables (map, not schematic).
+
+Recommendation: **A+B**. Blocks calling the renderer done for 2.0 — the
+current output fails human review on dense targets even though it passes
+the numeric gate.
