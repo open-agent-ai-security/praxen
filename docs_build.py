@@ -56,6 +56,7 @@ PAGES = [
     ("challenging-findings.md",   "Challenging Findings"),
     ("understanding-variability.md", "Run-to-Run Variability"),
     ("thinking-modes.md",         "Thinking Modes"),
+    ("threat-modeling.md",        "Threat Modeling"),
     ("abv.md",                    "Agent Behavior Verification"),
     ("owasp.md",                  "OWASP Gen AI Security"),
     ("RAISE.md",                  "The RAISE Framework"),

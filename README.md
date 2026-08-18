@@ -61,6 +61,8 @@ In practice, that's one sentence to your coding agent — e.g. *"Run a Praxen be
 
 Findings land in a self-contained HTML report, a machine-readable JSON file, and a plain-text summary in `./reports/`. Nothing phones home.
 
+Ask for a **threat model** and Praxen also draws the architecture: components in five trust lanes, trust boundaries, threat enumeration (confirmed / potential / partial / mitigated), and attack paths — every element citing file:line evidence from the agent's own workspace. ([threat modeling](docs/threat-modeling.md))
+
 Praxen runs **before deployment** and on each release — pre-deployment verification of the agent's controls against its remit. [Runtime monitoring of the deployed agent](docs/abv.md) is a complementary layer outside Praxen's scope.
 
 ---
