@@ -336,7 +336,7 @@ def render(graph, template_text):
                f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
                f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="#C0392B"/></marker>'
-               f'<marker id="arr-path-hi" viewBox="0 0 10 10" refX="0" refY="5" '
+               f'<marker id="arr-path-hi" viewBox="0 0 10 10" refX="{10*(1-1/1.7):.2f}" refY="5" '
                f'markerWidth="{ARROW_LEN*1.7}" markerHeight="{ARROW_LEN*1.7}" '
                f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="#E11900"/></marker></defs>')
@@ -441,12 +441,10 @@ def render(graph, template_text):
         rc = AP_ROLE_COLOR[role] if role else None
         oncls = " onpath" if onpath else ""
         svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-inv="{esc(n["id"])}">')
-        # on-path boxes get a role-colored ring + corner tag so the attack
-        # story (ingress / route / failed control / target) reads at a glance,
-        # statically, before any hover.
-        if onpath:
-            svg.append(f'<rect x="{x-3.5}" y="{y-3.5}" width="{COL_W+7}" height="{h+7}" '
-                       f'rx="11" fill="none" stroke="{rc}" stroke-width="1.6" opacity="0.85"/>')
+        # on-path boxes carry a role corner tag (source / route / failed
+        # control / target) so the attack story reads at a glance, statically,
+        # before any hover. No ring: the attack-path arrows already attach
+        # visibly to these boxes, so an extra frame is redundant noise.
         svg.append(f'<rect x="{x}" y="{y}" width="{COL_W}" height="{h}" rx="8" '
                    f'fill="#fff" stroke="{c}" stroke-width="1.6"/>')
         svg.append(f'<rect x="{x}" y="{y}" width="5" height="{h}" rx="2.5" fill="{c}"/>')
@@ -461,9 +459,9 @@ def render(graph, template_text):
                        f'fill="none" stroke="{c}" stroke-width="1.8" '
                        f'stroke-linecap="round" stroke-linejoin="round">{icp}</g>')
         if onpath:
-            # role tag riding the ring's top-left corner — source / waypoint /
+            # role tag riding the box's top-left corner — source / waypoint /
             # bypassed-control / sink, so the attack story reads without hover.
-            bx, by = x - 3.5, y - 3.5
+            bx, by = float(x), float(y)
             svg.append(f'<g><title>on attack path — {esc(AP_ROLE_LABEL[role])}</title>'
                        f'<circle cx="{bx}" cy="{by}" r="9" fill="{rc}"/>'
                        f'<g transform="translate({bx},{by})">{AP_GLYPH[role]}</g></g>')
