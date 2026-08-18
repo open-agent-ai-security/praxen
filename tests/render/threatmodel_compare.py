@@ -128,12 +128,25 @@ def match_components(ga, gb):
     rest_a = [n for n in na if n["id"] not in ids_b]
     rest_b = [n for n in nb if n["id"] not in {n["id"] for n in na}]
 
+    # Kind tokens are stripped from identity matching: the id embeds the
+    # kind (resolver-py-TOOL vs resolver-py-ADAPTER), so leaving them in
+    # double-penalizes a kind disagreement — once by diluting the name
+    # similarity and again via the penalty below — and refuses transparently
+    # identical components (found live in the uagents re-gate).
+    _KIND_TOKENS = set()
+    for k in ("entrypoint client adapter orchestrator model prompt memory "
+              "datastore tool mcp server control external service deploy "
+              "surface secret store log sink").split():
+        _KIND_TOKENS.add(k)
+
+    def _ident(n):
+        return _tokens(n["id"], n["name"]) - _KIND_TOKENS
+
     def score(a, b):
         # kind disagreement halves the score rather than barring the match:
-        # two runs judging one file a datastore vs a log_sink are still
-        # describing the same component (the probe yardstick, which the gate
-        # thresholds were calibrated on, matched on name similarity alone).
-        s = _sim(_tokens(a["id"], a["name"]), _tokens(b["id"], b["name"]))
+        # same component, different kind judgment, is a penalized match —
+        # not a different component.
+        s = _sim(_ident(a), _ident(b))
         return s if a["kind"] == b["kind"] else s * 0.5
 
     fuzzy = _global_greedy(rest_a, rest_b, score, cutoff=0.30)

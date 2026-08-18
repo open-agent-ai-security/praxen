@@ -66,6 +66,29 @@ def main():
     check("kind flip: still matched via penalty", r["component_agreement"] == 1.0,
           str(r["components"]))
 
+    # kind flip WITH the kind embedded in the id (the uagents case:
+    # resolver-py-adapter vs resolver-py-tool) → still matched
+    bk = copy.deepcopy(b)
+    n = bk["nodes"][0]
+    old_id2 = n["id"]
+    n["kind"] = "adapter" if n["kind"] != "adapter" else "tool"
+    new_id2 = old_id2.rsplit("-renamed", 1)[0] + "-" + n["kind"]
+    n["id"] = new_id2
+    for e in bk["edges"]:
+        for k in ("from", "to"):
+            if e[k] == old_id2:
+                e[k] = new_id2
+        e["id"] = f'{e["from"]}--{e["to"]}'
+    for bd in bk["trust_boundaries"]:
+        bd["crossing_edges"] = [c.replace(old_id2, new_id2) for c in bd["crossing_edges"]]
+    for ap2 in bk["attack_paths"]:
+        for st in ap2["steps"]:
+            if st["node"] == old_id2:
+                st["node"] = new_id2
+    r = cmp.compare(g, bk)
+    check("kind-in-id flip: still matched", r["component_agreement"] == 1.0,
+          str(r["components"]))
+
     # status flip on a matched threat → disagreement recorded
     b3 = copy.deepcopy(g)
     t = b3["trust_boundaries"][0]["threats"][1]
