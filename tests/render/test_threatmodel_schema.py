@@ -58,7 +58,7 @@ def make_graph():
     """Minimal valid v1.0 graph: 2 nodes, 1 edge, 1 boundary exercising all
     four statuses, 1 attack path."""
     return {
-        "spec_version": "1.3",
+        "spec_version": "1.4",
         "executive_summary": "A demo agent for tests. Untrusted user text enters the loop; the one path to watch is prompt injection reaching the tool surface.",
         "praxen_version": "2.0.0",
         "target": {"slug": "demo", "source_root": "/tmp/demo"},
@@ -213,6 +213,13 @@ def main():
                      steps=g["attack_paths"][0]["steps"][:1]), ".steps")
     expect_error("path step node must resolve",
                  lambda g: g["attack_paths"][0]["steps"][0].update(node="ghost"), ".node")
+    # walk rule: consecutive steps must share an edge
+    def break_walk(g):
+        g["nodes"].append({"id": "lone-py-tool", "name": "Lone tool", "lane": "tools_mcp",
+                           "kind": "tool", "description": "unconnected",
+                           "evidence": [{"file": "z.py", "line": 1, "note": "n"}]})
+        g["attack_paths"][0]["steps"][1]["node"] = "lone-py-tool"
+    expect_error("attack path must be a walk over edges", break_walk, "no connecting edge")
     expect_valid("zero attack paths valid", lambda g: g.update(attack_paths=[]))
     expect_error("count conservation enforced",
                  lambda g: g["notes"]["counts"].update(threats=3),

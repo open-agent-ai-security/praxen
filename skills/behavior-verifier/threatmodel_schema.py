@@ -26,7 +26,7 @@ import schema as _s
 from schema import SchemaError  # re-exported: callers catch one error type
 
 # ── version ──────────────────────────────────────────────────────────────────
-SPEC_VERSION = "1.3"
+SPEC_VERSION = "1.4"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 LANES = [
@@ -244,6 +244,15 @@ def _validate_boundaries(data, edge_ids):
 
 
 def _validate_attack_paths(data, node_ids):
+    # undirected adjacency: an attack path must be a WALK over real edges, so
+    # the rendered chain never teleports over a missing hop. Direction is
+    # undirected because attacker *influence* can run opposite to the data
+    # edge (poisoned memory the loop reads back is memory→loop influence over a
+    # loop→memory query edge).
+    adj = set()
+    for e in data.get("edges", []):
+        if isinstance(e, dict) and "from" in e and "to" in e:
+            adj.add((e["from"], e["to"])); adj.add((e["to"], e["from"]))
     paths = _s._list(data, "attack_paths", "$")
     pids = set()
     for i, ap in enumerate(paths):
@@ -265,6 +274,17 @@ def _validate_attack_paths(data, node_ids):
             node = _s._nonempty_str(st, "node", sp)
             if node not in node_ids:
                 _s._err(f"{sp}.node", f"references unknown node {node!r}")
+            if j > 0:
+                prev = steps[j - 1]["node"]
+                if (prev, node) not in adj:
+                    _s._err(f"{sp}.node",
+                            f"attack-path step {j}→{j + 1} has no connecting edge "
+                            f"({prev!r} → {node!r}); a path must be a WALK over real "
+                            f"edges. Insert the intermediate node the influence "
+                            f"passes through (usually the orchestrator/loop where "
+                            f"injected content becomes an action), or add the edge "
+                            f"that carries the hop with its evidence — do not skip "
+                            f"the hijack step.")
             fid = st.get("finding_id")
             if fid is not None and (not isinstance(fid, str)
                                     or not _s._FINDING_ID_RE.match(fid)):

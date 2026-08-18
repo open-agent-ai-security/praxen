@@ -3,7 +3,7 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen Threat-Model Graph — contract v1.3
+# Praxen Threat-Model Graph — contract v1.4
 
 One JSON object per analyzed agent. This is the published contract for the
 threat-model graph that the extraction pass writes and `render_threatmodel.py`
@@ -12,8 +12,9 @@ renders; the runtime validator enforces it. Frozen from probe spec v0.4.3
 the pre-ship gate's findings — the `stored-state` archetype, `partial`
 calibration, and coinage rules; **v1.2 (2026-08-17)** makes attack paths
 run untrusted-origin → consequence; **v1.3 (2026-08-17)** adds the
-required plain-English `executive_summary` (the report leads with prose,
-like the analysis report) — see
+required plain-English `executive_summary`; **v1.4 (2026-08-17)** requires
+every attack path to be a WALK over real edges (no skipped hijack step) —
+see
 `plans/RESULTS_THREAT_MODEL_PROBE.md` and
 `tests/runs/v2.0.0-threatmodel-gate/GATE.md` for the evidence.
 
@@ -25,7 +26,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 
 ```json
 {
-  "spec_version": "1.3",
+  "spec_version": "1.4",
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
@@ -40,7 +41,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 }
 ```
 
-`spec_version` is exactly `"1.3"`. Legacy probe statuses
+`spec_version` is exactly `"1.4"`. Legacy probe statuses
 (`finding`/`residual`/`open`) are not valid — emit only
 the canonical status set below.
 
@@ -334,6 +335,15 @@ you can cite end-to-end:
 load-bearing rule).** This is what separates an attack from the agent
 simply doing its job.
 
+- **The path must be a WALK over real edges (v1.4, validator-enforced).**
+  Every consecutive pair of steps must be connected by an edge in `edges`
+  (either direction — attacker *influence* can run opposite to the data
+  edge). You may NOT jump from a gate or an input straight to the dangerous
+  call: the node where injected content becomes an action — almost always
+  the orchestrator/react loop — is a required step in between. If two
+  logical steps aren't edge-connected, insert the node the influence passes
+  through, or add the carrying edge with its evidence. A skipped hop leaves
+  the rendered path visibly broken and is a validation error.
 - **Step 1 is the untrusted origin — where attacker-influenceable content
   or action ENTERS**, across an ingress/untrusted boundary: a
   `user_inputs` entrypoint that is *not* the trusted owner/operator (a
