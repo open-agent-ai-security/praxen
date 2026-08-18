@@ -532,7 +532,8 @@ def _raise_card_ctx(cat, _idx):
             "CATEGORY_NAME": esc(cat["name"]),
             "SCORE": "N/A",
             # An N/A category is excluded from the weighted score, so no pill is
-            # lit — five ghosts read as "not assessed", distinct from a real 0.
+            # lit. Its five ghosts are identical to a real 0's; the "N/A" label
+            # and its score class — not the pills — are what tell the two apart.
             "SCORE_PIPS": _score_pips(0),
             "CONFIDENCE": esc(cat["confidence"]),
             "WEIGHT_PCT": str(round(weight * 100)),
