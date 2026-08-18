@@ -500,18 +500,6 @@ def render(graph, template_text):
                    f'<div class="lg-row"><span class="lg-cap">Kinds</span>{row2}</div>'
                    f'<div class="lg-row"><span class="lg-cap">Marks</span>{row3}</div>')
 
-    bk_rows = []
-    for b in g["trust_boundaries"]:
-        worst = worst_status(b["threats"])
-        c = status_color[worst]
-        bk_rows.append(
-            f'<tr><td><b class="lg-b" style="background:{c}">{bnd_num[b["id"]]}</b></td>'
-            f'<td><b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span></td>'
-            f'<td>{len(b["threats"])}</td><td>{len(b["remit_rules"])}</td>'
-            f'<td style="color:{c};font-weight:700">{worst}</td></tr>')
-    boundary_key_html = ('<table class="bk"><tr><th></th><th>Trust boundary</th>'
-                         '<th>Threats</th><th>Remit rules</th><th>Worst status</th></tr>'
-                         + "".join(bk_rows) + '</table>')
 
     appanels = []
     for p in g["attack_paths"]:
@@ -543,8 +531,11 @@ def render(graph, template_text):
             + f' <span class="rx">{esc(r["excerpt"])}</span><br>'
             for r in b["remit_rules"])
         panels.append(
-            f'<details open id="bnd-{esc(b["id"])}"><summary><b>{bnd_num[b["id"]]} — {esc(b["name"])}</b> — '
-            f'{len(b["threats"])} threats, {len(b["remit_rules"])} remit rules</summary>'
+            f'<details open id="bnd-{esc(b["id"])}"><summary>'
+            f'<b class="lg-b" style="background:{status_color[worst_status(b["threats"])]}">{bnd_num[b["id"]]}</b> '
+            f'<b>{esc(b["name"])}</b> <span class="rx">({esc(b["id"])})</span> — '
+            f'{len(b["threats"])} threats, {len(b["remit_rules"])} remit rules · '
+            f'worst: <b style="color:{status_color[worst_status(b["threats"])]}">{worst_status(b["threats"])}</b></summary>'
             f'<div class="remits">{remits or "<i>the remit does not touch this boundary — threats here are assessed against the RAISE/OWASP baseline alone (a remit is a job description, not a security model; silence here is normal)</i>"}</div>'
             f'<table><tr><th>STRIDE</th><th>OWASP</th><th>Threat</th><th>Status</th></tr>'
             + "".join(rows) + '</table></details>')
@@ -692,7 +683,6 @@ def render(graph, template_text):
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Attack paths are drawn in <b style="color:var(--sev-critical)">red</b>, running from where an attacker gets in to what they reach. Click any box to jump to its inventory row, or a <b>B</b>-badge to jump to that boundary; hover a box to reveal its data flows. Everything reads statically below — the key resolves every mark and the tables carry every citation.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
 <div class="legend" style="max-width:1100px;margin:12px auto 0">{legend_html}</div>
-<div style="max-width:1100px;margin:0 auto">{boundary_key_html}</div>
 </div>
 <div class="section"><div class="section-title">Attack Paths</div>{"".join(appanels) or '<div class="notes">none grounded in findings</div>'}</div>
 <div class="section"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
