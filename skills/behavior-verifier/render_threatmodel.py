@@ -284,10 +284,27 @@ def render(graph, template_text):
 
     # edges — hit path + visible path; labels render in a top layer
     arrow_grey, arrow_blue = tok("--text-muted"), tok("--blue")
-    svg.append(f'<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" '
+    # Arrowheads anchor at their BACK edge (refX=0), so the marker sits with its
+    # flat rear centered on the path's end and its tip extending ARROW_LEN px
+    # forward along the tangent. The path is trimmed by ARROW_LEN so the tip
+    # lands on the node edge and the visible line meets the center of that flat
+    # back edge — not the target pixel under the head. On a sharply curved
+    # bezier the trim follows the real end tangent (endpoint - last control
+    # point), keeping the head square to the line instead of stabbing its side.
+    ARROW_LEN = 7.0  # = markerWidth(7) * viewBox-span(10)/10
+
+    def _trimmed(sx, sy, c1x, c1y, c2x, c2y, ex, ey):
+        dx, dy = ex - c2x, ey - c2y
+        L = (dx * dx + dy * dy) ** 0.5
+        if L > 1e-6:
+            ex -= ARROW_LEN * dx / L
+            ey -= ARROW_LEN * dy / L
+        return f"M{sx} {sy} C {c1x} {c1y}, {c2x} {c2y}, {ex} {ey}"
+
+    svg.append(f'<defs><marker id="arr" viewBox="0 0 10 10" refX="0" refY="5" '
                f'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="{arrow_grey}"/></marker>'
-               f'<marker id="arr-hi" viewBox="0 0 10 10" refX="9" refY="5" '
+               f'<marker id="arr-hi" viewBox="0 0 10 10" refX="0" refY="5" '
                f'markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
                f'<path d="M0 0L10 5L0 10z" fill="{arrow_blue}"/></marker></defs>')
     loop_count, elbls, ei = {}, [], 0
@@ -303,7 +320,7 @@ def render(graph, template_text):
             x1 = x2 = fx + COL_W
             k = loop_count.get(e["from"], 0); loop_count[e["from"]] = k + 1
             mx = x1 + 36 + 20 * k
-            d = f"M{x1} {fy} C {mx} {fy}, {mx} {ty}, {x2} {ty}"
+            d = _trimmed(x1, fy, mx, fy, mx, ty, x2, ty)
             lx, ly, rot = mx + 6, (fy + ty) / 2, ""
             dim = ""
         else:
@@ -318,10 +335,10 @@ def render(graph, template_text):
                 floor_y = TOP_Y - 22
                 cy1 = max(fy + dip, floor_y)
                 cy2 = max(ty + dip, floor_y)
-                d = f"M{x1} {fy} C {x1 + 90 * dirn} {cy1}, {x2 - 90 * dirn} {cy2}, {x2} {ty}"
+                d = _trimmed(x1, fy, x1 + 90 * dirn, cy1, x2 - 90 * dirn, cy2, x2, ty)
                 ly = (fy + ty) / 2 + (cy1 - fy) * 0.75
             else:
-                d = f"M{x1} {fy} C {mx} {fy}, {mx} {ty}, {x2} {ty}"
+                d = _trimmed(x1, fy, mx, fy, mx, ty, x2, ty)
                 ly = (fy + ty) / 2
             lx = mx - 4
             rot = f' transform="rotate(-90 {lx} {ly})"'
