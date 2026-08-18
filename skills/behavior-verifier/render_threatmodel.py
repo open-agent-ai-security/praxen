@@ -277,7 +277,7 @@ def render(graph, template_text):
             by = BAND_TOP + (j % 4) * BAND_ROW + 11
             btip = (f'{bnd_num[b["id"]]} — {b["name"]} · {len(b["threats"])} threats · '
                     f'{len(b["remit_rules"])} remit rules (details below)')
-            svg.append(f'<g class="bnd" data-tip="{esc(btip)}">')
+            svg.append(f'<g class="bnd" data-bnd="{esc(b["id"])}" data-tip="{esc(btip)}">')
             svg.append(f'<line x1="{x}" y1="{by+11}" x2="{x}" y2="{total_h-20}" '
                        f'stroke="{c}" stroke-width="2" stroke-dasharray="7 5" opacity="0.75"/>')
             svg.append(f'<circle cx="{x}" cy="{by}" r="11" fill="{c}"/>'
@@ -379,7 +379,7 @@ def render(graph, template_text):
                    f'data-to="{esc(e["to"])}" data-tip="{esc(tip)}">')
         svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
         svg.append(f'<path class="vis" d="{d}" fill="none" stroke="{arrow_grey}" '
-                   f'stroke-width="1.0" opacity="0.4" marker-end="url(#arr)"/>')
+                   f'stroke-width="1.0" opacity="0" marker-end="url(#arr)"/>')
         svg.append('</g>')
         ei += 1
 
@@ -433,7 +433,7 @@ def render(graph, template_text):
         role = ap_role(n["id"], n["kind"]) if onpath else None
         rc = AP_ROLE_COLOR[role] if role else None
         oncls = " onpath" if onpath else ""
-        svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-tip="{esc(tip)}">')
+        svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-inv="{esc(n["id"])}">')
         # on-path boxes get a role-colored ring + corner tag so the attack
         # story (ingress / route / failed control / target) reads at a glance,
         # statically, before any hover.
@@ -520,7 +520,8 @@ def render(graph, template_text):
             + (f' <span class="fid">[{esc(s["finding_id"])}]</span>' if s.get("finding_id") else "")
             + f' <span class="rx">{esc(s["summary"])}</span>'
             for s in p["steps"])
-        appanels.append(f'<div class="ap">⚔ <b>{esc(p["name"])}</b>: {steps}</div>')
+        appanels.append(f'<div class="ap"><div class="ap-title">⚔ {esc(p["name"])}</div>'
+                        f'<div class="ap-steps">{steps}</div></div>')
 
     panels = []
     for b in g["trust_boundaries"]:
@@ -542,7 +543,7 @@ def render(graph, template_text):
             + f' <span class="rx">{esc(r["excerpt"])}</span><br>'
             for r in b["remit_rules"])
         panels.append(
-            f'<details open><summary><b>{bnd_num[b["id"]]} — {esc(b["name"])}</b> — '
+            f'<details open id="bnd-{esc(b["id"])}"><summary><b>{bnd_num[b["id"]]} — {esc(b["name"])}</b> — '
             f'{len(b["threats"])} threats, {len(b["remit_rules"])} remit rules</summary>'
             f'<div class="remits">{remits or "<i>the remit does not touch this boundary — threats here are assessed against the RAISE/OWASP baseline alone (a remit is a job description, not a security model; silence here is normal)</i>"}</div>'
             f'<table><tr><th>STRIDE</th><th>OWASP</th><th>Threat</th><th>Status</th></tr>'
@@ -552,7 +553,7 @@ def render(graph, template_text):
     for n in g["nodes"]:
         evs = "; ".join(f'{ev["file"]}:{ev.get("line") or "—"}' for ev in n["evidence"][:2])
         inv_rows.append(
-            f'<tr><td style="white-space:nowrap">{icon_svg(n["kind"], kind_color[n["kind"]], 14)} '
+            f'<tr id="inv-{esc(n["id"])}"><td style="white-space:nowrap">{icon_svg(n["kind"], kind_color[n["kind"]], 14)} '
             f'<b>{esc(n["name"])}</b></td><td>{esc(n["kind"])}</td><td>{esc(n["lane"])}</td>'
             f'<td>{esc(n["description"])}</td><td class="rx">{esc(evs)}</td></tr>')
     inventory_html = ('<table><tr><th>Component</th><th>Kind</th><th>Lane</th>'
@@ -606,7 +607,9 @@ def render(graph, template_text):
   th {{ background:var(--surface); font-size:11px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }}
   .remits {{ margin:8px 0; font-size:12.5px; line-height:2; }}
   .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
-  .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; font-size:13px; }}
+  .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; }}
+  .ap-title {{ font-size:15px; font-weight:800; color:var(--sev-critical); margin-bottom:6px; }}
+  .ap-steps {{ font-size:13px; line-height:1.7; }}
   .notes {{ font-size:12px; color:var(--text-muted); }}
   .legend {{ font-size:11.5px; color:var(--text-muted); }}
   .legend .lg-row {{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:3px 0; }}
@@ -637,10 +640,14 @@ def render(graph, template_text):
     filter:drop-shadow(0 0 6px rgba(225,25,0,.75)); }}
   @media (prefers-reduced-motion: reduce) {{
     .edge.hi .apvis, .apedge:hover .apvis {{ animation:none; stroke-dasharray:none; }} }}
-  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.4)); cursor:default; }}
+  .node {{ cursor:pointer; }}
+  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.4)); }}
   /* A node that sits on an attack path glows red on hover, not blue. */
   .node.onpath:hover rect:first-of-type {{ filter:drop-shadow(0 0 5px rgba(192,57,43,.6)); }}
-  .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:default; }}
+  .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:pointer; }}
+  @keyframes tmflash {{ 0%,100% {{ background:transparent; }} 30% {{ background:var(--surface-alt); }} }}
+  tr.flash > td {{ animation:tmflash 1.1s ease; }}
+  details.flash {{ animation:tmflash 1.1s ease; }}
   #tt {{ position:fixed; background:var(--navy); color:var(--surface); padding:7px 11px; border-radius:7px; font-size:12.5px; line-height:1.45; max-width:380px; pointer-events:none; opacity:0; z-index:10; box-shadow:0 3px 10px rgba(13,27,42,.35); transition:opacity .08s; }}
   .footer {{ background:var(--navy); border-top:4px solid var(--orange); margin-top:40px; padding:18px 32px; color:#8BAFC8; }}
   .footer .rf-row {{ display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap; }}
@@ -680,7 +687,7 @@ def render(graph, template_text):
 <div class="exec-summary">{summary_html}</div></div>
 <div class="section section-fullbleed">
 <div class="section-title">Architecture &amp; Trust Boundaries</div>
-<div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Every component, flow, and boundary cites evidence. Hover nodes for citations, edges for what flows, and B-badges for boundary detail — or read it all statically: the key below resolves every mark, and the component inventory carries every citation.</div>
+<div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Attack paths are drawn in <b style="color:var(--sev-critical)">red</b>, running from where an attacker gets in to what they reach. Click any box to jump to its inventory row, or a <b>B</b>-badge to jump to that boundary; hover a box to reveal its data flows. Everything reads statically below — the key resolves every mark and the tables carry every citation.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
 <div class="legend" style="max-width:1100px;margin:12px auto 0">{legend_html}</div>
 <div style="max-width:1100px;margin:0 auto">{boundary_key_html}</div>
@@ -728,6 +735,13 @@ document.addEventListener('keydown', ev => {{ if (ev.key === 'Escape') {{ suppre
 // Single-edge hover: tooltip only. On-canvas labels appear on NODE hover,
 // annotating the whole fan of connected flows at once.
 const lblOf = e => document.querySelector('.elbl[data-ei="' + e.dataset.ei + '"]');
+function jumpTo(el) {{ if (!el) return; el.scrollIntoView({{behavior:'smooth', block:'center'}});
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }}
+document.querySelectorAll('.node').forEach(n =>
+  n.addEventListener('click', () => jumpTo(document.getElementById('inv-' + n.dataset.inv))));
+document.querySelectorAll('.bnd').forEach(b =>
+  b.addEventListener('click', () => {{ const d = document.getElementById('bnd-' + b.dataset.bnd);
+    if (d) {{ d.open = true; jumpTo(d); }} }}));
 document.querySelectorAll('.node').forEach(n => {{
   const id = n.dataset.id;
   const mine = [...document.querySelectorAll('.edge')].filter(e => e.dataset.from === id || e.dataset.to === id);
