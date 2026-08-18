@@ -335,7 +335,11 @@ def render(graph, template_text):
                f'<marker id="arr-path" viewBox="0 0 10 10" refX="0" refY="5" '
                f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
                f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
-               f'<path d="M0 0L10 5L0 10z" fill="#C0392B"/></marker></defs>')
+               f'<path d="M0 0L10 5L0 10z" fill="#C0392B"/></marker>'
+               f'<marker id="arr-path-hi" viewBox="0 0 10 10" refX="0" refY="5" '
+               f'markerWidth="{ARROW_LEN*1.7}" markerHeight="{ARROW_LEN*1.7}" '
+               f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
+               f'<path d="M0 0L10 5L0 10z" fill="#E11900"/></marker></defs>')
 
     # --- geometry helper: returns (x1, fy, x2, ty, span, orientation) ---
     def geo(e):
@@ -561,17 +565,6 @@ def render(graph, template_text):
     counts = {st: sum(1 for b in g["trust_boundaries"] for t in b["threats"]
                       if t["status"] == st) for st in tms.THREAT_STATUSES}
     notes = g["notes"]
-    # masthead verdict badge — the worst threat status across the whole model,
-    # mapped to the house .status-badge classes (headline glance, like the
-    # analysis report's verdict chip).
-    if counts["confirmed"]:
-        verdict_label, verdict_cls = "CONFIRMED THREATS", "status-critical"
-    elif counts["potential"]:
-        verdict_label, verdict_cls = "POTENTIAL THREATS", "status-high"
-    elif counts["partial"]:
-        verdict_label, verdict_cls = "PARTIAL COVERAGE", "status-advisory"
-    else:
-        verdict_label, verdict_cls = "MITIGATED", "status-clean"
     # a slug is our only handle on the agent's name; title-case it for display
     agent_title = g["target"]["slug"].replace("-", " ").replace("_", " ").title()
     # provenance, not the raw "You are powered by ..." self-report string
@@ -672,7 +665,7 @@ def render(graph, template_text):
   .edge.hi .apvis, .apedge:hover .apvis {{
     stroke:#E11900; stroke-width:4.2; opacity:1 !important;
     stroke-dasharray:10 6; animation:apflow .55s linear infinite;
-    filter:drop-shadow(0 0 6px rgba(225,25,0,.75)); }}
+    filter:drop-shadow(0 0 6px rgba(225,25,0,.75)); marker-end:url(#arr-path-hi); }}
   @media (prefers-reduced-motion: reduce) {{
     .edge.hi .apvis, .apedge:hover .apvis {{ animation:none; stroke-dasharray:none; }} }}
   .node {{ cursor:pointer; }}
@@ -707,7 +700,6 @@ def render(graph, template_text):
     <div class="masthead-date">evidence-derived · Praxen {esc(g["praxen_version"])} · graph contract {esc(g["spec_version"])}{aref_html}</div>
   </div>
   <div class="masthead-summary">
-    <span class="status-badge {verdict_cls}">{verdict_label}</span>
     <div class="masthead-metrics">
       <div class="mh-metric"><b>{len(g["nodes"])}</b><span>Components</span></div>
       <div class="mh-metric"><b>{len(g["edges"])}</b><span>Flows</span></div>
