@@ -467,9 +467,8 @@ def render(graph, template_text):
     svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
     # -- static companions -----------------------------------------------------
-    def chip(text, color):
-        return (f'<span style="background:{color};color:#fff;border-radius:4px;'
-                f'padding:1px 7px;font-size:11px;font-weight:600">{esc(text)}</span>')
+    def chip(text, cls):
+        return f'<span class="status-pill {cls}">{esc(text)}</span>' 
 
     kinds_present = []
     for n in g["nodes"]:
@@ -523,7 +522,7 @@ def render(graph, template_text):
                 extra = f' <span class="fid">{esc(t["finding_id"])}</span>'
             elif t["status"] in ("mitigated", "partial"):
                 mev = t["mitigation_evidence"]
-                extra = f' <span class="rx">{esc(mev["file"])}:{esc(mev.get("line") or "—")}</span>'
+                extra = f' <code>{esc(mev["file"])}:{esc(mev.get("line") or "—")}</code>'
                 if t["status"] == "partial":
                     extra += f'<br><span class="rx">remainder: {esc(t["remainder"])}</span>'
             sp = t["stride"]
@@ -533,9 +532,9 @@ def render(graph, template_text):
                    if t["owasp"] else '<span class="rx">—</span>')
             rows.append(f'<tr>{stride_cell}<td class="tm-c">{owc}</td>'
                         f'<td>{esc(t["summary"])}</td>'
-                        f'<td>{chip(t["status"], status_color[t["status"]])}{extra}</td></tr>')
+                        f'<td>{chip(t["status"], "st-" + t["status"])}{extra}</td></tr>')
         remits = " ".join(
-            chip(f'{r["rule_id"]} {r["coverage_status"]}', coverage_color[r["coverage_status"]])
+            chip(f'{r["rule_id"]} {r["coverage_status"]}', "pill-" + r["coverage_status"])
             + f' <span class="rx">{esc(r["excerpt"])}</span><br>'
             for r in b["remit_rules"])
         panels.append(
@@ -554,7 +553,7 @@ def render(graph, template_text):
         inv_rows.append(
             f'<tr id="inv-{esc(n["id"])}"><td style="white-space:nowrap">{icon_svg(n["kind"], kind_color[n["kind"]], 14)} '
             f'<b>{esc(n["name"])}</b></td><td>{esc(n["kind"])}</td><td>{esc(n["lane"])}</td>'
-            f'<td>{esc(n["description"])}</td><td class="rx">{esc(evs)}</td></tr>')
+            f'<td>{esc(n["description"])}</td><td><code>{esc(evs)}</code></td></tr>')
     inventory_html = ('<table><tr><th>Component</th><th>Kind</th><th>Lane</th>'
                       '<th>Description</th><th>Evidence</th></tr>'
                       + "".join(inv_rows) + '</table>')
@@ -562,6 +561,23 @@ def render(graph, template_text):
     counts = {st: sum(1 for b in g["trust_boundaries"] for t in b["threats"]
                       if t["status"] == st) for st in tms.THREAT_STATUSES}
     notes = g["notes"]
+    # masthead verdict badge — the worst threat status across the whole model,
+    # mapped to the house .status-badge classes (headline glance, like the
+    # analysis report's verdict chip).
+    if counts["confirmed"]:
+        verdict_label, verdict_cls = "CONFIRMED THREATS", "status-critical"
+    elif counts["potential"]:
+        verdict_label, verdict_cls = "POTENTIAL THREATS", "status-high"
+    elif counts["partial"]:
+        verdict_label, verdict_cls = "PARTIAL COVERAGE", "status-advisory"
+    else:
+        verdict_label, verdict_cls = "MITIGATED", "status-clean"
+    # a slug is our only handle on the agent's name; title-case it for display
+    agent_title = g["target"]["slug"].replace("-", " ").replace("_", " ").title()
+    # provenance, not the raw "You are powered by ..." self-report string
+    _m = re.search(r"named (.+?)\.\s", g.get("model_identity", "")) or \
+        re.search(r"named (.+)", g.get("model_identity", ""))
+    model_name = _m.group(1).strip() if _m else "unknown"
     aref = g.get("analysis_ref")
     aref_html = (f' · built against <b>{esc(aref)}</b>' if aref
                  else ' · no analysis reference (standalone extraction)')
@@ -595,17 +611,34 @@ def render(graph, template_text):
   .section {{ margin-bottom:40px; }}
   .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
   .section-desc {{ color:#555; font-size:13px; margin:0 0 18px; line-height:1.6; }}
-  .exec-summary {{ background:var(--surface-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:16px 22px; font-size:14.5px; line-height:1.65; color:var(--text); }}
+  .exec-summary {{ background:var(--surface-alt); border-left:4px solid var(--blue-dark); border-radius:0 8px 8px 0; padding:16px 22px; font-size:14.5px; line-height:1.65; color:var(--text); }}
   .exec-summary p {{ margin:0 0 12px; }} .exec-summary p:last-child {{ margin-bottom:0; }}
   .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
   .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
   details {{ background:#FFF; border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:10px 0; }}
   summary {{ cursor:pointer; }} summary b {{ color:var(--navy); }}
-  table {{ border-collapse:collapse; margin-top:8px; font-size:12.5px; width:100%; }}
-  th,td {{ border:1px solid var(--border); padding:5px 9px; text-align:left; vertical-align:top; }}
-  th {{ background:var(--surface); font-size:11px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }}
+  table {{ width:100%; border-collapse:collapse; font-size:13px; margin:14px 0 6px; border:1px solid var(--border); border-radius:8px; overflow:hidden; }}
+  th {{ background:var(--navy); color:#FFFFFF; padding:9px 13px; text-align:left; font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; }}
+  td {{ padding:9px 13px; border-bottom:1px solid var(--border); vertical-align:top; }}
+  tr:last-child td {{ border-bottom:none; }}
+  table tr:hover td {{ background:#F8F9FE; }}
   .remits {{ margin:8px 0; font-size:12.5px; line-height:2; }}
   .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
+  .status-pill {{ display:inline-block; padding:2px 10px; border-radius:10px; font-weight:700; font-size:11px; letter-spacing:0.04em; }}
+  .pill-verified {{ background:#D1FAE5; color:#065F46; }} .pill-gap {{ background:#FEE2E2; color:#991B1B; }}
+  .pill-partial {{ background:#FFEDD5; color:#92400E; }} .pill-vague {{ background:#FEF9C3; color:#713F12; }}
+  .pill-enp {{ background:#E5E7EB; color:#374151; }}
+  .st-confirmed {{ background:#FEE2E2; color:#991B1B; }} .st-potential {{ background:#DBEAFE; color:#1E40AF; }}
+  .st-partial {{ background:#FFEDD5; color:#92400E; }} .st-mitigated {{ background:#D1FAE5; color:#065F46; }}
+  .status-badge {{ display:inline-block; padding:5px 16px; border-radius:12px; font-weight:800; font-size:13px; letter-spacing:0.08em; color:#FFFFFF; }}
+  .status-critical {{ background:var(--sev-critical); }} .status-high {{ background:var(--sev-high); }}
+  .status-advisory {{ background:var(--sev-medium); }} .status-clean {{ background:var(--green); }}
+  .jumpnav {{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border); padding:9px 32px; display:flex; gap:8px; flex-wrap:wrap; }}
+  .jumpnav a {{ font-size:12px; font-weight:700; letter-spacing:0.03em; color:var(--blue-dark); text-decoration:none; padding:5px 12px; border:1px solid var(--border-alt); border-radius:14px; background:#FFFFFF; }}
+  .jumpnav a:hover {{ background:var(--surface-alt); border-color:var(--blue); }}
+  .section[id] {{ scroll-margin-top:56px; }}
+  code {{ background:#E6ECF5; padding:1px 5px; border-radius:3px; font-size:12px; color:var(--navy); }}
+  @media print {{ .jumpnav {{ display:none; }} }}
   td.tm-c, th.tm-c {{ text-align:center; white-space:nowrap; vertical-align:middle; }}
   .pill {{ display:inline-block; padding:1px 9px; border-radius:10px; background:var(--surface); border:1px solid var(--border); font-size:11px; font-weight:700; color:var(--text-muted); }}
   .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; }}
@@ -669,11 +702,12 @@ def render(graph, template_text):
 </style></head><body>
 <div class="masthead"><div class="masthead-main">
   <div>{mh_logo}
-    <div class="masthead-agent">{esc(g["target"]["slug"])}</div>
+    <div class="masthead-agent">{esc(agent_title)}</div>
     <div class="masthead-kind">Threat Model</div>
     <div class="masthead-date">evidence-derived · Praxen {esc(g["praxen_version"])} · graph contract {esc(g["spec_version"])}{aref_html}</div>
   </div>
   <div class="masthead-summary">
+    <span class="status-badge {verdict_cls}">{verdict_label}</span>
     <div class="masthead-metrics">
       <div class="mh-metric"><b>{len(g["nodes"])}</b><span>Components</span></div>
       <div class="mh-metric"><b>{len(g["edges"])}</b><span>Flows</span></div>
@@ -685,21 +719,22 @@ def render(graph, template_text):
     </div>
   </div>
 </div></div>
+<nav class="jumpnav"><a href="#s-summary">Summary</a><a href="#s-attack">Attack Paths</a><a href="#s-boundaries">Trust Boundaries</a><a href="#s-inventory">Component Inventory</a></nav>
 <div class="content">
-<div class="section"><div class="section-title">Summary</div>
+<div class="section" id="s-summary"><div class="section-title">Summary</div>
 <div class="exec-summary">{summary_html}</div></div>
-<div class="section section-fullbleed">
+<div class="section section-fullbleed" id="s-arch">
 <div class="section-title">Architecture &amp; Trust Boundaries</div>
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Attack paths are drawn in <b style="color:var(--sev-critical)">red</b>, running from where an attacker gets in to what they reach. Click any box to jump to its inventory row, or a <b>B</b>-badge to jump to that boundary; hover a box to reveal its data flows. Everything reads statically below — the key resolves every mark and the tables carry every citation.</div>
 <div class="svgwrap"><svg width="{total_w}" height="{total_h}" viewBox="0 0 {total_w} {total_h}" xmlns="http://www.w3.org/2000/svg">{"".join(svg)}</svg></div>
 <div class="legend" style="max-width:1100px;margin:12px auto 0">{legend_html}</div>
 </div>
-<div class="section"><div class="section-title">Attack Paths</div>{"".join(appanels) or '<div class="notes">none grounded in findings</div>'}</div>
-<div class="section"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
-<div class="section"><div class="section-title">Component Inventory</div>
+<div class="section" id="s-attack"><div class="section-title">Attack Paths</div>{"".join(appanels) or '<div class="notes">none grounded in findings</div>'}</div>
+<div class="section" id="s-boundaries"><div class="section-title">Trust Boundaries — Threats &amp; Governing Remit Rules</div>{"".join(panels)}</div>
+<div class="section" id="s-inventory"><div class="section-title">Component Inventory</div>
 <div class="section-desc">Every component with its kind, lane, and source evidence — the diagram's tooltips, on paper.</div>{inventory_html}</div>
 <div class="section"><div class="section-title">Extraction Notes</div>
-<div class="notes">lane_fit: {esc(notes["lane_fit"])}<br>omissions: {esc(notes["omissions"] or "none recorded")}<br>model: {esc(g["model_identity"])}</div></div>
+<div class="notes">lane_fit: {esc(notes["lane_fit"])}<br>omissions: {esc(notes["omissions"] or "none recorded")}<br>generated by: <b>{esc(model_name)}</b></div></div>
 </div>
 <div class="footer"><div class="rf-row">
   {ft_logo}
