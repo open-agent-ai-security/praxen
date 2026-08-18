@@ -57,6 +57,7 @@ PAGES = [
     ("understanding-variability.md", "Run-to-Run Variability"),
     ("thinking-modes.md",         "Thinking Modes"),
     ("threat-modeling.md",        "Threat Modeling"),
+    ("threat-modeling-methodology.md", "Threat-Model Methodology"),
     ("abv.md",                    "Agent Behavior Verification"),
     ("owasp.md",                  "OWASP Gen AI Security"),
     ("RAISE.md",                  "The RAISE Framework"),
