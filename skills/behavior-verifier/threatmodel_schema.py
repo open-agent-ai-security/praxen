@@ -26,7 +26,7 @@ import schema as _s
 from schema import SchemaError  # re-exported: callers catch one error type
 
 # ── version ──────────────────────────────────────────────────────────────────
-SPEC_VERSION = "1.0"
+SPEC_VERSION = "1.1"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 LANES = [
@@ -45,6 +45,7 @@ BOUNDARY_ARCHETYPES = [
     "untrusted-ingress", "control-plane-exposure", "model-egress",
     "tool-invocation", "state-commit", "data-at-rest", "secret-material",
     "telemetry-egress", "supply-chain", "value-transfer", "peer-a2a",
+    "stored-state",
 ]
 STRIDE = ["S", "T", "R", "I", "D", "E"]
 # Severity order (worst first) — the renderer's boundary coloring ladder.

@@ -58,7 +58,7 @@ def make_graph():
     """Minimal valid v1.0 graph: 2 nodes, 1 edge, 1 boundary exercising all
     four statuses, 1 attack path."""
     return {
-        "spec_version": "1.0",
+        "spec_version": "1.1",
         "praxen_version": "2.0.0",
         "target": {"slug": "demo", "source_root": "/tmp/demo"},
         "analysis_ref": "demo-findings-2026-08-17.json",

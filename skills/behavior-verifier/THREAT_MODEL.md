@@ -105,7 +105,7 @@ about the target.
 > reprint secret values (path + pattern only). Do not modify anything
 > outside your output file; every input is read-only.
 >
-> Output: write the graph to `{OUTPUT_JSON}` with `"spec_version": "1.0"`,
+> Output: write the graph to `{OUTPUT_JSON}` with `"spec_version": "1.1"`,
 > `"praxen_version": "{PRAXEN_VERSION}"`, `"analysis_ref":
 > {ANALYSIS_REF_OR_NULL}`, and your verbatim "You are powered by ..."
 > declaration as `model_identity`. Before writing, self-check: all edge
@@ -126,9 +126,10 @@ python3 {SKILL_DIR}/render_threatmodel.py \
   --out-html ./reports/<slug>-threatmodel-<TIMESTAMP>.html
 ```
 
-- **On a validation error:** relay the exact error verbatim to the
-  extraction agent to repair its own JSON — never hand-edit graph content
-  yourself. At most two repair rounds; if it still fails, stop and report
+- **On a validation error:** first copy the failing graph aside
+  (`<file>.prerepair`) so the repair's diff is auditable, then relay the
+  exact error verbatim to the extraction agent to repair its own JSON —
+  never hand-edit graph content yourself. At most two repair rounds; if it still fails, stop and report
   the error to the operator with the artifact paths.
 - **Cross-check cited findings** (the validator cannot see the findings
   JSON): every ID from `threatmodel_schema.cited_finding_ids(graph)` must

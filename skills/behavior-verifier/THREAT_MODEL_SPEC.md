@@ -3,13 +3,16 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen Threat-Model Graph — contract v1.0
+# Praxen Threat-Model Graph — contract v1.1
 
 One JSON object per analyzed agent. This is the published contract for the
 threat-model graph that the extraction pass writes and `render_threatmodel.py`
 renders; the runtime validator enforces it. Frozen from probe spec v0.4.3
-(2026-08-17) after four validation rounds — see
-`plans/RESULTS_THREAT_MODEL_PROBE.md` for the evidence.
+(2026-08-17) after four validation rounds; **v1.1 (2026-08-17)** folds in
+the pre-ship gate's findings — the `stored-state` archetype, `partial`
+calibration, and coinage rules — see
+`plans/RESULTS_THREAT_MODEL_PROBE.md` and
+`tests/runs/v2.0.0-threatmodel-gate/GATE.md` for the evidence.
 
 Everything is evidence-derived: **no node, edge, boundary, or threat without
 a citation into the source tree, the findings JSON, or the remit.** If you
@@ -19,7 +22,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 
 ```json
 {
-  "spec_version": "1.0",
+  "spec_version": "1.1",
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
@@ -33,7 +36,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 }
 ```
 
-`spec_version` is exactly `"1.0"`. Legacy probe statuses
+`spec_version` is exactly `"1.1"`. Legacy probe statuses
 (`finding`/`residual`/`open`) are not valid in v1.0 documents — emit only
 the canonical status set below.
 
@@ -90,14 +93,20 @@ runs on the same code MUST coin the same id:
    heading — or, when the code has no named defining scope, **the named
    construct the block turns on** (the flag, constant, or registry it
    registers), kebab-cased: `fallback-processing-finbot-agent-py-orchestrator`,
-   `redaction-skill-md-control`. The base file id names the file's dominant
-   role; splits take prefixes. **If two would-be splits share the same
+   `redaction-skill-md-control`. CamelCase scopes kebab on case boundaries
+   (`FinBotConfig` → `fin-bot-config-`). A control implemented across two
+   functions takes its prefix from the construct or configuration it keys
+   on, never from whichever function happens to lead the evidence list.
+   The base file id names the file's dominant role — a family that IS the
+   file's dominant role keeps the base id, and only the splits take
+   prefixes. **If two would-be splits share the same
    defining scope** (two controls under one heading, one function), that
    collision is the contract telling you they are ONE node — merge them
    with multi-line evidence.
-4. **Cross-file collision** (two nodes, same basename+kind, different
-   files): prefix the parent directory: `admin-admin-py-...` vs
-   `vendor-admin-py-...`.
+4. **Cross-file collision** (two nodes with the same basename in
+   different files, ANY kind — v1.1 widened; four `manager.py` nodes with
+   different kinds are still indistinguishable to a reader): prefix the
+   parent directory: `admin-admin-py-...` vs `vendor-admin-py-...`.
 5. **Runtime-created artifact:** when code writes/reads a FIXED literal
    path (`private_keys.json`), the node is named for that artifact:
    `private-keys-json-secret-store`. When the path is dynamic
@@ -105,7 +114,10 @@ runs on the same code MUST coin the same id:
 6. **No-file node** (external service, human actor, peer): `id = <proper
    name of the thing, lowercase kebab>-<kind>` using the name the code
    itself uses (`openai-external-service`, `peer-agent-entrypoint`). An
-   actor the code never names takes the remit's name for it. Never invent
+   actor the code never names takes the remit's name for it — and may cite
+   the remit file itself as its `evidence.file` (the one sanctioned
+   non-workspace citation). An in-process signing identity is a
+   `secret_store` node distinct from any at-rest key file. Never invent
    synonyms.
 
 **Edgeless nodes are legitimate** and expected for: committed secrets,
@@ -190,6 +202,19 @@ fits — the id IS the archetype string, and most boundaries fit one:
 | `supply-chain` | dependencies, install path, plugin/skill provenance |
 | `value-transfer` | funds/irreversible external action crossing |
 | `peer-a2a` | agent ↔ agent communication |
+| `stored-state` | writable persistent state (goals, config, memory) whose contents later re-enter the agent's decisions or prompts |
+
+**State disambiguation (the gate's most-coined surface):** `state-commit`
+is the *write* of a decision into durable state; `data-at-rest` is stored
+data *read by a lower-trust caller*; `stored-state` is persisted content
+*re-entering the agent's own reasoning later* (the replay/poisoning
+surface). A stored-goals mechanism typically yields `stored-state` for the
+replay, with the ungated write filed under `control-plane-exposure` or
+`state-commit` as evidence dictates.
+
+**A2A direction convention:** inbound peer traffic lands on
+`untrusted-ingress`; outbound sends, resolution, and sync responses land on
+`peer-a2a`.
 
 Only if no archetype fits, coin `<from-concept>--<to-concept>` and say so
 in `notes`. Two boundaries of the same archetype: suffix `-2` and
@@ -249,6 +274,15 @@ distinguish in `name`.
     `partial` status.
   - `mitigated` — a control demonstrably handles the whole threat (cite
     code).
+  - **Partial calibration (v1.1).** `partial` requires a control acting on
+    the SAME mechanism as the threat — an adjacent control does not count.
+    Tiebreaks at the borders: vs `mitigated` — if you cannot NAME a
+    concrete uncovered input, path, or configuration in `remainder`, it is
+    `mitigated`; vs `potential` — if no control touches the mechanism at
+    all, it is `potential`; vs `confirmed` — a finding proving the
+    remainder always wins. A control that exists but is trivially disabled
+    by reachable configuration is `partial` with the bypass named as the
+    remainder.
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
 
 ## Attack paths
