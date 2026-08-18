@@ -3,7 +3,7 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen Threat-Model Graph — contract v1.2
+# Praxen Threat-Model Graph — contract v1.3
 
 One JSON object per analyzed agent. This is the published contract for the
 threat-model graph that the extraction pass writes and `render_threatmodel.py`
@@ -11,7 +11,9 @@ renders; the runtime validator enforces it. Frozen from probe spec v0.4.3
 (2026-08-17) after four validation rounds; **v1.1 (2026-08-17)** folds in
 the pre-ship gate's findings — the `stored-state` archetype, `partial`
 calibration, and coinage rules; **v1.2 (2026-08-17)** makes attack paths
-run untrusted-origin → consequence (the report's headline rule) — see
+run untrusted-origin → consequence; **v1.3 (2026-08-17)** adds the
+required plain-English `executive_summary` (the report leads with prose,
+like the analysis report) — see
 `plans/RESULTS_THREAT_MODEL_PROBE.md` and
 `tests/runs/v2.0.0-threatmodel-gate/GATE.md` for the evidence.
 
@@ -23,11 +25,12 @@ cannot cite it, leave it out and record the omission in `notes`.
 
 ```json
 {
-  "spec_version": "1.2",
+  "spec_version": "1.3",
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
+  "executive_summary": "<2-3 short paragraphs of plain English — see Executive summary>",
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
   "nodes": [],
   "edges": [],
@@ -37,7 +40,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 }
 ```
 
-`spec_version` is exactly `"1.2"`. Legacy probe statuses
+`spec_version` is exactly `"1.3"`. Legacy probe statuses
 (`finding`/`residual`/`open`) are not valid — emit only
 the canonical status set below.
 
@@ -285,6 +288,31 @@ distinguish in `name`.
     by reachable configuration is `partial` with the bypass named as the
     remainder.
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
+
+## Executive summary
+
+`executive_summary` is a required plain-English string (2–3 short
+paragraphs, no markup) — the first thing a reader sees, before the diagram,
+the way the analysis report leads with its behavior summary. Write it for a
+hurried operator who may read nothing else, and write it LAST, once the
+graph, boundaries, and attack paths are settled, so it reflects them.
+
+- **Paragraph 1 — what this agent is and how it's shaped.** What it does,
+  where its untrusted inputs come from, what it can reach and act on, and
+  the one or two trust surfaces that matter most. Concrete, not generic
+  ("A SOC investigation agent driven by a Claude Code skill over a bundled
+  Exabeam MCP; its only untrusted input is tenant telemetry it treats as
+  data, and its most consequential capability is case suppression.").
+- **Paragraph 2 (and optionally 3) — the threats to deal with first**, in
+  priority order, in the operator's language. Lead with the attack paths
+  (origin → consequence) and the confirmed high-severity boundaries; say
+  plainly what an attacker gets and what to fix. Do not list every threat —
+  name the few that matter. If the picture is genuinely clean, say that and
+  say what keeps it clean.
+
+Ground every claim in the graph — the summary asserts nothing the nodes,
+boundaries, and paths don't already support. No finding IDs or file paths
+in the prose; those live in the tables.
 
 ## Attack paths
 

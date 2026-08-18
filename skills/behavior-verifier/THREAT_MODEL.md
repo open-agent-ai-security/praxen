@@ -99,13 +99,13 @@ about the target.
 > text genuinely governs conduct at that boundary** — a remit is a job
 > description, not a security model, and empty `remit_rules` is a normal
 > outcome never to be remarked on; run the mitigation-check sweep BEFORE
-> assigning any threat status; build attack paths that run from an untrusted ORIGIN (where attacker-influenceable content enters — NOT an internal tool or the loop acting under injected influence) to a CONSEQUENCE (host exec, data egress, state-commit, persistent poisoning), citing the finding at each link — see the contract's Attack paths section; a few complete origin→consequence chains beat many fragments.
+> assigning any threat status; write the required `executive_summary` LAST (2-3 plain-English paragraphs: para 1 = what the agent is and its key trust surfaces; para 2-3 = the threats to deal with first, led by the attack paths, in the operator's language, no IDs or paths in the prose); build attack paths that run from an untrusted ORIGIN (where attacker-influenceable content enters — NOT an internal tool or the loop acting under injected influence) to a CONSEQUENCE (host exec, data egress, state-commit, persistent poisoning), citing the finding at each link — see the contract's Attack paths section; a few complete origin→consequence chains beat many fragments.
 >
 > Rules: every element cites evidence — no citation, no element. Never
 > reprint secret values (path + pattern only). Do not modify anything
 > outside your output file; every input is read-only.
 >
-> Output: write the graph to `{OUTPUT_JSON}` with `"spec_version": "1.2"`,
+> Output: write the graph to `{OUTPUT_JSON}` with `"spec_version": "1.3"`,
 > `"praxen_version": "{PRAXEN_VERSION}"`, `"analysis_ref":
 > {ANALYSIS_REF_OR_NULL}`, and your verbatim "You are powered by ..."
 > declaration as `model_identity`. Before writing, self-check: all edge
