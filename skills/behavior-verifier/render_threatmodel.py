@@ -672,7 +672,7 @@ def render(graph, template_text):
   .node.onpath:hover rect:first-of-type {{ filter:drop-shadow(0 0 5px rgba(192,57,43,.6)); }}
   .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:pointer; }}
   @keyframes tmflash {{ 0%,100% {{ background:transparent; }} 30% {{ background:var(--surface-alt); }} }}
-  tr[id^="inv-"], details[id^="bnd-"] {{ scroll-margin-top:16px; }}
+  tr[id^="inv-"], details[id^="bnd-"] {{ scroll-margin-top:64px; }}
   tr.flash > td {{ animation:tmflash 1.1s ease; }}
   details.flash {{ animation:tmflash 1.1s ease; }}
   #tt {{ position:fixed; background:var(--navy); color:var(--surface); padding:7px 11px; border-radius:7px; font-size:12.5px; line-height:1.45; max-width:380px; pointer-events:none; opacity:0; z-index:10; box-shadow:0 3px 10px rgba(13,27,42,.35); transition:opacity .08s; }}
