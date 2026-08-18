@@ -130,3 +130,32 @@ the mean of all three pairwise comparisons (r1–r2, r1–r3, r2–r3) on each
 measure; gate = the mean of the four per-target scores against the
 unchanged thresholds (boundary ≥0.9, status ~90%, component ≥0.7).
 Whatever the numbers say, they ship in this file unadjusted.
+
+## Run 3 — result (computed exactly as pre-declared)
+
+One fresh v1.1 extraction per target (all four first-pass valid,
+render-clean); per-target score = mean of the three pairwise comparisons;
+gate = mean of the four per-target scores.
+
+| target | boundary | status | component |
+|---|---|---|---|
+| finbot | 0.939 | 0.908 | 0.815 |
+| socxen | 0.933 | 1.000 | 0.819 |
+| uagents | 0.876 | 1.000 | 0.644 |
+| craftbot | 0.886 | 0.965 | 0.563 |
+| **gate mean** | **0.909 ✓** | **0.968 ✓** | **0.710 ✓** |
+
+**VERDICT: PASS.** All three gates met under the estimator declared before
+the data existed. The residual, on record: component agreement on the two
+big-workspace targets (uagents 0.64, craftbot 0.56) reflects real
+decomposition wobble — collapse choices under the node budget, rule-6/rule-1
+overlap for file-backed external services — while the boundary and status
+layers, the report's security-meaningful content, hold at 0.88–0.94 and
+0.91–1.00 per target. The runs' remaining ambiguity notes (edge reuse
+across boundaries, listener archetype, rule-4 node-vs-file scope,
+prefix-stacking order) are candidate v1.2 clarifications for after 2.0 —
+none blocks the contract as shipped.
+
+Twelve v1.1 extractions total across runs 2–3: 12/12 validator-clean (11
+first-pass; the run-1 era repair predates v1.1), 12/12 render-clean,
+every finding of every target cited in every graph that claims it.
