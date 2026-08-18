@@ -76,6 +76,9 @@ FAMILIES = [
 STATUS_TOKEN = {"confirmed": "--sev-critical", "potential": "--blue",
                 "partial": "--sev-medium", "mitigated": "--green"}
 STATUS_RANK = {"mitigated": 0, "partial": 1, "potential": 2, "confirmed": 3}
+STRIDE_NAME = {"S": "Spoofing", "T": "Tampering", "R": "Repudiation",
+               "I": "Information disclosure", "D": "Denial of service",
+               "E": "Elevation of privilege"}
 COVERAGE_TOKEN = {"verified": "--green", "partial": "--sev-medium",
                   "gap": "--sev-critical", "vague": "--sev-low", "enp": "--sev-low"}
 # Lightened-on-navy masthead variants — literals mirrored from
@@ -523,7 +526,12 @@ def render(graph, template_text):
                 extra = f' <span class="rx">{esc(mev["file"])}:{esc(mev.get("line") or "—")}</span>'
                 if t["status"] == "partial":
                     extra += f'<br><span class="rx">remainder: {esc(t["remainder"])}</span>'
-            rows.append(f'<tr><td>{esc(t["stride"])}</td><td>{esc(t["owasp"] or "—")}</td>'
+            sp = t["stride"]
+            stride_cell = (f'<td class="tm-c"><span class="pill" '
+                           f'title="{esc(STRIDE_NAME.get(sp, sp))}">{esc(sp)}</span></td>')
+            owc = (f'<span class="pill">{esc(t["owasp"])}</span>'
+                   if t["owasp"] else '<span class="rx">—</span>')
+            rows.append(f'<tr>{stride_cell}<td class="tm-c">{owc}</td>'
                         f'<td>{esc(t["summary"])}</td>'
                         f'<td>{chip(t["status"], status_color[t["status"]])}{extra}</td></tr>')
         remits = " ".join(
@@ -537,7 +545,7 @@ def render(graph, template_text):
             f'{len(b["threats"])} threats, {len(b["remit_rules"])} remit rules · '
             f'worst: <b style="color:{status_color[worst_status(b["threats"])]}">{worst_status(b["threats"])}</b></summary>'
             f'<div class="remits">{remits or "<i>the remit does not touch this boundary — threats here are assessed against the RAISE/OWASP baseline alone (a remit is a job description, not a security model; silence here is normal)</i>"}</div>'
-            f'<table><tr><th>STRIDE</th><th>OWASP</th><th>Threat</th><th>Status</th></tr>'
+            f'<table><tr><th class="tm-c">STRIDE</th><th class="tm-c">OWASP</th><th>Threat</th><th>Status</th></tr>'
             + "".join(rows) + '</table></details>')
 
     inv_rows = []
@@ -598,6 +606,8 @@ def render(graph, template_text):
   th {{ background:var(--surface); font-size:11px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }}
   .remits {{ margin:8px 0; font-size:12.5px; line-height:2; }}
   .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
+  td.tm-c, th.tm-c {{ text-align:center; white-space:nowrap; vertical-align:middle; }}
+  .pill {{ display:inline-block; padding:1px 9px; border-radius:10px; background:var(--surface); border:1px solid var(--border); font-size:11px; font-weight:700; color:var(--text-muted); }}
   .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; }}
   .ap-title {{ font-size:15px; font-weight:800; color:var(--sev-critical); margin-bottom:6px; }}
   .ap-steps {{ font-size:13px; line-height:1.55; margin:0; padding-left:22px; }}
