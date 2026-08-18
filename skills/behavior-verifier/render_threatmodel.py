@@ -20,9 +20,12 @@ Design contract (RELEASE_2.0_PLAN.md item 4):
   literal colors this module carries (the lightened-on-navy masthead
   variants) are asserted against the template text by the test suite.
 * **Static-completeness.** The page reads complete on paper: printed legend,
-  boundary key table, kind icons, numbered attack-path badges, component
-  inventory with citations, print CSS. Hover behaviors (highlighting, fan
-  labels, disciplined tooltips) are an enhancement layer only.
+  boundary key table, kind icons, role-marked attack-path nodes
+  (source / pass-through / failed-control / target), the executive summary,
+  and the component inventory with citations; print CSS keeps it legible on
+  paper. Attack paths are drawn bold red on a faint grey substrate so the
+  dangerous flows dominate. Hover behaviors (red-path flow animation,
+  disciplined tooltips) are an enhancement layer only.
 * **Determinism.** Same graph + same template -> byte-identical output.
 
 Python 3.9+ stdlib only.
@@ -282,7 +285,17 @@ def render(graph, template_text):
                        f'font-weight="700" fill="#fff">{esc(bnd_num[b["id"]])}</text>')
             svg.append('</g>')
 
-    # edges — hit path + visible path; labels render in a top layer
+    # ── edges ────────────────────────────────────────────────────────────────
+    # The diagram spends ink where it matters. Generic data flows are a faint
+    # grey substrate (subordinate context); the ATTACK PATHS are drawn bold red
+    # ON TOP. So the reader's eye lands on how you get owned, not on a
+    # connectivity catalogue. Edges that lie on an attack path (a consecutive
+    # step pair) are "promoted" to the red layer.
+    ap_pairs = set()
+    for p in g["attack_paths"]:
+        seq = [s["node"] for s in p["steps"]]
+        for a, b in zip(seq, seq[1:]):
+            ap_pairs.add((a, b))
     arrow_grey, arrow_blue = tok("--text-muted"), tok("--blue")
     # Arrowheads anchor at their BACK edge (refX=0), so the marker sits with its
     # flat rear centered on the path's end and its tip extending ARROW_LEN px
@@ -315,72 +328,118 @@ def render(graph, template_text):
                f'<marker id="arr-hi" viewBox="0 0 10 10" refX="0" refY="5" '
                f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
                f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
-               f'<path d="M0 0L10 5L0 10z" fill="{arrow_blue}"/></marker></defs>')
-    loop_count, elbls, ei = {}, [], 0
-    for e in g["edges"]:
+               f'<path d="M0 0L10 5L0 10z" fill="{arrow_blue}"/></marker>'
+               f'<marker id="arr-path" viewBox="0 0 10 10" refX="0" refY="5" '
+               f'markerWidth="{ARROW_LEN}" markerHeight="{ARROW_LEN}" '
+               f'markerUnits="userSpaceOnUse" orient="auto-start-reverse">'
+               f'<path d="M0 0L10 5L0 10z" fill="#C0392B"/></marker></defs>')
+
+    # --- geometry helper: returns (x1, fy, x2, ty, span, orientation) ---
+    def geo(e):
         f, t = pos[e["from"]], pos[e["to"]]
-        fy = port[(e["id"], e["from"])]
-        ty = port[(e["id"], e["to"])]
+        fy = port[(e["id"], e["from"])]; ty = port[(e["id"], e["to"])]
         fx, tx = f[0], t[0]
-        span = abs(LANES.index(lane_of[e["to"]]) - LANES.index(lane_of[e["from"]]))
+        sp = abs(LANES.index(lane_of[e["to"]]) - LANES.index(lane_of[e["from"]]))
+        if fx == tx:
+            return (fx + COL_W, fy, fx + COL_W, ty, sp, "loop")
+        x1 = (fx + COL_W) if fx < tx else fx
+        x2 = tx if fx < tx else (tx + COL_W)
+        return (x1, fy, x2, ty, sp, "lr" if fx < tx else "rl")
+
+    loop_count, ei, promoted, elbls = {}, 0, [], []
+    for e in g["edges"]:
+        x1, fy, x2, ty, span, o = geo(e)
+        mx = (x1 + x2) / 2
         tip = (f'{nodes[e["from"]]["name"]} → {nodes[e["to"]]["name"]}: '
                f'{e["label"]} [{e["data"]}]')
-        if fx == tx:  # same lane: side loop, offset per loop
-            x1 = x2 = fx + COL_W
+        is_ap = (e["from"], e["to"]) in ap_pairs
+
+        if o == "loop":
             k = loop_count.get(e["from"], 0); loop_count[e["from"]] = k + 1
-            mx = x1 + 36 + 20 * k
-            d = _trimmed(x1, fy, mx, fy, mx, ty, x2, ty)
-            lx, ly, rot = mx + 6, (fy + ty) / 2, ""
-            dim = ""
+            lmx = x1 + 36 + 20 * k
+            d = _trimmed(x1, fy, lmx, fy, lmx, ty, x2, ty)
+        elif span >= 2:
+            # lane-skipper: bow around the intermediate columns, direction-aware,
+            # clamped below the badge band.
+            dirn = 1 if x2 >= x1 else -1
+            dip = 55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1)
+            floor_y = TOP_Y - 22
+            cy1 = max(fy + dip, floor_y); cy2 = max(ty + dip, floor_y)
+            d = _trimmed(x1, fy, x1 + 90 * dirn, cy1, x2 - 90 * dirn, cy2, x2, ty)
         else:
-            x1 = (fx + COL_W) if fx < tx else fx
-            x2 = tx if fx < tx else (tx + COL_W)
-            mx = (x1 + x2) / 2
-            if span >= 2:
-                # bow around intermediate columns, direction-aware, clamped
-                # below the badge band.
-                dirn = 1 if x2 >= x1 else -1
-                dip = 55 * (span - 1) * (1 if (fy + ty) / 2 > (total_h + TOP_Y) / 2 else -1)
-                floor_y = TOP_Y - 22
-                cy1 = max(fy + dip, floor_y)
-                cy2 = max(ty + dip, floor_y)
-                d = _trimmed(x1, fy, x1 + 90 * dirn, cy1, x2 - 90 * dirn, cy2, x2, ty)
-                ly = (fy + ty) / 2 + (cy1 - fy) * 0.75
-            else:
-                d = _trimmed(x1, fy, mx, fy, mx, ty, x2, ty)
-                ly = (fy + ty) / 2
-            lx = mx - 4
-            rot = f' transform="rotate(-90 {lx} {ly})"'
-            dim = ' style="opacity:.22"' if span >= 2 else ''
+            d = _trimmed(x1, fy, mx, fy, mx, ty, x2, ty)
+
+        if is_ap:
+            promoted.append((d, tip, e))   # drawn bold red, on top, below
+            ei += 1
+            continue
+        # grey substrate: faint line + matching arrowhead so flow direction
+        # reads while the red attack lines dominate.
         svg.append(f'<g class="edge" data-ei="{ei}" data-from="{esc(e["from"])}" '
                    f'data-to="{esc(e["to"])}" data-tip="{esc(tip)}">')
         svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="9"/>')
         svg.append(f'<path class="vis" d="{d}" fill="none" stroke="{arrow_grey}" '
-                   f'stroke-width="1.2" marker-end="url(#arr)" opacity="0.4"{dim}/>')
+                   f'stroke-width="1.0" opacity="0.4" marker-end="url(#arr)"/>')
         svg.append('</g>')
-        elbls.append(f'<text class="elbl" data-ei="{ei}" x="{lx}" y="{ly}" '
-                     f'text-anchor="middle" font-size="10.5" font-weight="600" '
-                     f'fill="{tok("--blue-dark")}" paint-order="stroke" stroke="#FFFFFF" '
-                     f'stroke-width="3.5"{rot}>{esc(e["label"])}</text>')
         ei += 1
 
-    # attack-path step badges (first path; sequence is the story — route ink
-    # was tried twice in the probe and rejected: it sprays across the canvas)
-    ap = g["attack_paths"]
-    badge_at = {}
-    if ap:
-        for i, step in enumerate(ap[0]["steps"], 1):
-            badge_at[step["node"]] = i
+    # quiet mode: attack-path edges drawn bold, red, arrowed, ON TOP.
+    # class "apedge"/"apvis" so node- and line-hover can make the RED ones pop
+    # while the generic blue substrate stays subtle.
+    ap_nodes = {s["node"] for p in g["attack_paths"] for s in p["steps"]}
+    ap_first = {p["steps"][0]["node"] for p in g["attack_paths"] if p["steps"]}
+    ap_last = {p["steps"][-1]["node"] for p in g["attack_paths"] if p["steps"]}
+
+    def ap_role(nid, kind):
+        # the node's job in the attack story, most-telling first
+        if nid in ap_first:
+            return "source"          # untrusted content enters here
+        if nid in ap_last:
+            return "sink"            # the consequence / egress
+        if kind == "control":
+            return "bypass"          # a control ON the path = it didn't stop it
+        return "way"                 # pass-through (loop, model, ...)
+
+    # white glyphs centered on the corner badge (drawn at translate(bx,by))
+    AP_GLYPH = {
+        "source": '<path d="M-6 0h6M-1 -3.5L2.5 0-1 3.5M5 -5v10" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+        "sink": '<circle r="3.6" fill="none" stroke="#fff" stroke-width="1.4"/>'
+                '<g stroke="#fff" stroke-width="1.4" stroke-linecap="round"><path d="M0 -6.2v2M0 4.2v2M-6.2 0h2M4.2 0h2"/></g>',
+        "bypass": '<path d="M0 -5.5l4.5 1.8v3.4c0 2.7-1.8 4.6-4.5 5.5-2.7-.9-4.5-2.8-4.5-5.5v-3.4z" fill="none" stroke="#fff" stroke-width="1.3"/>'
+                  '<path d="M-4 -4L4 4.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
+        "way": '<path d="M-2 -3.2L1.4 0-2 3.2" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    }
+    AP_ROLE_LABEL = {"source": "source (ingress)", "sink": "target (consequence)",
+                     "bypass": "control on the path (bypassed)", "way": "pass-through"}
+    # Red is reserved for TARGETS (where damage lands). Ingress is purple
+    # (untrusted origin), a failed control is amber (warning), and a plain
+    # pass-through is grey (plumbing) — so the eye finds the consequences.
+    AP_ROLE_COLOR = {"source": "#8D00FF", "sink": "#C0392B",
+                     "bypass": "#D4A017", "way": "#6C757D"}
+    for d, tip, e in promoted:
+        svg.append(f'<g class="edge apedge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" '
+                   f'data-tip="{esc(tip)}">')
+        svg.append(f'<path class="hit" d="{d}" fill="none" stroke="transparent" stroke-width="12"/>')
+        svg.append(f'<path class="apvis" d="{d}" fill="none" stroke="#C0392B" stroke-width="2.4" '
+                   f'opacity="0.9" marker-end="url(#arr-path)"/>')
+        svg.append('</g>')
 
     for n in g["nodes"]:
         x, y, h, lines = pos[n["id"]]
         c = kind_color[n["kind"]]
         tip = n["description"] + " | evidence: " + "; ".join(
             f'{ev["file"]}:{ev.get("line") or "—"}' for ev in n["evidence"][:4])
-        if n["id"] in badge_at and ap:
-            tip += (f' | ⚔ attack-path step {badge_at[n["id"]]} of '
-                    f'{len(ap[0]["steps"])}: “{ap[0]["name"]}”')
-        svg.append(f'<g class="node" data-id="{esc(n["id"])}" data-tip="{esc(tip)}">')
+        onpath = n["id"] in ap_nodes
+        role = ap_role(n["id"], n["kind"]) if onpath else None
+        rc = AP_ROLE_COLOR[role] if role else None
+        oncls = " onpath" if onpath else ""
+        svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-tip="{esc(tip)}">')
+        # on-path boxes get a role-colored ring + corner tag so the attack
+        # story (ingress / route / failed control / target) reads at a glance,
+        # statically, before any hover.
+        if onpath:
+            svg.append(f'<rect x="{x-3.5}" y="{y-3.5}" width="{COL_W+7}" height="{h+7}" '
+                       f'rx="11" fill="none" stroke="{rc}" stroke-width="1.6" opacity="0.85"/>')
         svg.append(f'<rect x="{x}" y="{y}" width="{COL_W}" height="{h}" rx="8" '
                    f'fill="#fff" stroke="{c}" stroke-width="1.6"/>')
         svg.append(f'<rect x="{x}" y="{y}" width="5" height="{h}" rx="2.5" fill="{c}"/>')
@@ -394,11 +453,13 @@ def render(graph, template_text):
             svg.append(f'<g transform="translate({x+COL_W-26},{y+7}) scale(0.75)" '
                        f'fill="none" stroke="{c}" stroke-width="1.8" '
                        f'stroke-linecap="round" stroke-linejoin="round">{icp}</g>')
-        if n["id"] in badge_at:
-            svg.append(f'<circle cx="{x+COL_W-14}" cy="{y+h-13}" r="10" '
-                       f'fill="{tok("--sev-critical")}"/>'
-                       f'<text x="{x+COL_W-14}" y="{y+h-9}" text-anchor="middle" '
-                       f'font-size="11" font-weight="700" fill="#fff">{badge_at[n["id"]]}</text>')
+        if onpath:
+            # role tag riding the ring's top-left corner — source / waypoint /
+            # bypassed-control / sink, so the attack story reads without hover.
+            bx, by = x - 3.5, y - 3.5
+            svg.append(f'<g><title>on attack path — {esc(AP_ROLE_LABEL[role])}</title>'
+                       f'<circle cx="{bx}" cy="{by}" r="9" fill="{rc}"/>'
+                       f'<g transform="translate({bx},{by})">{AP_GLYPH[role]}</g></g>')
         svg.append('</g>')
     svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
@@ -418,12 +479,21 @@ def render(graph, template_text):
         for nm, c in FAMILIES if tok(c) in fam_present)
     row2 = "".join(f'<span class="lg">{icon_svg(k, kind_color[k])}'
                    f'{esc(k.replace("_", " "))}</span>' for k in kinds_present)
+
+    def _ap_badge(role):  # 18px role-colored disc + glyph, for the legend
+        return (f'<svg width="18" height="18" viewBox="-9 -9 18 18">'
+                f'<circle r="9" fill="{AP_ROLE_COLOR[role]}"/>{AP_GLYPH[role]}</svg>')
     row3 = "".join([
         f'<span class="lg"><i class="lg-dash" style="border-color:{status_color["confirmed"]}"></i>boundary — worst threat: confirmed</span>',
         f'<span class="lg"><i class="lg-dash" style="border-color:{status_color["potential"]}"></i>— potential (unanswered hypothesis)</span>',
         f'<span class="lg"><i class="lg-dash" style="border-color:{status_color["partial"]}"></i>— partial (control covers part; remainder stated)</span>',
         f'<span class="lg"><i class="lg-dash" style="border-color:{status_color["mitigated"]}"></i>— mitigated</span>',
-        f'<span class="lg"><b class="lg-b" style="background:{status_color["confirmed"]}">1</b>attack-path step (follow 1→2→3…)</span>',
+        f'<span class="lg"><i style="background:none;border-top:3px solid #C0392B;height:0;border-radius:0"></i>attack path (origin → consequence)</span>',
+        '<span class="lg"><i style="background:none;border:1.6px solid #C0392B;border-radius:4px;width:16px;height:12px"></i>box on an attack path:</span>',
+        f'<span class="lg">{_ap_badge("source")} source (ingress)</span>',
+        f'<span class="lg">{_ap_badge("way")} pass-through</span>',
+        f'<span class="lg">{_ap_badge("bypass")} control that failed</span>',
+        f'<span class="lg">{_ap_badge("sink")} target (consequence)</span>',
         '<span class="lg"><i class="lg-arc"></i>faint arc = flow spanning 2+ lanes</span>',
     ])
     legend_html = (f'<div class="lg-row"><span class="lg-cap">Families</span>{row1}</div>'
@@ -444,7 +514,7 @@ def render(graph, template_text):
                          + "".join(bk_rows) + '</table>')
 
     appanels = []
-    for p in ap:
+    for p in g["attack_paths"]:
         steps = " → ".join(
             f'<b>{esc(nodes[s["node"]]["name"])}</b>'
             + (f' <span class="fid">[{esc(s["finding_id"])}]</span>' if s.get("finding_id") else "")
@@ -495,6 +565,9 @@ def render(graph, template_text):
     aref = g.get("analysis_ref")
     aref_html = (f' · built against <b>{esc(aref)}</b>' if aref
                  else ' · no analysis reference (standalone extraction)')
+    summary_html = "".join(f"<p>{esc(par.strip())}</p>"
+                           for par in g.get("executive_summary", "").split("\n\n")
+                           if par.strip())
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -522,6 +595,8 @@ def render(graph, template_text):
   .section {{ margin-bottom:40px; }}
   .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
   .section-desc {{ color:#555; font-size:13px; margin:0 0 18px; line-height:1.6; }}
+  .exec-summary {{ background:var(--surface-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:16px 22px; font-size:14.5px; line-height:1.65; color:var(--text); }}
+  .exec-summary p {{ margin:0 0 12px; }} .exec-summary p:last-child {{ margin-bottom:0; }}
   .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
   .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
   details {{ background:#FFF; border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:10px 0; }}
@@ -545,8 +620,26 @@ def render(graph, template_text):
   .bk {{ margin-top:14px; }} .bk td, .bk th {{ padding:4px 9px; }}
   .elbl {{ opacity:0; pointer-events:none; transition:opacity .1s; }}
   .elbl.show {{ opacity:1; }}
-  .edge:hover .vis, .edge.hi .vis {{ stroke:var(--blue); stroke-width:2.6; opacity:1 !important; marker-end:url(#arr-hi); }}
-  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.55)); cursor:default; }}
+  /* Generic substrate edges: on node-hover show them only faintly (they are
+     context, not the point); on direct edge-hover, a soft blue so you can
+     trace the one under the cursor. Never the loud blue that drowned the red. */
+  .edge.hi .vis {{ stroke:var(--text-muted); stroke-width:1.3; opacity:0.5 !important; }}
+  .edge:hover .vis {{ stroke:var(--blue); stroke-width:1.8; opacity:0.85 !important; }}
+  /* Attack-path (red) edges POP on node-hover and on their own hover. */
+  .apvis {{ transition:stroke-width .1s, opacity .1s; }}
+  /* Hover: the attack line doesn't just brighten — it FLOWS. Marching-ants
+     dash animation runs origin→consequence so the eye follows the attack,
+     over a brighter red and a stronger glow. */
+  @keyframes apflow {{ to {{ stroke-dashoffset:-16; }} }}
+  .edge.hi .apvis, .apedge:hover .apvis {{
+    stroke:#E11900; stroke-width:4.2; opacity:1 !important;
+    stroke-dasharray:10 6; animation:apflow .55s linear infinite;
+    filter:drop-shadow(0 0 6px rgba(225,25,0,.75)); }}
+  @media (prefers-reduced-motion: reduce) {{
+    .edge.hi .apvis, .apedge:hover .apvis {{ animation:none; stroke-dasharray:none; }} }}
+  .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.4)); cursor:default; }}
+  /* A node that sits on an attack path glows red on hover, not blue. */
+  .node.onpath:hover rect:first-of-type {{ filter:drop-shadow(0 0 5px rgba(192,57,43,.6)); }}
   .bnd:hover line {{ opacity:1; stroke-width:3; }} .bnd {{ cursor:default; }}
   #tt {{ position:fixed; background:var(--navy); color:var(--surface); padding:7px 11px; border-radius:7px; font-size:12.5px; line-height:1.45; max-width:380px; pointer-events:none; opacity:0; z-index:10; box-shadow:0 3px 10px rgba(13,27,42,.35); transition:opacity .08s; }}
   .footer {{ background:var(--navy); border-top:4px solid var(--orange); margin-top:40px; padding:18px 32px; color:#8BAFC8; }}
@@ -583,6 +676,8 @@ def render(graph, template_text):
   </div>
 </div></div>
 <div class="content">
+<div class="section"><div class="section-title">Summary</div>
+<div class="exec-summary">{summary_html}</div></div>
 <div class="section section-fullbleed">
 <div class="section-title">Architecture &amp; Trust Boundaries</div>
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Every component, flow, and boundary cites evidence. Hover nodes for citations, edges for what flows, and B-badges for boundary detail — or read it all statically: the key below resolves every mark, and the component inventory carries every citation.</div>

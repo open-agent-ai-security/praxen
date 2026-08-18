@@ -187,3 +187,25 @@ prototype before the 2.0 renderer freeze:
 Recommendation: **A+B**. Blocks calling the renderer done for 2.0 — the
 current output fails human review on dense targets even though it passes
 the numeric gate.
+
+## Resolved (2026-08-17): edge treatment + attack-path presentation
+
+Steve reviewed prototypes and chose **quiet mode** ("A": faint grey
+substrate + bold red attack paths), enshrined into the product renderer.
+The hub-ratsnest is gone because generic flows recede and only the attack
+paths assert themselves. Layered on top, from the same review:
+
+- **Attack paths run untrusted-origin → consequence and MUST be walks over
+  real edges** (contract v1.2/v1.4, validator-enforced) — no teleporting
+  past the orchestrator; the "enters the model's context" hop is drawn.
+- **Executive summary** (contract v1.3) — plain-English brief at the top.
+- **Role-marked on-path nodes** — red ring + corner badge, colored by role:
+  purple **source** (ingress), grey **pass-through**, amber **failed
+  control**, red **target** (consequence). Red is reserved for targets.
+- **Hover**: red paths flow (marching-ants animation) and pop; generic
+  edges recede; a `prefers-reduced-motion` fallback drops the animation.
+- Grey substrate keeps faint arrowheads so flow direction still reads.
+
+All in `render_threatmodel.py` (prototype retired). The orthogonal and
+bundle alternatives were not chosen; quiet won on "not intimidating,
+reads on its own." Contract is now v1.4.
