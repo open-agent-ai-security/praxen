@@ -515,13 +515,13 @@ def render(graph, template_text):
 
     appanels = []
     for p in g["attack_paths"]:
-        steps = " → ".join(
-            f'<b>{esc(nodes[s["node"]]["name"])}</b>'
+        steps = "".join(
+            f'<li><b>{esc(nodes[s["node"]]["name"])}</b>'
             + (f' <span class="fid">[{esc(s["finding_id"])}]</span>' if s.get("finding_id") else "")
-            + f' <span class="rx">{esc(s["summary"])}</span>'
+            + f' <span class="rx">{esc(s["summary"])}</span></li>'
             for s in p["steps"])
-        appanels.append(f'<div class="ap"><div class="ap-title">⚔ {esc(p["name"])}</div>'
-                        f'<div class="ap-steps">{steps}</div></div>')
+        appanels.append(f'<div class="ap"><div class="ap-title">{esc(p["name"])}</div>'
+                        f'<ol class="ap-steps">{steps}</ol></div>')
 
     panels = []
     for b in g["trust_boundaries"]:
@@ -609,7 +609,8 @@ def render(graph, template_text):
   .rx {{ color:var(--text-muted); font-size:11.5px; }} .fid {{ color:var(--sev-high); font-weight:700; font-size:11.5px; }}
   .ap {{ background:var(--surface-alt); border:1px solid var(--border-alt); border-left:4px solid var(--sev-critical); border-radius:0 8px 8px 0; padding:12px 16px; margin:10px 0; }}
   .ap-title {{ font-size:15px; font-weight:800; color:var(--sev-critical); margin-bottom:6px; }}
-  .ap-steps {{ font-size:13px; line-height:1.7; }}
+  .ap-steps {{ font-size:13px; line-height:1.55; margin:0; padding-left:22px; }}
+  .ap-steps li {{ margin:4px 0; }}
   .notes {{ font-size:12px; color:var(--text-muted); }}
   .legend {{ font-size:11.5px; color:var(--text-muted); }}
   .legend .lg-row {{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:3px 0; }}
