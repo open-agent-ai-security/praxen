@@ -148,7 +148,7 @@ Measured: across two targets scanned six times each, raw Critical counts ran
 and not one of those was refutable.**
 
 This is a **coverage** limit, not a correctness one. What a single run reports is
-largely dependable: across 75 adjudicated rulings in those four studies, **none** was
+largely dependable: across every adjudicated ruling in those four studies, **not one** was
 unsupported by its evidence. False positives are not unheard of — a separate multi-run
 study did produce one, out of 69 candidate findings — but they are rare next to what a
 single pass misses. It is what a single run *omits* that varies most.

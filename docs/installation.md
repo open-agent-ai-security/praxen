@@ -23,7 +23,7 @@ Install from the community plugin marketplace ([open-agent-ai-security/plugins](
 ```bash
 claude plugin marketplace add open-agent-ai-security/plugins
 claude plugin install praxen@open-agent-ai-security
-claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.2.1+
+claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v1.3.0+
 ```
 
 > **Added the marketplace from `open-agent-ai-security/praxen` previously?** That path still
@@ -42,7 +42,7 @@ Codex has its own plugin marketplace, and Praxen installs from the **same commun
 ```bash
 codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen@open-agent-ai-security
-codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.2.1+
+codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v1.3.0+
 ```
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).

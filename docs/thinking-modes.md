@@ -140,7 +140,7 @@ Both modes keep full provenance alongside the final report:
 ### High mode's main value is your remit, not false positives
 
 This is the counter-intuitive one. On a mature scanner there is usually little to kill —
-across four audited targets the audit confirmed **48 findings and removed none**. In the
+across four audited targets the audit confirmed **54 findings and removed none**. In the
 same four runs it found **nine defective rules in the remits**: obligations no
 implementation could satisfy, prohibitions on behavior the target documents as intended,
 allow-lists omitting routine operation, and sound prohibitions welded to over-broad

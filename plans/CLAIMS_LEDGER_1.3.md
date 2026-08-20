@@ -70,8 +70,9 @@
 6. **Under-detection, not over-claiming, is the dominant failure mode (2026-08-13).**
    **All four** adjudicators across both targets independently found ~half their super-run's
    findings came from **exactly one scan of three**, with **none refuted** (hermes 9/18 and
-   10/19; deepagents 9 entries + 2 split-outs, and 10 distinct claims). Across **76 rulings,
-   zero UNSUPPORTED** — the two removals were remit defects, not bad readings. Named case: WeCom/
+   10/19; deepagents 9 entries + 2 split-outs, and 10 distinct claims). Across **all rulings
+   in the four records (~79 by their own verdict summaries; split/merge accounting varies the
+   denominator by ±1), zero UNSUPPORTED** — the two removals were remit defects, not bad readings. Named case: WeCom/
    Weixin/Yuanbao adapters default `dm_policy: "open"` past the gateway's default-deny — an
    unauthenticated entry point to a terminal-capable agent that **two of three runs missed**,
    and which Hermes's own `SECURITY.md:201-205` calls an in-scope bug. Claim x-high on

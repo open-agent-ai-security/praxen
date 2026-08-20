@@ -9,7 +9,8 @@ report it accompanies:
 
   * examples/<name>/WORKER_REMIT.html      ← examples/<name>/WORKER_REMIT.md
   * tests/baselines/<CURRENT>/<slug>/<slug>-remit.html
-                                           ← tests/remits/<slug>.md
+                                           ← the freeze-pinned <slug>-remit.md in the
+                                             baseline dir (fallback: tests/remits/<slug>.md)
 
 Both are deterministic renders (see skills/behavior-verifier/render_remit.py), so
 "in sync with the remit" means: re-rendering the source Markdown reproduces the
