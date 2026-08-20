@@ -9,7 +9,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
-## [1.3.0] — unreleased
+## [1.3.0] — 2026-08-19
 
 **Thinking modes, and scores that come from evidence you can check.** Two features that turn out to depend on each other: the **high** and **x-high** thinking modes (#197), and a structural fix to how RAISE scores are formed (#195). **This is a scoring release, not a score-inert one** — it ships a fresh frozen baseline, **`v1.3-opus5`**, and its numbers are not comparable to `v1.2-opus5` scan-for-scan. `schema_version` stays **3.0**; nothing serialised changed.
 
@@ -21,7 +21,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - **Scores are assigned from committed evidence, not working memory.** Previously they were set at SKILL.md **Step 5**, from a workspace read held in context, *before* findings were decomposed or drafted; Step 9.4 only transcribed them. Step 5 now gathers evidence, and **Step 9.4 assigns** the scores from the committed set.
 - **New Step 8b — maturity evidence sweep.** An enumerated **M1–M12** lookup with fixed search patterns, where *verified absence* is recorded with the same weight as a hit ("none — searched `<patterns>`"). A findings list alone cannot see a red-team programme or a telemetry pipeline, so a mature project and a bare one looked identical to the score. An open-ended sweep was tried first and **failed its gate** — it relocated the variance instead of removing it.
 - **Boundary rules and the provenance test**, consolidated into `KB_RAISE_SCANNING.md`: the dominant-path ladder (nothing on the dominant path → cap 1; prompt-only → cap 2; operative code → uncapped), opt-in/default-off controls as *capability, not posture*, and adversarial material counting only where a project attacks **its own** defences — a CTF's shipped exploits are its product, not evidence of a testing programme.
-- Validated before shipping: **blind adjudication upheld the new pipeline 22 of 24** category calls, with judges naming the old bias as "capability counted as posture". Two structural alternatives were measured and discarded first; a checklist rubric was tested and **killed** (higher variance, and it averaged a deliberately-vulnerable target's disqualifying failure away).
+- Validated before shipping: **blind model adjudication upheld the new pipeline 22 of 24** category calls, with judges naming the old bias as "capability counted as posture". Two structural alternatives were measured and discarded first; a checklist rubric was tested and **killed** (higher variance, and it averaged a deliberately-vulnerable target's disqualifying failure away).
 
 ### Thinking modes (#197)
 - **`high`** — a context-unaware auditor re-reads every finding at its cited location and tries to refute it, then checks the remit's own rules against the target's documentation. Costs **~1.4× tokens and ~1.3–1.6× the clock** — and under concurrency the time multiple stretches toward 1.8× while the token cost holds, so estimate duration from the clock figure, not the token one.
@@ -31,7 +31,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 ### What the modes actually buy — measured
 - **Discovery.** A single scan misses roughly **1 in 6 High-severity findings**; x-high finds them. Across four x-high adjudications on two targets, **~half of every super-run's findings came from exactly one scan of three — and not one was refuted.** Under-detection, not over-claiming, is the dominant failure mode on large targets.
 - **Score stability, but only in combination.** The August test found **no damping** and correctly diagnosed why: the residual delta was a single band-edge call x-high *inherited* from #195. With #195 fixed, a re-test on the two widest-variance targets gave **pair delta 0.00 against 6-run raw ranges of 0.70**, with identical category vectors — Hermes 2.30/2.30, Deep Agents 1.85/1.85. **Claim the combined stack only:** x-high alone did not stabilise scores, and #195 alone does not eliminate raw spread.
-- **Remit quality.** On a mature scanner the audit's measurable yield is not FP removal — across four 1.3 high-mode audits it was **48 findings, 48 confirmed, 0 killed, but 9 rule-level remit defects surfaced**, four of them in a remit authored twenty minutes earlier.
+- **Remit quality.** On a mature scanner the audit's measurable yield is not FP removal — across four 1.3 high-mode audits it was **54 findings, 54 confirmed, 0 killed, but 9 rule-level remit defects surfaced**, four of them in a remit authored twenty minutes earlier.
 
 ### Baseline — `v1.3-opus5`
 - 12 targets, **36 standard runs** (median-of-3) plus 3 high-mode runs, Claude Opus 5, on the **same pinned sources** as v1.2. Mean weighted RAISE **1.49** (v1.2: 1.671); frozen entirely at medians it would be **1.45**. Three targets are frozen at a high-mode run by maintainer decision — a **deliberately mixed method**, recorded as a caveat in `BASELINE.md`.
@@ -48,7 +48,7 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ### Report rendering *(re-render only — no findings JSON touched)*
 - **RAISE scores render as five discrete pills** instead of a continuous bar. A category score is an ordinal band, not a percentage, so pills are an *exact* representation and let a reader count the value without reading the number; empty pills keep a ghost outline so the "out of 5" denominator stays visible. Only the masthead's weighted overall — which genuinely is fractional — carries a partial fill. An N/A category now renders five ghost pills, visually distinct from a real 0.
-- Placeholder-aware secret redaction (#243): `${VAR}`, `$VAR`, `{{var}}`, `%VAR%` and `<placeholder>` render verbatim instead of being redacted as literals.
+- Placeholder-aware secret redaction (#243): `${VAR}`, `$VAR`, `{{var}}`, `%VAR%` and `<PLACEHOLDER>` render verbatim instead of being redacted as literals.
 - `suite_health.py` uses the full maturity label scale and a data-driven y-axis (#176).
 
 ### Documentation

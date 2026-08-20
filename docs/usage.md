@@ -98,7 +98,7 @@ Praxen reads the evidence, evaluates it against the RAISE Framework and the Work
 | `<agent-slug>-findings-<date>.json` | Machine-readable findings. Use for automation, ticketing, dashboards, diffing across runs. |
 | `<agent-slug>-analysis-<timestamp>.txt` | Plain-text summary suitable for terminal output, email body, or Slack message. |
 
-The findings JSON is keyed by **date** (`<YYYY-MM-DD>` — one per agent per day); the HTML and TXT carry a full **per-run timestamp** (`<YYYY-MM-DD-HHMMSS>`), so re-running the same day keeps each report distinct. Praxen also writes a working `<agent-slug>-draft-<timestamp>.md` checkpoint during the run — a recovery artifact, not a deliverable, and safe to delete.
+The findings JSON is keyed by **date** (`<YYYY-MM-DD>` — one per agent per day); the HTML and TXT carry a full **per-run timestamp** (`<YYYY-MM-DD-HHMMSS>`), so re-running the same day keeps each report distinct. Praxen also writes two working artifacts during the run — a `<agent-slug>-evidence-<timestamp>.txt` evidence checkpoint and a `<agent-slug>-draft-<timestamp>.md` draft manifest. Both are recovery artifacts, not deliverables, and safe to delete after the run.
 
 The `.txt` summary is also printed to stdout during the analysis, so you can read it as the run completes.
 

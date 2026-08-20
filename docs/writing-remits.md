@@ -128,7 +128,7 @@ This section is a manual hardening pass to run **once**, on a new remit, before 
 
 High mode adds a second, context-unaware pass over the finished report. Beyond re-checking each finding, it **audits your rules against the target's own documentation** and produces a **remit feedback** list — rules that are fabricated, that forbid something the target documents as intended, that leave a routine counterparty out of an allow-list, or that weld a sound prohibition to an over-broad extension. See [Thinking Modes](thinking-modes.md) for the full mechanics and the cost.
 
-**Cost:** roughly **1.2× the tokens** and **1.8× the wall-clock** of a standard scan. The time multiplier is the larger one — don't quote the token figure as a time estimate.
+**Cost:** in our testing, roughly **1.4× the tokens** and **1.3–1.6× the wall-clock** of a standard scan — and under concurrency the time multiple stretches toward 1.8× while the token cost holds. Estimate duration from the clock figure, not the token one.
 
 ### 2. Read the adjudication file — not just the report
 

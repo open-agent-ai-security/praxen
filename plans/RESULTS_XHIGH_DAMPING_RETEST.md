@@ -140,10 +140,14 @@ that better prompting fixes.
 |---|---|---|---|---|
 | hermes A | 15 → 18 | 18 | 0 | 0 |
 | hermes B | 13 → 19 | 18 | 0 | 1 |
-| deepagents A | 21 → 20 | 21 | 0 | 0 |
-| deepagents B | 21 → 18 | 20 | 0 | 1 |
+| deepagents A | 21 → 21 | 21 | 0 | 0 |
+| deepagents B | 21 → 21 | 20 | 0 | 1 |
 
-**76 rulings across four adjudications: 0 UNSUPPORTED.** Not one finding rested on a
+(Rulings column = each record's own verdict summary; deepagents' earlier rows mistakenly
+listed findings-out. Split/merge accounting makes any cross-record total ±1 — the invariant
+is the UNSUPPORTED column.)
+
+**79 rulings across four adjudications (by the records' own verdict summaries): 0 UNSUPPORTED.** Not one finding rested on a
 misread line, a stale reference, or an over-claim. Two were removed, both on
 **remit defects** rather than bad readings.
 

@@ -85,9 +85,7 @@ Each finding is tagged against the **OWASP Top 10 for LLM Applications 2026**, *
 
 ## Working with Praxen
 
-Praxen produces an **expert review that focuses human attention.** Each report is a model-assisted analysis of where an agent's behavior may diverge from its remit. Treat the findings and RAISE maturity score as judgments to act on — a senior reviewer's notes, not an automated pass/fail. Scores are calibrated per model tier and vary run to run ([details](docs/understanding-variability.md)), and you can [challenge and revise any finding](docs/challenging-findings.md).
-
-Praxen works by **reading your agent's real workspace in place** — its actual code, config, and logs. It writes findings only to `./reports/` and never modifies the agent. It runs as a skill inside your coding agent, using that agent's own tools rather than a separate sandbox, so run Praxen where you already trust that agent to operate. The [security model and assumptions](SECURITY.md#security-model-and-assumptions) covers this in full.
+Praxen produces an **expert review that focuses human attention** — a senior reviewer's notes, not an automated pass/fail — and it works by **reading your agent's real workspace in place**, writing findings only to `./reports/` and never modifying the agent. How to treat the scores, run-to-run variability, and the [security model](SECURITY.md#security-model-and-assumptions) are covered in [Working with Praxen](docs/index.md#working-with-praxen) in the docs.
 
 ---
 
