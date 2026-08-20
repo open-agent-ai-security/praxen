@@ -133,7 +133,7 @@ _RAISE_POSTURE_FIELD_TYPES = {
 _RAISE_CATEGORY_FIELD_TYPES = {
     "key": "str",
     "name": "str",
-    "score": "int_or_none",   # null/N/A = category excluded (KB Step B3 all-N/A);
+    "score": "int_or_none",   # null/N/A = category excluded (see schema.py NA_ELIGIBLE_KEYS);
     "confidence": "str",       # schema.py enforces which keys may be N/A
     "weight": "float",
     "rationale": "str",

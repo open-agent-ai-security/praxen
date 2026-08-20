@@ -49,7 +49,7 @@ If the finding misreads the code, miscategorizes the issue, or asserts a chain t
 
 3. **Tighten the input.** If the evidence directory contains noise (test fixtures with deliberate vulnerabilities, archived old code, vendored dependencies), exclude it. Praxen will reason more sharply over a focused workspace.
 
-4. **If the issue persists across runs**, the analysis methodology may have a calibration bug. File it through whatever channel the project's release notes name. Include the finding ID, the cited evidence, what's actually in the code, and what you believe the correct severity (or absence of finding) should be.
+4. **If the issue persists across runs**, the analysis methodology may have a calibration bug. Please [file it](https://github.com/open-agent-ai-security/praxen/issues/new/choose). Include the finding ID, the cited evidence, what's actually in the code, and what you believe the correct severity (or absence of finding) should be.
 
 Do not edit the JSON or HTML output to "correct" the finding — those are the analysis artifacts and downstream consumers depend on them being unedited.
 

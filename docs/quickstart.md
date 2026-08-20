@@ -59,7 +59,7 @@ Claude opens the self-contained HTML report. Read it top to bottom:
 - **Remit Coverage table** — every rule you authored, marked `Verified` / `Gap` / `Partial` / `Vague` / `ENP` (Enforcement Not Possible). This is where you see how much of your policy the code actually honors.
 - **OWASP heatmaps** + **Positives** — the findings mapped to the OWASP LLM and Agentic risk catalogs, and the controls that *are* present and working.
 
-Ask Claude to walk through any finding — *"explain PRAX-005"*, *"why is this Critical?"* — and it re-examines the evidence with you. The analysis is conversational, so you can challenge or revise it; see [Challenging and Revising Findings](challenging-findings.md).
+Ask Claude to walk through any finding — *"explain PRAX-2026-08-03-005"* (finding IDs are `PRAX-<scan date>-<NNN>`), *"why is this Critical?"* — and it re-examines the evidence with you. The analysis is conversational, so you can challenge or revise it; see [Challenging and Revising Findings](challenging-findings.md).
 
 ## Bonus — don't just measure, improve
 

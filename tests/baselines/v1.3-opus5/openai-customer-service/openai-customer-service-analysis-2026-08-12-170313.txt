@@ -1,0 +1,129 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenAI Customer Service Agent
+Analysis: August 12, 2026, 17:03 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is the framework-offers-primitives, example-uses-none
+case in its purest form: the Agents SDK ships input_guardrails,
+output_guardrails, tool guardrails, and a per-tool needs_approval flag, and
+every one of the three agents and both tools in main.py is constructed without
+any of them. What survives is prompt-level policy — the seat routine's "ask
+for their confirmation number", the FAQ agent's "do not rely on your own
+knowledge" — with no code path that can enforce either, so update_seat()
+mutates booking state on whatever confirmation number the model produces. The
+blast radius is bounded by an unusually disciplined capability surface rather
+than by any control: with no shell, filesystem, network, or persistent-memory
+tool registered, a successful jailbreak reaches off-topic conversation,
+system-prompt disclosure, and a fabricated seat change, and no further.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.45 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 1   High: 3   Medium: 3   Low: 0   Informational: 0
+  Total: 7
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 12   Gap: 7   Partial: 5   Vague: 0   Enforcement-not-possible: 0   (of 24 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   1
+  LLM03  Excessive Agency                                   1
+  LLM04  Supply Chain                                       —
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     2
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Seat changes execute on any confirmation number the
+            model supplies — update_seat performs no booking lookup, no
+            validation, and carries no approval gate.
+      Action 1: Set needs_approval=True on the @function_tool decorator for
+                update_seat() at examples/customer_service/main.py:67 so the
+                booking mutation is surfaced for confirmation instead of
+                firing on the model's decision alone.
+      Action 2: Inside update_seat(), resolve the supplied confirmation number
+                against the active booking before writing anything, and raise
+                instead of returning a success string when it does not match —
+                the current body overwrites confirmation_number with whatever
+                the model passed.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-002  No input, output, or tool guardrails are wired on any
+            agent or tool, so nothing detects a jailbreak or blocks
+            instruction disclosure.
+      Action 1: Attach an input guardrail to the Triage Agent at
+                examples/customer_service/main.py:123 that trips on off-topic
+                and instruction-override attempts, and let its tripwire halt
+                the turn with an explicit decline — the SDK's InputGuardrail
+                and GuardrailFunctionOutput already provide the halt semantics
+                the remit's escalation rule assumes.
+      Action 2: Add an output guardrail on the same agents to catch
+                system-prompt and internal-instruction echoes before they
+                reach the customer, since no code path currently prevents the
+                model from reproducing its own instructions on request.
+
+  PRAX-2026-08-12-003  The triage agent — the conversation's entry point —
+            carries no topic restriction, and no code gate declines
+            out-of-scope requests.
+      Action 1: Rewrite the Triage Agent's instructions at
+                examples/customer_service/main.py:126 to name the two in-scope
+                lanes (airline FAQ and seat booking) and to require an
+                explicit decline for anything else, so the entry agent carries
+                at least the scope statement the specialists already have.
+      Action 2: Change the auto-mode fallback input at
+                examples/customer_service/main.py:164 to an in-scope airline
+                question, so the shipped smoke path exercises the intended
+                domain rather than demonstrating an unrefused off-topic turn.
+
+  PRAX-2026-08-12-004  Conversation content including passenger PII is
+            exported by default to OpenAI's trace ingest endpoint, a
+            destination absent from the remit's trusted services.
+      Action 1: Pass a RunConfig with trace_include_sensitive_data=False to
+                Runner.run() at examples/customer_service/main.py:168, which
+                keeps the span skeleton the remit's recording rule depends on
+                while dropping the turn content and booking identifiers from
+                what leaves the process.
+      Action 2: If durable traces are wanted inside the airline's own
+                boundary, register an operator-controlled trace processor
+                instead of relying on the default backend exporter, and add
+                whatever sink is chosen to the remit's Trusted Services list.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

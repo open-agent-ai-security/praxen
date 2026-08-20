@@ -41,6 +41,32 @@ Selected per-invocation in natural language ("run a Praxen analysis in high
 thinking mode"). No config file, no standing state (consistent with #2's
 deferral). Unrecognized/absent mode ⇒ standard.
 
+**Measured cost (Opus 5, 2026-08-11 dry-runs; the "Cost (rough)" column is a
+token estimate — actual numbers below).** Wall-clock expansion runs *lower*
+than the token multiple, because the audit is a finding-bounded re-read (not a
+second discovery pass) and x-high's three scans run concurrently:
+
+| Mode | Tokens (measured) | Wall-clock (measured) | Absolute (Opus 5) |
+|---|---|---|---|
+| **standard** | 1× | 1× | ~215k–265k tok, ~14–19 min |
+| **high** | ~1.4–1.5× | **~1.3–1.6×** (scan + a few min audit) | ~305k–395k tok, ~17–28 min |
+| **x-high** | **~4.0×** | ~2.0–2.5× (parallel scans + one adjudication) | ~0.9M tok, ~30–35 min |
+
+Per-target: high FinBot 1.41×tok/1.27×wc, Aider 1.40/1.52, CraftBot 1.52/1.57,
+uAgents 1.42/—; x-high FinBot 4.06×tok/~2.25×wc.
+
+**Token burn and wall-clock diverge, and the divergence is the budgeting
+point.** Parallelism cuts x-high's *wall-clock* (three scans overlap at ~15
+min) but not its *token bill* — three full scans' tokens are spent regardless
+of concurrency, plus a scan-sized adjudication pass (the adjudicator re-runs
+Steps 5–12 on the union), so ~3× + ~1× ≈ 4× tokens at ~2.25× wall-clock. High
+mode's audit is a finding-bounded re-read: ~90k–135k tokens / ~4–10 min on top
+of the scan (scales with finding count × evidence density — subtle production
+agents audit slower than dense demo apps). The docs keep the round multiples
+(~2× / ~4–5×) as conservative planning ceilings; operator guidance carries both
+measured axes and says to budget by tokens, not the clock
+(`docs/thinking-modes.md`).
+
 ## 3. First principles
 
 1. **Evidence decides membership; run-count decides nothing.** A finding seen
@@ -173,7 +199,19 @@ rules. One canonical findings JSON, one report — plus:
 - Frozen baselines and per-target bands are **standard-mode artifacts**.
   Thinking-mode outputs are never graded against standard bands, and no
   baseline is ever frozen in a thinking mode. Docs state cross-mode scores are
-  not comparable-by-band (expected direction: equal or cleaner).
+  not comparable-by-band.
+- **Corrected 2026-08-11 by the §9.2/§9.5 validation** (`RESULTS_XHIGH_VALIDATION.md`):
+  the original "expected direction: equal or cleaner" is **wrong in
+  direction**, and the claim that x-high "damps score variance" is **not
+  supported by the data**. Measured: adjudication *adds* verified findings
+  (12 single-run rescues across 4 super-runs, ~1 kill total), so super-run
+  scores trend **lower** than the raw runs (uAgents −0.125, AutoGen −0.017 vs
+  raw means). And two independent super-runs differed by exactly the raw
+  6-run range on both targets (0.15 / 0.25) — with **five of six categories
+  agreeing exactly** and the entire delta coming from one band-edge category
+  call. The honest statement, now in the docs: **x-high stabilises and expands
+  the finding set; per-category anchoring (#195) is what still moves the
+  score, and x-high inherits that rather than fixing it.**
 - **Freeze-independent satellite.** Standard path unchanged (modulo the
   gate-scanned SKILL pointer), no schema change, no template change ⇒ this can
   ship as a 1.2.x satellite or alongside 1.3 without riding the v1.3-opus5
@@ -198,6 +236,27 @@ rules. One canonical findings JSON, one report — plus:
 4. **Duplicate audit:** the x-high output contains no unmatched duplicates
    (scan_diff assist + adjudicator hand-check is the mitigation; this test is
    the proof it worked).
+5. **Discovery yield — does x-high catch verified findings a single run
+   misses?** (Added 2026-08-11 at Steve's direction; the stability proof in
+   §9.2 measures the *damping* half, this measures the *discovery* half, and
+   it is why principle 1 bans vote-counting.) For every finding in the
+   adjudicated super-run set, record how many of the three raw runs found it
+   (`k` ∈ {1,2,3}); **expected single-run recall = Σ(k/3) / N**. The
+   complement is the share of verified findings an ordinary single scan would
+   have missed on average. Grade it **overall and by severity tier** — a
+   missed Critical and a missed Medium are not the same result. Pass = the
+   super-run demonstrably contains verified findings a single run would have
+   missed, with the rescue rate stated, not asserted.
+
+   *Prior data point (FinBot x-high, 2026-08-11):* 19 union entries — 11
+   found-in-3, 4 found-in-2, 4 found-in-1 → **expected single-run recall
+   78.9%**, i.e. an ordinary scan misses ~21% of the verified set. Severity
+   split matters: **all 6 Criticals were unanimous** (found by all three
+   runs), and every single-run rescue was Medium or Low. On this target the
+   headline risks reproduced reliably and the discovery payoff sat entirely in
+   the tail. Whether that holds on the wide-band targets — or whether
+   Criticals themselves flip there — is the open question the §9.2 pairs on
+   autogen/uagents answer.
 
 ## 10. Risks
 

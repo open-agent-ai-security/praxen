@@ -23,6 +23,7 @@
 | Looking at a report and trying to understand it | [Interpreting Reports](interpreting-reports.md) |
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
 | Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
+| Running a scan where a miss would be expensive | [Thinking Modes](thinking-modes.md) — the **high** and **x-high** effort levels |
 | Getting the most out of a Praxen report | [Working with Praxen](#working-with-praxen) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |

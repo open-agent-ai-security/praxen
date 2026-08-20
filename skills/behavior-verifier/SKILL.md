@@ -26,7 +26,9 @@ allowed-tools: Read Grep Glob Bash Write
 
 Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 — the manifest that lets a long scan recover from mid-analysis context compaction. **Do not skip Step 9.9.**
 
-**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
+**Thinking modes (opt-in).** This procedure is **standard mode** — the default, and complete as written. If, and only if, the operator's invocation names a thinking mode (**high** / **x-high**), read `THINKING_MODES.md` beside this file before Step 1 and orchestrate per that file — it wraps this pipeline in post-scan verification without changing any step. If no mode was named, skip this paragraph; nothing else in this file changes.
+
+**Pipeline.** 12 steps. Steps 1–8 gather evidence and synthesise findings; **Step 8b sweeps for maturity evidence** (practice, not defects — a findings list alone cannot see a red team or a shipped telemetry pipeline); **Step 8.5 commits the finding decomposition** (a themes outline, so two scans of the same agent split into the same findings); Step 9 writes the prose, **assigns the RAISE scores in 9.4 from that gathered evidence rather than from a fresh workspace read**, **appending each finding to the draft manifest as it is drafted** rather than in one terminal burst; **Step 9.9 is the completeness gate** — the manifest is on disk and the interim overview is printed; Step 10 emits the canonical JSON; Step 11 invokes `render.py` (validates the JSON, then renders the HTML and TXT — no synthesis, no inference); Step 12 prints the summary.
 
 **Contents — jump table (useful after a context compaction).** A long scan can exceed the coding agent's context window; if your session resumed mid-procedure, this jump table is the fastest way to relocate the step you were on.
 
@@ -38,12 +40,13 @@ Plus a checkpoint file `<agent-slug>-draft-<TIMESTAMP>.md` written in Step 9.9 �
 - [Step 3 — Load Your Calibration](#step-3--load-your-calibration) — KB_RAISE_SCANNING, KB_AGENTIC_TOP10, KB_LLM_TOP10 (+ KB_MCP_SECURITY if MCP config is present)
 - [Step 4 — Discover and Read the Workspace](#step-4--discover-and-read-the-workspace) — artifact sweep, large-file strategy, empty-file signal, log-file discovery
 - [Step 4b — Secondary Prompt Discovery](#step-4b--secondary-prompt-discovery-session-loaded-files) — session-loaded files (`SOUL.md`, `MEMORY.md`, …); compound escalation
-- [Step 5 — Analyze Against RAISE Categories](#step-5--analyze-against-raise-categories) — six-category 0–5 scoring + confidence
-- [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; configuration gaps; MCP server evaluation; remit-delta
+- [Step 5 — Analyze Against RAISE Categories](#step-5--analyze-against-raise-categories) — six-category analysis; evidence gathered here, **scored in 9.4**
+- [Step 6 — Apply Named Detection Patterns](#step-6--apply-named-detection-patterns) — Policy-Implementation Divergence (Phase 1 inventory + Phase 2 audit); credential exposure; declared-but-never-consulted; planned-but-not-deployed; external value → filesystem path; configuration gaps; MCP server evaluation; remit-delta
 - [Step 7 — Compound Signal Reasoning](#step-7--compound-signal-reasoning) — combination escalations to Critical
 - [Step 8 — Positive Posture Recognition](#step-8--positive-posture-recognition) — confirmed positives
+- [Step 8b — Maturity Evidence Sweep](#step-8b--maturity-evidence-sweep) — hunt *practice*, not defects: adversarial testing, feedback loops, supply-chain hygiene, monitoring; record verified absences too. Feeds the 9.4 scores
 - [Step 8.5 — Finding-Themes Outline](#step-85--finding-themes-outline-decomposition-primer) — commit the decomposition (one line per intended finding) before drafting; stabilises finding count across runs
-- [Step 9 — Synthesize the Report Prose](#step-9--synthesize-the-report-prose) — 9.1 remit summary · 9.2 structure summary · 9.3 behavior summary · 9.4 RAISE rationales · 9.5 weighted rationale · 9.6 remit coverage · 9.7 positives (drafted + **appended to the manifest one at a time**) · 9.8 log files · **9.9 completeness gate: manifest on disk + interim overview**
+- [Step 9 — Synthesize the Report Prose](#step-9--synthesize-the-report-prose) — 9.1 remit summary · 9.2 structure summary · 9.3 behavior summary · 9.4 RAISE scores + rationales · 9.5 weighted rationale · 9.6 remit coverage · 9.7 positives (drafted + **appended to the manifest one at a time**) · 9.8 log files · **9.9 completeness gate: manifest on disk + interim overview**
 - [Step 10 — Write the Canonical Findings JSON](#step-10--write-the-canonical-findings-json) — manifest-exists pre-check, JSON shape, common validation errors
 - [Step 11 — Render the Report](#step-11--render-the-report) — invoke `render.py`
 - [Step 12 — Final Summary (stdout)](#step-12--final-summary-stdout) — print the .txt summary + the file pointers
@@ -235,7 +238,19 @@ Using the workspace path from Step 1, discover all artifacts in the agent's work
 | Dependency files | `requirements*.txt`, `package-lock.json`, `yarn.lock`, `Pipfile.lock`, `poetry.lock` |
 | Credential-adjacent files | `.env`, `secrets*`, `credentials*`, `token*`, `key*`, `auth*` — read carefully |
 | Memory files | `MEMORY.md`, `memory*.md`, `*memory*.json`, `sessions.json` |
+| IaC / deployment artifacts | Helm values (`values.yaml`, `values-*.yaml`); Kubernetes manifests (`*.yaml` under `k8s/`, `deploy/`, `manifests/`, `helm/`); Terraform (`*.tf`, `*.tfvars`); `docker-compose*.yml`; `Dockerfile`. Look for: seed phrases, API keys, and default credentials committed as chart/compose defaults; hardcoded env vars; missing securityContext or overly permissive RBAC; public network exposure; rw host mounts. These surfaces carry deployment defaults that are high-yield and routinely missed — a committed Helm default is as real as a hardcoded credential in code. |
 | Action logs and postmortems | `*log*`, `*audit*`, `*postmortem*`, `*incident*` |
+
+**Adapter surfaces — sample by risk, not by architecture.** When the target has
+many parallel adapters, connectors, or platform integrations (a `platforms/`,
+`adapters/`, `integrations/`, or `connectors/` directory with N similar files),
+each one is a distinct input-validation surface — "read the architecturally
+load-bearing files" under-covers exactly these. Do not read all N
+indiscriminately; sample deliberately: prioritize adapters that perform
+**filesystem writes, path construction, or database operations with
+externally-supplied values** (an ID from an API response used in a path join is
+the canonical miss), and record in the evidence checkpoint which adapters were
+read and which were not, so the coverage decision is visible.
 
 **Large-file reading strategy — heuristic, not mandatory shell call.**
 
@@ -352,12 +367,14 @@ Hold in working memory, and carry into Step 5 and Step 6:
 
 Evaluate all artifacts from Step 4 against the six RAISE categories. Use `KB_RAISE_SCANNING.md` as your primary guide — specifically its artifact intake patterns, signal-to-risk heuristic tables, inference rules, and scoring anti-patterns.
 
-Score each category 0–5 with a confidence level (High / Medium / Low). Score what you can verify. Do not give credit for controls that are claimed but not evidenced. When in doubt, score lower.
+Assess each category and gather its evidence — the 0–5 scores and confidence levels are assigned in **Step 9.4**, not here. Credit only what you can verify. Do not give credit for controls that are claimed but not evidenced. When in doubt, read the control's wiring rather than its name.
 
-**Score for what the agent enforces at runtime, not for what is present in the repo.** This is the same Policy-Implementation Divergence discipline you apply to findings, applied to the score:
+**Assess what the agent enforces at runtime, not what is present in the repo.** This is the same Policy-Implementation Divergence discipline you apply to findings, applied to the score:
 
 - A control primitive that exists in the codebase but is **off by default, trivially bypassable, or not actually wired into this agent's execution path** is a *finding*, not a *point* — it does not lift the category. (A `package-lock.json` sitting next to hardcoded credentials and caret-ranged SDK deps is a **1** in *Manage Your Supply Chain*, not a 2; `inputValidation` present in a config schema but set to `false` is **0** in *Implement Zero Trust*.)
-- A test harness, attack-fixture set, or vulnerability-demo suite whose purpose is to **demonstrate** an agent's weaknesses — not to **drive architectural fixes** — does not lift *Build an AI Red Team* above **1**. The bar for a 2+ is evidence the team's own adversarial testing changed the design.
+- Adversarial material is scored by **whose defences it is about** — the provenance test in `KB_RAISE_SCANNING.md`. Two different cases, and they land on different numbers:
+  - **The project's own** demo suite or attack fixtures, which *demonstrate* weaknesses but never *drove a fix*: **that material alone cannot justify more than 1.** It is their material and they ran it; there is just no feedback loop. The ceiling binds the artifact, not the category — other surviving evidence is scored on its own merits, and the bar for 2+ is evidence the team's own adversarial testing changed the design.
+  - **Material the project ships to its users** — a CTF walkthrough, a challenge target, a training lab, an offensive toolkit aimed at someone else's systems: **contributes nothing — treat it as absent** (never write `N/A` for this; RAISE categories are always presence-scored). It is a product, not a practice, and a ceiling of 1 is not a floor of 1. If nothing else survives the provenance test, the category is **0**.
 - An in-memory buffer, an error log, or print statements are not "monitoring." *Monitor Continuously* above **1** needs a structured, action-level, durable record.
 
 **Calibration anchors — read both directions.** Most production agents land between *Ad hoc* (1) and *Established* (3); *Strong* (4) and *Exemplary* (5) are rare in shipping systems. Use these so you neither inflate nor deflate:
@@ -378,7 +395,7 @@ Score each category 0–5 with a confidence level (High / Medium / Low). Score w
 
 **Monitor Continuously** — Does the agent log its actions? Are logs structured enough to support automated detection? Look for: no logging calls in skill code, free-form log format with no schema, log files present but capturing only errors (not actions and decisions).
 
-Hold the six scores, confidences, and the evidence behind each — you will write the per-category rationale prose in Step 9.4.
+**Do not commit scores here.** Hold the per-category evidence and your provisional read of each — and **append the evidence notes to the Step 4 evidence checkpoint** (`./reports/<agent-slug>-evidence-<TIMESTAMP>.txt`) as a `RAISE NOTES` section, a few lines per category naming the operative controls and gaps you saw with their file locations. This is not optional: Step 9.4 scores from these notes, and notes that exist only in working memory do not survive a compaction. The numbers are assigned in **Step 9.4**, against the committed evidence — the Step 8.5 finding decomposition, the positives, the Step 8b maturity record, and these notes — not against this working-memory pass. Scoring here, before the findings exist, is what made the number depend on whatever this read happened to notice.
 
 ---
 
@@ -481,6 +498,34 @@ Search for planning documents, architectural notes, TODO comments, or design doc
 
 A document that says "we will add input validation" with no corresponding validation code: **Medium finding**. The plan does not protect production.
 
+### External Value → Filesystem Path
+
+An identifier or name sourced from an **external system's response** — an API
+reply, a webhook payload, a platform callback, a message header — used in
+filesystem path construction (path join, f-string into a path, directory
+creation) without validation is a path-traversal primitive. The trust question
+is the *source*: the same variable is in-envelope when it comes from operator
+config, and out-of-envelope when it comes back from a remote service's
+response.
+
+Check every site where an externally-sourced value meets a path:
+- No `resolve()` + `is_relative_to()` (or equivalent containment check), and no
+  character filtering, between the external value and the path constructor →
+  **High**; **Critical** when the write path auto-creates parent directories
+  (`mkdir(parents=True)` before write turns `../../../` into arbitrary
+  directory creation plus file write).
+- A fixed suffix appended at the call site (`f"{external_id}.json"`) limits
+  exact-file overwrite but does **not** prevent traversal — say so in the
+  finding rather than crediting it as a control.
+- The same external value flowing into multiple path constructors is one
+  finding with multiple evidence sites (the control gap is the unvalidated
+  source, not each sink).
+
+The same source-trust test applies to database identifiers and shell-command
+fragments built from external responses; file paths are called out because the
+class was demonstrably missed (a CVE-confirmed traversal in a scanned target's
+platform adapter, found only by third-party cross-reference).
+
 ### Configuration Gaps
 
 For each config file found, check for:
@@ -553,6 +598,91 @@ For each of the following, check whether the evidence supports it. Include confi
 
 ---
 
+## Step 8b — Maturity Evidence Sweep
+
+Step 8 recognises positives for the *report*. This step gathers the evidence
+the *score* needs, and it is the counterpart to everything before it: Steps 6–8
+hunt defects, this one hunts practice.
+
+A scan that only records what is wrong cannot measure maturity. A project with
+a red-team corpus, a drift-checked component inventory and shipped telemetry
+looks identical, in a findings list, to one with none of it — because none of
+that appears as a finding.
+
+**This is an enumerated lookup, not an open sweep.** Work the twelve questions
+below in order and answer **every one**, including the ones whose answer is
+nothing. Do not go looking for maturity evidence in any other way, and do not
+stop early because the target "obviously" has none — an unanswered question and
+a question answered "none" are different inputs to the score, and only the
+second is evidence.
+
+The searches are specified so that two scans of the same target gather the same
+material. Run the search as written, then record what it returned.
+
+**Search scope — fixed, so two runs search the same tree.** All matching is
+case-insensitive; patterns match file/directory basenames unless they contain a
+path separator. For M1–M6 and M9, search within the declared subject scope from
+`SCAN_INSTRUCTIONS.md` (Step 4) — the whole workspace when no scope is
+declared. For M7, M8, M10, M11 and M12, search the whole workspace regardless
+of scoping: CI, inventories, scanning and monitoring configuration live at the
+repo root even when the subject is one package. When a workspace-wide hit
+belongs to a sibling package rather than the subject or shared infrastructure,
+record it with that caveat — Step 9.4 decides what it credits.
+
+| # | Question | Search |
+|---|---|---|
+| M1 | Security-named test files? | Filenames matching `*test*security*`, `*security*test*`, `*test*guard*`, `*guard*test*`, `*test*auth*`, `*test*sanitiz*`, `*test*permission*`, `*test*sandbox*`, `*test*inject*` |
+| M2 | A dedicated adversarial directory or corpus? | Directories named `redteam`, `red-team`, `red_team`, `adversarial`, `attacks`, `pentest`; and filenames matching `*attack*`, `*exploit*`, `*jailbreak*`, `*payload*` under any `tests/`, `fixtures/`, `corpus/` or `data/` directory |
+| M3 | Named adversarial tooling? | Grep dependency and config files for `garak`, `promptfoo`, `pyrit`, `giskard`, `textattack`, `deepeval` |
+| M4 | A written threat model or security policy? | `SECURITY.md` (root or `.github/`), `THREAT_MODEL*`, `docs/security*` — and whether it names what is in and out of scope |
+| M5 | Dated security result reports? | Files under a results/reports directory whose names carry a date, or a report series in the security/threat-model docs |
+| M6 | Is the security testing command-invocable? | An executable runner (`run.py`, `*.sh`) in the M2 directories, or a documented single command that runs the security tests found in M1–M3. A generic test suite (`pytest`, `npm test`) counts only if the M1 files run under it — say which. |
+| M7 | Does it run automatically, and on what trigger? | `.github/workflows/*.yml` (or the equivalent) — read each and record its trigger: on push, on PR, on a schedule, manual only |
+| M8 | Does security testing gate a release? | Grep workflow files and the M4/M5 documents for `gate`, `block`, `required`, `threshold`, `must pass`, `fail the build`; record the matching line. Branch-protection rules live outside the repo — when nothing matches, the answer is `none in-repo — searched <tokens>`, not a guess. |
+| M9 | Findings traced to fixes? | A ledger, changelog or release-notes section **in the working tree** linking a reported finding to a commit, PR or advisory ID. Git history and forge metadata (releases, advisories pages) are out of scope. |
+| M10 | A component inventory? | `*.cdx.json`, `*.spdx*`, `sbom*`, `aibom*`, `mlbom*` — and whether anything checks it for drift |
+| M11 | Dependency and container scanning? | Workflow or config for Dependabot, Renovate, `osv-scanner`, CodeQL, Trivy, Snyk, Semgrep, `pip-audit`, `npm audit` |
+| M12 | Monitoring beyond local logs? | Config/deploy files referencing OpenTelemetry, OTLP, fluentbit, `vector` (config and deploy files only — do not grep source for `vector`, it is saturated in LLM codebases), Splunk, Datadog, Elastic, CloudWatch; alert rules; dashboards-as-code; on a deployed target, a telemetry connection recorded in the Step 4 runtime evidence |
+
+**Answer format — one line per question, all twelve, in order:**
+
+```
+M1: <paths found, or "none — searched <patterns>">
+M2: ...
+```
+
+List up to five paths per answer; summarize any remainder as
+`<dir>/ (+N more, unopened)`. For M7 with more than five workflows, record the
+trigger tally instead (`12 on-push, 2 scheduled, 1 manual-only`). Where an
+answer is non-empty, add `file:line` and one **factual** clause on what the
+artifact is: what it contains and who it is aimed at (the project's own
+defences, or content shipped to users). That clause is observation, not
+classification — Step 9.4 applies the provenance test and decides what
+anything counts for. Record enough for that judgment to be made.
+
+**Two rules that keep this honest:**
+
+- **A pattern hit is a place to look, not an answer.** M1's filename patterns
+  will miss a project whose security tests are named for the thing they guard,
+  and will match a vulnerable demo whose "attacks" are its product. Open what
+  you find before recording what it is — at most the first five hits per
+  question; record the rest as unopened counts. Do not run compensating
+  searches for what the patterns might have missed.
+- **CI is one form of evidence, not the required form.** M7 records the
+  trigger; it does not require one. Whether a runner-script exercise or a CI
+  job is the stronger practice is Step 9.4's call, not this step's.
+
+**Persist the record before moving on.** Append the twelve-line answer block to
+the Step 4 evidence checkpoint
+(`./reports/<agent-slug>-evidence-<TIMESTAMP>.txt`) as a `MATURITY (M1-M12)`
+section, exactly as Step 8.5 appends its `THEMES`. Step 9.4 reads it from
+there, and a compaction between here and 9.4 must not be able to destroy it.
+It is still **not** serialized into the report — nothing here changes the
+report schema. Confirmed positives still go to `positives[]` via Step 9.7 as
+they always did.
+
+---
+
 ## Step 8.5 — Finding-Themes Outline (decomposition primer)
 
 Before you draft any finding prose, commit the **decomposition** — how the raw signals from Steps 5–8 carve into discrete findings — as a short outline. This is a thinking step with one small on-disk artifact; it exists because the carve is where run-to-run variance is born: the same evidence, split one way, is 8 findings; split another, 13. Deciding the split *once, up front* is what keeps two scans of the same agent comparable.
@@ -575,7 +705,7 @@ Each line carries: intended **severity**, a **one-line theme** (what the finding
 
 - **One finding per distinct control gap**, not per file and not per symptom. Two symptoms of the same missing control are one finding with two evidence sites; one control gap that surfaces in two unrelated subsystems is two findings.
 
-- **Compound chains (Step 7) and their contributors — the decidable fold/break-out test.** A compound chain is **one** finding (list it once, with its contributing mechanisms noted inline). A contributing mechanism gets its **own** standalone finding *in addition* to the compound **only if it passes this test: would it still be a finding after the other links in the chain are fixed?** — i.e. it is exploitable on its own, not solely as a step in the chain.
+- **Compound chains (Step 7) and their contributors — the decidable fold/break-out test.** A compound chain is **one** finding (list it once, with its contributing mechanisms noted inline). A contributing mechanism gets its **own** standalone finding *in addition* to the compound **only if it passes both halves of this test: (a) would it still be a finding after the other links in the chain are fixed?** — i.e. it is exploitable on its own, not solely as a step in the chain — **and (b) does it have a distinct fix-point** — a different file, control, or configuration change than the one that fixes the chain? A mechanism that is independently exploitable but fixed by the same change as the chain folds anyway: it will disappear with the chain, and breaking it out double-counts one repair as two findings.
   - Passes → standalone (and it also appears as a contributor in the compound's chain note). *Example: a `0.0.0.0` public bind with no auth is a finding even if every downstream admin endpoint were removed → standalone.*
   - Fails → **folded** into the compound, no standalone finding. *Example: `forwarded_allow_ips="*"` (spoofable-loopback guard) or an inspector that is on-by-default are only exploitable **because** the endpoints are remotely reachable; fix the bind/exposure and they are no longer findings → fold them.*
   - Mark every contributor in the outline `[folded]` or `[standalone: independently exploitable because …]`. Never emit a mechanism **both** as a standalone finding and as a broken-out link of the compound — that double-counts (the exact carve that made one scan report 13 findings where two others reported 9).
@@ -637,11 +767,24 @@ Write **two to four sentences** that name the single most important pattern a se
 
 The renderer wraps this in a `.body` div that styles `<p>` paragraph breaks and inline `<code>`. If the narrative is more than one paragraph, wrap each in `<p>...</p>`. A single paragraph can be plain text.
 
-### 9.4 RAISE per-category rationale ×6 → `raise_posture.categories[].rationale`
+### 9.4 RAISE category scores and rationale ×6 → `raise_posture.categories[]`
 
-For each of the six RAISE categories — in this fixed order: **Limit Your Domain, Balance Your Knowledge Base, Implement Zero Trust, Manage Your Supply Chain, Build an AI Red Team, Monitor Continuously** — record the score (0–5) and confidence (High/Medium/Low) you arrived at in Step 5, plus a **rationale of one to two sentences** naming the specific evidence (or observed absence) behind the score: which file, which control, which gap. Concrete, not generic.
+**This is where the scores are assigned.** For each of the six RAISE categories — in this fixed order: **Limit Your Domain, Balance Your Knowledge Base, Implement Zero Trust, Manage Your Supply Chain, Build an AI Red Team, Monitor Continuously** — assign a score (0–5) and confidence (High/Medium/Low), plus a **rationale of one to two sentences** naming the specific evidence (or observed absence) behind the score: which file, which control, which gap. Concrete, not generic.
 
-Before you commit the numbers: re-read the scoring discipline in Step 5 ("Calibration anchors"). Each score must trace to specific evidence — the operative controls you verified *and* the gaps you filed as findings. Don't let a one-line positive in 9.7 inflate a category that's unaddressed at runtime; equally, don't drop a category to 0 just because you filed findings about its gaps when the control underneath is real and running.
+**Score from a fixed evidence set — do not re-read the workspace.** Four things, and only these (the first, third and fourth all live in the Step 4 evidence checkpoint, so they survive a compaction):
+
+1. the committed finding decomposition — the Step 8.5 `THEMES` outline, with its intended severities, categories and evidence sites,
+2. `positives[]` from Step 8,
+3. the **Step 8b maturity record** (`MATURITY (M1-M12)` section), including its verified absences,
+4. your Step 5 per-category evidence notes (`RAISE NOTES` section).
+
+Going back to the workspace for a fresh look is what makes two runs of the same scan disagree: each pass notices different things and scores what it noticed. The evidence is already gathered. Score it. If a severity genuinely changes during 9.9 drafting, revisit the affected category's score against the same evidence set before Step 10 — do not let the scores and the findings drift apart silently. And when the committed evidence cannot decide an adjacent-band call, that is not a license for a fresh workspace read: apply the KB's choose-the-lower rule and name both bands in the rationale.
+
+**Rationales for *Build an AI Red Team* and *Monitor Continuously* must cite the maturity record explicitly** — name the M-line(s) the score rests on (`M2: none` is a citation). These are the two categories where findings carry almost no signal, so a rationale that never references M1–M12 is a rationale that ignored the record.
+
+Before you commit the numbers: re-read the scoring discipline in Step 5 ("Calibration anchors") and the scoring model in `KB_RAISE_SCANNING.md` — its **provenance test** and its **boundary rules**, which decide the adjacent-band calls. Each score must trace to specific evidence — the operative controls you verified *and* the gaps you filed as findings. Don't let a one-line positive in 9.7 inflate a category that's unaddressed at runtime; equally, don't drop a category to 0 just because you filed findings about its gaps when the control underneath is real and running.
+
+**A category is not scored on defects alone.** Findings show what is broken; the Step 8b record shows what is practised. A category with few findings and no practice is not healthy, and one with real practice and several findings is not immature. *Build an AI Red Team* and *Monitor Continuously* are the categories where this bites hardest — almost nothing about them ever surfaces as a finding, so scoring them from `findings[]` alone will read every target as absent.
 
 *Example rationale (Implement Zero Trust, score 0):* "No code-level interposition exists on the agent's tool calls — `send_invite` emails any address the model produces with no allowlist, recipient confirmation, or rate check, and the only stated guardrails live in an LLM system prompt that free-text meeting notes can influence at runtime."
 
@@ -882,7 +1025,7 @@ Rules for the finding manifest and the JSON it produces:
 - **`praxen_version` and `schema_version` are populated by the Step 10 script** from Praxen's own canonical sources (`.claude-plugin/plugin.json` and `schema.py` respectively). You do **not** write them in the manifest. If the agent you are analyzing is itself a Claude Code plugin, its workspace contains its *own* `.claude-plugin/plugin.json` — that file is the analyzed agent's version, never Praxen's, and the converter never reads from the analyzed workspace.
 - **Finding IDs** are `PRAX-YYYY-MM-DD-NNN` (today's date, zero-padded sequence from `001`). They double as the HTML anchors — keep them unique. Order the array Critical → High → Medium → Low → Informational, and by ID within a severity (the renderer re-sorts by severity, but writing it in order keeps the JSON readable).
 - **`summary` vs `description`.** `summary` is the one-sentence finding-card header — required, must be specific. `description` is an *optional* longer-form body (one short paragraph) for downstream consumers; the report card currently shows only the `summary` (a future look-and-feel revisit may surface the description). If you have nothing more to say than the summary, omit `description` entirely.
-- **`policy_rule_ids` may be `null`.** A finding from the Policy-Implementation Divergence audit (Step 6) diverges from specific remit rule(s): set `policy_rule_ids` to the `R-NN` id(s) (the Step 10 script will populate `policy_rule_text` by looking up each id in `remit_coverage.rules[].rule_text` and joining multi-rule entries with `" / "`). But a finding raised by RAISE-category scoring (Step 5) or by a detection pattern with no corresponding remit clause — an absent control the remit never names, a supply-chain or monitoring gap the remit is silent on — does **not** trace to a rule. For such a finding set `policy_rule_ids: null`. Do not invent an `R-NN` id and do not stuff an explanatory sentence into `policy_rule_ids` to dodge the field — `null` is the correct, expected value, and the renderer simply omits the policy-rule line for that card.
+- **`policy_rule_ids` may be `null`.** A finding from the Policy-Implementation Divergence audit (Step 6) diverges from specific remit rule(s): set `policy_rule_ids` to the `R-NN` id(s) (the Step 10 script will populate `policy_rule_text` by looking up each id in `remit_coverage.rules[].rule_text` and joining multi-rule entries with `" / "`). But a finding raised by the RAISE-category assessment (Step 5; scores assigned at 9.4) or by a detection pattern with no corresponding remit clause — an absent control the remit never names, a supply-chain or monitoring gap the remit is silent on — does **not** trace to a rule. For such a finding set `policy_rule_ids: null`. Do not invent an `R-NN` id and do not stuff an explanatory sentence into `policy_rule_ids` to dodge the field — `null` is the correct, expected value, and the renderer simply omits the policy-rule line for that card.
 - **Don't stretch the rule link.** When the connection between a finding and a remit clause is indirect — e.g. an *inbound*-access gap weakening a clause about *outbound* counterparties — resist the temptation to link the rule anyway because it's "in the neighbourhood." If the linkage is genuinely traceable but indirect (the finding is the *enabling condition* for a violation of the rule, not the violation itself), link the rule **and** name the chain in the finding's `description` so a reader sees why the link is legitimate. If the linkage is across unrelated categories or you can't explain the chain in one sentence, set `policy_rule_ids` to `null` and put the connection (if any) in `description` instead. A stretched link confuses the operator and reduces trust in the audit; a clean `null` with an explanation does not.
 - **`evidence` is structured: an array of `{ "file", "line", "snippet" }` objects** — *not* free-form strings. `file` is a workspace-relative path (or a workspace-relative identifier when there's no single file); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context — a short, specific piece of prose. The renderer formats each item as `file:line — snippet` in the report. Every finding needs at least one evidence item. Bad evidence ("No input validation found") is still bad — say *what* and *where*, e.g. `{ "file": "src/agent.py", "line": 34, "snippet": "fetch_message() returns the full body before the trust check at :67" }`. **For evidence that spans a line range** (a function body, a Terraform block, a multi-line config), put the *start* line in the `line` field and carry the range in the `snippet` itself — e.g. `{ "file": "agent.py", "line": 197, "snippet": "request_approval node, lines 197-209 — yields RequestInput but the approval-UI handler dismisses it without operator review" }`. The schema requires a single integer (or null) for `line`; range syntax lives in the snippet. **Never reprint a secret value** in `snippet` (see the rule at the top of this skill).
 - **`recommended_actions` is an array of strings.** One action → single-item array; multiple actions → multiple items. The renderer renders a single-item array as inline text and a multi-item array as a bulleted list. Each item is one concrete action: file to edit, config to change, control to add. Inline `<code>` / `<strong>` / `<em>` is allowed.

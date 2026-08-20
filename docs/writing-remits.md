@@ -116,6 +116,58 @@ A mature remit usually goes through three or four iterations before the policy a
 
 See [Challenging and Revising Findings](challenging-findings.md) for guidance on when a finding indicates a remit problem versus a code problem.
 
+## Advanced — hardening a new remit
+
+A freshly written remit is the least trustworthy input in the whole pipeline. It has never been checked against anything, and its defects are *invisible in an ordinary scan*: an over-broad or invented rule produces a finding that looks entirely real — correct file, correct line, honest violation of the rule **as written** — because the rule itself is what's wrong. You cannot spot that by reading the findings. You have to check the rules.
+
+This section is a manual hardening pass to run **once**, on a new remit, before anyone acts on its report. It is deliberately more work than the normal loop above; skip it for a remit that has already been through a few scan cycles.
+
+### 1. Run the first scan in high mode
+
+> *"Run a Praxen analysis of `./my-agent` in **high** thinking mode."*
+
+High mode adds a second, context-unaware pass over the finished report. Beyond re-checking each finding, it **audits your rules against the target's own documentation** and produces a **remit feedback** list — rules that are fabricated, that forbid something the target documents as intended, that leave a routine counterparty out of an allow-list, or that weld a sound prohibition to an over-broad extension. See [Thinking Modes](thinking-modes.md) for the full mechanics and the cost.
+
+**Cost:** in our testing, roughly **1.4× the tokens** and **1.3–1.6× the wall-clock** of a standard scan — and under concurrency the time multiple stretches toward 1.8× while the token cost holds. Estimate duration from the clock figure, not the token one.
+
+### 2. Read the adjudication file — not just the report
+
+**The remit feedback is not in the HTML report.** The report is a risk document about the *agent*; the rule critique is a quality document about *your remit*, and it is written to a separate file:
+
+```
+reports/<slug>-adjudication-<timestamp>.md
+```
+
+Open it and read the `## Remit feedback` section. Each entry names the defective rule, the defect class, a citation into the target's own docs, and **the narrower obligation those docs actually support** — usually close to a drop-in replacement. The agent's closing message also points at this file, but that message is easy to scroll past; the file is the durable copy.
+
+### 3. Fix the rules — and re-check your own fixes
+
+Apply the narrower obligations. Then re-read what you wrote, because **fixing an over-reach is itself a common way to introduce a new one**: it is very easy to replace a too-broad rule with a rule that demands a specific mechanism the target never documented. If your replacement names a procedure, a threshold, or a sequence of steps, confirm the docs actually describe it. If they don't, state the *property* the docs support and put the mechanism question in Open Questions.
+
+### 4. Optional — an independent review pass
+
+For a remit that will drive decisions, a second opinion catches what the first pass missed. There is no built-in mode for this yet; today it is a manual step. Ask a **fresh** agent — one that has not seen the scan, the adjudication, or your edits — to review the revised remit:
+
+> *Review this Worker Remit against the target's documentation. For **every** rule, ask: (a) does it demand a mechanism, list, or threshold that neither the docs nor any design doc ever stated — a fabricated obligation? (b) does it prohibit behavior the docs describe as intended and supported? (c) does an allow/trust list omit a counterparty the docs describe as routine operation? (d) does one clause bundle a sound prohibition with an over-broad extension? (e) does it contradict another rule in this same remit, or is it written so no evidence could settle it?*
+>
+> *Every defect must carry a **documentation** citation. Judge the rules against the documentation, never against the implementation — a rule the code does not satisfy is a **gap finding**, which is the remit working correctly, not a defect. Also tell me what important documented behavior the remit fails to constrain at all.*
+
+That last instruction matters more than it looks. A reviewer with code access and a loose standard will flag your best rules — the ones the implementation fails — as "defects," and quietly strip the remit of everything that would have produced a finding.
+
+Expect **more than one round**. In the case this guidance was written from, a blind-authored remit came back with four defective rules; fixing them introduced one new fabricated obligation, which the independent pass caught; a third check came back clean.
+
+### 5. Human review is the closing gate — not the automated passes
+
+**The steps above narrow the problem. They do not settle it.** Every automated pass is reasoning from the target's documentation, and a remit is a statement of *your* intent, which the documentation may under-specify, contradict, or never mention.
+
+Three judgments no auditor can make for you:
+
+- **Where the docs are silent.** Approver identity, volume limits, whether unattended operation is permitted, whether a destination allow-list is required — these are policy decisions. An agent that "resolves" them is inventing your policy. Keep them in **Open Questions** until a human decides, and record who decided and when.
+- **Where a rule is defensible either way.** "Halt when the safety gate is missing" and "warn prominently and proceed" are both coherent policies. Only the operator can choose. Writing the stricter one into the remit unilaterally manufactures a finding against a system behaving exactly as its owner intends.
+- **Whether the remit says what you meant.** A rule can be well-formed, well-cited, and still not be your policy.
+
+Sign off on the remit yourself before anyone acts on a report built from it — and when you hand that report to a team, say which rules are new, so they know which findings rest on freshly written policy.
+
 ## Common mistakes
 
 - **Pasting the README into the remit.** The README describes what the agent is. The remit declares what it's allowed to do. They overlap but are not the same.
