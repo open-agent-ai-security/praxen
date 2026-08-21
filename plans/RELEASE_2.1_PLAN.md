@@ -117,6 +117,11 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 - **#104** — entropy-based secret detection in `render.py`'s redaction
   backstop (catch high-entropy credentials the pattern list doesn't know).
   Stays here — render-byte churn wants its own freeze window.
+- **Threat-model contract v1.5** — amendment batch from the 12-target
+  baseline sweep; consolidated in `CONTRACT_V15_AMBIGUITY_HARVEST.md`
+  (items 1–4 are the core: split/merge/budget precedence, owasp
+  primary+co-tag, untrusted-origin lane+coinage — contains a live
+  two-run contradiction — and egress-side archetypes).
 
 ### B · Coverage & roster
 
