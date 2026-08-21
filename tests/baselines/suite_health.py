@@ -140,8 +140,18 @@ def rows_table(rows, out_dir: Path, baseline_dir: Path):
                 rem = f' · <a href="{html.escape(str(rel))}">remit ↗</a>'
             except ValueError:
                 pass
+        # Threat-model report (2.0): rendered from the extraction graph committed
+        # beside the analysis artifacts in the same target dir.
+        tms = sorted((baseline_dir / slug).glob(f"{slug}-threatmodel-*.html"))
+        tm = ""
+        if tms:
+            try:
+                rel = tms[-1].resolve().relative_to(out_dir.resolve())
+                tm = f' · <a href="{html.escape(str(rel))}">threat model ↗</a>'
+            except ValueError:
+                pass
         body.append(f"""      <tr>
-        <td class="t-name">{html.escape(disp)}<div class="t-repo"><a href="https://github.com/{html.escape(repo)}" target="_blank" rel="noopener">{html.escape(repo)}</a>{rem}{rep}</div></td>
+        <td class="t-name">{html.escape(disp)}<div class="t-repo"><a href="https://github.com/{html.escape(repo)}" target="_blank" rel="noopener">{html.escape(repo)}</a>{rem}{rep}{tm}</div></td>
         <td class="sponsor">{html.escape(SPONSOR.get(slug, "—"))}</td>
         <td class="num">{star_str(stars)}</td>
         <td>{fresh_pill(fresh)}</td>

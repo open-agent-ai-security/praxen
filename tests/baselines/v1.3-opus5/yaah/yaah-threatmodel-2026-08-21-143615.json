@@ -1,0 +1,1097 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "yaah",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/yaah"
+  },
+  "analysis_ref": "yaah-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "yaah is a Go command-line tool and runtime that writes the configuration for other coding agents — hooks, skills, sub-agents, slash commands and MCP servers — and then runs alongside them as a hook dispatcher, a local MCP server and a per-session audit store. It is not itself an LLM agent: everything it receives comes either from the developer at the keyboard or from the coding agent it serves, and the second of those is model-generated, which makes the hook payloads and the MCP tool arguments the untrusted side of the boundary. Its two consequential surfaces are the safety controls it enforces on the host agent's actions — a dangerous-command guard and a credential scanner — and the configuration it writes into the developer's repository, which decides what the host agent may do, which servers it launches, and what third-party instruction text it loads every session.\n\nThree things are worth fixing before anything else. A skill fetched from a third-party repository is copied into the coding agent's skill tree with the remote author's own front matter intact, so that author, not the harness, decides which tools the skill may use — including shell access — and the grant is re-read every session; the equivalent path for sub-agents already strips that front matter and is the model to copy. The lint tool exposed over MCP takes a file path and a profile straight from the model and runs external programs built from them, three of which fetch and execute a package from the public npm registry, and the same tool surface will read any absolute path the caller names and create directories anywhere it points; one tool call from a coding agent that has read poisoned content is enough to install and run someone else's code on the developer's machine. And the two controls the harness exists to provide are thinner than they look: the command guard is seven text patterns over a shell string, so the obvious rewrites of everything it names pass through; the credential scanner runs after the write, so a secret is already on disk when the block fires; and generating for one of the four supported coding agents drops both controls entirely without a warning.\n\nTwo more should be scheduled rather than ignored. The Notion integration writes the operator's API token in clear text into the config files every generator emits, and nothing keeps those files out of version control. And every generated workflow command is invocable by the model itself — including the one that runs a full plan, execute and verify cycle with no human checkpoint — because the switch that would prevent it exists in the generator and is never set. Underneath both, the harness ships the host agent's permission rules, sandbox mode and server allowlist empty even though it fully supports them, and neither safety control has a single test in a repository that otherwise has fourteen test files.",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "operator-entrypoint",
+      "name": "Developer / operator",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The human who runs the yaah CLI to generate coding-agent configuration and manage session state; the trusted owner of record.",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 53, "note": "main() builds the cobra root command the developer invokes directly" },
+        { "file": "cmd/yaah/main.go", "line": 82, "note": "generate RunE — the operator chooses target agent and output directory" }
+      ]
+    },
+    {
+      "id": "claude-code-entrypoint",
+      "name": "Host coding agent",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The coding agent yaah runs alongside (Claude Code, OpenCode, Codex, Copilot); it pipes hook event JSON into `yaah hook` on stdin and calls the yaah MCP tools over stdio, so every argument yaah receives from it is model-generated.",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 178, "note": "hooks.ReadInput(os.Stdin) parses the payload the host agent pipes in" },
+        { "file": "pkg/hooks/input.go", "line": 10, "note": "Input is the JSON payload Claude Code passes on stdin: tool_name, tool_input, session_id, permission_mode" },
+        { "file": "pkg/mcpserver/server.go", "line": 39, "note": "mcpServer.Run over StdioTransport — the host agent is the MCP client on the other end" }
+      ]
+    },
+    {
+      "id": "main-go-client",
+      "name": "yaah CLI",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "The cobra command surface — generate, hook, serve, session, doctor, skills — and the process that converts a blocking hook result into exit status 2.",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 59, "note": "root.AddCommand wires generate, hook, info, version, doctor, serve, session, skills" },
+        { "file": "cmd/yaah/main.go", "line": 184, "note": "HandleHookEvent returning ErrHookBlocked becomes os.Exit(2) — the host's hard-block status" },
+        { "file": "cmd/yaah/main.go", "line": 47, "note": "the experimental fact-check subagent is installed only when YAAH_EXPERIMENTAL_FACT_CHECK is set in the environment" }
+      ]
+    },
+    {
+      "id": "settings-go-adapter",
+      "name": "Per-target config generators",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The four generators (Claude, OpenCode, Codex, Copilot) that serialize the harness config into each agent's native format; all four copy MCPServer.Env through unchanged.",
+      "evidence": [
+        { "file": "pkg/generator/settings.go", "line": 220, "note": "GenerateClaudeSettings copies srv.Env into the emitted MCP server entry verbatim" },
+        { "file": "pkg/generator/codex.go", "line": 48, "note": "the Codex generator copies srv.Env into config.toml the same way" },
+        { "file": "pkg/generator/copilot.go", "line": 46, "note": "the Copilot generator copies srv.Env into mcp-config.json the same way" },
+        { "file": "pkg/generator/factory.go", "line": 6, "note": "ForTarget enumerates the family — one generator per supported coding agent" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator",
+      "name": "Harness runtime",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "Wires the seven registries, dispatches each hook event through the enlisted handlers, combines their results into a single block decision, records the call in the session, and writes skills, agents and commands into the host tree.",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 96, "note": "HandleHookEvent — loads the session, records the tool call, dispatches, and returns ErrHookBlocked" },
+        { "file": "pkg/harness/harness.go", "line": 121, "note": "hooks.Dispatch runs every handler registered for the event" },
+        { "file": "pkg/hooks/registry.go", "line": 88, "note": "CombineResults ORs the Block flags from all handler results" },
+        { "file": "pkg/harness/harness.go", "line": 392, "note": "WriteAllForTarget writes skill, agent and command markdown into the target layout" }
+      ]
+    },
+    {
+      "id": "guard-go-control",
+      "name": "Command guard",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "PreToolUse handler that blocks Bash commands matching seven case-insensitive regexes over the raw command string; anything not matched is allowed.",
+      "evidence": [
+        { "file": "pkg/hooks/handlers/guard.go", "line": 29, "note": "NewCommandGuard — the complete denylist is seven patterns" },
+        { "file": "pkg/hooks/handlers/guard.go", "line": 86, "note": "Execute matches only the flat string from input.BashCommand(); no argv parsing and no default-deny" }
+      ]
+    },
+    {
+      "id": "secretscan-go-control",
+      "name": "Secret scanner",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "PostToolUse handler that reads the edited file back from disk and blocks when one of thirteen credential patterns matches; it reports location and pattern only, never the matched value.",
+      "evidence": [
+        { "file": "pkg/hooks/handlers/secretscan.go", "line": 68, "note": "Events() returns only HookPostToolUse — the handler runs after the write" },
+        { "file": "pkg/hooks/handlers/secretscan.go", "line": 96, "note": "ScanFile opens the path from disk rather than inspecting the proposed content" },
+        { "file": "pkg/hooks/handlers/secretscan.go", "line": 140, "note": "on a hit it returns Block with location-and-pattern text; nothing reverts or quarantines the file" }
+      ]
+    },
+    {
+      "id": "hookmap-go-control",
+      "name": "Cross-agent hook map",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Table mapping each Claude hook event to the equivalent event name per target agent; it carries no Codex name for PreToolUse or PostToolUse, and the generator silently drops any event whose mapped name is empty.",
+      "evidence": [
+        { "file": "pkg/generator/hookmap.go", "line": 30, "note": "the PreToolUse entry defines Claude, OpenCode and Copilot names but no Codex field" },
+        { "file": "pkg/generator/hookmap.go", "line": 35, "note": "the PostToolUse entry has the same omission" },
+        { "file": "pkg/generator/codex.go", "line": 91, "note": "GenerateHooks continues past any event whose Codex name is empty, with no warning" }
+      ]
+    },
+    {
+      "id": "defaults-go-control",
+      "name": "Host hardening defaults (empty)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Stub control: the default settings block populates only model, thinking, effort level and update channel, leaving the permission, sandbox and MCP-allowlist fields the schema declares and the generator copies entirely unset.",
+      "evidence": [
+        { "file": "pkg/harness/defaults.go", "line": 294, "note": "AllDefaults Settings block sets Model, AlwaysThinkingEnabled, EffortLevel and AutoUpdatesChannel only" },
+        { "file": "pkg/schema/settings.go", "line": 40, "note": "Permissions, Sandbox and AllowManagedPermissionRulesOnly are declared; the MCP allowlist fields follow at lines 79-81" },
+        { "file": "pkg/generator/settings.go", "line": 134, "note": "GenerateClaudeSettings copies all of those fields through — nothing ever constructs them" }
+      ]
+    },
+    {
+      "id": "autonomous-go-prompt",
+      "name": "/yaah:* workflow commands",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "The generated workflow command markdown, including the autonomous phase runner whose body executes discuss, plan, execute and verify in sequence without pausing; no built-in command sets DisableModelInvocation.",
+      "evidence": [
+        { "file": "pkg/commands/builtins/autonomous.go", "line": 18, "note": "Advanced() returns Context \"fork\" only — DisableModelInvocation is left false" },
+        { "file": "pkg/commands/builtins/autonomous.go", "line": 29, "note": "the command body runs the full lifecycle \"without human intervention at each step\"" },
+        { "file": "pkg/harness/harness.go", "line": 602, "note": "buildCommandMarkdown emits the disable-model-invocation frontmatter line when the flag is set — the emitter exists, no caller sets it" }
+      ]
+    },
+    {
+      "id": "skills-remote-go-prompt",
+      "name": "Remote skill content",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "Loader for third-party SKILL.md files: the fetched bytes are stored unchanged, every sibling file beside SKILL.md is copied along with them, and the writer skips its own frontmatter generation whenever the remote body already starts with a fence.",
+      "evidence": [
+        { "file": "pkg/skills/remote.go", "line": 95, "note": "resolve calls gitcache.FetchFileWithExtras with scanExtras=true" },
+        { "file": "pkg/skills/remote.go", "line": 100, "note": "r.content = content — no frontmatter handling, unlike the remote-agent path" },
+        { "file": "pkg/harness/harness.go", "line": 501, "note": "contentHasFrontmatter check — a remote body beginning with --- is written through unchanged" }
+      ]
+    },
+    {
+      "id": "agents-remote-go-control",
+      "name": "Remote agent frontmatter strip",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Control on the remote-agent path: fetched agent markdown has its YAML frontmatter removed before generation, so a third-party repository cannot declare tools, a model or a permission mode for a generated sub-agent.",
+      "evidence": [
+        { "file": "pkg/agents/remote.go", "line": 104, "note": "resolve runs stripFrontmatter over the fetched payload" },
+        { "file": "pkg/agents/remote.go", "line": 111, "note": "stripFrontmatter returns only the body between or after the fences" }
+      ]
+    },
+    {
+      "id": "store-go-datastore",
+      "name": "Session audit trail",
+      "lane": "agent_core",
+      "kind": "datastore",
+      "description": "Per-session JSON record of tool calls, blocked calls, modified files and a Findings array, written atomically under .claude/sessions/, alongside the plaintext lifecycle log the session-logger appends.",
+      "evidence": [
+        { "file": "pkg/session/store.go", "line": 52, "note": "Save marshals the session and writes it atomically (temp file then rename)" },
+        { "file": "pkg/session/session.go", "line": 6, "note": "Session carries ToolCalls, BlockedCalls, FilesModified and Findings" },
+        { "file": "pkg/harness/harness.go", "line": 113, "note": "each tool call is recorded with summarizeToolInput before dispatch" },
+        { "file": "pkg/hooks/handlers/sessionlog.go", "line": 54, "note": "SessionLogger appends one line per lifecycle event to .claude/logs/sessions.log" }
+      ]
+    },
+    {
+      "id": "sanitize-id-store-go-control",
+      "name": "Session id sanitizer",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Rejects empty identifiers, the special values . and .., and any identifier containing a path separator or a non-base name, before it is used to build a session file path.",
+      "evidence": [
+        { "file": "pkg/session/store.go", "line": 153, "note": "sanitizeID rejects empty, dot, dot-dot, separators and non-base names" },
+        { "file": "pkg/session/store.go", "line": 168, "note": "path() runs sanitizeID before joining the base directory — every Load and Save goes through it" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server",
+      "name": "yaah MCP server",
+      "lane": "tools_mcp",
+      "kind": "mcp_server",
+      "description": "stdio MCP server exposing exactly the seven declared tools; caller-supplied file paths, project directories, commands and session ids are used as given, with no project-root containment.",
+      "evidence": [
+        { "file": "pkg/mcpserver/server.go", "line": 43, "note": "registerTools adds the seven declared tools and nothing else" },
+        { "file": "pkg/mcpserver/tools.go", "line": 66, "note": "yaah_scan_secrets calls ScanFile on the raw caller-supplied path" },
+        { "file": "pkg/mcpserver/tools.go", "line": 377, "note": "yaah_planning_init joins .planning onto whatever project_dir the caller names and MkdirAlls the tree" },
+        { "file": "pkg/mcpserver/tools.go", "line": 226, "note": "yaah_session_info is the only handler that touches the session store, and only to read" }
+      ]
+    },
+    {
+      "id": "linter-go-tool",
+      "name": "Lint execution engine",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Runs each profile step through exec.CommandContext — three built-in profiles shell out to npx — driven either by the PostToolUse hook or by the yaah_lint MCP tool on a caller-supplied path, with no guard consulted on either route.",
+      "evidence": [
+        { "file": "pkg/hooks/handlers/linter.go", "line": 228, "note": "exec.CommandContext(ctx, args[0], args[1:]...) runs each profile step" },
+        { "file": "pkg/hooks/handlers/linter.go", "line": 79, "note": "the Biome profile's first argument is npx, which installs from the registry when the package is absent" },
+        { "file": "pkg/mcpserver/tools.go", "line": 91, "note": "the yaah_lint handler sets cwd to filepath.Dir(args.FilePath) and passes args.Profile straight into LintFile" }
+      ]
+    },
+    {
+      "id": "gitcache-go-datastore",
+      "name": "Remote source cache",
+      "lane": "tools_mcp",
+      "kind": "datastore",
+      "description": "Clones pinned remote repositories under the yaah home directory using a three-tier git strategy and serves the requested file plus every sibling beside it from the cached checkout.",
+      "evidence": [
+        { "file": "pkg/gitcache/gitcache.go", "line": 52, "note": "FetchFileWithExtras — cache key, ref marker, clone-or-reuse, then read the subpath" },
+        { "file": "pkg/gitcache/gitcache.go", "line": 107, "note": "gitClone's three tiers: shallow branch/tag clone, fetch by SHA, full clone plus checkout" },
+        { "file": "pkg/gitcache/gitcache.go", "line": 152, "note": "ScanExtraFiles walks the target directory and collects every non-dotfile sibling" }
+      ]
+    },
+    {
+      "id": "state-md-memory",
+      "name": ".planning/STATE.md",
+      "lane": "tools_mcp",
+      "kind": "memory",
+      "description": "Planning state file created by yaah_planning_init and parsed back by yaah_planning_status, whose stored phase, status and timestamp are returned to the calling model as the project's current position.",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 410, "note": "STATE.md is written with a fixed frontmatter template under the caller's project directory" },
+        { "file": "pkg/mcpserver/tools.go", "line": 302, "note": "yaah_planning_status reads STATE.md back and parses its frontmatter into the tool result" }
+      ]
+    },
+    {
+      "id": "context7-go-external-service",
+      "name": "Default outbound MCP servers",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Context7, launched as `npx -y @context7/mcp` with no version specifier, and Pulumi's hosted HTTP endpoint — both enabled by AllDefaults and both present in the committed project config.",
+      "evidence": [
+        { "file": "pkg/mcp/providers/context7.go", "line": 22, "note": "Args are {\"-y\", \"@context7/mcp\"} — unpinned, and -y suppresses the install prompt" },
+        { "file": "pkg/mcp/providers/pulumi.go", "line": 21, "note": "the Pulumi provider is a remote HTTP MCP endpoint" },
+        { "file": "pkg/harness/defaults.go", "line": 192, "note": "AllDefaults sets EnableContext7 and EnablePulumiMCP true, with no operator action required" },
+        { "file": ".mcp.json", "line": 4, "note": "the committed project config shows the resulting npx entry" }
+      ]
+    },
+    {
+      "id": "notion-go-secret-store",
+      "name": "Notion provider credential",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "MCP provider that holds the operator's Notion API token as a struct field and splices it into an OPENAPI_MCP_HEADERS environment value as a literal Bearer header; no environment-variable indirection or secrets-manager reference exists on this path.",
+      "evidence": [
+        { "file": "pkg/mcp/providers/notion.go", "line": 12, "note": "the token is stored as a plain apiToken struct field" },
+        { "file": "pkg/mcp/providers/notion.go", "line": 27, "note": "Server() concatenates that field into the Env map's header JSON as a literal value" },
+        { "file": "pkg/harness/defaults.go", "line": 384, "note": "the provider is registered whenever a token string is present — no approval step" }
+      ]
+    },
+    {
+      "id": "settings-json-deploy-surface",
+      "name": "Generated host config",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "What yaah writes into the target repository — settings.json, .mcp.json, .codex/config.toml, opencode.json, .copilot/mcp-config.json — plus the generated skill and sub-agent trees the host agent reads every session.",
+      "evidence": [
+        { "file": ".claude/settings.json", "line": 7, "note": "the committed settings carry the generated hook wiring and MCP server list" },
+        { "file": ".mcp.json", "line": 2, "note": "the committed project MCP config emitted by the same pipeline" },
+        { "file": ".claude/skills/agent-rules/SKILL.md", "line": 10, "note": "a generated skill file carrying the remote author's own allowed-tools line, including Bash(bash:*)" },
+        { "file": "cmd/yaah/main.go", "line": 113, "note": "os.WriteFile writes each generated file into the output directory unconditionally" }
+      ]
+    },
+    {
+      "id": "github-com-external-service",
+      "name": "Remote skill/agent repositories",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The third-party GitHub repositories yaah ships in its catalog (pulumi/agent-skills, dirien/claude-skills, jeffallan/claude-skills, rshade/agent-skills, msitarzewski/agency-agents and others) whose markdown becomes the host agent's skills and sub-agents.",
+      "evidence": [
+        { "file": "pkg/harness/defaults.go", "line": 492, "note": "remote skills are registered by owner/repo@ref — the shipped catalog pins 40-hex commit SHAs" },
+        { "file": "pkg/gitcache/gitcache.go", "line": 26, "note": "ParseUses turns the uses string into https://<host>/<owner>/<repo>.git plus a ref" },
+        { "file": ".claude/skills/agent-rules/SKILL.md", "line": 8, "note": "a fetched skill naming its upstream repository in its own metadata block" }
+      ]
+    },
+    {
+      "id": "ci-yaml-deploy-surface",
+      "name": "CI and release pipeline",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The GitHub Actions build and release workflow whose only pre-release check is `go test ./...`, with cosign signing and a syft SBOM at tag time and every action SHA-pinned.",
+      "evidence": [
+        { "file": ".github/workflows/ci.yaml", "line": 35, "note": "the build job's single check is go test ./..." },
+        { "file": ".github/workflows/ci.yaml", "line": 18, "note": "actions are pinned to commit SHAs with version comments" },
+        { "file": ".goreleaser.yaml", "line": 34, "note": "cosign sign-blob over the checksum artifact" },
+        { "file": ".goreleaser.yaml", "line": 44, "note": "an SBOM is generated for each archive" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "operator-entrypoint--main-go-client",
+      "from": "operator-entrypoint",
+      "to": "main-go-client",
+      "label": "CLI invocation",
+      "data": "command-line arguments: target agent, output directory, session id",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 59, "note": "the command tree the operator drives" },
+        { "file": "cmd/yaah/main.go", "line": 151, "note": "--output and --agent flags parsed from the operator's invocation" }
+      ]
+    },
+    {
+      "id": "claude-code-entrypoint--main-go-client",
+      "from": "claude-code-entrypoint",
+      "to": "main-go-client",
+      "label": "hook event JSON on stdin",
+      "data": "tool name, tool input (bash command or file path), session id, cwd",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 178, "note": "hooks.ReadInput(os.Stdin) for `yaah hook <event>`" },
+        { "file": "pkg/hooks/input.go", "line": 31, "note": "ReadInput unmarshals the host agent's payload with no authentication or schema restriction" }
+      ]
+    },
+    {
+      "id": "main-go-client--harness-go-orchestrator",
+      "from": "main-go-client",
+      "to": "harness-go-orchestrator",
+      "label": "dispatch event, build config",
+      "data": "parsed hook input; generation request",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 183, "note": "newHarness() then HandleHookEvent for the runtime path" },
+        { "file": "cmd/yaah/main.go", "line": 84, "note": "p.GenerateConfig() for the generation path" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--guard-go-control",
+      "from": "harness-go-orchestrator",
+      "to": "guard-go-control",
+      "label": "Bash command screened",
+      "data": "model-authored shell command string",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 121, "note": "Dispatch routes PreToolUse events with a Bash matcher to the guard" },
+        { "file": "pkg/hooks/handlers/guard.go", "line": 79, "note": "Execute pulls the flat command string from the hook input" }
+      ]
+    },
+    {
+      "id": "guard-go-control--harness-go-orchestrator",
+      "from": "guard-go-control",
+      "to": "harness-go-orchestrator",
+      "label": "block verdict",
+      "data": "block flag and matched-rule reason, or nothing at all",
+      "evidence": [
+        { "file": "pkg/hooks/handlers/guard.go", "line": 92, "note": "violations become Result{Block:true}; no match returns nil" },
+        { "file": "pkg/hooks/registry.go", "line": 88, "note": "CombineResults ORs the block flags into one decision" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--secretscan-go-control",
+      "from": "harness-go-orchestrator",
+      "to": "secretscan-go-control",
+      "label": "edited file scanned",
+      "data": "path of a write that has already completed",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 121, "note": "Dispatch routes PostToolUse Edit/Write/MultiEdit events to the scanner" },
+        { "file": "pkg/hooks/handlers/secretscan.go", "line": 127, "note": "Execute takes input.FilePath() and re-reads it from disk" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--linter-go-tool",
+      "from": "harness-go-orchestrator",
+      "to": "linter-go-tool",
+      "label": "edited file linted",
+      "data": "file path and working directory",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 121, "note": "Dispatch routes the same PostToolUse event to the linter" },
+        { "file": "pkg/hooks/handlers/linter.go", "line": 249, "note": "Execute selects profiles by extension and runs their steps" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--claude-code-entrypoint",
+      "from": "harness-go-orchestrator",
+      "to": "claude-code-entrypoint",
+      "label": "allow or block returned",
+      "data": "exit status and handler messages",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 158, "note": "combined output and error are written to stdout/stderr, then ErrHookBlocked or nil" },
+        { "file": "cmd/yaah/main.go", "line": 184, "note": "ErrHookBlocked becomes exit 2; anything else lets the host proceed" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--sanitize-id-store-go-control",
+      "from": "harness-go-orchestrator",
+      "to": "sanitize-id-store-go-control",
+      "label": "session id validated",
+      "data": "session identifier from the hook payload",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 101, "note": "sessionStore.Load(input.SessionID) on every event that carries one" },
+        { "file": "pkg/session/store.go", "line": 168, "note": "path() runs sanitizeID before the identifier reaches the filesystem" }
+      ]
+    },
+    {
+      "id": "sanitize-id-store-go-control--store-go-datastore",
+      "from": "sanitize-id-store-go-control",
+      "to": "store-go-datastore",
+      "label": "session record written",
+      "data": "tool-call records with raw command text, blocked calls with reasons, modified file list",
+      "evidence": [
+        { "file": "pkg/session/store.go", "line": 52, "note": "Save persists the record under the validated path" },
+        { "file": "pkg/harness/harness.go", "line": 182, "note": "summarizeToolInput stores the first 120 characters of the Bash command verbatim" },
+        { "file": "pkg/hooks/handlers/sessionlog.go", "line": 62, "note": "the lifecycle logger appends event, session id and cwd to sessions.log" }
+      ]
+    },
+    {
+      "id": "claude-code-entrypoint--server-go-mcp-server",
+      "from": "claude-code-entrypoint",
+      "to": "server-go-mcp-server",
+      "label": "MCP tool calls over stdio",
+      "data": "model-supplied file paths, profile names, commands, project directories, session ids",
+      "evidence": [
+        { "file": "pkg/mcpserver/server.go", "line": 39, "note": "the server runs over stdio for the duration of the host agent's session" },
+        { "file": "pkg/mcpserver/tools.go", "line": 60, "note": "each handler receives its args struct straight from the MCP caller" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server--linter-go-tool",
+      "from": "server-go-mcp-server",
+      "to": "linter-go-tool",
+      "label": "yaah_lint runs profile steps",
+      "data": "caller-chosen file path, profile name and working directory",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 91, "note": "cwd is filepath.Dir(args.FilePath) and both arguments go into LintFile unvalidated" },
+        { "file": "pkg/hooks/handlers/linter.go", "line": 228, "note": "each step is executed as an external process" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server--secretscan-go-control",
+      "from": "server-go-mcp-server",
+      "to": "secretscan-go-control",
+      "label": "yaah_scan_secrets reads a file",
+      "data": "absolute file path chosen by the caller",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 66, "note": "scanner.ScanFile(args.FilePath) with no root check" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server--sanitize-id-store-go-control",
+      "from": "server-go-mcp-server",
+      "to": "sanitize-id-store-go-control",
+      "label": "yaah_session_info looks up a session",
+      "data": "session identifier",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 229, "note": "store.Load(args.SessionID) for a caller-supplied id" },
+        { "file": "pkg/session/store.go", "line": 168, "note": "the same sanitizeID gate applies on this route" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server--state-md-memory",
+      "from": "server-go-mcp-server",
+      "to": "state-md-memory",
+      "label": "yaah_planning_init writes state",
+      "data": "planning directory tree and initial STATE.md content",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 377, "note": "planningDir is joined onto the caller's project_dir and MkdirAll creates the tree" },
+        { "file": "pkg/mcpserver/tools.go", "line": 410, "note": "STATE.md is written under that directory" }
+      ]
+    },
+    {
+      "id": "state-md-memory--server-go-mcp-server",
+      "from": "state-md-memory",
+      "to": "server-go-mcp-server",
+      "label": "yaah_planning_status reads state back",
+      "data": "stored phase, status and last-updated values",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 302, "note": "STATE.md is read from the caller's directory" },
+        { "file": "pkg/mcpserver/tools.go", "line": 308, "note": "its frontmatter lines are parsed into the returned status with no schema or provenance check" }
+      ]
+    },
+    {
+      "id": "server-go-mcp-server--claude-code-entrypoint",
+      "from": "server-go-mcp-server",
+      "to": "claude-code-entrypoint",
+      "label": "tool results into the model's context",
+      "data": "scan findings, lint output, session record, planning status",
+      "evidence": [
+        { "file": "pkg/mcpserver/tools.go", "line": 75, "note": "scan findings are marshalled back as tool content" },
+        { "file": "pkg/mcpserver/tools.go", "line": 233, "note": "the whole session record is marshalled back to the caller" },
+        { "file": "pkg/mcpserver/tools.go", "line": 356, "note": "planning status is returned to the model as the project's current position" }
+      ]
+    },
+    {
+      "id": "main-go-client--settings-go-adapter",
+      "from": "main-go-client",
+      "to": "settings-go-adapter",
+      "label": "config handed to the target generator",
+      "data": "settings, hook rules, MCP servers, skills, agents, commands",
+      "evidence": [
+        { "file": "cmd/yaah/main.go", "line": 96, "note": "generator.ForTarget(target) per requested agent" },
+        { "file": "cmd/yaah/main.go", "line": 105, "note": "gen.GenerateSettings(cfg) then GenerateMCP and GenerateHooks" }
+      ]
+    },
+    {
+      "id": "settings-go-adapter--settings-json-deploy-surface",
+      "from": "settings-go-adapter",
+      "to": "settings-json-deploy-surface",
+      "label": "serialized config written to the repo",
+      "data": "settings.json / config.toml / opencode.json content, including MCP env values",
+      "evidence": [
+        { "file": "pkg/generator/settings.go", "line": 227, "note": "MarshalIndent produces the file content, env values included" },
+        { "file": "cmd/yaah/main.go", "line": 113, "note": "os.WriteFile lands it in the target repository" }
+      ]
+    },
+    {
+      "id": "notion-go-secret-store--settings-go-adapter",
+      "from": "notion-go-secret-store",
+      "to": "settings-go-adapter",
+      "label": "server definition carrying a token",
+      "data": "env map whose header value contains the literal API token",
+      "evidence": [
+        { "file": "pkg/mcp/providers/notion.go", "line": 27, "note": "the token is inside the Env map returned by Server()" },
+        { "file": "pkg/generator/settings.go", "line": 220, "note": "the generator copies that Env map through unchanged" }
+      ]
+    },
+    {
+      "id": "harness-go-orchestrator--settings-json-deploy-surface",
+      "from": "harness-go-orchestrator",
+      "to": "settings-json-deploy-surface",
+      "label": "skills, agents and commands written",
+      "data": "markdown files with frontmatter",
+      "evidence": [
+        { "file": "pkg/harness/harness.go", "line": 411, "note": "each skill is written as SKILL.md into the target skills directory" },
+        { "file": "pkg/harness/harness.go", "line": 448, "note": "each agent is written into the target agents directory" },
+        { "file": "pkg/harness/harness.go", "line": 475, "note": "each command is written into the target commands directory" }
+      ]
+    },
+    {
+      "id": "settings-json-deploy-surface--claude-code-entrypoint",
+      "from": "settings-json-deploy-surface",
+      "to": "claude-code-entrypoint",
+      "label": "host agent loads the generated config",
+      "data": "hook wiring, MCP server list, skill and sub-agent definitions",
+      "evidence": [
+        { "file": ".claude/settings.json", "line": 7, "note": "the hook rules the host agent executes come from this generated file" },
+        { "file": ".claude/skills/agent-rules/SKILL.md", "line": 10, "note": "the skill's allowed-tools line is what the host reads as the skill's tool grant" }
+      ]
+    },
+    {
+      "id": "settings-json-deploy-surface--context7-go-external-service",
+      "from": "settings-json-deploy-surface",
+      "to": "context7-go-external-service",
+      "label": "host launches the configured servers",
+      "data": "npx command line and remote endpoint URL",
+      "evidence": [
+        { "file": ".mcp.json", "line": 4, "note": "the generated entry the host agent starts on every session" },
+        { "file": "pkg/mcp/providers/context7.go", "line": 22, "note": "that entry resolves and installs the latest published package version each time" }
+      ]
+    },
+    {
+      "id": "autonomous-go-prompt--harness-go-orchestrator",
+      "from": "autonomous-go-prompt",
+      "to": "harness-go-orchestrator",
+      "label": "command definition and frontmatter flags",
+      "data": "command markdown body; DisableModelInvocation left false",
+      "evidence": [
+        { "file": "pkg/commands/builtins/autonomous.go", "line": 18, "note": "Advanced() supplies only Context \"fork\"" },
+        { "file": "pkg/harness/harness.go", "line": 600, "note": "buildCommandMarkdown reads those advanced options when emitting frontmatter" }
+      ]
+    },
+    {
+      "id": "skills-remote-go-prompt--harness-go-orchestrator",
+      "from": "skills-remote-go-prompt",
+      "to": "harness-go-orchestrator",
+      "label": "fetched skill body handed to the writer",
+      "data": "third-party markdown with its own frontmatter, plus sibling files",
+      "evidence": [
+        { "file": "pkg/skills/remote.go", "line": 100, "note": "content and extras are stored exactly as fetched" },
+        { "file": "pkg/harness/harness.go", "line": 501, "note": "a body already starting with --- suppresses yaah's own frontmatter generation" }
+      ]
+    },
+    {
+      "id": "gitcache-go-datastore--skills-remote-go-prompt",
+      "from": "gitcache-go-datastore",
+      "to": "skills-remote-go-prompt",
+      "label": "cached SKILL.md and siblings",
+      "data": "repository file bytes",
+      "evidence": [
+        { "file": "pkg/gitcache/gitcache.go", "line": 89, "note": "the subpath is read out of the cached checkout" },
+        { "file": "pkg/skills/remote.go", "line": 95, "note": "resolve requests the file and its extras" }
+      ]
+    },
+    {
+      "id": "github-com-external-service--gitcache-go-datastore",
+      "from": "github-com-external-service",
+      "to": "gitcache-go-datastore",
+      "label": "git clone at the requested ref",
+      "data": "repository contents",
+      "evidence": [
+        { "file": "pkg/gitcache/gitcache.go", "line": 107, "note": "gitClone fetches the ref over HTTPS into the cache directory" },
+        { "file": "pkg/gitcache/gitcache.go", "line": 26, "note": "the repo URL is built from the uses string" }
+      ]
+    },
+    {
+      "id": "gitcache-go-datastore--agents-remote-go-control",
+      "from": "gitcache-go-datastore",
+      "to": "agents-remote-go-control",
+      "label": "fetched agent markdown",
+      "data": "third-party markdown including frontmatter",
+      "evidence": [
+        { "file": "pkg/agents/remote.go", "line": 99, "note": "gitcache.FetchFile supplies the raw agent file" }
+      ]
+    },
+    {
+      "id": "agents-remote-go-control--harness-go-orchestrator",
+      "from": "agents-remote-go-control",
+      "to": "harness-go-orchestrator",
+      "label": "agent body with frontmatter removed",
+      "data": "prompt text only",
+      "evidence": [
+        { "file": "pkg/agents/remote.go", "line": 104, "note": "stripFrontmatter runs before the content is exposed" },
+        { "file": "pkg/harness/harness.go", "line": 538, "note": "buildAgentMarkdown then writes frontmatter from yaah's own metadata" }
+      ]
+    },
+    {
+      "id": "hookmap-go-control--settings-go-adapter",
+      "from": "hookmap-go-control",
+      "to": "settings-go-adapter",
+      "label": "per-target event names",
+      "data": "event name string, or empty when unsupported",
+      "evidence": [
+        { "file": "pkg/generator/hookmap.go", "line": 30, "note": "the mapping table each generator consults" },
+        { "file": "pkg/generator/codex.go", "line": 90, "note": "CodexEventName's empty result drops the event from the emitted hooks file" }
+      ]
+    },
+    {
+      "id": "defaults-go-control--settings-go-adapter",
+      "from": "defaults-go-control",
+      "to": "settings-go-adapter",
+      "label": "settings block with hardening fields unset",
+      "data": "settings struct: model, thinking, effort, update channel only",
+      "evidence": [
+        { "file": "pkg/harness/defaults.go", "line": 294, "note": "the only populated settings fields" },
+        { "file": "pkg/generator/settings.go", "line": 134, "note": "Permissions, Sandbox and the MCP allowlists are copied — from nothing" }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Host coding agent into the yaah runtime",
+      "crossing_edges": [
+        "claude-code-entrypoint--main-go-client",
+        "claude-code-entrypoint--server-go-mcp-server"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-26",
+          "excerpt": "A shell command matching the dangerous-command denylist ... MUST NEVER be allowed to execute — the command guard blocks it (fail closed).",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-25",
+          "excerpt": "A file edit that introduces a hardcoded credential MUST NEVER be written — the secret scanner blocks it (fail closed).",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-01",
+          "excerpt": "yaah MUST NEVER treat the content of fetched remote skills or agents, MCP tool descriptions, or scanned/linted file contents as instructions that change its own behavior or safety decisions",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM10",
+          "summary": "A destructive command rewritten past the seven-pattern denylist — rm -fr / instead of rm -rf /, git push -f instead of --force, TRUNCATE instead of DROP, or any of them wrapped in a variable or sh -c — is screened as safe and the host agent executes it.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM02",
+          "summary": "A credential-bearing edit has already landed on disk when the PostToolUse scanner reads the file back, and the block result carries a message but no revert, quarantine or restore, so the fail-closed promise holds only in wording.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "A regression in either safety control would ship undetected: the package holding the guard and the scanner has no test file while fourteen exist elsewhere, and CI's only gate is a blanket go test run.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-013",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "MCP tool calls reaching the filesystem and external binaries",
+      "crossing_edges": [
+        "server-go-mcp-server--linter-go-tool",
+        "server-go-mcp-server--secretscan-go-control",
+        "server-go-mcp-server--state-md-memory",
+        "harness-go-orchestrator--linter-go-tool"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-16",
+          "excerpt": "No MCP tool may execute arbitrary shell commands outside the command guard, and no tool may return detected secret values in cleartext.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-05",
+          "excerpt": "Within the target repository and the yaah cache directory",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-17",
+          "excerpt": "Files within the target repository, read for secret scanning, linting, and config generation.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-31",
+          "excerpt": "Session lifecycle events, tool calls (including MCP-server tool invocations served via yaah serve) ... are recorded to .claude/sessions/<id>.json",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "yaah_lint runs each profile step through exec.CommandContext with the working directory derived from the caller's own path, and three built-in profiles invoke npx, so one tool call selects which third-party package is downloaded and executed on the developer's machine — with no guard consulted on this route.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM03",
+          "summary": "yaah_scan_secrets opens whatever absolute path the caller names and reports which credential pattern matched at which line — a probe oracle over files outside the project — and yaah_planning_init creates a five-directory tree and writes STATE.md under any project_dir given, with none of the containment the session store already demonstrates.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "No MCP tool handler writes to the session store, so all seven tools execute with no audit record, and the Findings channel the record declares and the CLI prints is populated by nothing.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "state-commit",
+      "name": "Generation overwriting the target repository's agent configuration",
+      "crossing_edges": [
+        "main-go-client--settings-go-adapter",
+        "settings-go-adapter--settings-json-deploy-surface",
+        "harness-go-orchestrator--settings-json-deploy-surface"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-23",
+          "excerpt": "Generating and overwriting agent configuration files in the target repository; running the lint, secret-scan, and comment hooks; recording session audit events",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-28",
+          "excerpt": "Generated configuration MUST NEVER weaken the host coding agent's permission/sandbox posture",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "A generate run replaces the settings, MCP and hook files of every supported target in place with no diff, backup or confirmation, so a hand-narrowed posture in the target repository is silently overwritten by the built-in defaults (checked: cmd/yaah/main.go:113 and 127 — unconditional os.WriteFile, no existence check or prompt anywhere on the path).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Generated configuration places the host coding agent into a permission-bypassing or sandbox-disabled mode by default.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "pkg/harness/defaults.go", "line": 294 }
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Planning state written by a tool and read back into the model's decisions",
+      "crossing_edges": [
+        "server-go-mcp-server--state-md-memory",
+        "state-md-memory--server-go-mcp-server",
+        "server-go-mcp-server--claude-code-entrypoint"
+      ],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "STATE.md is created wherever the caller's project_dir points and is later parsed straight back into the model's context as the project's current phase and status, so anything able to edit that file steers later workflow decisions across sessions (checked: pkg/mcpserver/tools.go:302-322 — the frontmatter is split on --- and matched by prefix with no schema, size, ownership or provenance check, and no root containment on the directory it is read from).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Session audit record readable by the host agent",
+      "crossing_edges": [
+        "harness-go-orchestrator--sanitize-id-store-go-control",
+        "sanitize-id-store-go-control--store-go-datastore",
+        "server-go-mcp-server--sanitize-id-store-go-control"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-18",
+          "excerpt": "Detected secret values MUST NEVER be written into session logs, findings records, generated configuration, or any yaah output in cleartext",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-27",
+          "excerpt": "Session files MUST NEVER be read or written at paths derived from unvalidated session identifiers",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Session records keep the first 120 characters of each Bash command verbatim and the scanner never inspects Bash input, so an inline export or curl header carrying a token persists unmasked in the session file — which yaah_session_info then marshals back to the calling model in full.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "A caller-supplied session id escapes the session directory through path traversal on either the CLI or the yaah_session_info route.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "pkg/session/store.go", "line": 153 }
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Operator credential embedded in generated configuration",
+      "crossing_edges": [
+        "notion-go-secret-store--settings-go-adapter",
+        "settings-go-adapter--settings-json-deploy-surface"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-19",
+          "excerpt": "Credentials, API tokens, and OAuth secrets MUST NEVER be embedded in generated configuration files.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-21",
+          "excerpt": "Credentials, API tokens, and OAuth secrets MUST be sourced from environment variables or a secrets manager.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-20",
+          "excerpt": "Credentials, API tokens, and OAuth secrets MUST NEVER be committed to the repository.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-15",
+          "excerpt": "Any MCP provider that carries credentials or OAuth (e.g. Notion, remote OAuth servers).",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The Notion provider splices the operator's token into an environment value as a literal Bearer header and every generator copies that value into its output, so the credential lands in five repository config files that .gitignore does not exclude — and the provider is registered on the mere presence of a token, with no approval step for a credential-carrying integration.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Third-party skills, agents and MCP servers entering the host",
+      "crossing_edges": [
+        "github-com-external-service--gitcache-go-datastore",
+        "gitcache-go-datastore--skills-remote-go-prompt",
+        "gitcache-go-datastore--agents-remote-go-control",
+        "settings-json-deploy-surface--context7-go-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-06",
+          "excerpt": "Fetch and cache only; sources must be pinned (see Authorized Counterparties)",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-12",
+          "excerpt": "Fetching default or shipped remote skills/agents from mutable refs (branches) rather than immutable refs (a commit SHA or version tag).",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-24",
+          "excerpt": "Enabling any feature that makes outbound network calls or spawns an autonomous subagent ... MUST be off by default and enabled only by explicit operator opt-in.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-11",
+          "excerpt": "github.com (and specifically the pinned source repositories above) for remote skill/agent fetch.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "The built-in defaults enable Context7 and the Pulumi endpoint, so a plain generate emits a config whose Context7 entry runs npx with no version specifier — resolving and installing whatever the registry currently publishes on every host start — against a registry host that appears in no trusted-domain list and with no operator opt-in.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Remote skill markdown is written into the host agent's skill tree with the third-party author's own frontmatter intact — allowed-tools, model, agent and disable-model-invocation all come from the remote file — and every sibling file beside SKILL.md is copied with no content check or provenance label, while the remote-agent path strips exactly this.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Nothing verifies fetched content against the pin after checkout, and the ref parser accepts a branch or tag name in the same slot as a commit SHA, so pinning holds only for as long as every source keeps using one.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "pkg/harness/defaults.go", "line": 492 },
+          "remainder": "a Go-library caller may pass any uses string, and gitcache.ParseUses (gitcache.go:16-27) forwards a branch name to the tier-1 clone unchanged"
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "The host agent's safety surface as yaah ships it",
+      "crossing_edges": [
+        "settings-json-deploy-surface--claude-code-entrypoint",
+        "autonomous-go-prompt--harness-go-orchestrator",
+        "hookmap-go-control--settings-go-adapter",
+        "defaults-go-control--settings-go-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-02",
+          "excerpt": "yaah MUST NEVER auto-invoke its /yaah:* workflow commands, including the autonomous workflow, without an explicit user invocation",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-03",
+          "excerpt": "yaah MUST NEVER run with its command-guard or secret-scanner safety hooks removed, disabled, or downgraded to a non-blocking / advisory mode",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-28",
+          "excerpt": "it may not place the host into a permission-bypassing (bypassPermissions / dontAsk) or sandbox-disabled mode by default, nor drop the host below its stated minimum permission/sandbox posture",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Every generated workflow command ships model-invocable because the frontmatter flag that would stop it is emitted by the generator and set by no command, including the autonomous runner whose own body executes discuss, plan, execute and verify with no human checkpoint.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM03",
+          "summary": "Generating for the Codex target emits a working configuration in which neither the command guard nor the secret scanner is wired to any event, because the hook map has no Codex name for the two events they register for and the generator drops unmapped events without a warning or a degraded-mode notice.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The emitted settings carry no permission rules, no sandbox mode and no MCP allowlist even though the schema declares all of them and the generator copies all of them, so the harness whose job is configuring the host's safety surface ships that surface empty.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011",
+          "mitigation_evidence": null
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "remote-skill-frontmatter-to-standing-tool-grant",
+      "name": "A third-party skill repository's own front matter becomes a standing tool grant in the developer's coding agent",
+      "steps": [
+        {
+          "node": "github-com-external-service",
+          "finding_id": null,
+          "summary": "Untrusted origin: markdown authored in a third-party GitHub repository that yaah ships in its default catalog — nobody on the yaah side reviews its content, and the repository owner can change what a future pin points at."
+        },
+        {
+          "node": "gitcache-go-datastore",
+          "finding_id": null,
+          "summary": "The repository is cloned into the local cache and the requested file plus every sibling beside it is read back with no content inspection."
+        },
+        {
+          "node": "skills-remote-go-prompt",
+          "finding_id": "PRAX-2026-08-12-009",
+          "summary": "The remote bytes are stored unchanged — no frontmatter strip, unlike the remote-agent path — so the third-party allowed-tools, model, agent and disable-model-invocation values survive intact."
+        },
+        {
+          "node": "harness-go-orchestrator",
+          "finding_id": "PRAX-2026-08-12-009",
+          "summary": "The hijack: because the remote body already begins with a fence, the writer emits none of its own frontmatter and passes the third-party block through verbatim."
+        },
+        {
+          "node": "settings-json-deploy-surface",
+          "finding_id": null,
+          "summary": "The file lands in the host agent's skill tree with the remote author's tool grant on line 10 — Bash(bash:*) among them — and is committed alongside the repository."
+        },
+        {
+          "node": "claude-code-entrypoint",
+          "finding_id": null,
+          "summary": "Consequence: the coding agent reads that grant every session, so a remote author, not the operator, sets what the skill may execute — a persistent capability change that outlives any single run."
+        }
+      ]
+    },
+    {
+      "id": "mcp-tool-call-to-package-execution",
+      "name": "One tool call from the coding agent installs and runs someone else's code on the developer's machine",
+      "steps": [
+        {
+          "node": "claude-code-entrypoint",
+          "finding_id": null,
+          "summary": "Untrusted origin: an unauthenticated stdio MCP caller whose arguments are model-generated, produced by an agent whose context routinely holds third-party content — including the remote skills yaah itself installed."
+        },
+        {
+          "node": "server-go-mcp-server",
+          "finding_id": "PRAX-2026-08-12-008",
+          "summary": "The hijack: the file path and profile name are taken as given, with no containment against a project root and no guard consulted, and the working directory is derived from the caller's own path."
+        },
+        {
+          "node": "linter-go-tool",
+          "finding_id": "PRAX-2026-08-12-006",
+          "summary": "Consequence: the chosen profile's steps are executed as external processes, and three of them run npx, which downloads and executes a package from the public registry on the developer's machine."
+        }
+      ]
+    },
+    {
+      "id": "rewritten-command-past-guard-to-host-shell",
+      "name": "A rewritten destructive command clears the guard and runs on the developer's machine",
+      "steps": [
+        {
+          "node": "claude-code-entrypoint",
+          "finding_id": null,
+          "summary": "Untrusted origin: a Bash command proposed by the host agent's model, which is exactly the input the guard exists to distrust and which any content the agent has read can shape."
+        },
+        {
+          "node": "main-go-client",
+          "finding_id": null,
+          "summary": "The hook payload is read from stdin and parsed with no authentication and no restriction on what a caller may claim."
+        },
+        {
+          "node": "harness-go-orchestrator",
+          "finding_id": null,
+          "summary": "The hijack: the dispatcher hands the raw command string to the PreToolUse handlers and will allow the action unless one of them returns a block."
+        },
+        {
+          "node": "guard-go-control",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "The denylist is seven regexes over the flat string, so rm -fr /, git push -f origin main, TRUNCATE, a reversed dd or any of them wrapped in an alias or sh -c matches nothing and is reported safe."
+        },
+        {
+          "node": "harness-go-orchestrator",
+          "finding_id": null,
+          "summary": "With no handler blocking, the combined result carries no block flag and the hook process exits zero."
+        },
+        {
+          "node": "claude-code-entrypoint",
+          "finding_id": null,
+          "summary": "Consequence: the host agent treats the zero exit as approval and executes the destructive command on the developer's workstation."
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "yaah is a configuration generator and hook runtime rather than an LLM agent, so two placements are by analogy: the four per-target generators sit in client_adapters as platform adapters (they adapt to external agent products, not to a user-facing client), and the host coding agent sits in user_inputs rather than client_adapters because its hook payloads and MCP arguments are the untrusted input origin, not a channel the operator talks through. Session records are kept in agent_core as session state rather than in external_deploy as telemetry sinks, since neither file ever leaves the machine.",
+    "omissions": "No arbitration divergence: on every finding the stored primary tag (first code in the tags array) matches the KB's primary under the same evidence — LLM02 for the embedded credential and for the unredacted command capture (disclosure at rest, ASI03 not applying as a scope defect); LLM03 for the ungated model-invocable commands, the Codex control drop, the empty hardening block and the uncontained tool paths, with ASI10/ASI05/ASI02 riding as co-tags per the outlive and mechanism rules; LLM10 for the weak command guard, since yaah supplies only the inadequate screen and the exec sink is the host agent's, while ASI05 stays primary for yaah_lint where yaah itself execs; LLM04 for the unpinned npx MCP defaults (install-time provenance) and LLM01 for the unlabeled third-party skill ingest, which has no goal-alteration evidence and so does not flip to ASI04; observability and testing gaps carry no OWASP code. Not modeled as nodes: the experimental fact-check hooks (defaults.go:321 — a Sonnet subagent with WebFetch handed to the host runtime as a hook rule, installed only when an environment variable is set, and reachable by no path here); the LSP providers and the Codex marketplace plugin, which fold into the generated-config node's evidence; the comment-checker handler, which carries no distinct trust consequence. The CI/release node is edgeless repository-posture evidence. A hygiene sweep for committed credentials across the tree found no live secret — the single private-key marker is placeholder documentation text inside a fetched third-party skill's references directory, which the scan scope excludes.",
+    "counts": { "nodes": 23, "edges": 31, "boundaries": 8, "threats": 18 }
+  }
+}
