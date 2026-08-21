@@ -20,9 +20,10 @@ published contract, and rendered to a self-contained HTML report. It is
 **score-inert**: it never changes findings, scores, remit coverage, or any
 analysis artifact.
 
-**Announce the cost before starting.** One sentence: a threat-model
-extraction costs roughly **0.4–0.5× a standard scan** (one fresh-context
-pass, ~10–15 minutes) plus a local validate-and-render step.
+**Announce the cost before starting.** One sentence: in our testing a
+threat-model extraction costs roughly **0.5–1× the tokens of a standard
+scan, typically ~0.75×** (one fresh-context pass, ~10–20 minutes) plus a
+local validate-and-render step.
 
 ---
 

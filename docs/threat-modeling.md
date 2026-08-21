@@ -21,8 +21,9 @@ Ask for it in natural language, the same way you invoke an analysis:
 - *"Run a Praxen analysis with a threat model"* — runs the full analysis
   first, then the model against its results.
 
-A threat model costs roughly **0.4–0.5× a standard scan** — one
-fresh-context extraction pass, typically 10–15 minutes — and never changes
+In our testing, a threat model costs roughly **0.5–1× the tokens of a
+standard scan, typically ~0.75×** — one fresh-context extraction pass,
+usually 10–20 minutes solo, stretching under concurrent runs — and never changes
 the analysis: no finding, score, or report is touched. It works best *after*
 an analysis (that is what makes `confirmed` statuses possible); running one
 without an analysis is supported but the model can only report what it
