@@ -122,12 +122,19 @@ as input, so the generator work is *better* after this ships.
   measurement) — publish as budgeting guidance like the thinking-modes
   cost section, from measured runs.
 
-## Open decisions (Steve, with prototype in hand — not blockers to start)
+## Open decisions — RESOLVED (Steve, 2026-08-22)
 
-- Invocation UX: phrasing and whether threat-model runs standalone,
-  post-scan, or both by default.
-- #151 in or out of the release.
-- Artifact naming / report cross-linking (analysis report ↔ threat model).
+- Invocation UX: Steve selected **"Ship as built"** — post-analysis
+  default, combined invocation supported, standalone allowed with the
+  confirmed-statuses warning.
+- #151: out — parked indefinitely by Steve, 2026-08-18.
+- Cross-linking: Steve selected **"Link one way"** — the threat-model
+  masthead's "built against" reference links to the analysis HTML
+  (renderer `--analysis-html`, opt-in); the reverse link is out for 2.0
+  (non-goal: no analysis-template change).
+- #261 (asked alongside): Steve selected **"Fold into 2.0"** — the
+  x-high checkpoint-path fix and both THINKING_MODES nits ride this
+  release; no 1.3.1.
 
 ## Release mechanics
 

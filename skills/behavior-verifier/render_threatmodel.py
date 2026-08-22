@@ -186,7 +186,7 @@ def worst_status(threats):
 
 
 # ── render ───────────────────────────────────────────────────────────────────
-def render(graph, template_text):
+def render(graph, template_text, analysis_html=None):
     """Render a validated graph to a self-contained HTML string."""
     g = tms.validate(graph)
     tokens, root_css, mh_logo, ft_logo = extract_brand(template_text)
@@ -570,8 +570,13 @@ def render(graph, template_text):
         re.search(r"named (.+)", g.get("model_identity", ""))
     model_name = _m.group(1).strip() if _m else "unknown"
     aref = g.get("analysis_ref")
-    aref_html = (f' · built against <b>{esc(aref)}</b>' if aref
-                 else ' · no analysis reference (standalone extraction)')
+    if aref and analysis_html:
+        aref_html = (f' · built against <a href="{esc(analysis_html)}">'
+                     f'<b>{esc(aref)}</b></a>')
+    elif aref:
+        aref_html = f' · built against <b>{esc(aref)}</b>'
+    else:
+        aref_html = ' · no analysis reference (standalone extraction)'
     summary_html = "".join(f"<p>{esc(par.strip())}</p>"
                            for par in g.get("executive_summary", "").split("\n\n")
                            if par.strip())
@@ -789,6 +794,10 @@ def main(argv=None) -> int:
                     help="report_template.html (brand single-source)")
     ap.add_argument("--out-html", dest="out_html", required=True, metavar="PATH",
                     help="write the rendered HTML report here")
+    ap.add_argument("--analysis-html", dest="analysis_html", metavar="NAME",
+                    help="relative filename of the analysis HTML report this "
+                         "graph was built against; when given, the masthead's "
+                         "'built against' reference becomes a link to it")
     args = ap.parse_args(argv)
 
     with open(args.graph, encoding="utf-8") as f:
@@ -796,7 +805,7 @@ def main(argv=None) -> int:
     with open(args.template, encoding="utf-8") as f:
         template_text = f.read()
     try:
-        out = render(graph, template_text)
+        out = render(graph, template_text, analysis_html=args.analysis_html)
     except (SchemaError, RenderError) as e:
         print(f"render_threatmodel: {e}", file=sys.stderr)
         return 1

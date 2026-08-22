@@ -19,8 +19,8 @@ disciplined merge of what the verification finds.
 | Mode | What runs | Cost (rough) | When |
 |---|---|---|---|
 | **standard** | The `SKILL.md` pipeline, byte-for-byte unchanged | 1× | Default. Baselines, bands, everyday scans |
-| **high** | Scan → context-unaware findings audit → cleanup + re-render | ~2× | Before a report leaves your hands |
-| **x-high** | 3 independent scans → union → evidence adjudication → one super-run | ~4–5× | Audits, gates, anything where quality outranks time and tokens |
+| **high** | Scan → context-unaware findings audit → cleanup + re-render | ~1.4× tokens, 1.3–1.6× clock | Before a report leaves your hands |
+| **x-high** | 3 independent scans → union → evidence adjudication → one super-run | ~4× tokens, 2–2.5× clock | Audits, gates, anything where quality outranks time and tokens |
 
 **Announce the mode and its cost before starting.** One or two sentences to
 the operator: which mode is running, the expected cost multiple from the table
@@ -199,7 +199,9 @@ Otherwise:
      provenance.**
    - Strip removed IDs from every surviving finding's `related_findings`.
    - For each rule whose `finding_id` pointed at a removed finding: apply the
-     auditor's re-status for UNSUPPORTED kills; for REMIT-DEFECT, keep the
+     auditor's re-status for UNSUPPORTED kills and set the rule's
+     `finding_id` to `null` (the finding it pointed at no longer exists in
+     the manifest); for REMIT-DEFECT, keep the
      rule's status as audited and set its `finding_id` to `null` — the rule
      stays in the coverage table (the remit is the operator's document; a
      thinking mode never edits it), and the defect goes in the remit-feedback
@@ -269,13 +271,16 @@ adjudicator to rule on.
 ### Phase 3 — adjudication + super-run assembly
 
 Spawn a **fresh** agent — the adjudicator — with only: the union worklist,
-the three findings JSON paths, the remit path, the workspace path, this
-file's path, and the instruction block below.
+the three findings JSON paths, the three evidence-checkpoint paths (each
+run's `xhigh-runN/reports/<slug>-evidence-<TIMESTAMP>.txt`), the remit
+path, the workspace path, this file's path, and the instruction block
+below.
 
 > **Adjudication brief (pass verbatim, with paths filled in):**
 >
 > You are the adjudicator for a Praxen x-high analysis. Three independent
-> scans of the same target produced the findings in `<run1/2/3 json paths>`;
+> scans of the same target produced the findings in `<run1/2/3 json paths>`,
+> with their evidence checkpoints at `<run1/2/3 evidence-checkpoint paths>`;
 > the union worklist at `<union path>` enumerates every distinct candidate
 > finding. You have not seen any of the scans run. Read the `X-high mode`
 > section of `<THINKING_MODES.md path>`, then `SKILL.md` beside it — you

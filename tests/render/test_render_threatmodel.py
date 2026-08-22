@@ -53,6 +53,16 @@ def main():
     out2 = rtm.render(json.load(open(GRAPH, encoding="utf-8")), template)
     check("render is deterministic", out1 == out2)
 
+    # analysis cross-link: opt-in via analysis_html, absent by default
+    linked = rtm.render(json.load(open(GRAPH, encoding="utf-8")), template,
+                        analysis_html="demo-analysis.html")
+    aref = json.load(open(GRAPH, encoding="utf-8"))["analysis_ref"]
+    check("analysis_html links the built-against reference",
+          f'built against <a href="demo-analysis.html"><b>' in linked)
+    check("default render carries no built-against link",
+          'built against <a href=' not in out1
+          and f"built against <b>" in out1)
+
     golden = open(GOLDEN, encoding="utf-8").read()
     check("render matches the committed golden output", out1 == golden,
           "regenerate with: python3 skills/behavior-verifier/render_threatmodel.py "

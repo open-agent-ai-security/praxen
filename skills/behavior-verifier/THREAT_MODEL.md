@@ -124,8 +124,14 @@ producing HTML, and fails loudly with the offending JSON path:
 python3 {SKILL_DIR}/render_threatmodel.py \
   --graph ./reports/<slug>-threatmodel-<TIMESTAMP>.json \
   --template {SKILL_DIR}/report_template.html \
-  --out-html ./reports/<slug>-threatmodel-<TIMESTAMP>.html
+  --out-html ./reports/<slug>-threatmodel-<TIMESTAMP>.html \
+  --analysis-html <analysis-report-filename-or-omit>
 ```
+
+Pass `--analysis-html` with the bare filename of the analysis HTML the
+findings JSON came from (it sits in the same `./reports/` dir) so the
+masthead's "built against" reference links to it; omit the flag for a
+standalone extraction or when the analysis HTML is absent.
 
 - **On a validation error:** first copy the failing graph aside
   (`<file>.prerepair`) so the repair's diff is auditable, then relay the
