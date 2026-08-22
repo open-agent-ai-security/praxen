@@ -226,5 +226,5 @@ nothing.
   variance the modes exist to damp, and what single runs already guarantee
 - [Interpreting Reports](interpreting-reports.md) — reading the report the
   modes produce (identical format in every mode)
-- [Challenging Findings](challenging-findings.md) — the conversational
-  revise-and-re-render workflow, which works in any mode
+- [Challenging Findings](challenging-findings.md) — what to do when you
+  disagree with a finding, in any mode

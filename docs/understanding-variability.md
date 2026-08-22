@@ -45,7 +45,7 @@ suite, plus a dedicated 12-run study on the two most variable targets.
 
 ## Following up with the LLM
 
-Because synthesis is an LLM step, you can interrogate and revise it in conversation — ask the agent to explain a score, re-examine a finding against its evidence, or re-evaluate a category, and it re-emits the findings JSON. That workflow (and why you revise the manifest/JSON rather than the HTML) is covered in [Challenging and Revising Findings](challenging-findings.md).
+Because synthesis is an LLM step, you can interrogate it in conversation — ask the agent to explain a score, re-examine a finding against its evidence, or re-evaluate a category. When you still disagree with what you find, [Challenging and Revising Findings](challenging-findings.md) covers the structured paths: add evidence and re-run, tighten the remit, or accept the risk on the record.
 
 The move specific to *variability*: **re-run the whole analysis** and see whether a borderline result reproduces. If it holds, it's real; if it swings, the target is judgment-sensitive (above) and worth characterising over several runs — see below.
 

@@ -21,11 +21,13 @@ STRIDE to enumerate what can go wrong at each one, and the OWASP Agentic /
 LLM Top 10s to name each threat in language your security team already
 speaks.
 
-> **📊 See it live:** the threat model renders to a self-contained HTML
-> report that shares the analysis report's chrome — a diagram, the attack
-> paths, and per-boundary threat tables. As those sections go live in the
-> hosted examples, this page will link straight to them, the same way the
-> base Praxen report links terms back to their documentation.
+> **📊 See it live:** every target in Praxen's public baseline suite ships
+> a hosted threat model — a diagram, the attack paths, and per-boundary
+> threat tables in a self-contained HTML report sharing the analysis
+> report's chrome. Browse [OpenHands](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html),
+> [Hermes desktop agent](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/hermes-agent-desktop/hermes-agent-desktop-threatmodel-2026-08-21-143615.html),
+> or [FinBot](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/finbot/finbot-threatmodel-2026-08-21-143615.html), or any
+> target from the [suite health page](https://open-agent-ai-security.github.io/praxen/tests/baselines/suite-health-report.html).
 
 ## The shape: a data-flow model in five trust lanes
 

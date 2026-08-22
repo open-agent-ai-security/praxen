@@ -12,6 +12,12 @@ cites file:line evidence** from the agent's own workspace. It is derived
 from what the code actually does, not drawn by a human or prompted from a
 description of the system: a threat model with receipts.
 
+> **📊 See it live:** every target in Praxen's public baseline suite ships a
+> hosted threat model — browse [OpenHands](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html),
+> [Hermes desktop agent](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/hermes-agent-desktop/hermes-agent-desktop-threatmodel-2026-08-21-143615.html),
+> or [FinBot](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/finbot/finbot-threatmodel-2026-08-21-143615.html), or any target from
+> the [suite health page](https://open-agent-ai-security.github.io/praxen/tests/baselines/suite-health-report.html).
+
 ## Running one
 
 Ask for it in natural language, the same way you invoke an analysis:
@@ -54,7 +60,7 @@ Every threat at a boundary carries one of four statuses:
 | status | meaning |
 |---|---|
 | **confirmed** | An analysis finding proves it — the finding ID is cited |
-| **potential** | An unanswered hypothesis: no covering finding, and the extraction looked for a mitigating control and found none |
+| **potential** | An unanswered hypothesis: no covering finding, and the sweep for a mitigating control found none |
 | **partial** | A control demonstrably answers part of the threat (cited), and the uncovered remainder is stated |
 | **mitigated** | A control demonstrably answers the whole threat (cited) |
 
@@ -74,11 +80,10 @@ could go wrong at each trust crossing, then check each hypothesis against
 the findings and the code. Where the two meet, a threat is `confirmed`;
 where the top-down view finds surface the bottom-up pass never examined,
 threats surface as `potential` — which is precisely the review list a
-follow-up analysis or detection improvement should start from.
+follow-up analysis should start from.
 
-The graph's structure is stable run to run where it matters: independent
-extractions of the same target converge on the same trust-boundary set and
-the same headline attack paths, with variation confined to enumeration
-depth and naming at the margins. Threat modeling follows the same rule as
+In our testing, independent extractions of the same target converged on
+the same trust-boundary set and threat statuses, with variation confined
+to enumeration depth and naming at the margins. Threat modeling follows the same rule as
 everything else in Praxen: one run produces one artifact — multi-run
 comparison is a diagnostic, not a deliverable.

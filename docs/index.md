@@ -24,6 +24,7 @@
 | Disagreeing with a finding or wanting to revise it | [Challenging and Revising Findings](challenging-findings.md) |
 | Wondering why two runs gave slightly different scores | [Understanding Run-to-Run Variability](understanding-variability.md) |
 | Running a scan where a miss would be expensive | [Thinking Modes](thinking-modes.md) — the **high** and **x-high** effort levels |
+| Wanting the architecture view — trust boundaries and attack paths | [Threat Modeling](threat-modeling.md) — an evidence-derived threat model where every element cites file:line |
 | Getting the most out of a Praxen report | [Working with Praxen](#working-with-praxen) |
 | Hit a problem on a first run | [Usage § Troubleshooting](usage.md#troubleshooting) |
 | Trying to understand the OWASP frameworks Praxen tags against | [OWASP Gen AI Security](owasp.md) |
@@ -62,7 +63,7 @@ Praxen is **not just a source-code analyzer.** Any of these — alone or in comb
 - **Source repository** — a project directory, GitHub repo, or plugin source tree.
 - **Running deployment** — live memory and bootstrap files (`MEMORY.md`, `SOUL.md`), operational logs (action reports, session JSONL, audit trails, escalation logs), live config.
 - **Behavioral artifacts** — chat transcripts, email histories, conversation logs, decision records.
-- **Governance & methodology docs** — red-team reports, threat models, runbooks, incident retrospectives, dependency-management policy. These feed the maturity-oriented RAISE categories (Build an AI Red Team, Monitor Continuously, Manage Your Supply Chain) that source code alone can't speak to.
+- **Governance & methodology docs** — red-team reports, existing threat models, runbooks, incident retrospectives, dependency-management policy. These feed the maturity-oriented RAISE categories (Build an AI Red Team, Monitor Continuously, Manage Your Supply Chain) that source code alone can't speak to.
 
 The methodology adapts. Categories the input doesn't cover are scored at lower confidence and explicitly noted in the report. See [Usage](usage.md) for how to point Praxen at each type.
 
@@ -82,6 +83,6 @@ For an overview of the OWASP Gen AI Security Project and a one-line gloss on eac
 - Install: `claude plugin marketplace add open-agent-ai-security/plugins` then `claude plugin install praxen@open-agent-ai-security` (or the in-session `/plugin ...` equivalents — see [Installation](installation.md))
 - Skill name: `behavior-verifier`
 - Output directory: `./reports/` relative to where you run the analysis
-- Output files: `<agent-slug>-analysis-<timestamp>.html`, `<agent-slug>-findings-<date>.json`, `<agent-slug>-analysis-<timestamp>.txt`
+- Output files: `<agent-slug>-analysis-<timestamp>.html`, `<agent-slug>-findings-<date>.json`, `<agent-slug>-analysis-<timestamp>.txt`; ask for a [threat model](threat-modeling.md) and `<agent-slug>-threatmodel-<timestamp>.json` / `.html` land beside them
 
 For the full specification, see [`PRAXEN_SPEC.md`](../PRAXEN_SPEC.md) at the repo root.

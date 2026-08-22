@@ -8,7 +8,7 @@
 </p>
 
 # Praxen
-**agent behavior verifier**
+**Agent Behavior Verifier**
 
 [![Project level: Flagship](https://img.shields.io/badge/project_level-flagship-8366f5)](https://open-agent-ai-security.github.io/project-levels/)
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
@@ -61,8 +61,6 @@ In practice, that's one sentence to your coding agent — e.g. *"Run a Praxen be
 
 Findings land in a self-contained HTML report, a machine-readable JSON file, and a plain-text summary in `./reports/`. Nothing phones home.
 
-Ask for a **threat model** and Praxen also draws the architecture: components in five trust lanes, trust boundaries, threat enumeration (confirmed / potential / partial / mitigated), and attack paths — every element citing file:line evidence from the agent's own workspace. ([threat modeling](docs/threat-modeling.md))
-
 Praxen runs **before deployment** and on each release — pre-deployment verification of the agent's controls against its remit. [Runtime monitoring of the deployed agent](docs/abv.md) is a complementary layer outside Praxen's scope.
 
 ---
@@ -79,13 +77,17 @@ Every analysis runs a set of named verification patterns, including:
 
 …and more — supply-chain risk (unpinned dependencies, unreviewed plugins), declared-but-never-consulted controls, empty security-stub files (planned-but-unbuilt sandboxes, approval gates, redactors), and secondary prompt discovery (session-loaded identity files like `SOUL.md` / `AGENTS.md` / `MEMORY.md` audited as system prompts). See [docs/usage.md](docs/usage.md) and [PRAXEN_SPEC.md](PRAXEN_SPEC.md) for the full set.
 
+## Threat modeling (new in 2.0)
+
+Ask for a **threat model** and Praxen also draws the architecture: components in five trust lanes, trust boundaries, threat enumeration (confirmed / potential / partial / mitigated), and attack paths — every element citing file:line evidence from the agent's own workspace. See a live one: the [OpenHands threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html), extracted from the agent's own workspace, or the [Threat Modeling guide](docs/threat-modeling.md).
+
 Each finding is tagged against the **OWASP Top 10 for LLM Applications 2026**, **OWASP Top 10 for Agentic AI Applications 2026**, OWASP's **A Practical Guide for Secure MCP Server Development 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids — browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** for the aggregate across Praxen's example suite. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
 
 ---
 
 ## Working with Praxen
 
-Praxen produces an **expert review that focuses human attention** — a senior reviewer's notes, not an automated pass/fail — and it works by **reading your agent's real workspace in place**, writing findings only to `./reports/` and never modifying the agent. How to treat the scores, run-to-run variability, and the [security model](SECURITY.md#security-model-and-assumptions) are covered in [Working with Praxen](docs/index.md#working-with-praxen) in the docs.
+Praxen produces an **expert review that focuses human attention** — a senior reviewer's notes, not an automated pass/fail — and it works by **reading your agent's real workspace in place**, writing findings only to `./reports/` and never modifying the agent. How to treat the scores, run-to-run variability, and the [security model](SECURITY.md#security-model-and-assumptions) are covered in [Working with Praxen](docs/index.md#working-with-praxen) in the docs. For scans where a miss would be expensive, [thinking modes](docs/thinking-modes.md) add an audited (**high**) or triple-run, adjudicated (**x-high**) report.
 
 ---
 
