@@ -40,8 +40,11 @@ The diagram places every component in one of five lanes — **User / Inputs →
 Client / Adapters → Agent Core → Tools / MCP → External / Deploy** — with an
 icon carrying the component's kind (a tool looks like a tool) and color
 carrying its family. Dashed vertical lines are **trust boundaries**, keyed by
-`B1…Bn` badges to the boundary table below the diagram. Numbered red badges
-mark the steps of the primary **attack path**. Everything the hover
+`B1…Bn` badges to the boundary table below the diagram. Components on an
+**attack path** carry a corner badge showing their role — purple where
+untrusted content enters, amber for a control the path bypasses, red where
+the damage lands — and the path itself is drawn in bold red; the Attack
+Paths section below the diagram lists each path's steps in order. Everything the hover
 interactions show — evidence citations, flow labels, boundary detail — is
 also on the page statically: the legend, the boundary key, and the component
 inventory make the report complete on paper.
