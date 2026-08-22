@@ -49,7 +49,7 @@ LANE_TITLES = {
     "tools_mcp": "Tools / MCP",
     "external_deploy": "External / Deploy",
 }
-COL_W, COL_GAP, MARGIN_X, TOP_Y = 250, 110, 30, 158
+COL_W, COL_GAP, MARGIN_X, TOP_Y = 205, 90, 30, 158
 BAND_TOP, BAND_ROW = 16, 26   # boundary badges live in a reserved strip
 NODE_GAP = 22
 
@@ -155,7 +155,7 @@ def _resolve(tokens, name):
 
 
 # ── text helpers ─────────────────────────────────────────────────────────────
-def wrap(text, width=30):
+def wrap(text, width=24):
     words, lines, cur = text.split(), [], ""
     for w in words:
         if cur and len(cur) + 1 + len(w) > width:
@@ -275,7 +275,7 @@ def render(graph, template_text, analysis_html=None):
     for gap, blist in bnd_at_gap.items():
         for j, (b, worst) in enumerate(blist):
             x = MARGIN_X + (gap + 1) * COL_W + gap * COL_GAP + COL_GAP / 2 \
-                + (j - (len(blist) - 1) / 2) * 16
+                + (j - (len(blist) - 1) / 2) * 14
             c = status_color[worst]
             by = BAND_TOP + (j % 4) * BAND_ROW + 11
             btip = (f'{bnd_num[b["id"]]} — {b["name"]} · {len(b["threats"])} threats · '
@@ -643,6 +643,7 @@ def render(graph, template_text, analysis_html=None):
   .exec-sum-box p {{ margin:0 0 12px; }} .exec-sum-box p:last-child {{ margin-bottom:0; }}
   .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
   .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
+  .svgwrap svg {{ max-width:100%; height:auto; }}
   details {{ background:#FFF; border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:10px 0; }}
   summary {{ cursor:pointer; }} summary b {{ color:var(--navy); }}
   table {{ width:100%; border-collapse:collapse; font-size:13px; margin:14px 0 6px; border:1px solid var(--border); border-radius:8px; overflow:hidden; }}
