@@ -30,7 +30,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 
-**👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages.
+**👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages — or a [live threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html) of OpenHands.
 
 ---
 
@@ -98,6 +98,7 @@ Praxen produces an **expert review that focuses human attention** — a senior r
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
 - [**Interpreting Reports**](docs/interpreting-reports.md) — reading the HTML / JSON / TXT outputs
+- [**Threat Modeling**](docs/threat-modeling.md) — the evidence-derived architecture view: trust lanes, boundaries, attack paths
 - [**Challenging and Revising Findings**](docs/challenging-findings.md) — what to do when you disagree
 - [**Full documentation index**](docs/index.md)
 
