@@ -397,15 +397,18 @@ def render(graph, template_text, analysis_html=None):
     ap_first = {p["steps"][0]["node"] for p in g["attack_paths"] if p["steps"]}
     ap_last = {p["steps"][-1]["node"] for p in g["attack_paths"] if p["steps"]}
 
-    def ap_role(nid, kind):
-        # the node's job in the attack story, most-telling first
-        if nid in ap_first:
-            return "source"          # untrusted content enters here
+    def ap_roles(nid, kind):
+        # the node's jobs in the attack story. A node can honestly hold two:
+        # a disclosure path ends where it began, making the caller both the
+        # ingress AND the consequence — show both, target first (red wins).
+        roles = []
         if nid in ap_last:
-            return "sink"            # the consequence / egress
-        if kind == "control":
-            return "bypass"          # a control ON the path = it didn't stop it
-        return "way"                 # pass-through (loop, model, ...)
+            roles.append("sink")     # the consequence / egress
+        if nid in ap_first:
+            roles.append("source")   # untrusted content enters here
+        if not roles:
+            roles.append("bypass" if kind == "control" else "way")
+        return roles
 
     # white glyphs centered on the corner badge (drawn at translate(bx,by))
     AP_GLYPH = {
@@ -423,6 +426,13 @@ def render(graph, template_text, analysis_html=None):
     # pass-through is grey (plumbing) — so the eye finds the consequences.
     AP_ROLE_COLOR = {"source": "#8D00FF", "sink": "#C0392B",
                      "bypass": "#D4A017", "way": "#6C757D"}
+    ap_map = []
+    for p_ in g["attack_paths"]:
+        stp = [s["node"] for s in p_["steps"]]
+        ap_map.append({"sink": stp[-1] if stp else None, "nodes": stp,
+                       "edges": [f"{a}|{b}" for a, b in zip(stp, stp[1:])]})
+    ap_map_js = json.dumps(ap_map)
+
     for d, tip, e in promoted:
         svg.append(f'<g class="edge apedge" data-from="{esc(e["from"])}" data-to="{esc(e["to"])}" '
                    f'data-tip="{esc(tip)}">')
@@ -437,10 +447,10 @@ def render(graph, template_text, analysis_html=None):
         tip = n["description"] + " | evidence: " + "; ".join(
             f'{ev["file"]}:{ev.get("line") or "—"}' for ev in n["evidence"][:4])
         onpath = n["id"] in ap_nodes
-        role = ap_role(n["id"], n["kind"]) if onpath else None
-        rc = AP_ROLE_COLOR[role] if role else None
+        roles = ap_roles(n["id"], n["kind"]) if onpath else []
         oncls = " onpath" if onpath else ""
-        svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-inv="{esc(n["id"])}">')
+        sink_attr = ' data-sink="1"' if n["id"] in ap_last else ""
+        svg.append(f'<g class="node{oncls}" data-id="{esc(n["id"])}" data-inv="{esc(n["id"])}"{sink_attr}>')
         # on-path boxes carry a role corner tag (source / route / failed
         # control / target) so the attack story reads at a glance, statically,
         # before any hover. No ring: the attack-path arrows already attach
@@ -459,12 +469,20 @@ def render(graph, template_text, analysis_html=None):
                        f'fill="none" stroke="{c}" stroke-width="1.8" '
                        f'stroke-linecap="round" stroke-linejoin="round">{icp}</g>')
         if onpath:
-            # role tag riding the box's top-left corner — source / waypoint /
+            # role tags riding the box's top-left corner — source / waypoint /
             # bypassed-control / sink, so the attack story reads without hover.
+            # A both-ends node (disclosure returning to the caller) wears two.
             bx, by = float(x), float(y)
-            svg.append(f'<g><title>on attack path — {esc(AP_ROLE_LABEL[role])}</title>'
-                       f'<circle cx="{bx}" cy="{by}" r="9" fill="{rc}"/>'
-                       f'<g transform="translate({bx},{by})">{AP_GLYPH[role]}</g></g>')
+            title = "on attack path — " + " AND ".join(AP_ROLE_LABEL[r] for r in roles)
+            badges = []
+            for role in roles:
+                # targets (where the damage lands) carry a visibly larger
+                # badge — they are the payoff of the whole attack story.
+                br, gsc = (13, " scale(1.44)") if role == "sink" else (9, "")
+                badges.append(f'<circle cx="{bx}" cy="{by}" r="{br}" fill="{AP_ROLE_COLOR[role]}"/>'
+                              f'<g transform="translate({bx},{by}){gsc}">{AP_GLYPH[role]}</g>')
+                bx += br + 12  # next badge sits beside, clear of the first
+            svg.append(f'<g><title>{esc(title)}</title>{"".join(badges)}</g>')
         svg.append('</g>')
     svg.append('<g class="lblLayer">' + "".join(elbls) + '</g>')
 
@@ -577,9 +595,20 @@ def render(graph, template_text, analysis_html=None):
         aref_html = f' · built against <b>{esc(aref)}</b>'
     else:
         aref_html = ' · no analysis reference (standalone extraction)'
-    summary_html = "".join(f"<p>{esc(par.strip())}</p>"
-                           for par in g.get("executive_summary", "").split("\n\n")
-                           if par.strip())
+    # The contract assigns the summary's paragraphs fixed roles (para 1 = what
+    # the agent is; paras 2-3 = the threats to deal with first, led by the
+    # attack paths), so the section split is mechanical, matching the labeled
+    # summary boxes of the analysis report.
+    _pars = [f"<p>{esc(par.strip())}</p>"
+             for par in g.get("executive_summary", "").split("\n\n")
+             if par.strip()]
+    summary_html = (f'<div class="exec-sum-box"><div class="label">'
+                    f'The Agent (as modeled)</div>{_pars[0]}</div>'
+                    if _pars else "")
+    if len(_pars) > 1:
+        summary_html += (f'<div class="exec-sum-box exec-sum-threats">'
+                         f'<div class="label">Priority Threats (led by attack '
+                         f'paths)</div>{"".join(_pars[1:])}</div>')
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -607,8 +636,11 @@ def render(graph, template_text, analysis_html=None):
   .section {{ margin-bottom:40px; }}
   .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
   .section-desc {{ color:#555; font-size:13px; margin:0 0 18px; line-height:1.6; }}
-  .exec-summary {{ background:var(--surface-alt); border-left:4px solid var(--blue-dark); border-radius:0 8px 8px 0; padding:16px 22px; font-size:14.5px; line-height:1.65; color:var(--text); }}
-  .exec-summary p {{ margin:0 0 12px; }} .exec-summary p:last-child {{ margin-bottom:0; }}
+  .exec-summary {{ display:flex; flex-direction:column; gap:14px; }}
+  .exec-sum-box {{ background:var(--surface-alt); border-left:4px solid var(--blue-dark); border-radius:0 8px 8px 0; padding:14px 22px 16px; font-size:14.5px; line-height:1.65; color:var(--text); }}
+  .exec-sum-box.exec-sum-threats {{ border-left-color:var(--sev-critical); }}
+  .exec-sum-box .label {{ font-size:11.5px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }}
+  .exec-sum-box p {{ margin:0 0 12px; }} .exec-sum-box p:last-child {{ margin-bottom:0; }}
   .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
   .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
   details {{ background:#FFF; border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:10px 0; }}
@@ -665,12 +697,21 @@ def render(graph, template_text, analysis_html=None):
      dash animation runs origin→consequence so the eye follows the attack,
      over a brighter red and a stronger glow. */
   @keyframes apflow {{ to {{ stroke-dashoffset:-16; }} }}
-  .edge.hi .apvis, .apedge:hover .apvis {{
+  .edge.hi .apvis, .apedge:hover .apvis, .apedge.iso .apvis {{
     stroke:#E11900; stroke-width:4.2; opacity:1 !important;
     stroke-dasharray:10 6; animation:apflow .55s linear infinite;
     filter:drop-shadow(0 0 6px rgba(225,25,0,.75)); marker-end:url(#arr-path-hi); }}
   @media (prefers-reduced-motion: reduce) {{
-    .edge.hi .apvis, .apedge:hover .apvis {{ animation:none; stroke-dasharray:none; }} }}
+    .edge.hi .apvis, .apedge:hover .apvis, .apedge.iso .apvis {{ animation:none; stroke-dasharray:none; }} }}
+  /* Target-hover isolation: hovering a target (consequence) node mutes
+     everything except the attack path(s) that reach it, so each corridor
+     from untrusted origin to this target reads alone. */
+  .node {{ transition:opacity .12s; }}
+  svg.isolating .node {{ opacity:0.22; }}
+  svg.isolating .node.iso {{ opacity:1; }}
+  svg.isolating .edge:not(.apedge) .vis {{ opacity:0 !important; }}
+  svg.isolating .apedge:not(.iso) .apvis {{ opacity:0.12 !important; }}
+  svg.isolating .bnd line {{ opacity:0.25; }}
   .node {{ cursor:pointer; }}
   .node:hover rect:first-of-type {{ filter:drop-shadow(0 0 4px rgba(0,107,255,.4)); }}
   /* A node that sits on an attack path glows red on hover, not blue. */
@@ -774,12 +815,38 @@ document.querySelectorAll('.node').forEach(n =>
 document.querySelectorAll('.bnd').forEach(b =>
   b.addEventListener('click', () => {{ const d = document.getElementById('bnd-' + b.dataset.bnd);
     if (d) {{ d.open = true; jumpTo(d); }} }}));
-document.querySelectorAll('.node').forEach(n => {{
+document.querySelectorAll('.node:not([data-sink])').forEach(n => {{
   const id = n.dataset.id;
   const mine = [...document.querySelectorAll('.edge')].filter(e => e.dataset.from === id || e.dataset.to === id);
   n.addEventListener('mouseenter', () => mine.forEach(e => {{ e.classList.add('hi'); const l = lblOf(e); l && l.classList.add('show'); }}));
   n.addEventListener('mouseleave', () => mine.forEach(e => {{ e.classList.remove('hi'); const l = lblOf(e); l && l.classList.remove('show'); }}));
 }});
+// Target-hover isolation: hovering a target (consequence) node dims the rest
+// of the diagram and pops every attack path that ends at it, end to end.
+const APDATA = {ap_map_js};
+const svgRoot = document.querySelector('.svgwrap svg');
+document.querySelectorAll('.node[data-sink]').forEach(n => {{
+  const id = n.dataset.id;
+  const paths = APDATA.filter(p => p.sink === id);
+  if (!paths.length) return;
+  const isoNodes = new Set(paths.flatMap(p => p.nodes));
+  const isoEdges = new Set(paths.flatMap(p => p.edges.flatMap(k => {{
+    const [a, b] = k.split('|'); return [k, b + '|' + a]; }})));
+  n.addEventListener('mouseenter', () => {{
+    svgRoot.classList.add('isolating');
+    document.querySelectorAll('.node').forEach(m => isoNodes.has(m.dataset.id) && m.classList.add('iso'));
+    document.querySelectorAll('.apedge').forEach(e => isoEdges.has(e.dataset.from + '|' + e.dataset.to) && e.classList.add('iso'));
+  }});
+  n.addEventListener('mouseleave', clearIso);
+}});
+function clearIso() {{
+  svgRoot.classList.remove('isolating');
+  document.querySelectorAll('.iso').forEach(m => m.classList.remove('iso'));
+}}
+// A scroll can slide a target under (or out from under) a stationary cursor
+// without firing boundary events until the next mouse move — clear on scroll
+// so the isolation never sticks.
+window.addEventListener('scroll', clearIso, {{passive: true}});
 </script>
 </body></html>"""
 
