@@ -231,6 +231,11 @@ def _validate_scan(data):
              f"must be a real ISO-8601 timestamp with explicit timezone; got {ts!r} ({e})")
     _nonempty_str(scan, "workspace", "$.scan")
     _int(scan, "artifact_count", "$.scan", minimum=0)
+    # Optional provenance: the remit's own declared version (Identity table
+    # "Remit Version"). Absent when the remit declares none — additive in 2.0,
+    # so pre-2.0 findings JSONs remain valid unchanged.
+    if "remit_version" in scan:
+        _nonempty_str(scan, "remit_version", "$.scan")
 
 
 def _validate_intro_band(data):

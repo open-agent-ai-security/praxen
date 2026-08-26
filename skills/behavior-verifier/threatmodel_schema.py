@@ -86,7 +86,7 @@ def _validate_top(data):
     _closed(data, "$", {
         "spec_version", "praxen_version", "target", "analysis_ref",
         "model_identity", "executive_summary", "lanes", "nodes", "edges",
-        "trust_boundaries", "attack_paths", "notes",
+        "trust_boundaries", "attack_paths", "notes", "remit_version",
     })
     version = _s._nonempty_str(data, "spec_version", "$")
     if version != SPEC_VERSION:
@@ -99,6 +99,10 @@ def _validate_top(data):
     _s._nonempty_str(target, "slug", "$.target")
     _s._nonempty_str(target, "source_root", "$.target")
     _s._str(data, "analysis_ref", "$", allow_none=True)
+    # Optional provenance: the remit's own declared version, carried so the
+    # rendered model names the policy edition it was extracted against.
+    if "remit_version" in data:
+        _s._nonempty_str(data, "remit_version", "$")
     _s._nonempty_str(data, "model_identity", "$")
     _s._nonempty_str(data, "executive_summary", "$")
     lanes = _s._get(data, "lanes", "$")

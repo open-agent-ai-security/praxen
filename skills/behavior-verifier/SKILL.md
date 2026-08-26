@@ -852,6 +852,7 @@ The manifest's job is to be **complete enough that Step 10's canonical JSON is p
 - scan_timestamp: <$SCAN_TS — ISO 8601 UTC>   (cannot be regenerated after a compaction)
 - workspace: <absolute path>
 - artifact_count: <integer>
+- remit_version: <the remit Identity table's "Remit Version" value, verbatim — omit this line entirely if the remit declares none>
 
 ## intro_band
 ### agent_remit_summary

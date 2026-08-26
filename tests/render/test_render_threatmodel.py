@@ -63,6 +63,14 @@ def main():
           'built against <a href=' not in out1
           and f"built against <b>" in out1)
 
+    # optional remit_version: masthead suffix present iff the graph carries it
+    gv = json.load(open(GRAPH, encoding="utf-8"))
+    gv["remit_version"] = "9.9-test"
+    check("remit_version validates as optional", tms.validate(dict(gv)) is not None)
+    out_rv = rtm.render(gv, template)
+    check("remit_version shows in the masthead", "remit v9.9-test" in out_rv)
+    check("no remit_version, no masthead suffix", "remit v" not in out1)
+
     golden = open(GOLDEN, encoding="utf-8").read()
     check("render matches the committed golden output", out1 == golden,
           "regenerate with: python3 skills/behavior-verifier/render_threatmodel.py "

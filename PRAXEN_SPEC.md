@@ -286,7 +286,8 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
     "scan_date": "<YYYY-MM-DD>",
     "scan_timestamp": "<ISO 8601 UTC>",
     "workspace": "<absolute path to the analyzed workspace>",
-    "artifact_count": "<int — workspace artifacts read>"
+    "artifact_count": "<int — workspace artifacts read>",
+    "remit_version": "<string, optional — the remit's own declared version; omitted when the remit declares none>"
   },
   "intro_band": {
     "agent_remit_summary": "<2–4 sentences: what the remit says the agent is for; may contain <code>>",

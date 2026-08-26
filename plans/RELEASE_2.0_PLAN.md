@@ -115,7 +115,11 @@ as input, so the generator work is *better* after this ships.
   chains present per target; remit-overlay audit passes the
   job-description rule (only genuine governance attached; empty rule sets
   never remarked on).
-- **No collateral damage:** standard-mode scan byte-identical; full test
+- **No collateral damage:** standard-mode scan byte-identical — with one
+  recorded exception (Steve, 2026-08-26): new scans additionally emit the
+  optional `scan.remit_version` provenance field when the remit declares a
+  version; score-inert, absent on version-less remits, pre-2.0 JSONs
+  unaffected; full test
   suite green; `claude plugin validate` clean; `v1.3-opus5` baselines
   untouched (byte-gates hold — nothing in 2.0 re-scans or re-scores).
 - **Cost documentation:** extraction ≈ 0.4–0.5× a standard scan (probe

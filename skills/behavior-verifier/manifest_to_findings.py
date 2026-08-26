@@ -116,6 +116,7 @@ _SCAN_FIELD_TYPES = {
     "scan_timestamp": "str",
     "workspace": "str",
     "artifact_count": "int",
+    "remit_version": "str",   # optional — present only when the remit declares one
     "manifest_format_version": "int",
     # Accepted-but-ignored for backward compatibility with manifests written
     # before the version-source-of-truth cleanup (the converter now reads

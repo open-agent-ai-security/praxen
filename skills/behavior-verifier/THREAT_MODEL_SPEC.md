@@ -30,6 +30,7 @@ cannot cite it, leave it out and record the omission in `notes`.
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
+  "remit_version": "<string, OPTIONAL — the remit's own declared version (Identity table \"Remit Version\"); omit when the remit declares none>",
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
   "executive_summary": "<2-3 short paragraphs of plain English — see Executive summary>",
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],

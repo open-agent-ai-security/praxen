@@ -588,6 +588,8 @@ def render(graph, template_text, analysis_html=None):
         re.search(r"named (.+)", g.get("model_identity", ""))
     model_name = _m.group(1).strip() if _m else "unknown"
     aref = g.get("analysis_ref")
+    rv = g.get("remit_version")
+    rv_html = f' · remit v{esc(rv)}' if rv else ''
     if aref and analysis_html:
         aref_html = (f' · built against <a href="{esc(analysis_html)}">'
                      f'<b>{esc(aref)}</b></a>')
@@ -742,7 +744,7 @@ def render(graph, template_text, analysis_html=None):
   <div>{mh_logo}
     <div class="masthead-agent">{esc(agent_title)}</div>
     <div class="masthead-kind">Threat Model</div>
-    <div class="masthead-date">evidence-derived · Praxen {esc(g["praxen_version"])} · graph contract {esc(g["spec_version"])}{aref_html}</div>
+    <div class="masthead-date">evidence-derived · Praxen {esc(g["praxen_version"])} · graph contract {esc(g["spec_version"])}{rv_html}{aref_html}</div>
   </div>
   <div class="masthead-summary">
     <div class="masthead-metrics">

@@ -108,7 +108,9 @@ about the target.
 >
 > Output: write the graph to `{OUTPUT_JSON}` with `"spec_version": "1.4"`,
 > `"praxen_version": "{PRAXEN_VERSION}"`, `"analysis_ref":
-> {ANALYSIS_REF_OR_NULL}`, and your verbatim "You are powered by ..."
+> {ANALYSIS_REF_OR_NULL}`, `"remit_version"` set to the remit Identity
+> table's "Remit Version" value (omit the field if the remit declares
+> none), and your verbatim "You are powered by ..."
 > declaration as `model_identity`. Before writing, self-check: all edge
 > node-refs resolve, all boundary edge-refs resolve, every cited
 > `finding_id` exists in the findings JSON, `notes.counts` match the

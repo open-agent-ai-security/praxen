@@ -692,6 +692,8 @@ def _global_ctx(data):
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
         "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
+        "REMIT_VERSION_SUFFIX": (" · Remit v" + esc(data["scan"]["remit_version"])
+                                 if data["scan"].get("remit_version") else ""),
         "AGENT_REMIT_SUMMARY": render_rich(ib["agent_remit_summary"],
                                            allow=_RICH_FIELDS["agent_remit_summary"]),
         "AGENT_STRUCTURE_SUMMARY": render_rich(ib["agent_structure_summary"],
@@ -789,6 +791,8 @@ def render_txt(data: dict) -> str:
     out.append(f"Agent:    {scan['agent']}")
     out.append(f"Analysis: {_format_timestamp(scan['scan_timestamp'])}")
     out.append(f"Praxen v{data['praxen_version']}")
+    if scan.get("remit_version"):
+        out.append(f"Remit v{scan['remit_version']}")
     out.append(bar)
     out.append("")
 
