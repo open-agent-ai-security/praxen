@@ -72,7 +72,7 @@ Every release bumps the version, so a refresh always picks up the latest. Check 
 
 ```bash
 claude plugin marketplace update open-agent-ai-security   # refresh the catalog
-claude plugin update praxen@open-agent-ai-security         # install the latest
+claude plugin update praxen-beta@open-agent-ai-security         # install the latest
 ```
 
 Both steps matter: without the first, `plugin update` only sees your local (possibly stale) catalog cache.
@@ -112,7 +112,7 @@ Auto-update is **per-marketplace and off by default** for third-party marketplac
 **Claude Code (plugin marketplace):**
 
 ```bash
-claude plugin uninstall praxen@open-agent-ai-security
+claude plugin uninstall praxen-beta@open-agent-ai-security
 claude plugin marketplace remove open-agent-ai-security
 ```
 
@@ -121,7 +121,7 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 **OpenAI Codex (marketplace):**
 
 ```bash
-codex plugin remove praxen@open-agent-ai-security
+codex plugin remove praxen-beta@open-agent-ai-security
 codex plugin marketplace remove open-agent-ai-security
 ```
 
