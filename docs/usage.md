@@ -163,7 +163,7 @@ A short list of first-run snags and how to clear them.
 The plugin is installed but the current session hasn't picked it up.
 
 - From within Claude Code: run `/reload-plugins`, or restart Claude Code.
-- From the terminal: `claude plugin list` should show `praxen@open-agent-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen@open-agent-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
+- From the terminal: `claude plugin list` should show `praxen@open-agent-ai-security`, `enabled`. If it doesn't, re-run the install (`claude plugin install praxen-beta@open-agent-ai-security`); if it does and the in-session agent still can't find it, you're in a stale session — start a new one.
 - Using an unzipped release directly (no marketplace): point the agent at `skills/behavior-verifier/SKILL.md` explicitly rather than naming the skill.
 
 ### "Worker Remit not found" / "no remit at that path"

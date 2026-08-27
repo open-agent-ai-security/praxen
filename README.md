@@ -12,7 +12,7 @@
 
 [![Project level: Flagship](https://img.shields.io/badge/project_level-flagship-8366f5)](https://open-agent-ai-security.github.io/project-levels/)
 [![CI](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml/badge.svg)](https://github.com/open-agent-ai-security/praxen/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/badge/release-v1.3.0-blue)](https://github.com/open-agent-ai-security/praxen/releases)
+[![Latest release](https://img.shields.io/badge/release-v2.0.0--beta.1-blue)](https://github.com/open-agent-ai-security/praxen/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -25,8 +25,8 @@ That's where the risk actually lives: most agentic security and safety failures 
 ---
 
 **📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
-- **Claude Code:** two short commands — `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`
-- **OpenAI Codex:** two short commands — `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen@open-agent-ai-security`
+- **Claude Code:** two short commands — `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen-beta@open-agent-ai-security`
+- **OpenAI Codex:** two short commands — `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen-beta@open-agent-ai-security`
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 
