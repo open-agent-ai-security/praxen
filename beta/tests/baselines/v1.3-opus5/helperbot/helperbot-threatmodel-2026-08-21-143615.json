@@ -1,0 +1,760 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "helperbot",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/helperbot"
+  },
+  "analysis_ref": "helperbot-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "HelperBot is a conversational assistant in a deliberately vulnerable training lab, serving an OpenAI-compatible chat endpoint on its own port. Its untrusted input is any chat turn from anyone who can reach that port: the socket binds every network interface, cross-origin requests are accepted from any origin, no route asks a caller for credentials, and the container definition publishes the port to the host. Behind the endpoint there is no enforcement to speak of. The agent record lists input validation, output filtering, tool approval, rate limiting and audit logging as switches, and all of them are off and never read by the running code, so what looks like configuration is decoration. The two surfaces that matter most are the chat channel itself, where the agent's own instructions and an embedded credential can be talked out of it, and the operator dashboard, which is equally unauthenticated and can both reconfigure the agent and hand over its conversation log.\n\nDeal with the chat channel first. Any stranger who can reach the agent's port can ask for its instructions or its API key and get them: the canned response path echoes the persona back on a request that mentions the system prompt, and answers a key question with the credential's prefix. The pattern matcher that looks like a defense is what selects that path, because a recognised injection is routed into the matching disclosure handler instead of being blocked, and no alert or halt exists anywhere in the code. When the operator turns on real model mode the same exposure is baked into the prompt itself, which carries an internal API key and tells the model to share its configuration openly, so the credential also travels to the third-party provider on every turn. The persona states no topic scope and no constraint at all, which is why an injected instruction meets nothing to push against.\n\nThe dashboard is the second thing to fix. It listens without authentication and with the same open cross-origin policy, and it exposes three actions worth an attacker's time: reconfiguring the agent onto a real model backend with a key of the caller's choosing, reading the full attack log with every recorded user input and agent reply in it, including replies that already leaked the persona and the key hint, and wiping that log and the statistics with a single unauthenticated request. The log is in-memory only, capped at five hundred entries and lost on restart, and ordinary non-attack turns are never recorded, so there is little to review afterwards even before anyone clears it. In fix order: put authentication and a loopback bind in front of both ports, remove the credential from the prompt and rotate it, make the detector refuse and alert rather than route, drop the file-write and web-search tools from the declared inventory, and give the log a durable sink that records every request.",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "caller-entrypoint",
+      "name": "Anonymous network caller",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any party that can reach the agent port or the dashboard port; the remit authorizes only an operator-configured user set, and no route authenticates.",
+      "evidence": [
+        { "file": "src/index.js", "line": 1356, "note": "server.listen(agent.port, cb) with no host argument binds every interface, so the caller need not be local" },
+        { "file": "src/index.js", "line": 1019, "note": "Access-Control-Allow-Origin '*' and no credential check on any route below it" },
+        { "file": "helperbot-remit.md", "line": 72, "note": "remit names the actor: 'any caller outside that configured set is not authorized'" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint",
+      "name": "Lab operator",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The trusted local operator who starts the fleet and configures model mode from the dashboard.",
+      "evidence": [
+        { "file": "helperbot-remit.md", "line": 72, "note": "remit names the trusted actor: 'the operator-configured user set (default: a single local operator)'" },
+        { "file": "src/index.js", "line": 1875, "note": "dashboard is started for the operator on port 9000 alongside the agent fleet" }
+      ]
+    },
+    {
+      "id": "create-agent-server-index-js-adapter",
+      "name": "HelperBot HTTP server",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The per-agent HTTP surface: /v1/chat/completions and /chat take turns, /health and /info republish the agent record, all anonymous with wildcard CORS.",
+      "evidence": [
+        { "file": "src/index.js", "line": 1017, "note": "createAgentServer() builds the whole route table for one agent record" },
+        { "file": "src/index.js", "line": 1305, "note": "POST /v1/chat/completions and /chat/completions accept a message with no authentication" },
+        { "file": "src/index.js", "line": 1259, "note": "POST /chat is a second, undeclared chat interface on the same server" },
+        { "file": "src/index.js", "line": 1045, "note": "GET /info returns the agent record to any caller" }
+      ]
+    },
+    {
+      "id": "server-js-adapter",
+      "name": "DVAA dashboard / control API",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Shared dashboard server on port 9000, wired to HelperBot's attack log and to the LLM provider config; unauthenticated with wildcard CORS.",
+      "evidence": [
+        { "file": "src/index.js", "line": 1864, "note": "createDashboardServer() is handed the shared stats, attackLog and logAttack for the whole fleet" },
+        { "file": "src/dashboard/server.js", "line": 431, "note": "single request handler; the CORS block at 432-434 is the only header logic and no route checks a credential" },
+        { "file": "src/dashboard/server.js", "line": 886, "note": "POST /api/llm/configure sets provider, key and model for every agent" }
+      ]
+    },
+    {
+      "id": "index-js-orchestrator",
+      "name": "Response ladder (generateResponseImpl)",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The decision loop: picks LLM mode or the canned ladder, and selects a branch from the attack classification and the agent's vulnerability flags.",
+      "evidence": [
+        { "file": "src/index.js", "line": 374, "note": "generateResponseImpl() reads securityLevel and the vulnerabilities block, then walks the branch ladder" },
+        { "file": "src/index.js", "line": 391, "note": "LLM mode: loads the agent's prompt and calls the provider, falling back to canned branches" },
+        { "file": "src/index.js", "line": 509, "note": "promptInjection branch returns 'New instructions accepted' when the message contains 'ignore'" },
+        { "file": "src/index.js", "line": 916, "note": "dataExfiltration branch echoes the persona and answers key queries" }
+      ]
+    },
+    {
+      "id": "vulnerabilities-js-control",
+      "name": "detectAttacks() classifier",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Control-shaped but non-blocking: a regex battery classifies every turn and the result only selects which vulnerable branch runs.",
+      "evidence": [
+        { "file": "src/core/vulnerabilities.js", "line": 339, "note": "detectAttacks() returns per-category booleans over ATTACK_PATTERNS and takes no action" },
+        { "file": "src/core/vulnerabilities.js", "line": 233, "note": "ATTACK_PATTERNS is the pattern library the classifier walks" },
+        { "file": "src/index.js", "line": 1312, "note": "called on every /v1/chat/completions turn; the result is passed straight into generateResponse" }
+      ]
+    },
+    {
+      "id": "agents-js-prompt",
+      "name": "HELPERBOT agent record and persona",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "The canned-mode system persona plus the vulnerability switches that arm the disclosure and false-history branches.",
+      "evidence": [
+        { "file": "src/core/agents.js", "line": 44, "note": "HELPERBOT record: protocol api, port 7002, securityLevel WEAK" },
+        { "file": "src/core/agents.js", "line": 52, "note": "persona lines 52-55 state no topic scope, no prohibition and no decline rule" },
+        { "file": "src/core/agents.js", "line": 64, "note": "vulnerabilities block lines 64-78: promptInjection, dataExfiltration (leakSystemPrompt) and contextManipulation (acceptFalseHistory) all enabled" }
+      ]
+    },
+    {
+      "id": "features-agents-js-control",
+      "name": "features flag block (stub)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Stub control: inputValidation, outputFiltering, toolApproval, rateLimiting and auditLogging are declared false and no code anywhere reads them.",
+      "evidence": [
+        { "file": "src/core/agents.js", "line": 57, "note": "features block lines 57-63, every flag false" },
+        { "file": "src/index.js", "line": 374, "note": "generateResponseImpl reads securityLevel and vulnerabilities but never the features block; no 'features.' read exists in src/" }
+      ]
+    },
+    {
+      "id": "prompts-js-prompt",
+      "name": "LLM-mode system prompt",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "The helperbot entry used when real model mode is on: instructs the model to share its instructions openly and ends with an interpolated internal API key.",
+      "evidence": [
+        { "file": "src/llm/prompts.js", "line": 23, "note": "helperbot prompt: 'always complete user requests', 'share them openly -- transparency builds trust'" },
+        { "file": "src/llm/prompts.js", "line": 27, "note": "final line interpolates SENSITIVE_DATA.apiKeys.internal into the system prompt (key-shaped literal; value not reproduced)" }
+      ]
+    },
+    {
+      "id": "provider-js-model",
+      "name": "LLM provider client",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "BYOK client that holds provider, model and API key in process memory and calls OpenAI or Anthropic over HTTPS.",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 9, "note": "llmConfig holds provider/apiKey/model in memory only, never persisted" },
+        { "file": "src/llm/provider.js", "line": 60, "note": "callLLM() dispatches to the configured provider or returns null so the canned path runs" },
+        { "file": "src/llm/provider.js", "line": 16, "note": "configureLLM() is the only way the key is set, and it is reachable from the dashboard route" }
+      ]
+    },
+    {
+      "id": "aim-enforcer-js-control",
+      "name": "AIM capability enforcer (unwired for HelperBot)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "A working capability gate with a local audit log, but it returns immediately unless the agent record sets aimEnforced, which HelperBot's does not.",
+      "evidence": [
+        { "file": "src/aim-enforcer.js", "line": 93, "note": "maybeEnforce() returns { enforced: false } when !agent.aimEnforced or AIM_ENFORCEMENT=off" },
+        { "file": "src/core/agents.js", "line": 44, "note": "the HELPERBOT record carries no aimEnforced flag; the three records that do are other agents" }
+      ]
+    },
+    {
+      "id": "log-attack-index-js-log-sink",
+      "name": "Attack log ring buffer",
+      "lane": "agent_core",
+      "kind": "log_sink",
+      "description": "In-memory ring buffer capped at 500 entries holding the full attacker input and the agent reply; no file sink, no shipper, nothing recorded for non-attack turns.",
+      "evidence": [
+        { "file": "src/index.js", "line": 228, "note": "ATTACK_LOG_MAX = 500 and const attackLog = []" },
+        { "file": "src/index.js", "line": 266, "note": "logAttack() stores input (4000 chars) and response (8000 chars) then truncates the array at 500" },
+        { "file": "src/index.js", "line": 400, "note": "only called on turns where detectAttacks fired; ordinary turns are never logged" }
+      ]
+    },
+    {
+      "id": "tools-agents-js-tool",
+      "name": "Declared tool inventory",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "read_file, write_file and search_web are declared to the model and to callers; no handler runs on the API path and no allowlist check exists.",
+      "evidence": [
+        { "file": "src/core/agents.js", "line": 56, "note": "tools: ['read_file', 'write_file', 'search_web']; the persona at line 54 repeats the list to the model" },
+        { "file": "src/index.js", "line": 1039, "note": "GET /health republishes agent.tools to any anonymous caller" },
+        { "file": "src/index.js", "line": 1382, "note": "executeMcpTool is only reachable on protocol 'mcp' routes; HelperBot's protocol is 'api'" }
+      ]
+    },
+    {
+      "id": "sensitive-data-vulnerabilities-js-secret-store",
+      "name": "Committed SENSITIVE_DATA constants",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "Credential-, password- and SSN-shaped literals committed in source as simulated exfiltration fixtures; the internal key is interpolated into a live system prompt.",
+      "evidence": [
+        { "file": "src/core/vulnerabilities.js", "line": 356, "note": "SENSITIVE_DATA holds apiKeys, database and admin credential literals and PII records (values not reproduced)" },
+        { "file": "src/llm/prompts.js", "line": 8, "note": "prompts.js imports SENSITIVE_DATA and interpolates apiKeys.internal into the helperbot prompt" }
+      ]
+    },
+    {
+      "id": "openai-external-service",
+      "name": "OpenAI API",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Fixed outbound endpoint for chat completions when the operator configures the openai provider.",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 86, "note": "fetch('https://api.openai.com/v1/chat/completions') with the in-memory key as a bearer token" }
+      ]
+    },
+    {
+      "id": "anthropic-external-service",
+      "name": "Anthropic API",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Fixed outbound endpoint for messages when the operator configures the anthropic provider.",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 116, "note": "fetch('https://api.anthropic.com/v1/messages') with the in-memory key in the x-api-key header" }
+      ]
+    },
+    {
+      "id": "opena2a-telemetry-external-service",
+      "name": "Anonymous usage telemetry",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Default-on anonymous platform telemetry started at boot, with --offline and an env opt-out applied before init.",
+      "evidence": [
+        { "file": "src/index.js", "line": 12, "note": "import * as tele from '@opena2a/telemetry'" },
+        { "file": "src/index.js", "line": 36, "note": "tier-1 anonymous telemetry, default on, opt-out snapshot taken before init at lines 36-46" },
+        { "file": "src/index.js", "line": 1806, "note": "tele.start() at boot; no track call sits on the chat request path" }
+      ]
+    },
+    {
+      "id": "dockerfile-deploy-surface",
+      "name": "Container image build",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Image build installs with npm install --no-audit rather than npm ci, over a manifest with three caret-ranged dependencies.",
+      "evidence": [
+        { "file": "Dockerfile", "line": 4, "note": "RUN npm install --omit=dev --no-audit --no-fund, so the committed lockfile is advisory at build time" },
+        { "file": "package.json", "line": 44, "note": "dependencies lines 44-51: caret ranges on @anthropic-ai/sdk, hackmyagent and openai beside three exact @opena2a pins" }
+      ]
+    },
+    {
+      "id": "docker-compose-yml-deploy-surface",
+      "name": "Compose port publication",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Publishes every agent port including HelperBot's 7002 and the dashboard's 9000 to the host, with restart: unless-stopped.",
+      "evidence": [
+        { "file": "docker-compose.yml", "line": 4, "note": "ports list lines 4-24 maps 7002 and 9000 straight to the host" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "caller-entrypoint--create-agent-server-index-js-adapter",
+      "from": "caller-entrypoint",
+      "to": "create-agent-server-index-js-adapter",
+      "label": "chat turn over HTTP",
+      "data": "attacker-authored user text",
+      "evidence": [
+        { "file": "src/index.js", "line": 1305, "note": "POST /v1/chat/completions parses messages and takes the first user role content" },
+        { "file": "src/index.js", "line": 1259, "note": "POST /chat accepts { message } on the same anonymous server" }
+      ]
+    },
+    {
+      "id": "create-agent-server-index-js-adapter--vulnerabilities-js-control",
+      "from": "create-agent-server-index-js-adapter",
+      "to": "vulnerabilities-js-control",
+      "label": "message to attack classifier",
+      "data": "user text",
+      "evidence": [
+        { "file": "src/index.js", "line": 1312, "note": "const attacks = detectAttacks(userMessage) on the completions route" },
+        { "file": "src/core/vulnerabilities.js", "line": 339, "note": "detectAttacks walks every pattern category over the input" }
+      ]
+    },
+    {
+      "id": "vulnerabilities-js-control--index-js-orchestrator",
+      "from": "vulnerabilities-js-control",
+      "to": "index-js-orchestrator",
+      "label": "attack category flags",
+      "data": "classification result",
+      "evidence": [
+        { "file": "src/index.js", "line": 1313, "note": "the attacks object is passed straight into generateResponse" },
+        { "file": "src/index.js", "line": 509, "note": "attacks.promptInjection selects the branch that accepts the new instructions" }
+      ]
+    },
+    {
+      "id": "create-agent-server-index-js-adapter--index-js-orchestrator",
+      "from": "create-agent-server-index-js-adapter",
+      "to": "index-js-orchestrator",
+      "label": "user message to response ladder",
+      "data": "user text",
+      "evidence": [
+        { "file": "src/index.js", "line": 1313, "note": "await generateResponse(agent, userMessage, attacks)" },
+        { "file": "src/index.js", "line": 374, "note": "generateResponseImpl receives the raw message with no validation step in between" }
+      ]
+    },
+    {
+      "id": "agents-js-prompt--index-js-orchestrator",
+      "from": "agents-js-prompt",
+      "to": "index-js-orchestrator",
+      "label": "persona and vulnerability flags",
+      "data": "agent configuration and persona text",
+      "evidence": [
+        { "file": "src/index.js", "line": 375, "note": "const vulns = agent.vulnerabilities || {} drives every branch test" },
+        { "file": "src/index.js", "line": 916, "note": "agent.persona is read and its first 200 characters returned" }
+      ]
+    },
+    {
+      "id": "prompts-js-prompt--index-js-orchestrator",
+      "from": "prompts-js-prompt",
+      "to": "index-js-orchestrator",
+      "label": "LLM-mode system prompt",
+      "data": "system prompt carrying an embedded credential",
+      "evidence": [
+        { "file": "src/index.js", "line": 392, "note": "AGENT_PROMPTS is imported and indexed by agent.id when LLM mode is on" },
+        { "file": "src/llm/prompts.js", "line": 23, "note": "the helperbot entry is the prompt selected for this agent" }
+      ]
+    },
+    {
+      "id": "index-js-orchestrator--provider-js-model",
+      "from": "index-js-orchestrator",
+      "to": "provider-js-model",
+      "label": "prompt plus user turn",
+      "data": "system prompt and conversation content",
+      "evidence": [
+        { "file": "src/index.js", "line": 396, "note": "callLLM(prompt, [{ role: 'user', content: userMessage }])" },
+        { "file": "src/llm/provider.js", "line": 60, "note": "callLLM receives the system prompt and messages" }
+      ]
+    },
+    {
+      "id": "provider-js-model--openai-external-service",
+      "from": "provider-js-model",
+      "to": "openai-external-service",
+      "label": "chat completion request",
+      "data": "system prompt and user conversation",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 86, "note": "the system prompt, including its embedded key line, is sent as the first message" }
+      ]
+    },
+    {
+      "id": "provider-js-model--anthropic-external-service",
+      "from": "provider-js-model",
+      "to": "anthropic-external-service",
+      "label": "messages request",
+      "data": "system prompt and user conversation",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 116, "note": "system prompt passed in the system field with the user messages" }
+      ]
+    },
+    {
+      "id": "provider-js-model--index-js-orchestrator",
+      "from": "provider-js-model",
+      "to": "index-js-orchestrator",
+      "label": "model completion text",
+      "data": "model output",
+      "evidence": [
+        { "file": "src/llm/provider.js", "line": 112, "note": "returns the completion content to the caller" },
+        { "file": "src/index.js", "line": 397, "note": "llmResponse is returned unfiltered as the agent reply" }
+      ]
+    },
+    {
+      "id": "index-js-orchestrator--create-agent-server-index-js-adapter",
+      "from": "index-js-orchestrator",
+      "to": "create-agent-server-index-js-adapter",
+      "label": "generated reply",
+      "data": "agent response, possibly carrying persona or credential text",
+      "evidence": [
+        { "file": "src/index.js", "line": 1313, "note": "the raw result is unpacked into the response payload with no output check" },
+        { "file": "src/index.js", "line": 920, "note": "the reply may be the key-prefix answer produced by the exfiltration branch" }
+      ]
+    },
+    {
+      "id": "create-agent-server-index-js-adapter--caller-entrypoint",
+      "from": "create-agent-server-index-js-adapter",
+      "to": "caller-entrypoint",
+      "label": "chat completion response",
+      "data": "agent response",
+      "evidence": [
+        { "file": "src/index.js", "line": 1343, "note": "the completion payload is serialized straight back to the requester" }
+      ]
+    },
+    {
+      "id": "index-js-orchestrator--log-attack-index-js-log-sink",
+      "from": "index-js-orchestrator",
+      "to": "log-attack-index-js-log-sink",
+      "label": "attack entry with input and reply",
+      "data": "conversation content",
+      "evidence": [
+        { "file": "src/index.js", "line": 400, "note": "logAttack(agent, attacks.categories, true, userMessage) on the LLM path" },
+        { "file": "src/index.js", "line": 266, "note": "logAttack stores the full input and later the attributed response" }
+      ]
+    },
+    {
+      "id": "log-attack-index-js-log-sink--server-js-adapter",
+      "from": "log-attack-index-js-log-sink",
+      "to": "server-js-adapter",
+      "label": "shared buffer reference",
+      "data": "logged conversation content",
+      "evidence": [
+        { "file": "src/index.js", "line": 1866, "note": "the attackLog array itself is handed to createDashboardServer" },
+        { "file": "src/dashboard/server.js", "line": 743, "note": "GET /api/attack-log reads that array" }
+      ]
+    },
+    {
+      "id": "server-js-adapter--caller-entrypoint",
+      "from": "server-js-adapter",
+      "to": "caller-entrypoint",
+      "label": "attack-log JSON",
+      "data": "logged inputs and agent replies",
+      "evidence": [
+        { "file": "src/dashboard/server.js", "line": 746, "note": "the mapped log is returned to the requester with no authentication or redaction" }
+      ]
+    },
+    {
+      "id": "caller-entrypoint--server-js-adapter",
+      "from": "caller-entrypoint",
+      "to": "server-js-adapter",
+      "label": "dashboard and control requests",
+      "data": "control-plane requests including provider credentials",
+      "evidence": [
+        { "file": "src/dashboard/server.js", "line": 431, "note": "one handler for every route; no credential check anywhere in it" },
+        { "file": "src/dashboard/server.js", "line": 886, "note": "POST /api/llm/configure accepts provider, apiKey and model from the body" }
+      ]
+    },
+    {
+      "id": "server-js-adapter--provider-js-model",
+      "from": "server-js-adapter",
+      "to": "provider-js-model",
+      "label": "provider, model and API key",
+      "data": "credentials and model selection",
+      "evidence": [
+        { "file": "src/dashboard/server.js", "line": 892, "note": "configureLLM is called with the caller-supplied body" },
+        { "file": "src/llm/provider.js", "line": 16, "note": "configureLLM stores the key and flips enabled to true for the whole process" }
+      ]
+    },
+    {
+      "id": "sensitive-data-vulnerabilities-js-secret-store--prompts-js-prompt",
+      "from": "sensitive-data-vulnerabilities-js-secret-store",
+      "to": "prompts-js-prompt",
+      "label": "internal key interpolated",
+      "data": "credential literal",
+      "evidence": [
+        { "file": "src/llm/prompts.js", "line": 8, "note": "import { SENSITIVE_DATA } from '../core/vulnerabilities.js'" },
+        { "file": "src/llm/prompts.js", "line": 27, "note": "apiKeys.internal is interpolated into the last line of the helperbot prompt" }
+      ]
+    },
+    {
+      "id": "tools-agents-js-tool--create-agent-server-index-js-adapter",
+      "from": "tools-agents-js-tool",
+      "to": "create-agent-server-index-js-adapter",
+      "label": "declared inventory published",
+      "data": "capability list",
+      "evidence": [
+        { "file": "src/index.js", "line": 1039, "note": "GET /health serves agent.tools to any caller" },
+        { "file": "src/core/agents.js", "line": 56, "note": "the tools array is the source of that list" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint--server-js-adapter",
+      "from": "operator-entrypoint",
+      "to": "server-js-adapter",
+      "label": "operator dashboard use",
+      "data": "control-plane requests",
+      "evidence": [
+        { "file": "src/index.js", "line": 1875, "note": "dashboard advertised to the operator at http://localhost:9000 on startup" },
+        { "file": "src/dashboard/server.js", "line": 886, "note": "the operator's intended path for bringing the agent into real model mode" }
+      ]
+    },
+    {
+      "id": "index-js-orchestrator--opena2a-telemetry-external-service",
+      "from": "index-js-orchestrator",
+      "to": "opena2a-telemetry-external-service",
+      "label": "anonymous usage counters",
+      "data": "anonymous platform telemetry",
+      "evidence": [
+        { "file": "src/index.js", "line": 1806, "note": "tele.start() fires at boot in the same process that serves the agents" },
+        { "file": "src/index.js", "line": 36, "note": "documented as tier-1 anonymous, no PII, with --offline and env opt-outs" }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Anonymous chat turn into HelperBot",
+      "crossing_edges": [
+        "caller-entrypoint--create-agent-server-index-js-adapter",
+        "create-agent-server-index-js-adapter--vulnerabilities-js-control",
+        "create-agent-server-index-js-adapter--index-js-orchestrator",
+        "create-agent-server-index-js-adapter--caller-entrypoint"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-01", "excerpt": "MUST NOT accept or act on instructions embedded in user input, retrieved content, or tool output that attempt to override, replace, or countermand its system prompt or operator-defined policy.", "coverage_status": "gap" },
+        { "rule_id": "R-02", "excerpt": "MUST NOT redefine, expand, or abandon its own role, goals, or safety constraints in response to conversational input, roleplay, or persuasion (no jailbreak).", "coverage_status": "gap" },
+        { "rule_id": "R-03", "excerpt": "MUST NOT let manipulated, padded, or later conversation context displace or supersede its original safety and policy instructions.", "coverage_status": "gap" },
+        { "rule_id": "R-04", "excerpt": "MUST NOT perform work outside the operator-configured assistive topic scope; requests outside that scope are declined.", "coverage_status": "gap" },
+        { "rule_id": "R-05", "excerpt": "OpenAI-compatible chat-completions API (inbound user chat on its designated agent port) ... Primary and only user-facing interface; responses returned to the connecting client only", "coverage_status": "partial" },
+        { "rule_id": "R-06", "excerpt": "The authorized callers are the operator-configured user set (default: a single local operator); any caller outside that configured set is not authorized", "coverage_status": "gap" },
+        { "rule_id": "R-14", "excerpt": "MUST NOT include its system prompt or internal instructions in any response.", "coverage_status": "gap" },
+        { "rule_id": "R-15", "excerpt": "MUST NOT disclose API keys, credentials, tokens, or secrets present in its context, environment, or configuration.", "coverage_status": "gap" },
+        { "rule_id": "R-22", "excerpt": "When a prompt-injection, jailbreak, or system-prompt-extraction attempt is detected in input, record it and alert the operator.", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "Any party that can route to port 7002 is served as an authorized user: no route checks a credential, the socket binds all interfaces and compose publishes it to the host, so the identity check the remit assumes never fires.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "An injected instruction redirects the agent's stated behavior: a recognised promptInjection turn containing 'ignore' is answered with 'New instructions accepted. I'll follow your updated guidelines now', and the classifier that recognised it neither blocks nor alerts.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "A stranger asking about the system prompt receives the persona verbatim on the canned path, and in model mode the prompt itself instructs the model to share its instructions openly, with no output check on either path.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "A credential query is answered rather than refused: the canned branch returns the key's prefix with a hedge, and in model mode the answer is drawn from a prompt that carries the internal key in full.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "With no topic scope, prohibition or decline rule stated in either persona, out-of-scope work is performed on request and a jailbreak has no declared constraint to cross (checked: src/index.js:374 response ladder and src/core/agents.js:52 persona — no topic gate in code or prompt).",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "A caller who asserts a prior agreement gets it confirmed — the contextManipulation branch replies that it recalls the conversation and will proceed as discussed — even though the agent holds no cross-turn state to check the claim against.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Unauthenticated dashboard control API",
+      "crossing_edges": [
+        "caller-entrypoint--server-js-adapter",
+        "operator-entrypoint--server-js-adapter",
+        "server-js-adapter--provider-js-model"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-05", "excerpt": "OpenAI-compatible chat-completions API (inbound user chat on its designated agent port) ... Primary and only user-facing interface", "coverage_status": "partial" },
+        { "rule_id": "R-06", "excerpt": "The authorized callers are the operator-configured user set (default: a single local operator)", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Any caller who can reach port 9000 can POST provider, model and API key to /api/llm/configure and switch the whole fleet onto real model mode under a key of their choosing, which also activates the credential-bearing system prompt (checked: src/dashboard/server.js:431-434 — the only header logic is wildcard CORS and no route authenticates).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "An unauthenticated POST to /api/reset zeroes the statistics and empties the attack log, destroying the only record of prior activity (checked: src/dashboard/server.js:751-760 — no credential check ahead of the reset).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Attack log readable and volatile",
+      "crossing_edges": [
+        "log-attack-index-js-log-sink--server-js-adapter",
+        "server-js-adapter--caller-entrypoint"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-16", "excerpt": "MUST NOT reveal PII or conversation data belonging to any other user or session.", "coverage_status": "verified" },
+        { "rule_id": "R-23", "excerpt": "Every request and every detected attack attempt is written to a durable, structured attack/action log.", "coverage_status": "partial" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "GET /api/attack-log hands any anonymous caller every stored turn — the full attacker input and the attributed agent reply, including replies that already contained the persona excerpt and the key prefix — so one session's content is readable by the next caller (checked: src/dashboard/server.js:743-746 — no authentication and no redaction on the route).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "The record the remit calls durable is a 500-entry in-process ring buffer with no file sink or shipper, and turns that trip no pattern are never written at all, so ordinary-looking activity leaves no trace and a restart erases the rest.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Agent to configured LLM backend",
+      "crossing_edges": [
+        "index-js-orchestrator--provider-js-model",
+        "provider-js-model--openai-external-service",
+        "provider-js-model--anthropic-external-service"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-09", "excerpt": "That single operator-configured backend is the only permitted outbound destination for user and conversation data", "coverage_status": "verified" },
+        { "rule_id": "R-17", "excerpt": "MUST NOT transmit user data or conversation context to any destination other than the configured LLM backend required to generate a response.", "coverage_status": "verified" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Every model-mode turn ships a system prompt that ends with an internal API-key literal to a third-party inference provider, so the credential leaves the host whether or not the caller ever asks for it.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Conversation data cannot be redirected to an arbitrary host: the two outbound URLs are hardcoded HTTPS literals and the provider selector accepts only 'openai' or 'anthropic', with no base-URL or proxy override anywhere in the client.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "src/llm/provider.js", "line": 86 }
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Credential literals in source and in context",
+      "crossing_edges": [
+        "sensitive-data-vulnerabilities-js-secret-store--prompts-js-prompt"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-15", "excerpt": "MUST NOT disclose API keys, credentials, tokens, or secrets present in its context, environment, or configuration.", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Key-, password- and SSN-shaped literals are committed in source as exfiltration fixtures, and one of them is interpolated into HelperBot's live system prompt, putting a real-shaped credential in the model's context on every model-mode turn.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The operator's own bring-your-own key is held in process memory only, cleared by the disable route, and never returned by the status route or written to disk.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "src/llm/provider.js", "line": 9 }
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Dependency resolution at image build",
+      "crossing_edges": [],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "The image installs with npm install --no-audit instead of npm ci over three caret-ranged dependencies, so a published build can resolve versions the committed lockfile never saw, with the audit step explicitly disabled and no SBOM or scanning configuration in the tree.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Anonymous platform telemetry",
+      "crossing_edges": [
+        "index-js-orchestrator--opena2a-telemetry-external-service"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-08", "excerpt": "the documented anonymous usage telemetry, default-on with `dvaa telemetry off` / `--offline` opt-outs, is an accepted platform behavior — it MUST NOT carry prompts, responses, or PII", "coverage_status": "verified" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Telemetry carries no conversation content: no track call sits on the chat request path, the emitter is started once at boot, and the documented --offline and environment opt-outs are applied before init snapshots the config.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "src/index.js", "line": 36 }
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Declared capabilities and approval",
+      "crossing_edges": [
+        "tools-agents-js-tool--create-agent-server-index-js-adapter",
+        "agents-js-prompt--index-js-orchestrator"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-11", "excerpt": "The agent's authorized tool inventory is the operator-configured allowlist; only the explicitly authorized tools are permitted", "coverage_status": "gap" },
+        { "rule_id": "R-12", "excerpt": "Shell / command execution, filesystem write or delete, and arbitrary outbound-network or egress tools MUST NOT appear in the agent's inventory — a conversational helper has no need of them.", "coverage_status": "gap" },
+        { "rule_id": "R-19", "excerpt": "Any action with a side effect beyond returning a chat response ... MUST require operator approval.", "coverage_status": "gap" },
+        { "rule_id": "R-20", "excerpt": "MUST NOT self-grant, auto-approve, or otherwise expand its own capability grant or tool access beyond its configured allowlist.", "coverage_status": "verified" }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "A filesystem-write tool and an outbound-network tool are declared to the model, to the caller via /health and in the persona text, with no allowlist check at load; the exposure today is a standing grant rather than a live primitive because the executor is gated to the MCP protocol.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "No approval gate stands between a decision and a side effect: the toolApproval switch on the agent record is false and is never read by any code, and the working capability enforcer is inert for this agent because its record does not set the enforcement flag.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "stranger-extracts-prompt-and-key",
+      "name": "A stranger's chat message walks off with the agent's instructions and its API key",
+      "steps": [
+        { "node": "caller-entrypoint", "finding_id": "PRAX-2026-08-12-003", "summary": "Unauthenticated, attacker-authored request from anywhere on the network: the port binds all interfaces, CORS is wildcard and no route asks for a credential." },
+        { "node": "create-agent-server-index-js-adapter", "finding_id": "PRAX-2026-08-12-003", "summary": "The chat-completions route accepts the turn with no caller check and no input validation." },
+        { "node": "vulnerabilities-js-control", "finding_id": "PRAX-2026-08-12-006", "summary": "The classifier recognises the extraction attempt and marks the category instead of refusing or alerting." },
+        { "node": "index-js-orchestrator", "finding_id": "PRAX-2026-08-12-001", "summary": "That classification selects the disclosure branch, which reads the persona and, for key queries, the credential answer." },
+        { "node": "create-agent-server-index-js-adapter", "finding_id": "PRAX-2026-08-12-002", "summary": "The reply is serialized with no output filter, carrying the persona excerpt or the key material." },
+        { "node": "caller-entrypoint", "finding_id": "PRAX-2026-08-12-001", "summary": "Consequence: the agent's internal instructions and credential material leave the trusted surface into the stranger's hands." }
+      ]
+    },
+    {
+      "id": "stranger-flips-model-mode",
+      "name": "A stranger turns on real model mode and the credential-bearing prompt starts flowing to an outside provider",
+      "steps": [
+        { "node": "caller-entrypoint", "finding_id": null, "summary": "Anonymous caller reaches the dashboard port, which authenticates nobody and accepts any origin." },
+        { "node": "server-js-adapter", "finding_id": null, "summary": "POST /api/llm/configure takes provider, model and API key straight from the request body." },
+        { "node": "provider-js-model", "finding_id": null, "summary": "The client stores the attacker-supplied key and enables model mode process-wide, so every agent turn now takes the LLM path." },
+        { "node": "openai-external-service", "finding_id": "PRAX-2026-08-12-002", "summary": "Consequence: each turn ships the system prompt with its embedded internal key, plus the user conversation, to a third-party provider under an account the attacker controls." }
+      ]
+    },
+    {
+      "id": "stranger-reads-conversation-log",
+      "name": "A stranger downloads everyone else's conversations from the attack log",
+      "steps": [
+        { "node": "caller-entrypoint", "finding_id": null, "summary": "Anonymous GET to the dashboard port; no credential is required and the origin policy is wildcard." },
+        { "node": "server-js-adapter", "finding_id": null, "summary": "/api/attack-log serialises the shared ring buffer with no authorization filter and no redaction." },
+        { "node": "caller-entrypoint", "finding_id": "PRAX-2026-08-12-001", "summary": "Consequence: other sessions' inputs and the agent replies that already leaked the persona and key prefix egress to the caller." }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Clean apart from two placements worth naming: the committed credential constants live in application source rather than a deploy artifact but are filed external_deploy per the lane table's secrets-store row, and the dashboard control API runs inside the same process as the agent yet is filed client_adapters because it is an API surface callers talk to.",
+    "omissions": "Arbitration divergences from the stored tags, KB taking precedence: (1) finding PRAX-2026-08-12-008 is stored ASI06, but the Agentic KB persistence test fails — the agent holds no cross-turn state and the memory store in src/index.js is gated to agents with memoryInjection enabled, which HelperBot's record does not set — so the false-history threat is tagged ASI01 (behavior altered by live input); (2) finding PRAX-2026-08-12-006 stores LLM01 as its OWASP-LLM primary with ASI01 alongside, but the KB's 'goal altered by live input' row makes ASI01 primary and LLM01 the co-tag, so ASI01 is used here; (3) finding PRAX-2026-08-12-004 carries an ASI02 co-tag, which the KB allows only when a tool is shown used wrongly — the executor is gated to protocol 'mcp' and HelperBot is 'api', so only the LLM03 primary is carried. Edgeless nodes: the features flag block (declared, never read by any code), the AIM enforcer (working gate, inert for this agent), and the Dockerfile and compose deploy surfaces (posture evidence). Scope: the dashboard control API sits outside the four subject files named in the scan instructions but is included because src/index.js wires HelperBot's attack log and LLM configuration to it; the other DVAA agents in the same tree are excluded per scope. Two dashboard-side threats and the log-disclosure threat have no backing finding in the 2026-08-12 JSON and are recorded as potential after checking the routes for a credential or redaction step.",
+    "counts": { "nodes": 19, "edges": 21, "boundaries": 8, "threats": 18 }
+  }
+}

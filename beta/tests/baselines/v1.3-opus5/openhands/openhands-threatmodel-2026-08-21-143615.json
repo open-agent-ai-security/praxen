@@ -1,0 +1,1136 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "openhands",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/openhands"
+  },
+  "analysis_ref": "openhands-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "OpenHands ships an always-on control plane for an automated software engineer. A Python API server, driven by a browser client and a REST API, provisions sandboxes, holds the operator's git provider tokens and LLM credentials, composes each task's context from user settings and registered skill sources, and then dispatches the work to a separate agent server that actually runs shell commands, edits files and browses the web. Two trust surfaces carry almost all of the risk: the front door, where every API route takes its authentication from a single helper that contributes nothing at all unless one environment variable is set; and the handoff into the sandbox, which is where the server's credentials cross into a process running model-generated code.\n\nThe front door is the thing to fix first. In the shipped default, any caller who can reach the published port is served as the operator, and the reference container publishes the port bound to every interface. From there a stranger can start conversations, provision sandboxes, read and rewrite user settings, and drive the git tools using the operator's tokens. Three consequences follow directly. On a host-direct runtime the agent-server child is handed the whole server environment, so a task an outsider started runs with every provider token, JWT secret and cloud credential the server holds. A settings write can register a skill marketplace that is cloned and loaded into the agent's context at the start of every later conversation, which is persistent poisoning that outlives the session that planted it. And the pull-request tool surface is attached to the application through a mount that escapes the route-level check entirely, so it stays open even in a deployment that has correctly set its session key, letting commits and pull requests land on the operator's repositories under the operator's identity. Setting the session key, configuring explicit cross-origin allowlists, and moving the search-proxy mount under the authenticated router are the concrete fixes.\n\nAfter that, the secrets and the record. Provider tokens and user secrets are written to disk as unencrypted JSON in a directory the reference deployment bind-mounts from the host, even though the codebase already owns the encryption primitive to protect them; and git clone failures are returned verbatim to API callers, where the clone URL those diagnostics echo carries the provider token in it. The monitoring half is detection with no response: rejected logins and rejected sandbox callbacks are logged with good structured context, but nothing counts repeated failures, nothing alerts an operator, and both JSON formatting and on-disk persistence are off by default, so there is no durable audit record of who did what. Worth protecting from regression is everything downstream of the front door, which is genuinely well built: session keys bound to a running sandbox and to its owner, cross-user ownership checks on callbacks, argument-injection-hardened git invocation, a deliberately narrow crypto algorithm allowlist, and a secret-redaction filter actually attached to the log handlers.",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "unauthenticated-caller-entrypoint",
+      "name": "Unauthenticated network caller",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any caller that can reach the published port; in the shipped default it is served with the same authority as the operator.",
+      "evidence": [
+        { "file": "openhands/app_server/utils/dependencies.py", "line": 23, "note": "get_dependencies() returns an empty list when SESSION_API_KEY is unset, so router-level protection is absent by default" },
+        { "file": "containers/app/Dockerfile", "line": 105, "note": "the shipped image runs uvicorn bound to 0.0.0.0:3000, so the surface is reachable from any interface" },
+        { "file": "openhands/app_server/user_auth/default_user_auth.py", "line": 32, "note": "DefaultUserAuth.get_user_id returns None for every request, so no caller identity is ever established" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint",
+      "name": "Self-hosting operator",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The human operator driving the Agent Canvas client and REST API; in OSS mode the deployment models exactly one such local identity.",
+      "evidence": [
+        { "file": "openhands/app_server/user_auth/default_user_auth.py", "line": 24, "note": "DefaultUserAuth is the OSS user-auth implementation — a single-tenant local operator with no multi-tenancy" },
+        { "file": "openhands/app_server/user/user_router.py", "line": 21, "note": "/users/me is the operator-identity endpoint the client calls" }
+      ]
+    },
+    {
+      "id": "marketplace-repository-entrypoint",
+      "name": "Third-party marketplace repository",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "External git repositories registered as skill/plugin marketplaces; their skill files are cloned and their instructions loaded into the agent's context.",
+      "evidence": [
+        { "file": "openhands/app_server/settings/settings_models.py", "line": 742, "note": "registered_marketplaces persists arbitrary sources; entries with auto_load=True have their plugins loaded automatically at conversation start" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 284, "note": "the registered source is git-cloned server-side by the marketplace preview endpoint" },
+        { "file": "openhands/app_server/app_conversation/app_conversation_service_base.py", "line": 149, "note": "registered marketplaces are resolved to authenticated URLs and handed to the agent server for cloning at every conversation start" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter",
+      "name": "V1 API surface (/api/v1)",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The aggregate REST surface: thirteen routers for conversations, sandboxes, secrets, settings, users, skills, git, events, webhooks, web-client and config.",
+      "evidence": [
+        { "file": "openhands/app_server/v1_router.py", "line": 24, "note": "APIRouter(prefix='/api/v1') including thirteen sub-routers, lines 24-37" },
+        { "file": "openhands/app_server/app.py", "line": 71, "note": "app.include_router(v1_router.router) mounts the whole surface" },
+        { "file": "openhands/app_server/web_client/web_client_router.py", "line": 6, "note": "the web-client config router inside the V1 surface is deliberately public and declares no dependencies" }
+      ]
+    },
+    {
+      "id": "status-router-py-adapter",
+      "name": "Status / probe router",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Root-mounted liveness, readiness and /server_info endpoints declared with no dependencies argument of any kind.",
+      "evidence": [
+        { "file": "openhands/app_server/status/status_router.py", "line": 5, "note": "router = APIRouter(tags=['Status']) — declared without a dependencies argument" },
+        { "file": "openhands/app_server/status/status_router.py", "line": 28, "note": "get_server_info returns get_system_info() — CPU count, memory usage and runtime details" },
+        { "file": "openhands/app_server/app.py", "line": 72, "note": "included at the application root rather than through v1_router, so get_dependencies() never applies" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator",
+      "name": "FastAPI application root",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The composition root: constructs the app with the MCP mount, includes the V1 and status routers, and installs the middleware stack.",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 54, "note": "FastAPI(...) constructed at lines 54-60 with routes=[Mount(path='/mcp', app=mcp_app)] — a route tree outside the V1 router" },
+        { "file": "openhands/app_server/app.py", "line": 71, "note": "V1 router and status router included as separate trees, lines 71-72" },
+        { "file": "openhands/app_server/app.py", "line": 81, "note": "only LocalhostCORSMiddleware, CacheControlMiddleware and RateLimitMiddleware are installed, lines 81-86" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator",
+      "name": "Conversation orchestrator",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "Assembles each conversation start request — settings, secrets, skills, marketplaces, LLM and MCP configuration, trace metadata — and dispatches it to the sandboxed agent server.",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 382, "note": "_start_app_conversation, lines 382-520 — resolves the sandbox, builds the start request and POSTs it to the agent server with the sandbox session key" },
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1481, "note": "_add_system_mcp_servers wires the default OpenHands MCP server into every conversation's agent configuration" },
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1939, "note": "composed marketplaces are resolved and their skills loaded onto the request, lines 1939-1990" }
+      ]
+    },
+    {
+      "id": "dependencies-py-control",
+      "name": "Router auth dependency helper",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The single helper every V1 router takes its authentication from; contributes no dependency at all unless SESSION_API_KEY is set, and in SaaS mode only a non-failing header declaration.",
+      "evidence": [
+        { "file": "openhands/app_server/utils/dependencies.py", "line": 9, "note": "_SESSION_API_KEY read once from the environment; check_session_api_key at lines 13-20 is the only enforcing path" },
+        { "file": "openhands/app_server/utils/dependencies.py", "line": 23, "note": "get_dependencies(), lines 23-32 — empty list when the key is unset; SAAS branch appends only a non-failing APIKeyHeader" },
+        { "file": "openhands/app_server/user/user_router.py", "line": 13, "note": "comment crediting SetAuthCookieMiddleware with 'the actual protection' — that class is not present in this source tree" }
+      ]
+    },
+    {
+      "id": "middleware-py-control",
+      "name": "HTTP middleware stack",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Request-path middleware: a CORS origin gate that reflects any origin when no allowlist is configured, a cache-control header setter, and an in-process rate limiter keyed on the immediate socket address.",
+      "evidence": [
+        { "file": "openhands/app_server/middleware.py", "line": 37, "note": "is_allowed_origin, lines 37-52 — returns True for any origin when no allowlist and no regex are configured; constructor at 26-35 sets allow_credentials=True with wildcard methods and headers" },
+        { "file": "openhands/app_server/config.py", "line": 103, "note": "get_default_permitted_cors_origins returns [] unless a legacy variable is set, so the permissive branch is the shipped default" },
+        { "file": "openhands/app_server/middleware.py", "line": 95, "note": "InMemoryRateLimiter.__call__, lines 95-112 — buckets by request.client.host in a process-local dict with no forwarding-header handling; exemptions at 134-141" }
+      ]
+    },
+    {
+      "id": "session-auth-py-control",
+      "name": "Sandbox session-key validation",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Validates X-Session-API-Key, rejects keys whose sandbox is not RUNNING, and verifies that the sandbox belongs to the calling user.",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/session_auth.py", "line": 37, "note": "validate_session_key, lines 37-100 — 401 on missing/unknown key and on any sandbox not in RUNNING state" },
+        { "file": "openhands/app_server/sandbox/session_auth.py", "line": 103, "note": "validate_session_key_ownership, lines 103-139 — 403 when the sandbox owner differs from the authenticated caller" },
+        { "file": "openhands/app_server/sandbox/sandbox_router.py", "line": 188, "note": "get_secret_value is gated on this dependency before returning any raw secret to the sandbox" }
+      ]
+    },
+    {
+      "id": "sensitive-data-filter-logger-py-control",
+      "name": "Log secret-redaction filter",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Filter that scrubs credential-shaped environment values and known key patterns from log records; attached to the handlers rather than merely defined.",
+      "evidence": [
+        { "file": "openhands/app_server/utils/logger.py", "line": 248, "note": "SensitiveDataFilter builds its value list from environment keys containing SECRET/_KEY/_CODE/_TOKEN, then applies named patterns and the SDK redactors" },
+        { "file": "openhands/app_server/utils/logger.py", "line": 392, "note": "the filter instance is attached to the JSON and console handlers and to the logger itself, lines 392-411" }
+      ]
+    },
+    {
+      "id": "jwt-service-py-control",
+      "name": "JWT / JWE token service",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Signs and verifies the scoped access tokens the sandbox presents for secret retrieval, with a deliberately narrow two-element JWE algorithm allowlist; also exposes symmetric encrypt/decrypt helpers the secrets store never calls.",
+      "evidence": [
+        { "file": "openhands/app_server/services/jwt_service.py", "line": 27, "note": "_JWE_REGISTRY constructed with algorithms=['dir','A256GCM'] so any other alg or enc is rejected at parse time" },
+        { "file": "openhands/app_server/services/jwt_service.py", "line": 253, "note": "encrypt_value/decrypt_value, lines 253-277 — an available JWE wrapper with legacy Fernet fallback" },
+        { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 646, "note": "verify_jws_token gates the /webhooks/secrets retrieval path on a signed, user- and provider-scoped token" }
+      ]
+    },
+    {
+      "id": "settings-json-datastore",
+      "name": "Persisted user settings (settings.json)",
+      "lane": "agent_core",
+      "kind": "datastore",
+      "description": "The default per-user settings document — LLM profiles, disabled skills, registered marketplaces, custom MCP configuration — whose contents are re-read into every later conversation's agent configuration.",
+      "evidence": [
+        { "file": "openhands/app_server/settings/file_settings_store.py", "line": 15, "note": "FileSecretsStore's sibling: settings persist to the fixed path 'settings.json' in the file store; store() at line 48 writes the merged document" },
+        { "file": "openhands/app_server/server_config/server_config.py", "line": 17, "note": "FileSettingsStore is the configured default settings_store_class" },
+        { "file": "openhands/app_server/settings/settings_models.py", "line": 742, "note": "registered_marketplaces with auto_load semantics is one of the persisted fields" },
+        { "file": "openhands/app_server/settings/settings_router.py", "line": 224, "note": "store_settings deep-merges an arbitrary caller-supplied payload into the persisted document, lines 224-300" }
+      ]
+    },
+    {
+      "id": "mcp-router-py-mcp-server",
+      "name": "OpenHands MCP server (/mcp)",
+      "lane": "tools_mcp",
+      "kind": "mcp_server",
+      "description": "FastMCP server mounted through the FastAPI constructor: five git pull/merge-request creation tools plus a proxied Tavily search namespace holding the server's search key.",
+      "evidence": [
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 43, "note": "mcp_server = FastMCP('mcp', mask_error_details=True) — the tool surface the sandbox calls" },
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 49, "note": "init_tavily_proxy mounts Tavily's MCP server under the 'tavily' namespace using the server-held API key, lines 49-75" },
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 147, "note": "create_pr and its four sibling tools resolve provider tokens server-side and act on the repo named in the tool argument, lines 147-460" },
+        { "file": "openhands/app_server/app.py", "line": 59, "note": "attached via routes=[Mount(path='/mcp', app=mcp_app)], entirely outside v1_router" }
+      ]
+    },
+    {
+      "id": "sandbox-service-py-tool",
+      "name": "Sandbox provisioning (Docker / remote)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The isolated-sandbox provisioning family: creates the agent-server container, mints its 32-byte session key, sets its webhook callback URL and mounts the configured volumes.",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/sandbox_service.py", "line": 112, "note": "SandboxService ABC and start_sandbox at 157 define the family; SESSION_API_KEY_VARIABLE and WEBHOOK_CALLBACK_VARIABLE at 25-26 are how the child is bootstrapped" },
+        { "file": "openhands/app_server/sandbox/docker_sandbox_service.py", "line": 405, "note": "the default implementation: env assembly at 405-450 then containers.run(...) at 485-510 with the spec's initial_env, port mappings and volume binds" },
+        { "file": "openhands/app_server/sandbox/remote_sandbox_service.py", "line": 107, "note": "RemoteSandboxService — the cloud backend member of the same family, selected by RUNTIME=remote" }
+      ]
+    },
+    {
+      "id": "process-sandbox-service-py-tool",
+      "name": "Host-direct sandbox (ProcessSandboxService)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The host-direct runtime: spawns the agent server as a local subprocess whose environment is a copy of the app server's own.",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/process_sandbox_service.py", "line": 114, "note": "_start_agent_process, lines 114-148 — env = os.environ.copy(), then env.update(spec.initial_env) and subprocess.Popen(cmd, env=env, cwd=working_dir)" },
+        { "file": "openhands/app_server/config.py", "line": 333, "note": "ProcessSandboxServiceInjector is selected whenever RUNTIME is 'local' or 'process', lines 333-341" }
+      ]
+    },
+    {
+      "id": "sandbox-spec-service-py-control",
+      "name": "Agent-container environment allowlist",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "Deliberate two-prefix allowlist plus an explicit JSON override map governing which environment variables the Docker agent-server container inherits.",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/sandbox_spec_service.py", "line": 151, "note": "AUTO_FORWARD_PREFIXES = ('LLM_', 'LMNR_') — only these prefixes are forwarded; get_agent_server_env at 154-210 applies them plus OH_AGENT_SERVER_ENV overrides" },
+        { "file": "openhands/app_server/sandbox/docker_sandbox_spec_service.py", "line": 35, "note": "get_default_sandbox_specs composes the container's initial_env from a fixed literal set plus that allowlist, lines 35-52" },
+        { "file": "openhands/app_server/sandbox/sandbox_spec_service.py", "line": 120, "note": "get_agent_server_image pins the spec image to the installed SDK version, rewriting a mismatched tag rather than honouring it" }
+      ]
+    },
+    {
+      "id": "skills-router-py-tool",
+      "name": "Marketplace skills endpoint",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Server-side git clone of registered marketplace repositories to preview their skill metadata; returns the raw git stderr for failed clones to the caller.",
+      "evidence": [
+        { "file": "openhands/app_server/user/skills_router.py", "line": 32, "note": "router declared with dependencies=get_dependencies(), so it inherits the default-empty protection" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 284, "note": "git clone run in argv form with a bare -- separator and a timeout; the clone-failure branch at 292 returns result.stderr verbatim" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 334, "note": "the /marketplace-skills endpoint drives the clones and collects those strings into the response errors array, lines 334-380" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 257, "note": "a marketplace source on a host no configured provider matches is refused rather than fetched" }
+      ]
+    },
+    {
+      "id": "agent-server-tool",
+      "name": "Sandboxed agent server",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The dispatched agent process or container that runs the model loop and executes shell, editor and browser actions; the app server starts it, sends it the conversation, and receives its callbacks.",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/sandbox_models.py", "line": 27, "note": "AGENT_SERVER — the exposed-URL name for the agent-server surface the app server talks to" },
+        { "file": "openhands/app_server/sandbox/process_sandbox_service.py", "line": 130, "note": "the command that launches it: python -m <agent_server_module> --port <port>" },
+        { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 259, "note": "valid_sandbox authenticates the agent server's inbound callbacks by its session API key, lines 259-306" }
+      ]
+    },
+    {
+      "id": "secrets-json-secret-store",
+      "name": "Secrets store (secrets.json)",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "The configured default at-rest store: git provider tokens and user custom secrets serialised with secrets exposed and written as plain JSON to the persistence directory.",
+      "evidence": [
+        { "file": "openhands/app_server/secrets/file_secrets_store.py", "line": 32, "note": "store(), lines 32-34 — model_dump_json(context={'expose_secrets': True}) written straight to the fixed path 'secrets.json'" },
+        { "file": "openhands/app_server/server_config/server_config.py", "line": 20, "note": "FileSecretsStore is the configured default secret_store_class" },
+        { "file": "openhands/app_server/config.py", "line": 78, "note": "the persistence directory defaults to ~/.openhands, lines 78-88" }
+      ]
+    },
+    {
+      "id": "logger-py-log-sink",
+      "name": "Application logger",
+      "lane": "external_deploy",
+      "kind": "log_sink",
+      "description": "The single logging surface for security-relevant events; JSON formatting and file persistence are both off by default and there is no audit stream distinct from application logging.",
+      "evidence": [
+        { "file": "openhands/app_server/utils/logger.py", "line": 30, "note": "LOG_JSON defaults to False" },
+        { "file": "openhands/app_server/utils/logger.py", "line": 55, "note": "LOG_TO_FILE defaults to str(LOG_LEVEL == 'DEBUG'), so on-disk persistence is off in a normal deployment, lines 55-59" },
+        { "file": "openhands/app_server/utils/logger.py", "line": 312, "note": "get_file_handler — daily rotation with backupCount=7, wired only when the default-off file path is taken, lines 312-336" }
+      ]
+    },
+    {
+      "id": "laminar-external-service",
+      "name": "Laminar trace service",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Third-party LLM observability service; the conversation start request carries the user's email as the trace identity along with repository, branch and commit metadata.",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 387, "note": "laminar_user_id = get_user_email() or user_id, lines 387-391, repeated at 2170 and 2441; forwarded on the request body at 511-512" },
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1840, "note": "_build_observability_metadata attaches repo, branch, git provider and post-clone commit to the trace, lines 1840-1867" },
+        { "file": "openhands/app_server/user/user_context.py", "line": 35, "note": "get_user_email docstring flags the value as PII that may be forwarded to third-party observability services" }
+      ]
+    },
+    {
+      "id": "provider-py-external-service",
+      "name": "Git provider integrations",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The git provider family (GitHub, GitLab, Bitbucket, Bitbucket DC, Azure DevOps, Forgejo) and the handler that builds authenticated clone URLs with the provider token in the URL userinfo.",
+      "evidence": [
+        { "file": "openhands/app_server/integrations/service_types.py", "line": 16, "note": "ProviderType enumerates the supported git providers" },
+        { "file": "openhands/app_server/integrations/provider.py", "line": 510, "note": "get_authenticated_git_url builds credentials into the remote URL userinfo per provider, lines 510-600" },
+        { "file": "openhands/app_server/integrations/provider.py", "line": 566, "note": "an http:// host raises rather than silently downgrading unless ALLOW_INSECURE_GIT_ACCESS is set, lines 566-576" }
+      ]
+    },
+    {
+      "id": "docker-compose-yml-deploy-surface",
+      "name": "Reference container deployment",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The shipped compose deployment and the image it builds: publishes the control plane on port 3000, bind-mounts the host Docker socket and the persistence directory, and runs the server as root on all interfaces.",
+      "evidence": [
+        { "file": "docker-compose.yml", "line": 14, "note": "ports 3000:3000 published; volumes at 18-21 bind /var/run/docker.sock, ~/.openhands and the workspace base into the container" },
+        { "file": "containers/app/Dockerfile", "line": 100, "note": "USER root at line 100 and CMD uvicorn ... --host 0.0.0.0 --port 3000 at line 105" }
+      ]
+    },
+    {
+      "id": "pyproject-toml-deploy-surface",
+      "name": "Dependency and build posture",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Repo supply-chain posture: a mostly exactly-pinned manifest with about eighteen unconstrained direct dependencies, Dependabot as the only scanner, and SBOM/provenance enabled for the enterprise image only.",
+      "evidence": [
+        { "file": "pyproject.toml", "line": 24, "note": "dependencies list, lines 24-108 — anthropic[vertex], boto3, fastapi, uvicorn, google-cloud-aiplatform, google-genai, json-repair and types-toml carry no constraint; asyncpg, kubernetes, sqlalchemy, mcp and lmnr are floor-pinned" },
+        { "file": ".github/dependabot.yml", "line": 1, "note": "six ecosystem entries with a security-updates group — the only scanner configuration in the repository" },
+        { "file": ".github/workflows/ghcr-build.yml", "line": 42, "note": "provenance and sbom are set true for the enterprise image only; the build_app job leaves both at their false default, lines 42-43" },
+        { "file": ".github/workflows/npm-publish-ui.yml", "line": 69, "note": "third-party actions are pinned to full 40-character commit SHAs across the workflow set" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "unauthenticated-caller-entrypoint--v1-router-py-adapter",
+      "from": "unauthenticated-caller-entrypoint",
+      "to": "v1-router-py-adapter",
+      "label": "unauthenticated API requests",
+      "data": "attacker-authored HTTP requests and JSON bodies",
+      "evidence": [
+        { "file": "openhands/app_server/utils/dependencies.py", "line": 23, "note": "no dependency is contributed unless SESSION_API_KEY is set, so the request reaches every handler unauthenticated" },
+        { "file": "openhands/app_server/v1_router.py", "line": 24, "note": "all thirteen routers hang off this one prefix" }
+      ]
+    },
+    {
+      "id": "operator-entrypoint--v1-router-py-adapter",
+      "from": "operator-entrypoint",
+      "to": "v1-router-py-adapter",
+      "label": "operator UI and API calls",
+      "data": "operator task instructions, settings and secrets",
+      "evidence": [
+        { "file": "openhands/app_server/user/user_router.py", "line": 21, "note": "/users/me — the operator identity call the client makes first" },
+        { "file": "openhands/app_server/web_client/web_client_router.py", "line": 9, "note": "the client bootstraps from the public web-client config endpoint" }
+      ]
+    },
+    {
+      "id": "unauthenticated-caller-entrypoint--status-router-py-adapter",
+      "from": "unauthenticated-caller-entrypoint",
+      "to": "status-router-py-adapter",
+      "label": "probe and /server_info requests",
+      "data": "request in, host resource inventory back",
+      "evidence": [
+        { "file": "openhands/app_server/status/status_router.py", "line": 28, "note": "get_server_info returns system info to any caller" },
+        { "file": "openhands/app_server/app.py", "line": 72, "note": "included at the application root, outside the V1 dependency path" }
+      ]
+    },
+    {
+      "id": "unauthenticated-caller-entrypoint--mcp-router-py-mcp-server",
+      "from": "unauthenticated-caller-entrypoint",
+      "to": "mcp-router-py-mcp-server",
+      "label": "unauthenticated MCP tool calls",
+      "data": "tool invocations with attacker-chosen arguments",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 59, "note": "the /mcp mount is a constructor route, so router-level dependencies never apply to it" },
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 147, "note": "the mounted tools act on the repository named in the call" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator--middleware-py-control",
+      "from": "app-py-orchestrator",
+      "to": "middleware-py-control",
+      "label": "every request through middleware",
+      "data": "raw HTTP request and origin header",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 81, "note": "LocalhostCORSMiddleware, CacheControlMiddleware and RateLimitMiddleware installed here, lines 81-86" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator--v1-router-py-adapter",
+      "from": "app-py-orchestrator",
+      "to": "v1-router-py-adapter",
+      "label": "dispatch to V1 routes",
+      "data": "HTTP request after middleware",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 71, "note": "app.include_router(v1_router.router)" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator--status-router-py-adapter",
+      "from": "app-py-orchestrator",
+      "to": "status-router-py-adapter",
+      "label": "dispatch to status routes",
+      "data": "HTTP request after middleware",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 72, "note": "app.include_router(health_router) at the application root" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator--mcp-router-py-mcp-server",
+      "from": "app-py-orchestrator",
+      "to": "mcp-router-py-mcp-server",
+      "label": "dispatch to the /mcp mount",
+      "data": "MCP protocol requests",
+      "evidence": [
+        { "file": "openhands/app_server/app.py", "line": 33, "note": "mcp_app = mcp_server.http_app(path='/mcp', stateless_http=True), mounted at line 59" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--dependencies-py-control",
+      "from": "v1-router-py-adapter",
+      "to": "dependencies-py-control",
+      "label": "router-level auth check",
+      "data": "X-Session-API-Key header, when present",
+      "evidence": [
+        { "file": "openhands/app_server/v1_router.py", "line": 25, "note": "eleven of the thirteen routers declare dependencies=get_dependencies()" },
+        { "file": "openhands/app_server/utils/dependencies.py", "line": 13, "note": "check_session_api_key raises 401 on mismatch — the only enforcing branch" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--live-status-app-conversation-service-py-orchestrator",
+      "from": "v1-router-py-adapter",
+      "to": "live-status-app-conversation-service-py-orchestrator",
+      "label": "start / message conversation",
+      "data": "task text, selected repository, system message suffix",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/app_conversation_router.py", "line": 364, "note": "POST /app-conversations calls start_app_conversation on the service" },
+        { "file": "openhands/app_server/app_conversation/app_conversation_router.py", "line": 441, "note": "send-message is a documented thin proxy forwarding follow-up text to the agent server" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--settings-json-datastore",
+      "from": "v1-router-py-adapter",
+      "to": "settings-json-datastore",
+      "label": "settings write",
+      "data": "caller-supplied settings payload including marketplace registrations",
+      "evidence": [
+        { "file": "openhands/app_server/settings/settings_router.py", "line": 224, "note": "store_settings deep-merges an arbitrary payload and persists it, lines 224-300" },
+        { "file": "openhands/app_server/settings/file_settings_store.py", "line": 48, "note": "store() serialises the merged document to settings.json" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--secrets-json-secret-store",
+      "from": "v1-router-py-adapter",
+      "to": "secrets-json-secret-store",
+      "label": "secrets and provider-token writes",
+      "data": "git provider tokens and custom secret values",
+      "evidence": [
+        { "file": "openhands/app_server/secrets/secrets_router.py", "line": 249, "note": "create_custom_secret and the provider-token endpoints persist through the configured store" },
+        { "file": "openhands/app_server/secrets/file_secrets_store.py", "line": 32, "note": "the store writes them to secrets.json with secrets exposed" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--skills-router-py-tool",
+      "from": "v1-router-py-adapter",
+      "to": "skills-router-py-tool",
+      "label": "marketplace preview requests",
+      "data": "marketplace registrations (source, ref, repo path)",
+      "evidence": [
+        { "file": "openhands/app_server/v1_router.py", "line": 33, "note": "skills_router is one of the thirteen included routers" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 334, "note": "POST /skills/marketplace-skills takes a caller-supplied list of registrations" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--sandbox-service-py-tool",
+      "from": "v1-router-py-adapter",
+      "to": "sandbox-service-py-tool",
+      "label": "sandbox create / pause / resume / delete",
+      "data": "sandbox lifecycle commands",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/sandbox_router.py", "line": 75, "note": "POST /sandboxes starts a sandbox; pause, resume and delete follow at 84-155" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--session-auth-py-control",
+      "from": "v1-router-py-adapter",
+      "to": "session-auth-py-control",
+      "label": "sandbox-scoped key validation",
+      "data": "X-Session-API-Key presented by a sandbox",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/sandbox_router.py", "line": 157, "note": "the sandbox secret endpoints depend on _valid_sandbox_from_session_key" },
+        { "file": "openhands/app_server/sandbox/session_auth.py", "line": 37, "note": "validate_session_key is the shared enforcement point" }
+      ]
+    },
+    {
+      "id": "settings-json-datastore--live-status-app-conversation-service-py-orchestrator",
+      "from": "settings-json-datastore",
+      "to": "live-status-app-conversation-service-py-orchestrator",
+      "label": "persisted settings re-enter each conversation",
+      "data": "LLM profiles, disabled skills, marketplace registrations, custom MCP config",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1939, "note": "composed marketplaces resolved from the stored settings at conversation start, lines 1939-1990" },
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1511, "note": "_merge_custom_mcp_config merges the stored MCP configuration into the agent's server list" }
+      ]
+    },
+    {
+      "id": "secrets-json-secret-store--live-status-app-conversation-service-py-orchestrator",
+      "from": "secrets-json-secret-store",
+      "to": "live-status-app-conversation-service-py-orchestrator",
+      "label": "secrets loaded for the start request",
+      "data": "git provider tokens and custom secret sources",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1162, "note": "_setup_secrets_for_git_providers assembles the conversation's secret sources" },
+        { "file": "openhands/app_server/secrets/file_secrets_store.py", "line": 17, "note": "load() reads the persisted provider tokens back out of secrets.json" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator--sandbox-service-py-tool",
+      "from": "live-status-app-conversation-service-py-orchestrator",
+      "to": "sandbox-service-py-tool",
+      "label": "resolve or start a sandbox",
+      "data": "sandbox spec id and lifecycle request",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 922, "note": "_wait_for_sandbox_start drives the sandbox service before the conversation is dispatched" },
+        { "file": "openhands/app_server/sandbox/sandbox_service.py", "line": 157, "note": "start_sandbox is the family entry point" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator--process-sandbox-service-py-tool",
+      "from": "live-status-app-conversation-service-py-orchestrator",
+      "to": "process-sandbox-service-py-tool",
+      "label": "start a host-direct sandbox",
+      "data": "sandbox spec and working directory",
+      "evidence": [
+        { "file": "openhands/app_server/config.py", "line": 333, "note": "on RUNTIME local/process this implementation is what the orchestrator's sandbox service resolves to, lines 333-341" },
+        { "file": "openhands/app_server/sandbox/process_sandbox_service.py", "line": 114, "note": "_start_agent_process spawns the agent server locally" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator--agent-server-tool",
+      "from": "live-status-app-conversation-service-py-orchestrator",
+      "to": "agent-server-tool",
+      "label": "conversation start request",
+      "data": "task text, repo selection, skills, secrets, LLM and MCP configuration",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 497, "note": "the assembled start request is POSTed to the agent server with the sandbox session key, lines 497-520" },
+        { "file": "openhands/app_server/app_conversation/app_conversation_service_base.py", "line": 149, "note": "marketplace sources and skills are loaded onto the same request" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator--laminar-external-service",
+      "from": "live-status-app-conversation-service-py-orchestrator",
+      "to": "laminar-external-service",
+      "label": "trace identity and metadata",
+      "data": "user email, repository, branch and commit",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 511, "note": "laminar_user_id is placed on the request body so the agent server can set the trace user id" },
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1840, "note": "repo, branch, provider and commit are attached as trace metadata" }
+      ]
+    },
+    {
+      "id": "live-status-app-conversation-service-py-orchestrator--mcp-router-py-mcp-server",
+      "from": "live-status-app-conversation-service-py-orchestrator",
+      "to": "mcp-router-py-mcp-server",
+      "label": "wire the default MCP server",
+      "data": "MCP server URL and conversation header",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1481, "note": "_add_system_mcp_servers adds the default OpenHands MCP server (including the Tavily proxy) to every conversation, lines 1481-1509" }
+      ]
+    },
+    {
+      "id": "sandbox-spec-service-py-control--sandbox-service-py-tool",
+      "from": "sandbox-spec-service-py-control",
+      "to": "sandbox-service-py-tool",
+      "label": "allowlisted container environment",
+      "data": "the two-prefix env subset plus explicit overrides",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/docker_sandbox_spec_service.py", "line": 35, "note": "the spec's initial_env is built from the allowlist and handed to the sandbox service" },
+        { "file": "openhands/app_server/sandbox/docker_sandbox_service.py", "line": 417, "note": "env_vars = sandbox_spec.initial_env.copy() — the container gets only what the spec carries" }
+      ]
+    },
+    {
+      "id": "sandbox-service-py-tool--agent-server-tool",
+      "from": "sandbox-service-py-tool",
+      "to": "agent-server-tool",
+      "label": "launch the agent container",
+      "data": "session key, callback URL, allowlisted environment, volume mounts",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/docker_sandbox_service.py", "line": 485, "note": "containers.run(...) starts the agent-server image with that environment and those volumes, lines 485-510" },
+        { "file": "openhands/app_server/sandbox/sandbox_service.py", "line": 25, "note": "SESSION_API_KEY_VARIABLE and WEBHOOK_CALLBACK_VARIABLE are how the child is bootstrapped" }
+      ]
+    },
+    {
+      "id": "process-sandbox-service-py-tool--agent-server-tool",
+      "from": "process-sandbox-service-py-tool",
+      "to": "agent-server-tool",
+      "label": "spawn the agent process on the host",
+      "data": "the app server's entire environment plus the session key",
+      "evidence": [
+        { "file": "openhands/app_server/sandbox/process_sandbox_service.py", "line": 125, "note": "env = os.environ.copy() then subprocess.Popen(cmd, env=env, cwd=working_dir), lines 125-148" }
+      ]
+    },
+    {
+      "id": "agent-server-tool--mcp-router-py-mcp-server",
+      "from": "agent-server-tool",
+      "to": "mcp-router-py-mcp-server",
+      "label": "agent tool calls",
+      "data": "model-chosen tool arguments (repo, branch, title, body, search query)",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/live_status_app_conversation_service.py", "line": 1505, "note": "the agent is given the /mcp/mcp URL as its default MCP server" },
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 147, "note": "create_pr reads the conversation header off the incoming tool request" }
+      ]
+    },
+    {
+      "id": "agent-server-tool--v1-router-py-adapter",
+      "from": "agent-server-tool",
+      "to": "v1-router-py-adapter",
+      "label": "sandbox webhook callbacks",
+      "data": "conversation updates, events, secret lookups",
+      "evidence": [
+        { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 362, "note": "/webhooks/conversations and /webhooks/events/{id} receive the agent server's callbacks" },
+        { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 259, "note": "valid_sandbox resolves the calling sandbox strictly from its session API key" }
+      ]
+    },
+    {
+      "id": "v1-router-py-adapter--jwt-service-py-control",
+      "from": "v1-router-py-adapter",
+      "to": "jwt-service-py-control",
+      "label": "verify scoped secret-access token",
+      "data": "signed access token carrying user id and provider type",
+      "evidence": [
+        { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 646, "note": "verify_jws_token on the /webhooks/secrets path before any secret is resolved" },
+        { "file": "openhands/app_server/services/jwt_service.py", "line": 27, "note": "the JWE registry pins the permitted algorithms" }
+      ]
+    },
+    {
+      "id": "mcp-router-py-mcp-server--provider-py-external-service",
+      "from": "mcp-router-py-mcp-server",
+      "to": "provider-py-external-service",
+      "label": "open pull / merge requests",
+      "data": "provider token plus repo, branch, title and body",
+      "evidence": [
+        { "file": "openhands/app_server/mcp/mcp_router.py", "line": 181, "note": "the resolved provider token constructs GithubServiceImpl, which then calls create_pr" },
+        { "file": "openhands/app_server/integrations/service_types.py", "line": 16, "note": "ProviderType names the destinations reachable this way" }
+      ]
+    },
+    {
+      "id": "skills-router-py-tool--provider-py-external-service",
+      "from": "skills-router-py-tool",
+      "to": "provider-py-external-service",
+      "label": "authenticated marketplace clone",
+      "data": "clone URL with the provider token in its userinfo",
+      "evidence": [
+        { "file": "openhands/app_server/user/skills_router.py", "line": 241, "note": "get_authenticated_git_url is resolved for the registered marketplace source before cloning" },
+        { "file": "openhands/app_server/integrations/provider.py", "line": 510, "note": "the URL builder embeds the token in the userinfo component" }
+      ]
+    },
+    {
+      "id": "marketplace-repository-entrypoint--skills-router-py-tool",
+      "from": "marketplace-repository-entrypoint",
+      "to": "skills-router-py-tool",
+      "label": "cloned marketplace contents",
+      "data": "third-party manifest and skill files",
+      "evidence": [
+        { "file": "openhands/app_server/user/skills_router.py", "line": 284, "note": "git clone of the registered source into a temporary directory" },
+        { "file": "openhands/app_server/user/skills_router.py", "line": 334, "note": "the manifest and skill metadata are parsed and returned to the caller" }
+      ]
+    },
+    {
+      "id": "marketplace-repository-entrypoint--agent-server-tool",
+      "from": "marketplace-repository-entrypoint",
+      "to": "agent-server-tool",
+      "label": "auto-loaded skill instructions",
+      "data": "third-party skill markdown that becomes agent context",
+      "evidence": [
+        { "file": "openhands/app_server/app_conversation/app_conversation_service_base.py", "line": 149, "note": "authenticated marketplace sources are passed to the agent server's skills endpoint at conversation start" },
+        { "file": "openhands/app_server/settings/settings_models.py", "line": 742, "note": "auto_load registrations have their plugins loaded automatically at conversation start" }
+      ]
+    },
+    {
+      "id": "app-py-orchestrator--logger-py-log-sink",
+      "from": "app-py-orchestrator",
+      "to": "logger-py-log-sink",
+      "label": "application and security event logging",
+      "data": "auth rejections, webhook rejections, request errors",
+      "evidence": [
+        { "file": "openhands/app_server/utils/logger.py", "line": 392, "note": "the shared openhands logger with its handlers is the single sink for these records" },
+        { "file": "openhands/app_server/sandbox/session_auth.py", "line": 77, "note": "session-key rejections terminate at this logger" }
+      ]
+    },
+    {
+      "id": "sensitive-data-filter-logger-py-control--logger-py-log-sink",
+      "from": "sensitive-data-filter-logger-py-control",
+      "to": "logger-py-log-sink",
+      "label": "redaction applied to records",
+      "data": "log records with credential-shaped values scrubbed",
+      "evidence": [
+        { "file": "openhands/app_server/utils/logger.py", "line": 396, "note": "the filter is attached to the JSON and console handlers and to the logger itself, lines 396-411" }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Network caller into the control plane",
+      "crossing_edges": [
+        "unauthenticated-caller-entrypoint--v1-router-py-adapter",
+        "operator-entrypoint--v1-router-py-adapter",
+        "agent-server-tool--v1-router-py-adapter"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-05", "excerpt": "Authenticated operator session only", "coverage_status": "gap" },
+        { "rule_id": "R-09", "excerpt": "any identity not authenticated through that provider is not a trusted operator", "coverage_status": "gap" },
+        { "rule_id": "R-27", "excerpt": "Exposing the Agent Server or any agent-run service to an untrusted network without authentication", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "Eleven of the thirteen V1 routers take their protection from a helper that contributes no dependency unless SESSION_API_KEY is set, and the default user auth resolves every request to a null user id, so any caller reaching the port is served as the operator.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "With no CORS origins configured — the shipped default — the middleware reflects every origin while still allowing credentials, so any web page a logged-in operator visits can drive the control plane on their behalf even in a deployment that has correctly set a session key.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "D",
+          "owasp": "LLM06",
+          "summary": "The only request ceiling is an in-process limiter keyed on the immediate socket address, so behind the reverse proxy this service is normally deployed under every client collapses into one bucket and each replica enforces its own independent limit.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "A sandbox whose agent has been hijacked could try to impersonate another sandbox's callbacks; the webhook path resolves the caller strictly from the session API key it presents, scopes every subsequent action to that sandbox's owner, and rejects a conversation whose owner or sandbox does not match.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/event_callback/webhook_router.py", "line": 259 }
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Root-mounted surfaces outside the V1 auth path",
+      "crossing_edges": [
+        "unauthenticated-caller-entrypoint--status-router-py-adapter",
+        "unauthenticated-caller-entrypoint--mcp-router-py-mcp-server"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-05", "excerpt": "Authenticated operator session only", "coverage_status": "gap" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The status router is declared with no dependencies argument and included at the application root, so /server_info returns host CPU, memory and runtime inventory to unauthenticated callers even where a session key is configured.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The MCP surface — five git pull-request tools plus a proxied search namespace holding the operator's search credential — is attached through the FastAPI constructor rather than the V1 router, so router-level dependencies can never apply and the capability stays reachable in a correctly configured deployment.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Orchestrator dispatch into the sandboxed agent",
+      "crossing_edges": [
+        "live-status-app-conversation-service-py-orchestrator--agent-server-tool",
+        "live-status-app-conversation-service-py-orchestrator--sandbox-service-py-tool",
+        "live-status-app-conversation-service-py-orchestrator--process-sandbox-service-py-tool",
+        "agent-server-tool--mcp-router-py-mcp-server"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-02", "excerpt": "MUST NEVER treat instructions embedded in retrieved or external content", "coverage_status": "enp" }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Operator task text, the selected repository, and marketplace-sourced skill files are concatenated into one start request with no provenance labelling separating trusted instruction from third-party content before the agent's tool loop sees it (checked: live_status_app_conversation_service.py:1869-1990 and app_conversation_service_base.py:139-165 — no labelling or sanitisation step on the assembly path).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI04",
+          "summary": "The sandbox spec resolves to the agent-server image bundled with the installed SDK, and a mismatched image tag is rewritten to the bundled version with a warning rather than honoured, so the executing runtime cannot be silently swapped through configuration.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/sandbox/sandbox_spec_service.py", "line": 120 }
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Provider tokens and secrets at rest and in the sandbox child",
+      "crossing_edges": [
+        "v1-router-py-adapter--secrets-json-secret-store",
+        "secrets-json-secret-store--live-status-app-conversation-service-py-orchestrator",
+        "process-sandbox-service-py-tool--agent-server-tool",
+        "skills-router-py-tool--provider-py-external-service"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-17", "excerpt": "a host-direct child MUST NOT be handed the full ambient credential environment", "coverage_status": "partial" },
+        { "rule_id": "R-19", "excerpt": "Raw secret values MUST flow only in the SaaS→sandbox direction and MUST NEVER be returned to the SDK / client channel.", "coverage_status": "verified" },
+        { "rule_id": "R-20", "excerpt": "Unmasked secrets MUST NEVER be served without the required authentication", "coverage_status": "verified" },
+        { "rule_id": "R-21", "excerpt": "Sensitive information MUST NEVER be exposed in error messages, logs, or agent output.", "coverage_status": "partial" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "The host-direct sandbox copies the app server's entire environment into the agent-server child, so model-generated code on a local runtime inherits every provider token, JWT secret and cloud credential the server holds — while the Docker path in the same codebase forwards only a two-prefix allowlist.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The default secrets store serialises git provider tokens and user custom secrets with secrets exposed and writes them as unencrypted JSON into the persistence directory the reference compose file bind-mounts from the host, even though the codebase already owns a JWE wrapper that this path never calls.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Marketplace git clone and checkout failures are returned to the API caller verbatim, and the authenticated clone URL those diagnostics can echo embeds the provider token in its userinfo; the redaction filter that covers the log path is not applied to HTTP responses.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "A leaked sandbox session key could be replayed to read raw secret values; the shared validator rejects any key whose sandbox is not RUNNING and returns 403 when the sandbox belongs to a different user, so a key stops working the moment its sandbox pauses.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/sandbox/session_auth.py", "line": 76 }
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "A provider token could be carried over cleartext transport to an http:// git host; building an authenticated URL against such a host raises rather than silently downgrading unless the operator explicitly sets the insecure-access variable.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/integrations/provider.py", "line": 566 }
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Persisted settings that re-enter every later conversation",
+      "crossing_edges": [
+        "v1-router-py-adapter--settings-json-datastore",
+        "settings-json-datastore--live-status-app-conversation-service-py-orchestrator"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-02", "excerpt": "MUST NEVER treat instructions embedded in retrieved or external content", "coverage_status": "enp" },
+        { "rule_id": "R-03", "excerpt": "MUST NEVER redefine its own goals, security constraints, or approval requirements on the basis of such untrusted content", "coverage_status": "enp" }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "A settings write can register a marketplace with auto-load set, and every conversation started afterwards asks the agent server to clone that source and load its skill instructions into the agent's context — a change that outlives the session that made it (checked: settings_router.py:224-300 and marketplace_composition.py:206-270 — name-collision validation only, no provenance, pin or content check).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Custom MCP server entries persisted in the same settings document are merged into every conversation's agent configuration, so a stored entry adds tool surfaces the operator never approved for subsequent runs (checked: live_status_app_conversation_service.py:1511-1545 — a merge with no allowlist or approval step).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "state-commit",
+      "name": "Agent-initiated writes to operator git repositories",
+      "crossing_edges": [
+        "agent-server-tool--mcp-router-py-mcp-server",
+        "mcp-router-py-mcp-server--provider-py-external-service"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-12", "excerpt": "The agent may act only on the specific git repositories, organizations, and integrations the operator has authorized", "coverage_status": "verified" },
+        { "rule_id": "R-24", "excerpt": "Operations that write to or modify state outside the sandboxed workspace or the authorized repositories.", "coverage_status": "enp" },
+        { "rule_id": "R-25", "excerpt": "Destructive version-control operations — force-push, branch or repository deletion, and history rewrites.", "coverage_status": "enp" }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The pull-request tools resolve the operator's provider token server-side and act on whatever repository the call names, and because their mount escapes the router dependency the caller need not be the operator — so commits and pull requests can land on the operator's repositories under the operator's identity.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "The destructive version-control operations the remit gates behind human approval — force-push, branch or repository deletion, history rewrite — have no representation in this tree; the exposed tool set is creation-only.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/mcp/mcp_router.py", "line": 147 }
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Dependencies, image build, and third-party skill sources",
+      "crossing_edges": [
+        "marketplace-repository-entrypoint--skills-router-py-tool",
+        "marketplace-repository-entrypoint--agent-server-tool"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-04", "excerpt": "MUST be pinned to a full-length commit SHA", "coverage_status": "verified" }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "About eighteen direct dependencies carry no version constraint in an otherwise strictly pinned manifest, no SBOM or provenance is produced for the primary app image, and Dependabot is the only scanner in the repository, so a newly disclosed vulnerability in a pinned transitive dependency surfaces only if Dependabot happens to raise it.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI04",
+          "summary": "A registered marketplace source is cloned and its skill files become agent instructions with no signature, hash or mandatory commit pin, so a source rewritten after registration silently changes what the agent is told to do on the next run (checked: skill_loader.py:511-560 and settings_models.py:742-750 — ref is optional and never verified).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "A compromised third-party GitHub Action could reach the build; every action outside the first-party namespaces is pinned to a full 40-character commit SHA, with Dependabot covering pip, npm, github-actions and docker across six directory entries.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": ".github/workflows/npm-publish-ui.yml", "line": 69 }
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Traces, analytics, and the application log",
+      "crossing_edges": [
+        "live-status-app-conversation-service-py-orchestrator--laminar-external-service",
+        "app-py-orchestrator--logger-py-log-sink",
+        "sensitive-data-filter-logger-py-control--logger-py-log-sink"
+      ],
+      "remit_rules": [
+        { "rule_id": "R-22", "excerpt": "Credentials or sensitive project data MUST NEVER be transmitted to any destination outside the authorized counterparties.", "coverage_status": "partial" },
+        { "rule_id": "R-30", "excerpt": "Alert on repeated authentication / authorization failures", "coverage_status": "gap" },
+        { "rule_id": "R-31", "excerpt": "Record security-relevant events — authentication events, tool invocations, and outbound posts to external services", "coverage_status": "partial" }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Three call paths prefer the user's email over the internal id as the trace identity sent to a third-party observability service, and the same traces carry repository, branch and commit metadata, so both PII and project identity leave the authorized counterparty set whenever the integration is configured.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "Security-relevant events go to the ordinary application logger with JSON formatting and file persistence both default-off, and there is no audit stream distinct from application logging, so a normal deployment keeps only coloured plaintext on stdout.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "Session-key rejections, sandbox ownership mismatches and webhook rejections are all logged with structured context, but nothing counts repeated failures per source and no alert sink is wired to any rejection path, so the remit's alert-without-halting obligation has a detection half and no response half.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Credential values could be written into log records; a redaction filter is attached to the handlers and to the logger itself, scrubbing credential-shaped environment values, twelve named key patterns, and API-key literals.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/app_server/utils/logger.py", "line": 248 },
+          "remainder": "the filter derives its value list from the process environment, so a custom secret that exists only in secrets.json or in a request body is never in that list and is not scrubbed"
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Product analytics could carry user identity to a third-party ingest host without permission; every capture call returns immediately when the resolved context is not consented, and person profiles are disabled outside SaaS mode.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": { "file": "openhands/analytics/analytics_service.py", "line": 83 }
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "stranger-to-host-credentials",
+      "name": "A stranger on the network runs code that holds every credential the server has",
+      "steps": [
+        {
+          "node": "unauthenticated-caller-entrypoint",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "Untrusted because no credential is required and no identity is established: the router dependency list is empty unless a session key variable is set, and the shipped image binds every interface."
+        },
+        {
+          "node": "v1-router-py-adapter",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "The conversation and sandbox endpoints serve the caller with the same authority the operator would have."
+        },
+        {
+          "node": "live-status-app-conversation-service-py-orchestrator",
+          "finding_id": null,
+          "summary": "The caller's task text becomes a conversation start request and the orchestrator provisions a sandbox to run it."
+        },
+        {
+          "node": "process-sandbox-service-py-tool",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "On a host-direct runtime the agent server is spawned with a copy of the app server's entire environment, with no allowlist between them."
+        },
+        {
+          "node": "agent-server-tool",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "Model-generated shell then runs on the host holding the JWT secret, every git provider token and any cloud credential the server was started with."
+        }
+      ]
+    },
+    {
+      "id": "stranger-plants-persistent-skill-source",
+      "name": "A stranger plants a skill source that steers every future task",
+      "steps": [
+        {
+          "node": "unauthenticated-caller-entrypoint",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "Untrusted because the settings endpoint accepts an anonymous caller: its router derives protection from the same default-empty dependency list."
+        },
+        {
+          "node": "v1-router-py-adapter",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "The settings write is accepted and deep-merged into the stored document with only a name-collision check."
+        },
+        {
+          "node": "settings-json-datastore",
+          "finding_id": null,
+          "summary": "A marketplace registration with auto-load set is persisted, so the change survives the request, the session and a restart."
+        },
+        {
+          "node": "live-status-app-conversation-service-py-orchestrator",
+          "finding_id": null,
+          "summary": "Every conversation started afterwards composes that marketplace and asks the agent server to clone it and load its skills."
+        },
+        {
+          "node": "agent-server-tool",
+          "finding_id": null,
+          "summary": "Attacker-authored skill instructions enter the agent's context on each later task and direct its shell, editor and pull-request tools."
+        }
+      ]
+    },
+    {
+      "id": "stranger-to-operator-repositories",
+      "name": "A stranger gets commits and pull requests onto the operator's repositories",
+      "steps": [
+        {
+          "node": "unauthenticated-caller-entrypoint",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "Untrusted because the caller proves nothing: conversation creation is reachable without any identity."
+        },
+        {
+          "node": "v1-router-py-adapter",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "A conversation is started against a repository the operator has authorised, using the operator's stored provider tokens."
+        },
+        {
+          "node": "live-status-app-conversation-service-py-orchestrator",
+          "finding_id": null,
+          "summary": "The orchestrator wires the default MCP server into that conversation and dispatches the task."
+        },
+        {
+          "node": "agent-server-tool",
+          "finding_id": null,
+          "summary": "The agent follows the attacker's task and reaches for its pull-request tooling."
+        },
+        {
+          "node": "mcp-router-py-mcp-server",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "The tool surface sits on a mount outside the router dependency, and resolves the operator's provider token server-side for whatever repository the call names."
+        },
+        {
+          "node": "provider-py-external-service",
+          "finding_id": null,
+          "summary": "Commits and pull requests land on the operator's git provider under the operator's identity — an external, durable effect."
+        }
+      ]
+    },
+    {
+      "id": "poisoned-marketplace-to-operator-repositories",
+      "name": "A rewritten third-party skill repository turns the agent against the operator's code",
+      "steps": [
+        {
+          "node": "marketplace-repository-entrypoint",
+          "finding_id": null,
+          "summary": "Untrusted because it is third-party content with unlabelled provenance: the registration carries an optional, unverified ref and no signature or hash, so the source can be rewritten after it was approved."
+        },
+        {
+          "node": "agent-server-tool",
+          "finding_id": null,
+          "summary": "Its skill files are cloned at conversation start and their instruction text becomes part of the agent's context alongside the operator's own task."
+        },
+        {
+          "node": "mcp-router-py-mcp-server",
+          "finding_id": null,
+          "summary": "The redirected agent calls the pull-request tooling, which resolves the operator's provider token server-side."
+        },
+        {
+          "node": "provider-py-external-service",
+          "finding_id": null,
+          "summary": "Attacker-chosen changes are pushed and opened as pull requests on the operator's repositories."
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Two placements strained. The persisted settings document is app-server configuration rather than agent memory, but it is placed in agent_core because its contents (skills, marketplaces, custom MCP config) are re-read into every later conversation's agent context, which is the trust property that matters here. The sandboxed agent server is a separately deployed process, yet it sits in tools_mcp because within this snapshot's scope it is the code-execution surface the control plane invokes, not an independent external service.",
+    "omissions": "Arbitration divergence: the findings JSON tags PRAX-2026-08-12-005 with an agentic primary of ASI02 (Tool Misuse); under the current KB arbitration this is grant/gate evidence — a reachable ungated capability with no wrongful use evidenced — so the primary here is LLM03 (Excessive Agency), with ASI02 available only as a co-tag. The KB wins; the graph tags LLM03 at both boundaries where that finding is cited. No other stored tag disagreed with the KB. Scope-driven absences: the agentic core (controller / runtime / llm / mcp event loop), enterprise/, frontend/ and kind/ are outside the scan scope, so no model node and no model-egress boundary are emitted — the app server assembles and forwards LLM credentials and model metadata but makes no model call of its own (checked openhands/app_server/utils/llm.py, where LiteLLM is imported for the model catalogue only). For the same reason the remit's HMAC webhook-signature obligation is not attached to any boundary: the only webhook surface in this tree is the sandbox-to-app-server callback authenticated by session API key, while the git-provider webhook receivers that verify HMAC signatures live under the excluded enterprise/ tree. config.template.toml is named in the scan scope but no module under openhands/ reads it in this snapshot (it configures the legacy V0 core), so it is not modelled as a node. The PostHog analytics egress is covered by a threat on the telemetry-egress boundary but is collapsed into that boundary rather than given its own node, the consent gate being its only remit-relevant behaviour. Two nodes are deliberately edgeless: the reference container deployment and the dependency/build posture node, both repo- and deploy-posture evidence rather than data-flow participants.",
+    "counts": { "nodes": 25, "edges": 34, "boundaries": 8, "threats": 25 }
+  }
+}

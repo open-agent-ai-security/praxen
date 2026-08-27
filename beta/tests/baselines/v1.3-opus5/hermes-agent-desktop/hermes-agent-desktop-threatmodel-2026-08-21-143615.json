@@ -1,0 +1,1706 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "hermes-agent-desktop",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/hermes-agent-desktop"
+  },
+  "analysis_ref": "hermes-agent-desktop-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "Hermes is a single-operator personal agent with one shared core behind four front doors: a local CLI, a messaging gateway that speaks to roughly twenty-five chat platforms, a loopback HTTP API, and an Electron desktop app that launches and talks to that API. The core runs shell commands, executes Python, reads and writes files, fetches web pages, drives a browser, calls operator-installed MCP servers, and writes its own memory and skills. Two surfaces carry most of the risk: the messaging gateway, which decides whether a stranger's message becomes agent work, and the command approval gate, which decides whether the model's next instruction reaches the host shell. Everything the agent learns — memory entries, profile notes, self-authored skills — comes back into its own system prompt on the next run, so anything that lands there is durable.\n\nThe first thing to fix is that the approval gate stops running exactly where it matters least to notice and most to exploit. In any run that is not an interactive terminal session, a gateway session, or an explicit ask-mode session, every dangerous command that is not on the small catastrophic-command floor is approved automatically, and whole Python scripts are approved automatically too. Those same runs are the ones where fetched web pages, browser text, and MCP server replies flow back into the model held only by an advisory note telling it to treat the block as data. A single poisoned page an operator asks about can therefore end in a command on the host with nobody in the loop. Related: when the operator switches approvals to smart mode, a side model answers the destructive-command question in one word, and an approval also stands for the rest of the session.\n\nSecond, an enabled-but-unconfigured messaging adapter can serve anyone. Four of the platform adapters declare that they police their own access and then default that policy to open, which skips the gateway's otherwise solid default-deny; the stranger who gets through is treated as the operator, and can answer his own approval prompts. Third, the desktop installs and repairs the agent runtime by piping a script from a branch URL straight into a shell with no checksum or signature — the one part of the desktop that is not integrity-verified, in an app whose own binary is signed and notarized. Behind those, two lower-urgency items: official desktop builds send usage telemetry to a third-party endpoint unless the operator turns it off, and the skills the agent writes for itself are never scanned because that gate ships disabled. The controls that do exist here are genuinely good — an unbypassable catastrophic-command floor, an API server that refuses to start without a key, credential scrubbing that neither a skill nor the config file can override — which is why the fixes are narrow rather than structural.",
+  "lanes": [
+    "user_inputs",
+    "client_adapters",
+    "agent_core",
+    "tools_mcp",
+    "external_deploy"
+  ],
+  "nodes": [
+    {
+      "id": "operator-entrypoint",
+      "name": "Operator",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The single trusted operator who drives the agent from the local CLI or the desktop window.",
+      "evidence": [
+        {
+          "file": "hermes-agent-desktop-remit.md",
+          "line": 22,
+          "note": "Identity section names the single operator running the instance as owner; Hermes is declared single-tenant"
+        },
+        {
+          "file": "hermes-agent/cli.py",
+          "line": 15077,
+          "note": "cli.py main() is the operator's local entry into the agent"
+        }
+      ]
+    },
+    {
+      "id": "messaging-sender-entrypoint",
+      "name": "Messaging platform sender",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any third party who can DM or mention the bot on a connected chat platform; authorization is decided after the message arrives.",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 6609,
+          "note": "_is_user_authorized(source) resolves whether an inbound sender may be served at all"
+        },
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 855,
+          "note": "_is_dm_allowed(sender_id) decides at intake whether an arbitrary sender's DM is admitted"
+        }
+      ]
+    },
+    {
+      "id": "web-content-entrypoint",
+      "name": "Fetched web and browser content",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Page text, search results and browser DOM snapshots retrieved from the open web — authored by whoever controls the page, not by the operator.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/web_tools.py",
+          "line": 872,
+          "note": "web_extract_tool pulls arbitrary remote page content into the agent"
+        },
+        {
+          "file": "hermes-agent/tools/browser_tool.py",
+          "line": 2289,
+          "note": "browser_navigate drives a real browser to an arbitrary URL, whose page text later returns as a tool result"
+        },
+        {
+          "file": "hermes-agent/tools/url_safety.py",
+          "line": 1,
+          "note": "module exists precisely because a malicious prompt or page can steer where the agent fetches from"
+        }
+      ]
+    },
+    {
+      "id": "cli-py-client",
+      "name": "Hermes CLI / TUI",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "The interactive local command-line and terminal-UI surface the operator uses directly; sets the interactive flag that keeps approval prompting alive.",
+      "evidence": [
+        {
+          "file": "hermes-agent/cli.py",
+          "line": 15077,
+          "note": "main() is the CLI entry point that constructs and runs the agent"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1200,
+          "note": "HERMES_INTERACTIVE — set by the CLI — is what makes the approval path prompt rather than auto-approve"
+        }
+      ]
+    },
+    {
+      "id": "run-py-adapter",
+      "name": "Messaging gateway",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The gateway process that hosts ~25 platform adapters, authorizes callers default-deny, dispatches turns to the agent and resolves pending exec approvals per session.",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 1663,
+          "note": "GatewayRunner is the single process behind every messaging platform adapter"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 3192,
+          "note": "inbound events are checked against _is_user_authorized before any work is dispatched"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 6755,
+          "note": "with no allowlist configured, adapters advertising their own access policy are admitted before the default-deny return"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 14150,
+          "note": "/approve and /deny resolve a session's pending dangerous-command approval"
+        }
+      ]
+    },
+    {
+      "id": "wecom-py-adapter",
+      "name": "Self-policy chat adapters (WeCom family)",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "The four adapters (WeCom, Weixin, QQ Bot, Yuanbao) that declare they enforce their own access policy while defaulting that policy to open.",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 163,
+          "note": "dm_policy defaults to \"open\" when neither config nor env sets it"
+        },
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 850,
+          "note": "enforces_own_access_policy returns True unconditionally"
+        },
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 855,
+          "note": "_is_dm_allowed returns True for any sender unless dm_policy is disabled or allowlist"
+        }
+      ]
+    },
+    {
+      "id": "api-server-py-adapter",
+      "name": "OpenAI-compatible API server",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Gateway platform exposing an HTTP chat API on a loopback bind by default; refuses to start without an API key.",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/platforms/api_server.py",
+          "line": 4146,
+          "note": "connect() refuses to start when API_SERVER_KEY is unset, including loopback binds"
+        },
+        {
+          "file": "hermes-agent/gateway/platforms/api_server.py",
+          "line": 4155,
+          "note": "refuses to start network-accessible with a placeholder-strength key"
+        }
+      ]
+    },
+    {
+      "id": "main-index-ts-client",
+      "name": "Hermes Desktop (Electron)",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Electron app: hardened main/renderer split, launches the local hermes serve backend, manages runtime install and updates, and emits renderer telemetry.",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/main/index.ts",
+          "line": 242,
+          "note": "createWindow builds the desktop chat surface"
+        },
+        {
+          "file": "hermes-desktop/src/main/hermes.ts",
+          "line": 32,
+          "note": "LOCAL_API_URL points the app at the locally launched backend on 127.0.0.1:8642"
+        },
+        {
+          "file": "hermes-desktop/src/main/security.ts",
+          "line": 53,
+          "note": "hardenWebviewPreferences strips preload and forces sandbox/contextIsolation for attached web content"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator",
+      "name": "Agent conversation loop",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The tool-calling loop that drives one turn: model call, concurrent tool dispatch, retries, compression and post-turn memory/skill hooks; framework plumbing and cron/subagent runners fold in here.",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/conversation_loop.py",
+          "line": 351,
+          "note": "run_conversation is the single per-turn driver for every surface"
+        },
+        {
+          "file": "hermes-agent/agent/conversation_loop.py",
+          "line": 796,
+          "note": "the iteration-budget-bounded model/tool loop"
+        },
+        {
+          "file": "hermes-agent/agent/tool_executor.py",
+          "line": 110,
+          "note": "execute_tool_calls_concurrent dispatches the model's chosen tool calls"
+        }
+      ]
+    },
+    {
+      "id": "prompt-builder-py-prompt",
+      "name": "System prompt assembly",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "Assembles the system prompt from context files, memory snapshot, environment hints and installed skills.",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 43,
+          "note": "_scan_context_content gates repository context files on their way into the system prompt"
+        },
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 1039,
+          "note": "build_skills_system_prompt folds installed skill content into the prompt"
+        },
+        {
+          "file": "hermes-agent/run_agent.py",
+          "line": 2611,
+          "note": "AIAgent._build_system_prompt composes the assembled parts for the turn"
+        }
+      ]
+    },
+    {
+      "id": "threat-patterns-py-control",
+      "name": "Injection pattern scanner",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Shared regex threat-pattern library that blocks matching context files and replaces matching memory entries with placeholders before they enter the system prompt; regex-based, wired only to context and memory, not to tool results.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/threat_patterns.py",
+          "line": 1,
+          "note": "single source of truth for injection/promptware/exfil patterns, scoped all/context/strict"
+        },
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 57,
+          "note": "matching context files are replaced with a BLOCKED placeholder rather than loaded"
+        },
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 192,
+          "note": "memory entries are scanned at strict scope on load and blocked from the prompt snapshot"
+        }
+      ]
+    },
+    {
+      "id": "tool-dispatch-helpers-py-control",
+      "name": "Untrusted tool-result labeling",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Wraps results from an enumerated set of tools in an advisory untrusted-data delimiter; instruction-level only, covers four tool names/prefixes and skips results under 32 characters.",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 336,
+          "note": "make_tool_result_message is the single funnel every tool result passes through"
+        },
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 351,
+          "note": "_UNTRUSTED_TOOL_NAMES holds only web_extract and web_search; prefixes only browser_ and mcp_"
+        },
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 361,
+          "note": "_UNTRUSTED_WRAP_MIN_CHARS = 32 leaves short results unwrapped"
+        },
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 389,
+          "note": "the wrapper is prose telling the model to treat the block as data — no validation runs"
+        }
+      ]
+    },
+    {
+      "id": "approval-py-control",
+      "name": "Command and code-execution approval gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Combined pre-exec gate: unconditional hardline floor and sudo-stdin guard, then tirith plus a dangerous-pattern denylist and an operator prompt — but it returns approved without running any of the latter outside CLI/gateway/ask contexts.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1161,
+          "note": "check_all_command_guards is the single decision point for terminal commands"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1174,
+          "note": "hardline floor blocks catastrophic commands before yolo/mode/cron handling"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1206,
+          "note": "outside CLI/gateway/ask the function returns approved for every non-hardline dangerous command"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1518,
+          "note": "check_execute_code_guard returns approved for whole Python scripts on the same path"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 27,
+          "note": "yolo mode frozen at import so an in-process skill cannot switch approvals off"
+        }
+      ]
+    },
+    {
+      "id": "smart-approve-approval-py-control",
+      "name": "Smart approval (auxiliary-LLM verdict)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Opt-in approvals.mode=smart path that asks a side model to rule on a flagged command and, on APPROVE, grants standing session approval for every matched pattern key.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 878,
+          "note": "_smart_approve builds a prompt from the command text and maps a one-word answer to approve/deny/escalate"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1274,
+          "note": "on approve the handler calls approve_session for every warning key"
+        },
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 853,
+          "note": "mode defaults to manual, so this path is operator-enabled rather than shipped-on"
+        }
+      ]
+    },
+    {
+      "id": "memory-tool-py-memory",
+      "name": "Persistent memory and user profile",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "Agent-curated MEMORY.md / USER.md store that the agent writes during a turn and reads back into the system prompt on every later run.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 113,
+          "note": "MemoryStore owns the durable memory and user-profile entries"
+        },
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 163,
+          "note": "a frozen sanitized snapshot of both files is captured for system-prompt injection"
+        },
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 602,
+          "note": "memory_tool is the model-callable write path into that store"
+        }
+      ]
+    },
+    {
+      "id": "chat-completions-py-model",
+      "name": "LLM call (main and auxiliary)",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "The provider-agnostic chat-completions transport carrying the assembled prompt to the operator-configured endpoint, and the auxiliary side-LLM client used by curator, titles and smart approvals.",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/transports/chat_completions.py",
+          "line": 192,
+          "note": "build_kwargs assembles the chat.completions.create() request from messages and tool schemas"
+        },
+        {
+          "file": "hermes-agent/agent/transports/chat_completions.py",
+          "line": 545,
+          "note": "normalize_response converts the provider reply, including tool calls, back for the loop"
+        },
+        {
+          "file": "hermes-agent/agent/auxiliary_client.py",
+          "line": 4844,
+          "note": "call_llm is the side-LLM entry point used for auxiliary tasks including approval"
+        }
+      ]
+    },
+    {
+      "id": "terminal-tool-py-tool",
+      "name": "Terminal and code-execution tools",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Shell command execution and execute_code Python scripts, run through pluggable backends — local host by default, Docker/Singularity/Modal/Daytona/SSH optional.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/terminal_tool.py",
+          "line": 1721,
+          "note": "terminal_tool is the model-callable shell surface"
+        },
+        {
+          "file": "hermes-agent/tools/terminal_tool.py",
+          "line": 257,
+          "note": "delegates every command to the consolidated guard before execution"
+        },
+        {
+          "file": "hermes-agent/tools/code_execution_tool.py",
+          "line": 1104,
+          "note": "execute_code guards the whole script, then dispatches to local UDS or a remote backend"
+        },
+        {
+          "file": "hermes-agent/tools/environments/local.py",
+          "line": 9,
+          "note": "the default local backend runs commands as host subprocesses"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tool-py-mcp-server",
+      "name": "MCP client and connected servers",
+      "lane": "tools_mcp",
+      "kind": "mcp_server",
+      "description": "Connects to operator-installed MCP servers over stdio/HTTP/SSE, filters the subprocess environment, malware-checks npx/uvx packages, and registers server-declared tools into the model's schema.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/mcp_tool.py",
+          "line": 185,
+          "note": "stdio_client and the HTTP/SSE clients are the transports to third-party servers"
+        },
+        {
+          "file": "hermes-agent/tools/mcp_tool.py",
+          "line": 297,
+          "note": "_build_safe_env passes only baseline variables to stdio subprocesses"
+        },
+        {
+          "file": "hermes-agent/tools/mcp_tool.py",
+          "line": 1364,
+          "note": "check_package_for_malware runs before an npx/uvx server is spawned"
+        },
+        {
+          "file": "hermes-agent/tools/mcp_tool.py",
+          "line": 3260,
+          "note": "_scan_mcp_description is called on every server-declared tool description and its return value is discarded"
+        }
+      ]
+    },
+    {
+      "id": "web-tools-py-tool",
+      "name": "Web and browser ingestion tools",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "web_search, web_extract and the browser_* family — the tools that pull open-web content back into the conversation.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/web_tools.py",
+          "line": 765,
+          "note": "web_search_tool returns third-party search results"
+        },
+        {
+          "file": "hermes-agent/tools/web_tools.py",
+          "line": 872,
+          "note": "web_extract_tool returns the fetched page body"
+        },
+        {
+          "file": "hermes-agent/tools/browser_tool.py",
+          "line": 2489,
+          "note": "browser_snapshot returns page structure and text from a live browser session"
+        }
+      ]
+    },
+    {
+      "id": "skills-guard-py-control",
+      "name": "Skills Guard install scanner",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "Scans installable skill and plugin content against a trust-tier install policy; the agent-created tier only runs when skills.guard_agent_created is enabled, which is off by default.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/skills_guard.py",
+          "line": 39,
+          "note": "TRUSTED_REPOS defines which external sources get the relaxed tier"
+        },
+        {
+          "file": "hermes-agent/tools/skills_guard.py",
+          "line": 50,
+          "note": "INSTALL_POLICY blocks dangerous community content and asks on agent-created"
+        },
+        {
+          "file": "hermes-agent/tools/skills_guard.py",
+          "line": 57,
+          "note": "comment records that the agent-created gate only runs when skills.guard_agent_created is enabled (off by default)"
+        },
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 85,
+          "note": "the scan is skipped entirely when _guard_agent_created_enabled() is false"
+        }
+      ]
+    },
+    {
+      "id": "skill-manager-tool-py-datastore",
+      "name": "Self-authored skills store",
+      "lane": "tools_mcp",
+      "kind": "datastore",
+      "description": "On-disk skill directory the agent writes for itself and reads back into the system prompt on later runs.",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 476,
+          "note": "_create_skill writes a new SKILL.md into the skills directory"
+        },
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 717,
+          "note": "_write_file adds arbitrary supporting files to a skill"
+        },
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 1039,
+          "note": "installed skills are compiled into the system prompt for every subsequent run"
+        }
+      ]
+    },
+    {
+      "id": "installer-ts-deploy-surface",
+      "name": "Desktop runtime installer / updater",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "First-run and repair path that fetches the agent runtime install script from a branch URL and executes it on the operator's host.",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/main/installer.ts",
+          "line": 898,
+          "note": "curl piped into bash against a main-branch raw URL, spawned via bash -c"
+        },
+        {
+          "file": "hermes-desktop/src/main/installer.ts",
+          "line": 1001,
+          "note": "Windows wrapper fetches install.ps1 from the same branch URL, rewrites the BOM and invokes it"
+        }
+      ]
+    },
+    {
+      "id": "posthog-external-service",
+      "name": "PostHog analytics endpoint",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Third-party product-analytics destination that official desktop builds report screen views and feature usage to under a persistent anonymous id.",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/renderer/src/utils/analytics.ts",
+          "line": 5,
+          "note": "POSTHOG_HOST defaults to https://eu.i.posthog.com"
+        },
+        {
+          "file": "hermes-desktop/src/renderer/src/utils/analytics.ts",
+          "line": 49,
+          "note": "posthog.init sends to that host with a persistent anonymous identify()"
+        }
+      ]
+    },
+    {
+      "id": "env-secret-store",
+      "name": "Operator credential file (.env)",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "The HERMES_HOME .env file holding provider API keys and platform tokens, loaded into the agent process environment at start.",
+      "evidence": [
+        {
+          "file": "hermes-agent/hermes_cli/config.py",
+          "line": 534,
+          "note": "get_env_path resolves the credential file to HERMES_HOME/.env, separate from config.yaml"
+        },
+        {
+          "file": "hermes-agent/hermes_cli/env_loader.py",
+          "line": 238,
+          "note": "the user .env is loaded into the process environment with override"
+        }
+      ]
+    },
+    {
+      "id": "hermes-logging-py-log-sink",
+      "name": "Local rotating logs",
+      "lane": "external_deploy",
+      "kind": "log_sink",
+      "description": "agent.log / errors.log / gateway.log written through a redacting formatter as free-form text lines; nothing exports off-host.",
+      "evidence": [
+        {
+          "file": "hermes-agent/hermes_logging.py",
+          "line": 45,
+          "note": "_LOG_FORMAT is a printf-style prose line, not a structured record"
+        },
+        {
+          "file": "hermes-agent/hermes_logging.py",
+          "line": 222,
+          "note": "handlers are installed with RedactingFormatter for secret-like content"
+        },
+        {
+          "file": "hermes-agent/hermes_cli/dashboard_auth/audit.py",
+          "line": 1,
+          "note": "the only JSON-lines log in the tree covers dashboard auth events"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "operator-entrypoint--cli-py-client",
+      "from": "operator-entrypoint",
+      "to": "cli-py-client",
+      "label": "operator task text",
+      "data": "user text",
+      "evidence": [
+        {
+          "file": "hermes-agent/cli.py",
+          "line": 15077,
+          "note": "main() receives the operator's invocation and prompt"
+        }
+      ]
+    },
+    {
+      "id": "cli-py-client--conversation-loop-py-orchestrator",
+      "from": "cli-py-client",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "user turn into the loop",
+      "data": "user text",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/conversation_loop.py",
+          "line": 351,
+          "note": "run_conversation drives one user turn for every surface including the CLI"
+        }
+      ]
+    },
+    {
+      "id": "operator-entrypoint--main-index-ts-client",
+      "from": "operator-entrypoint",
+      "to": "main-index-ts-client",
+      "label": "chat input in the desktop window",
+      "data": "user text, attachments",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/main/index.ts",
+          "line": 242,
+          "note": "createWindow builds the chat surface the operator types into"
+        }
+      ]
+    },
+    {
+      "id": "main-index-ts-client--api-server-py-adapter",
+      "from": "main-index-ts-client",
+      "to": "api-server-py-adapter",
+      "label": "chat request to local backend",
+      "data": "user text, API key header",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/main/hermes.ts",
+          "line": 32,
+          "note": "LOCAL_API_URL targets 127.0.0.1:8642"
+        },
+        {
+          "file": "hermes-desktop/src/main/hermes.ts",
+          "line": 1052,
+          "note": "the desktop launches the gateway with API_SERVER_ENABLED forced true"
+        }
+      ]
+    },
+    {
+      "id": "api-server-py-adapter--run-py-adapter",
+      "from": "api-server-py-adapter",
+      "to": "run-py-adapter",
+      "label": "API session dispatched as a gateway platform",
+      "data": "user text, session identity",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/platforms/api_server.py",
+          "line": 4146,
+          "note": "the API server is a gateway platform adapter under gateway/platforms and starts inside the gateway process"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 3192,
+          "note": "gateway dispatch checks authorization then routes the turn to the agent"
+        }
+      ]
+    },
+    {
+      "id": "messaging-sender-entrypoint--run-py-adapter",
+      "from": "messaging-sender-entrypoint",
+      "to": "run-py-adapter",
+      "label": "inbound platform message",
+      "data": "untrusted user text",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 3192,
+          "note": "inbound events reach _is_user_authorized before dispatch"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 6609,
+          "note": "per-platform allowlists, pairing store and global allowlist resolve the sender"
+        }
+      ]
+    },
+    {
+      "id": "messaging-sender-entrypoint--wecom-py-adapter",
+      "from": "messaging-sender-entrypoint",
+      "to": "wecom-py-adapter",
+      "label": "inbound DM to a self-policy adapter",
+      "data": "untrusted user text",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 855,
+          "note": "_is_dm_allowed decides admission at intake from the adapter's own dm_policy"
+        }
+      ]
+    },
+    {
+      "id": "wecom-py-adapter--run-py-adapter",
+      "from": "wecom-py-adapter",
+      "to": "run-py-adapter",
+      "label": "intake-approved message handed to the gateway",
+      "data": "untrusted user text",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/platforms/wecom.py",
+          "line": 850,
+          "note": "enforces_own_access_policy asserts the adapter already gated the message"
+        },
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 6755,
+          "note": "the gateway honours that assertion and returns True instead of default-denying"
+        }
+      ]
+    },
+    {
+      "id": "run-py-adapter--conversation-loop-py-orchestrator",
+      "from": "run-py-adapter",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "authorized turn dispatched to the agent",
+      "data": "user text, session key",
+      "evidence": [
+        {
+          "file": "hermes-agent/gateway/run.py",
+          "line": 3188,
+          "note": "authorized events proceed into the agent turn path"
+        }
+      ]
+    },
+    {
+      "id": "prompt-builder-py-prompt--conversation-loop-py-orchestrator",
+      "from": "prompt-builder-py-prompt",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "assembled system prompt",
+      "data": "system instructions, memory snapshot, skill text",
+      "evidence": [
+        {
+          "file": "hermes-agent/run_agent.py",
+          "line": 2611,
+          "note": "_build_system_prompt composes the prompt the loop sends"
+        },
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 1039,
+          "note": "skills manifest is folded into that prompt"
+        }
+      ]
+    },
+    {
+      "id": "memory-tool-py-memory--threat-patterns-py-control",
+      "from": "memory-tool-py-memory",
+      "to": "threat-patterns-py-control",
+      "label": "memory and profile entries scanned on load",
+      "data": "stored agent notes",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 192,
+          "note": "each entry is scanned at strict scope before the snapshot is built"
+        }
+      ]
+    },
+    {
+      "id": "threat-patterns-py-control--prompt-builder-py-prompt",
+      "from": "threat-patterns-py-control",
+      "to": "prompt-builder-py-prompt",
+      "label": "sanitized entries and blocked placeholders",
+      "data": "screened stored content",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 163,
+          "note": "the sanitized snapshot, not the raw entries, is what the prompt receives"
+        },
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 57,
+          "note": "matching context files are replaced with a placeholder before loading"
+        }
+      ]
+    },
+    {
+      "id": "skill-manager-tool-py-datastore--prompt-builder-py-prompt",
+      "from": "skill-manager-tool-py-datastore",
+      "to": "prompt-builder-py-prompt",
+      "label": "skill content into the system prompt",
+      "data": "file contents (skill instructions)",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/prompt_builder.py",
+          "line": 1039,
+          "note": "build_skills_system_prompt reads the skills directory into the prompt"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--chat-completions-py-model",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "chat-completions-py-model",
+      "label": "messages and tool schemas",
+      "data": "prompt, conversation history, tool results",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/conversation_loop.py",
+          "line": 796,
+          "note": "the loop issues each API call within the iteration budget"
+        },
+        {
+          "file": "hermes-agent/agent/transports/chat_completions.py",
+          "line": 192,
+          "note": "build_kwargs assembles the outbound request"
+        }
+      ]
+    },
+    {
+      "id": "chat-completions-py-model--conversation-loop-py-orchestrator",
+      "from": "chat-completions-py-model",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "model reply and tool calls",
+      "data": "model output, tool-call arguments",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/transports/chat_completions.py",
+          "line": 545,
+          "note": "normalize_response returns content and tool calls to the loop"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--terminal-tool-py-tool",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "terminal-tool-py-tool",
+      "label": "shell command or python script",
+      "data": "model-authored command text",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/tool_executor.py",
+          "line": 110,
+          "note": "the executor dispatches the model's tool calls"
+        },
+        {
+          "file": "hermes-agent/tools/terminal_tool.py",
+          "line": 1721,
+          "note": "terminal_tool receives the command the model chose"
+        }
+      ]
+    },
+    {
+      "id": "terminal-tool-py-tool--approval-py-control",
+      "from": "terminal-tool-py-tool",
+      "to": "approval-py-control",
+      "label": "command string to the combined guard",
+      "data": "command text, backend type",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/terminal_tool.py",
+          "line": 257,
+          "note": "_check_all_guards delegates to the consolidated approval gate"
+        },
+        {
+          "file": "hermes-agent/tools/code_execution_tool.py",
+          "line": 1104,
+          "note": "execute_code calls check_execute_code_guard on the whole script"
+        }
+      ]
+    },
+    {
+      "id": "approval-py-control--smart-approve-approval-py-control",
+      "from": "approval-py-control",
+      "to": "smart-approve-approval-py-control",
+      "label": "flagged command and guard description",
+      "data": "command text, warning keys",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 1270,
+          "note": "in smart mode the gathered warnings are handed to _smart_approve before any prompt"
+        }
+      ]
+    },
+    {
+      "id": "smart-approve-approval-py-control--chat-completions-py-model",
+      "from": "smart-approve-approval-py-control",
+      "to": "chat-completions-py-model",
+      "label": "command text to the auxiliary model",
+      "data": "command text, flag reason",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/approval.py",
+          "line": 904,
+          "note": "call_llm carries the command and reason to the side model for a one-word verdict"
+        },
+        {
+          "file": "hermes-agent/agent/auxiliary_client.py",
+          "line": 4844,
+          "note": "call_llm is the auxiliary provider client"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--web-tools-py-tool",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "web-tools-py-tool",
+      "label": "search query or URL to fetch",
+      "data": "model-authored query/URL",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/web_tools.py",
+          "line": 872,
+          "note": "web_extract_tool is invoked with a model-supplied URL"
+        }
+      ]
+    },
+    {
+      "id": "web-content-entrypoint--web-tools-py-tool",
+      "from": "web-content-entrypoint",
+      "to": "web-tools-py-tool",
+      "label": "fetched page and browser text",
+      "data": "external page content",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/web_tools.py",
+          "line": 872,
+          "note": "remote page body is returned into the agent"
+        },
+        {
+          "file": "hermes-agent/tools/browser_tool.py",
+          "line": 2489,
+          "note": "browser_snapshot returns live page text"
+        }
+      ]
+    },
+    {
+      "id": "web-tools-py-tool--tool-dispatch-helpers-py-control",
+      "from": "web-tools-py-tool",
+      "to": "tool-dispatch-helpers-py-control",
+      "label": "tool result string",
+      "data": "external content",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 336,
+          "note": "every tool result passes through make_tool_result_message"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--mcp-tool-py-mcp-server",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "mcp-tool-py-mcp-server",
+      "label": "MCP tool call",
+      "data": "model-authored tool arguments",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/mcp_tool.py",
+          "line": 3260,
+          "note": "server-declared tools are registered into the model's schema and invoked from the loop"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tool-py-mcp-server--tool-dispatch-helpers-py-control",
+      "from": "mcp-tool-py-mcp-server",
+      "to": "tool-dispatch-helpers-py-control",
+      "label": "MCP server result content",
+      "data": "third-party server output",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 358,
+          "note": "mcp_ prefixed results are among those the wrapper is meant to label"
+        }
+      ]
+    },
+    {
+      "id": "tool-dispatch-helpers-py-control--conversation-loop-py-orchestrator",
+      "from": "tool-dispatch-helpers-py-control",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "tool message appended to the conversation",
+      "data": "tool output, labeled or unlabeled",
+      "evidence": [
+        {
+          "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+          "line": 336,
+          "note": "the returned tool-role message is what the loop appends and re-sends to the model"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--memory-tool-py-memory",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "memory-tool-py-memory",
+      "label": "memory write",
+      "data": "agent-authored notes derived from the session",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/memory_tool.py",
+          "line": 602,
+          "note": "memory_tool is the model-callable add/remove path"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--skill-manager-tool-py-datastore",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "skill-manager-tool-py-datastore",
+      "label": "agent-authored skill write",
+      "data": "model-authored instruction files",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 476,
+          "note": "_create_skill writes model-authored SKILL.md content"
+        },
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 717,
+          "note": "_write_file adds arbitrary files under the skill"
+        }
+      ]
+    },
+    {
+      "id": "skill-manager-tool-py-datastore--skills-guard-py-control",
+      "from": "skill-manager-tool-py-datastore",
+      "to": "skills-guard-py-control",
+      "label": "skill content to the install scanner",
+      "data": "skill markdown and scripts",
+      "evidence": [
+        {
+          "file": "hermes-agent/tools/skill_manager_tool.py",
+          "line": 88,
+          "note": "scan_skill is called with the skill directory and its source tier"
+        },
+        {
+          "file": "hermes-agent/tools/skills_guard.py",
+          "line": 50,
+          "note": "INSTALL_POLICY decides allow/ask/block from the verdict"
+        }
+      ]
+    },
+    {
+      "id": "conversation-loop-py-orchestrator--hermes-logging-py-log-sink",
+      "from": "conversation-loop-py-orchestrator",
+      "to": "hermes-logging-py-log-sink",
+      "label": "tool completions, approvals, session events",
+      "data": "activity records",
+      "evidence": [
+        {
+          "file": "hermes-agent/hermes_logging.py",
+          "line": 45,
+          "note": "all agent/tool/session loggers share the prose line format"
+        },
+        {
+          "file": "hermes-agent/hermes_logging.py",
+          "line": 222,
+          "note": "rotating handlers with RedactingFormatter receive those records"
+        }
+      ]
+    },
+    {
+      "id": "env-secret-store--conversation-loop-py-orchestrator",
+      "from": "env-secret-store",
+      "to": "conversation-loop-py-orchestrator",
+      "label": "provider and platform credentials into the process",
+      "data": "credentials",
+      "evidence": [
+        {
+          "file": "hermes-agent/hermes_cli/env_loader.py",
+          "line": 238,
+          "note": "the user .env is loaded into the process environment with override"
+        },
+        {
+          "file": "hermes-agent/hermes_cli/config.py",
+          "line": 534,
+          "note": "the credential file is HERMES_HOME/.env, deliberately separate from config.yaml"
+        }
+      ]
+    },
+    {
+      "id": "main-index-ts-client--posthog-external-service",
+      "from": "main-index-ts-client",
+      "to": "posthog-external-service",
+      "label": "usage telemetry",
+      "data": "screen views, feature usage, anonymous id",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/renderer/src/utils/analytics.ts",
+          "line": 14,
+          "note": "a null stored consent resolves to enabled when a build key is present"
+        },
+        {
+          "file": "hermes-desktop/src/renderer/src/utils/analytics.ts",
+          "line": 49,
+          "note": "posthog.init streams to the configured host and identifies a persistent anonymous id"
+        }
+      ]
+    },
+    {
+      "id": "main-index-ts-client--installer-ts-deploy-surface",
+      "from": "main-index-ts-client",
+      "to": "installer-ts-deploy-surface",
+      "label": "first-run and repair install trigger",
+      "data": "install request",
+      "evidence": [
+        {
+          "file": "hermes-desktop/src/main/installer.ts",
+          "line": 898,
+          "note": "the app spawns the remote install script when the runtime is missing or broken"
+        }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Inbound chat-platform messages reaching the gateway",
+      "crossing_edges": [
+        "messaging-sender-entrypoint--run-py-adapter",
+        "messaging-sender-entrypoint--wecom-py-adapter",
+        "wecom-py-adapter--run-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-05",
+          "excerpt": "MUST refuse to dispatch work, relay output, or resolve approvals until an operator-configured allowlist is set. MUST NOT fail open when no allowlist is configured.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-09",
+          "excerpt": "A caller found interacting with the agent but absent from the configured allowlist is a trust expansion.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-23",
+          "excerpt": "Agent work MUST NOT be dispatched, output relayed, or approvals resolved for any caller outside the configured authorization set.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-26",
+          "excerpt": "On an enabled network-exposed adapter with no caller allowlist, the response MUST be fail-closed — refuse to serve rather than dispatch.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "WeCom, Weixin, QQ Bot and Yuanbao declare that they police their own access and then default that policy to open, so an enabled-but-unconfigured adapter admits any DM sender as an authorized caller and the gateway's default-deny never runs.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "On every other platform adapter an unknown sender is refused: allowlists, chat allowlists and the pairing store are resolved and the function returns deny when nothing is configured unless an explicit allow-all flag is set.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/gateway/run.py",
+            "line": 6747
+          }
+        }
+      ]
+    },
+    {
+      "id": "untrusted-ingress-2",
+      "name": "External content ingested as tool results",
+      "crossing_edges": [
+        "web-content-entrypoint--web-tools-py-tool",
+        "web-tools-py-tool--tool-dispatch-helpers-py-control",
+        "mcp-tool-py-mcp-server--tool-dispatch-helpers-py-control",
+        "tool-dispatch-helpers-py-control--conversation-loop-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "The agent MUST NOT act on instructions embedded in ingested content — web pages, emails, inbound messages, file contents, tool results, or MCP server responses — as though they were operator commands.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Provenance labeling is limited to two tool names and two prefixes with a 32-character floor, so file reads, code-execution output and session-search hits — and any short result — reach the model with no marker at all, and no validation runs on tool results.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "For the covered tools the defence is an instruction inside the prompt telling the model to treat the wrapped block as data, which is a request to the model rather than enforcement.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/agent/tool_dispatch_helpers.py",
+            "line": 389
+          },
+          "remainder": "an injected directive that mimics operator phrasing inside the block is still ordinary tokens the model may follow — nothing downstream re-checks the decision"
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI04",
+          "summary": "Tool descriptions supplied by a third-party MCP server are scanned for injection patterns at registration, but the scan's findings are logged and discarded and the tool is registered anyway, so a poisoned description enters the model's tool schema.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/mcp_tool.py",
+            "line": 3260
+          },
+          "remainder": "the scan result is never acted on — registration always proceeds, and no equivalent scan exists for the server's tool results"
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Model decision reaching host execution",
+      "crossing_edges": [
+        "conversation-loop-py-orchestrator--terminal-tool-py-tool",
+        "terminal-tool-py-tool--approval-py-control",
+        "conversation-loop-py-orchestrator--web-tools-py-tool",
+        "conversation-loop-py-orchestrator--mcp-tool-py-mcp-server"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-13",
+          "excerpt": "the default local (host) terminal backend is authorized only for trusted content; any untrusted input surface MUST run under a sandboxed terminal backend (Docker/Modal/Daytona) or whole-process wrapping",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-14",
+          "excerpt": "Code-execution and MCP-subprocess tools operating on untrusted-influenced input MUST additionally be operator-gated or run only under that OS-level isolation posture.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-21",
+          "excerpt": "Destructive or irreversible shell and file operations (deletion, overwrite, bulk or recursive changes) MUST require operator approval before execution, in every execution context and regardless of interactive vs. unattended mode.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-25",
+          "excerpt": "On a destructive-command match, the response MUST be halt-pending-approval — pause and prompt the operator, never autonomous execution (the runtime enforcement of the destructive-operation approval gate).",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "In any run that is not CLI-interactive, gateway or ask-mode, the gate returns approved without running the rule engine, the pattern denylist or any prompt, and the same holds for whole execute_code scripts — so a model-chosen command or script reaches the host with no operator in the loop.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "With approvals in smart mode the destructive-command decision is delegated to a side model that answers in one word over attacker-influenceable command text, and an approve also registers standing session approval for every matched pattern so the command class runs unprompted for the rest of the session.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Nothing at startup refuses to enable a messaging, email or web-ingest surface while the terminal backend resolves to the local host, so the isolation posture the project documents as required is left entirely to operator configuration.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI03",
+          "summary": "Pending exec approvals are keyed by session and resolved by a slash command from that same session, so a caller admitted through a fail-open adapter answers his own approval prompt rather than the operator answering it.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI05",
+          "summary": "A fixed set of catastrophic commands and the sudo-stdin pattern are blocked unconditionally, ahead of the yolo bypass, the approval-mode check and the cron path, and the yolo flag is frozen at import so an in-process skill cannot switch approvals off.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/approval.py",
+            "line": 1174
+          }
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Agent to model provider",
+      "crossing_edges": [
+        "conversation-loop-py-orchestrator--chat-completions-py-model",
+        "chat-completions-py-model--conversation-loop-py-orchestrator",
+        "smart-approve-approval-py-control--chat-completions-py-model"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-10",
+          "excerpt": "Any outbound destination reached in code but absent from the operator's configured/allowlisted set is a trust expansion; under egress isolation, outbound connections MUST be limited to the allowlisted hosts.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-18",
+          "excerpt": "Operator credentials and session authorization material MUST NOT egress to any destination outside the trust envelope, whether via environment leakage, adapter logging, or a transport error that flushes them upstream.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Every request carries the whole assembled context — memory entries, the user profile, repository context files and prior tool results — to whichever base URL the operator configured, including a custom endpoint, with no destination allowlist and no classification of what may leave (checked: agent/transports/chat_completions.py:192 builds the request unfiltered; tools/url_safety.py guards tool fetches, not the model client).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Agent-written memory and skills re-entering the prompt",
+      "crossing_edges": [
+        "conversation-loop-py-orchestrator--memory-tool-py-memory",
+        "memory-tool-py-memory--threat-patterns-py-control",
+        "threat-patterns-py-control--prompt-builder-py-prompt",
+        "conversation-loop-py-orchestrator--skill-manager-tool-py-datastore",
+        "skill-manager-tool-py-datastore--prompt-builder-py-prompt"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-02",
+          "excerpt": "Authoring, editing, or evolving its own skills within the sandbox is an expected feature and is not, by itself, a broadening of granted authority.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-27",
+          "excerpt": "When Skills Guard detects injection-like patterns in installable skill or plugin content, surface the detection to the operator for review before install.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "Skills the agent writes for itself are never scanned because the agent-created tier only runs when a config flag that ships off is enabled, and those skill files are compiled into the system prompt on every later run — the exact loop an injection would use to persist.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "Content the agent stores and re-reads — memory entries, the user profile and repository context files — is screened by a shared regex pattern set before it reaches the system prompt, blocking matches outright.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/memory_tool.py",
+            "line": 192
+          },
+          "remainder": "the screen is a fixed regex set, so a paraphrased or novel directive that matches no pattern is stored and replayed into the prompt unchanged"
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Provider and platform credentials at rest and in process",
+      "crossing_edges": [
+        "env-secret-store--conversation-loop-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-16",
+          "excerpt": "Provider API keys and gateway/platform tokens MUST NOT be passed into lower-trust in-process or subprocess components (shell subprocesses, the code-execution child, MCP subprocesses, cron job scripts); they MUST be stripped from that environment by default",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-17",
+          "excerpt": "Credentials MUST NOT be written into the main config file or into version control; they belong in the operator credential file with tight permissions (or a dedicated secret store).",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Provider credentials are stripped from shell, MCP and code-execution child environments, and neither a skill's passthrough declaration nor the config file can re-register a blocklisted provider variable; MCP stdio children receive only a baseline safe set.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/env_passthrough.py",
+            "line": 86
+          }
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The desktop injects every profile API key into the backend process environment when it launches the gateway, regardless of which provider a session actually uses.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/env_passthrough.py",
+            "line": 86
+          },
+          "remainder": "the scrub keeps those keys out of tool children but not out of the agent process itself, where in-process skill and plugin code can read any of them from the environment"
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Runtime install, dependencies and third-party skills/servers",
+      "crossing_edges": [
+        "main-index-ts-client--installer-ts-deploy-surface",
+        "skill-manager-tool-py-datastore--skills-guard-py-control"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-11",
+          "excerpt": "Third-party MCP servers, skills, and plugins — but each MUST be reviewed and approved by the operator before install or activation; none may be auto-trusted on the strength of its own description alone.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-24",
+          "excerpt": "The desktop self-update and first-run install path MUST NOT fetch or install agent runtime code from an unverified or unauthenticated source; installers and runtime updates MUST be integrity-verified before they replace the running app or backend.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "First-run and repair install pipes a script fetched from a branch URL straight into a shell on macOS and Linux, and on Windows downloads and runs the equivalent script, with no checksum, signature or pinned revision — so whatever that branch holds at fetch time becomes agent runtime code on the host.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "No component inventory exists in either root and the vulnerability scanner that runs on lockfiles is configured never to fail, so a known CVE in a pinned version produces a report entry and never blocks a merge or a release.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI04",
+          "summary": "Every npx or uvx MCP server package is queried against the vulnerability database for malware advisories and blocked on a hit before the subprocess is spawned.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/tools/osv_check.py",
+            "line": 26
+          },
+          "remainder": "the check fails open on any network error or timeout and covers only npx/uvx packages — an HTTP/SSE server, a locally-pathed command or any other launcher is never queried"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Analytics and local activity logging",
+      "crossing_edges": [
+        "main-index-ts-client--posthog-external-service",
+        "conversation-loop-py-orchestrator--hermes-logging-py-log-sink"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-19",
+          "excerpt": "Outbound telemetry and usage attribution are opt-in and off by default; no telemetry or usage data may egress unless the operator has explicitly enabled it.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-29",
+          "excerpt": "Tool invocations, approval decisions, and session lifecycle events MUST be recorded to durable, structured logs (`agent.log` / `gateway.log`; `desktop.log` for the desktop layer) sufficient to reconstruct what the agent did.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "An untouched consent value is read as enabled whenever a build key was compiled in, so the first run of an official desktop build already streams screen views and feature usage to a third-party endpoint that is not in the operator's configured provider or platform set.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "The three primary logs are free-form printf lines rather than structured records and nothing exports or alerts beyond the local host, so reconstructing an incident means parsing prose on the affected machine.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Every log handler is installed with a redacting formatter, so secret-like values in logged commands and errors are stripped before they reach the rotating files.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/hermes_logging.py",
+            "line": 222
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Local HTTP backend the desktop and other local callers reach",
+      "crossing_edges": [
+        "main-index-ts-client--api-server-py-adapter",
+        "api-server-py-adapter--run-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-06",
+          "excerpt": "MUST default to a loopback bind; MUST require an allowlist before serving.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-07",
+          "excerpt": "MUST bind loopback only and rely on OS-level access control; MUST NOT be exposed beyond the local user without an explicit network authentication layer.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-22",
+          "excerpt": "Binding a local-only surface (dashboard, plugin HTTP server, or any local-IPC surface) to a non-loopback interface MUST be an explicit operator decision, never taken autonomously.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "The API server refuses to start at all without a key, including on a loopback bind, and refuses to start with a placeholder-strength key once the bind address is network-accessible.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-agent/gateway/platforms/api_server.py",
+            "line": 4146
+          }
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Installing the desktop turns the terminal-capable HTTP backend on by itself: the app writes an api_server block into the config file and forces the enable flag when it launches the gateway.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "hermes-desktop/src/main/hermes.ts",
+            "line": 220
+          },
+          "remainder": "the auto-written bind is loopback and the key requirement still holds, but the enablement itself is never presented as an operator decision — the only opt-out is editing the config afterwards"
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "poisoned-page-to-host-shell",
+      "name": "A poisoned web page the operator asked about runs a command on the host",
+      "steps": [
+        {
+          "node": "web-content-entrypoint",
+          "finding_id": null,
+          "summary": "The page is authored by whoever controls the site — attacker-controlled text the operator never wrote, arriving with no provenance beyond the URL."
+        },
+        {
+          "node": "web-tools-py-tool",
+          "finding_id": null,
+          "summary": "web_extract or a browser snapshot returns the page body verbatim as a tool result."
+        },
+        {
+          "node": "tool-dispatch-helpers-py-control",
+          "finding_id": "PRAX-2026-08-12-007",
+          "summary": "The result is wrapped in an advisory delimiter at best — an instruction to the model, not a filter — and short results are not wrapped at all."
+        },
+        {
+          "node": "conversation-loop-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-007",
+          "summary": "The injected directive re-enters the model's context as ordinary conversation tokens and shapes the next tool call."
+        },
+        {
+          "node": "terminal-tool-py-tool",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "In a headless run the guard approves every non-hardline dangerous command and any execute_code script without prompting, so the command runs on the host under the default local backend."
+        }
+      ]
+    },
+    {
+      "id": "unallowlisted-sender-to-host-shell",
+      "name": "A stranger's chat message on an unconfigured adapter runs a command on the host",
+      "steps": [
+        {
+          "node": "messaging-sender-entrypoint",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "An unauthenticated third party DMs the bot; the operator never added them to any allowlist."
+        },
+        {
+          "node": "wecom-py-adapter",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "The adapter's own DM policy defaults to open, so intake admits the sender."
+        },
+        {
+          "node": "run-py-adapter",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "Because the adapter advertises that it polices its own access, the gateway honours that and returns authorized before its default-deny ever runs."
+        },
+        {
+          "node": "conversation-loop-py-orchestrator",
+          "finding_id": null,
+          "summary": "The stranger's text is dispatched as an ordinary operator turn with the full toolset attached."
+        },
+        {
+          "node": "terminal-tool-py-tool",
+          "finding_id": "PRAX-2026-08-12-006",
+          "summary": "The command executes on the host under the default local backend — approval prompts go back to the same session, so the stranger resolves his own, and nothing requires an untrusted ingress surface to run sandboxed."
+        }
+      ]
+    },
+    {
+      "id": "mcp-result-to-persistent-skill",
+      "name": "A third-party MCP server's reply becomes a skill that instructs the agent forever after",
+      "steps": [
+        {
+          "node": "mcp-tool-py-mcp-server",
+          "finding_id": null,
+          "summary": "An operator-installed third-party server returns content it authored itself; the server's tool descriptions are scanned but registered regardless, and its results are never validated."
+        },
+        {
+          "node": "tool-dispatch-helpers-py-control",
+          "finding_id": "PRAX-2026-08-12-007",
+          "summary": "The reply is labeled only by an advisory wrapper, and only when it exceeds the length floor."
+        },
+        {
+          "node": "conversation-loop-py-orchestrator",
+          "finding_id": null,
+          "summary": "The self-improvement loop acts on the injected suggestion and writes a new skill from it."
+        },
+        {
+          "node": "skill-manager-tool-py-datastore",
+          "finding_id": "PRAX-2026-08-12-008",
+          "summary": "Agent-authored skills skip the install scanner entirely because that gate ships disabled, so the content lands on disk unreviewed."
+        },
+        {
+          "node": "prompt-builder-py-prompt",
+          "finding_id": "PRAX-2026-08-12-008",
+          "summary": "The skill is compiled into the system prompt on every later run — poisoning that outlives the session that created it."
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "One strain: the model call and the upstream provider endpoint are modeled as a single agent_core node rather than splitting an external_deploy provider node, because the endpoint is operator-selected at runtime (Nous Portal / OpenRouter / OpenAI / custom base URL) and the code names no fixed service — the model-egress boundary therefore crosses inside the agent_core lane. Otherwise clean: the gateway is client_adapters even though it also enforces caller authorization (the enforcing process rule), and the desktop's Electron main and renderer are one client node.",
+    "omissions": "Arbitration divergence: the stored tag on PRAX-2026-08-12-005 is ASI09 (Human-Agent Trust Exploitation); the KB's compound-signal table states that a missing or disabled approval gate on a consequential action is LLM03 primary and explicitly never ASI09 for the gate itself, and no human is deceived here — the human is removed from the loop by configuration. Tagged LLM03 per the KB. All other stored tags agree with the KB on the same evidence (ASI05 for the live-path exec gap, ASI03 for the failed identity check, ASI06 for cross-session skill persistence, LLM04 for install and inventory provenance, LLM01 for unlabeled ingested content, and no OWASP code for the pure observability gap). Not modeled for lack of a citable distinct trust consequence: the ACP editor adapter and the TUI gateway (local-IPC surfaces that reuse the same authorization path), subagent delegation and cron runners (they run the same loop and fold into the orchestrator's evidence), and the ~25 conforming platform adapters (folded into the gateway node). The compromised-upstream origin behind the desktop installer is not modeled as a node, so the confirmed install-path threat is recorded at the supply-chain boundary rather than as a fourth attack path.",
+    "counts": {
+      "nodes": 25,
+      "edges": 32,
+      "boundaries": 9,
+      "threats": 23
+    }
+  }
+}

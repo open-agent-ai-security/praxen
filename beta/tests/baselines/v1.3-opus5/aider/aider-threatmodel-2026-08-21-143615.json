@@ -1,0 +1,1254 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "aider",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/aider"
+  },
+  "analysis_ref": "aider-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "Aider is a pair-programming assistant that runs in a developer's terminal, reads and edits files in one local git repository, and commits its own work. Everything it does runs through a single language model and a single loop: the model's reply is parsed into file edits and shell commands, and the only thing standing between that reply and the developer's disk is a set of yes/no prompts. Untrusted material reaches that loop from three places -- web pages it fetches, the output of the commands it runs, and AI comments it finds in watched repository files -- and none of it arrives marked as anything other than the developer's own words. Its most consequential capabilities are writing files anywhere the developer can write, running shell commands, and committing to git.\n\nDeal with the file-write path first. A page aider fetches, or a comment planted in a file it watches, can direct the model to write to a path of the attacker's choosing; that path is never checked against the repository root or against the developer's ignore file, and the single confirmation guarding it is one of the prompts that answers itself when aider is run unattended. That is a complete route from a fetched web page to an arbitrary file on the developer's machine. Second is the browser interface: it is launched with no address binding and no password, so on any shared network anyone who can reach the port can add files, drive the model, and get the result committed -- and those commits skip the repository's own pre-commit hooks, which aider disables by default.\n\nWhat keeps this from being worse is one deliberately hardened gate: shell commands the model suggests are confirmed through a check that refuses to answer itself in unattended runs, and that discipline holds. The gaps are the neighbouring doors -- the automatic linter that runs a shell command after every edit with no confirmation at all, the transcript written at the default permissions with no credential filtering that can be replayed into a later session, and telemetry that ships stack traces containing local file paths once a developer opts in. The fixes, in order: contain model-supplied file paths inside the repository and honour the ignore file there, mark the gates that ingest fetched content and command output as explicit-yes so unattended runs cannot approve them, bind the browser UI to loopback, and turn pre-commit verification back on by default.",
+  "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
+  "nodes": [
+    {
+      "id": "operator-entrypoint",
+      "name": "Local operator/developer",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The developer who launched aider and types its instructions; the only trusted instruction source in the remit.",
+      "evidence": [
+        {"file": "aider/io.py", "line": 523, "note": "get_input() is the terminal prompt loop the developer types instructions into"},
+        {"file": "aider/coders/base_coder.py", "line": 876, "note": "run() loops on get_input(), so a normal turn originates with the operator"}
+      ]
+    },
+    {
+      "id": "watch-py-entrypoint",
+      "name": "Watched-file AI comments",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "FileWatcher turns AI / AI! / AI? comments found in any watched repository file into an instruction for the model, with no check on who authored the file.",
+      "evidence": [
+        {"file": "aider/watch.py", "line": 69, "note": "ai_comment_pattern matches AI/AI!/AI? in any watched file regardless of authorship"},
+        {"file": "aider/watch.py", "line": 181, "note": "process_changes adds the changed files to the chat and builds the prompt from their comments"},
+        {"file": "aider/watch_prompts.py", "line": 1, "note": "watch_code_prompt frames the extracted comments as 'I've written your instructions in comments in the code'"}
+      ]
+    },
+    {
+      "id": "untrusted-network-entrypoint",
+      "name": "Untrusted network caller",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any host that can route to the Streamlit port; browser mode ships with no bind address and no authentication.",
+      "evidence": [
+        {"file": "aider/main.py", "line": 233, "note": "launch_gui sets six Streamlit flags but never --server.address, so the default listen-on-all-interfaces applies"},
+        {"file": "aider/gui.py", "line": 374, "note": "st.chat_input accepts a prompt from whoever reaches the page; no auth check anywhere in the module"}
+      ]
+    },
+    {
+      "id": "io-py-client",
+      "name": "Terminal CLI (InputOutput)",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "The prompt_toolkit terminal surface: reads operator input, prints tool and model output, and owns the input/chat history files.",
+      "evidence": [
+        {"file": "aider/io.py", "line": 523, "note": "get_input assembles the prompt and returns the typed line"},
+        {"file": "aider/io.py", "line": 995, "note": "tool_output is the console writer and also appends to the chat transcript"},
+        {"file": "aider/io.py", "line": 736, "note": "add_to_input_history persists typed lines, including /run command lines"}
+      ]
+    },
+    {
+      "id": "gui-py-client",
+      "name": "Streamlit browser UI",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "Experimental web UI that drives the same Coder object; exposes chat, file add/drop, shell-command and git inputs.",
+      "evidence": [
+        {"file": "aider/gui.py", "line": 361, "note": "GUI.__init__ obtains the live Coder via get_coder()"},
+        {"file": "aider/gui.py", "line": 219, "note": "do_run_shell and do_git expose command and git text inputs in the same page"},
+        {"file": "aider/gui.py", "line": 70, "note": "get_coder replaces coder.commands.io with CaptureIO(yes=True), auto-answering non-explicit confirmations for browser-issued commands"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter",
+      "name": "Slash-command dispatcher",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "Maps /web, /run, /test, /git, /add, /undo, /help and friends onto the tools; also the surface that appends fetched and command output into the chat.",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 312, "note": "run() resolves a typed slash command to a cmd_* method"},
+        {"file": "aider/commands.py", "line": 219, "note": "cmd_web scrapes a URL and appends it to the conversation"},
+        {"file": "aider/commands.py", "line": 1013, "note": "cmd_run executes a shell command and optionally adds its output to the chat"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator",
+      "name": "Coder request loop",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "The single-agent loop: assembles context, calls the model, parses edits and shell commands out of the reply, applies them, commits, lints and reflects. Chat-chunk plumbing, the per-format Coder subclasses' parsing and the history summarizer fold in here.",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 876, "note": "run() is the interactive turn loop"},
+        {"file": "aider/coders/base_coder.py", "line": 1419, "note": "send_message assembles messages, calls the model, then applies edits, lints, and runs shell commands"},
+        {"file": "aider/coders/base_coder.py", "line": 2296, "note": "apply_updates parses the model reply into edits and applies them"},
+        {"file": "aider/coders/base_coder.py", "line": 924, "note": "run_one drives the bounded reflection loop on lint/test errors"}
+      ]
+    },
+    {
+      "id": "base-prompts-py-prompt",
+      "name": "Prompt stack and content framing",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "The prefixes and templates that frame every piece of content sent to the model; the only framings available are for added files, the repo map and read-only files -- there is no untrusted-content framing.",
+      "evidence": [
+        {"file": "aider/coders/base_prompts.py", "line": 24, "note": "files_content_prefix / repo_content_prefix / read_only_files_prefix are the whole framing vocabulary; nothing marks content as untrusted"},
+        {"file": "aider/prompts.py", "line": 36, "note": "run_output wraps command stdout as 'I ran this command / And got this output' -- the operator's own voice"},
+        {"file": "aider/coders/base_coder.py", "line": 1333, "note": "format_messages assembles the system prompt and these prefixes into the request"}
+      ]
+    },
+    {
+      "id": "models-py-model",
+      "name": "Model call (Model.send_completion)",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "Provider-agnostic model call through litellm, plus the model-metadata cache that shapes model selection and token budgeting.",
+      "evidence": [
+        {"file": "aider/models.py", "line": 1036, "note": "litellm.completion(**kwargs) is the single completion call site for the whole tool"},
+        {"file": "aider/models.py", "line": 162, "note": "MODEL_INFO_URL points at the main branch of a third-party repo for price/context metadata"},
+        {"file": "aider/models.py", "line": 208, "note": "_update_cache fetches that URL with requests.get and writes it to ~/.aider/caches with no digest or signature check"}
+      ]
+    },
+    {
+      "id": "aider-chat-history-md-memory",
+      "name": ".aider.chat.history.md transcript",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "The durable markdown transcript aider appends to on every turn; readable back into a later session as prior conversation when --restore-chat-history is set.",
+      "evidence": [
+        {"file": "aider/io.py", "line": 1117, "note": "append_chat_history is the sole writer; opened for append with no mode argument"},
+        {"file": "aider/args.py", "line": 274, "note": "defaults to .aider.chat.history.md in the git root and is always enabled"},
+        {"file": "aider/coders/base_coder.py", "line": 519, "note": "with restore_chat_history the file is read and split into done_messages, then summarized"}
+      ]
+    },
+    {
+      "id": "confirm-ask-io-py-control",
+      "name": "confirm_ask approval gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The one approval primitive the whole codebase uses; under --yes-always it answers 'yes' to every gate except those marked explicit_yes_required, which it answers 'no'.",
+      "evidence": [
+        {"file": "aider/io.py", "line": 807, "note": "confirm_ask signature: explicit_yes_required defaults to False"},
+        {"file": "aider/io.py", "line": 866, "note": "if self.yes is True: res = 'n' if explicit_yes_required else 'y' -- the whole non-interactive policy"},
+        {"file": "aider/io.py", "line": 902, "note": "allow_never records the question in never_prompts, which returns a standing False"}
+      ]
+    },
+    {
+      "id": "handle-shell-commands-base-coder-py-control",
+      "name": "Model-suggested shell gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The only call site in the tree that passes explicit_yes_required=True, making the shell-run confirmation immune to --yes-always; the sibling gate on ingesting the command output in the same function is an ordinary confirm_ask.",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2456, "note": "confirm_ask('Run shell command?', explicit_yes_required=True) -- the sole explicit-yes gate"},
+        {"file": "aider/coders/base_coder.py", "line": 2479, "note": "confirm_ask('Add command output to the chat?') in the same function, without explicit_yes_required"}
+      ]
+    },
+    {
+      "id": "allowed-to-edit-base-coder-py-control",
+      "name": "File-edit gate (allowed_to_edit)",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The only authorization step on a model-chosen write path: checks gitignore and asks for confirmation, but never checks repo-root containment or .aiderignore, and is not marked explicit_yes_required.",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2191, "note": "allowed_to_edit consults repo.git_ignored_file at :2202 but never repo.ignored_file"},
+        {"file": "aider/coders/base_coder.py", "line": 2226, "note": "'Allow edits to file that has not been added to the chat?' -- ordinary confirm_ask, no explicit_yes_required"},
+        {"file": "aider/coders/base_coder.py", "line": 571, "note": "abs_root_path joins the model path to the root and hands it to safe_abs_path"},
+        {"file": "aider/utils.py", "line": 96, "note": "safe_abs_path resolves with no is_relative_to check, so an absolute path or ../ walks out of the repo"}
+      ]
+    },
+    {
+      "id": "check-for-urls-base-coder-py-control",
+      "name": "Auto-detected URL fetch gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Confirms before fetching a URL spotted in input text; an ordinary confirm_ask with allow_never, so --yes-always answers it.",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 964, "note": "check_for_urls regex-extracts URLs from the incoming text"},
+        {"file": "aider/coders/base_coder.py", "line": 976, "note": "confirm_ask('Add URL to the chat?', group=group, allow_never=True) without explicit_yes_required, then cmd_web fetches"}
+      ]
+    },
+    {
+      "id": "run-cmd-py-tool",
+      "name": "Shell execution (run_cmd)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Executes command strings through the user's login shell with the inherited environment; the host-execution sink for /run, /test and model-suggested commands.",
+      "evidence": [
+        {"file": "aider/run_cmd.py", "line": 62, "note": "subprocess.Popen(command, shell=True, ...) with no env argument, so the process environment is inherited"},
+        {"file": "aider/run_cmd.py", "line": 116, "note": "pexpect.spawn(shell, args=['-i','-c', command]) is the interactive-terminal variant"}
+      ]
+    },
+    {
+      "id": "linter-py-tool",
+      "name": "Linter invocation",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Runs a per-language or operator-configured lint command after every edit; the filename argument is shell-quoted, but the invocation itself has no pre-execution confirmation.",
+      "evidence": [
+        {"file": "aider/linter.py", "line": 47, "note": "run_cmd appends oslex.quote(rel_fname) and calls run_cmd_subprocess (shell=True)"},
+        {"file": "aider/linter.py", "line": 82, "note": "lint() picks the operator's --lint-cmd, the per-language default, or the built-in basic_lint"},
+        {"file": "aider/args.py", "line": 543, "note": "--auto-lint declared with default=True"}
+      ]
+    },
+    {
+      "id": "scrape-py-tool",
+      "name": "Web scraper",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Fetches a URL with Playwright or httpx and converts the HTML to markdown; no domain allowlist and no content labelling.",
+      "evidence": [
+        {"file": "aider/scrape.py", "line": 98, "note": "Scraper.scrape fetches any URL handed to it and returns markdown"},
+        {"file": "aider/scrape.py", "line": 194, "note": "scrape_with_httpx follows redirects with verify=self.verify_ssl"},
+        {"file": "aider/scrape.py", "line": 253, "note": "slimdown_html strips tags and attributes but keeps all text, including instruction-shaped text"}
+      ]
+    },
+    {
+      "id": "repo-py-tool",
+      "name": "Git repository operations",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "GitPython wrapper for staging, committing, diffing and undoing; also the owner of the .aiderignore / --subtree-only scope check.",
+      "evidence": [
+        {"file": "aider/repo.py", "line": 131, "note": "commit() stages the named files and builds the commit command"},
+        {"file": "aider/repo.py", "line": 278, "note": "if not self.git_commit_verify: cmd.append('--no-verify') on every aider commit"},
+        {"file": "aider/repo.py", "line": 532, "note": "ignored_file / ignored_file_raw implement the .aiderignore and --subtree-only scope"}
+      ]
+    },
+    {
+      "id": "repomap-py-tool",
+      "name": "Repository map",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Builds a ranked tag summary of the wider repository for context; sourced from git-tracked files filtered through the aiderignore scope, cached under the repo root.",
+      "evidence": [
+        {"file": "aider/repomap.py", "line": 103, "note": "get_repo_map builds the summary from chat files and other tracked files"},
+        {"file": "aider/repo.py", "line": 486, "note": "get_tracked_files filters every path through ignored_file, so the map honours .aiderignore and --subtree-only"},
+        {"file": "aider/repomap.py", "line": 43, "note": "TAGS_CACHE_DIR is written under the repository root"}
+      ]
+    },
+    {
+      "id": "coders-init-py-tool",
+      "name": "Edit-format coders (file writer)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The family of edit-format coders enumerated in coders/__init__.py (edit-block, patch, whole-file, unified-diff and their editor variants); each implements apply_edits, which is where model output becomes bytes on disk.",
+      "evidence": [
+        {"file": "aider/coders/__init__.py", "line": 1, "note": "the __all__ table enumerates the whole coder family"},
+        {"file": "aider/coders/editblock_coder.py", "line": 41, "note": "EditBlockCoder.apply_edits writes the model's replacement text to the resolved path"},
+        {"file": "aider/coders/wholefile_coder.py", "line": 124, "note": "WholeFileCoder.apply_edits writes whole-file replacements"},
+        {"file": "aider/coders/patch_coder.py", "line": 549, "note": "PatchCoder.apply_edits applies add/update/delete actions"}
+      ]
+    },
+    {
+      "id": "help-py-tool",
+      "name": "/help documentation index",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "A llama-index vector store built over aider's own packaged website markdown and cached under the home directory; retrieval feeds a help-mode coder. The corpus ships with the package, so its write path is not agent-writable.",
+      "evidence": [
+        {"file": "aider/help.py", "line": 84, "note": "get_index builds/loads a VectorStoreIndex from the packaged aider.website markdown only"},
+        {"file": "aider/help.py", "line": 139, "note": "HuggingFaceEmbedding(model_name='BAAI/bge-small-en-v1.5') resolved by mutable name at runtime, no revision pin or hash"},
+        {"file": "aider/help.py", "line": 145, "note": "Help.ask retrieves the top-k nodes and wraps them in <doc> tags for the model"}
+      ]
+    },
+    {
+      "id": "webpage-external-service",
+      "name": "Fetched web page",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Whatever host the operator's URL resolves to; its content is attacker-authored from aider's point of view and reaches the model with no provenance marking.",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 227, "note": "cmd_web scrapes whatever URL was typed or auto-detected; aider ships no domain allowlist"},
+        {"file": "aider/scrape.py", "line": 170, "note": "page.goto(url) loads the arbitrary remote page"}
+      ]
+    },
+    {
+      "id": "llm-provider-external-service",
+      "name": "Configured LLM provider",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "The operator-configured provider endpoint litellm resolves from the model name and environment keys; receives prompts, added file contents and the repository map.",
+      "evidence": [
+        {"file": "aider/models.py", "line": 1036, "note": "litellm.completion dispatches to the provider selected by the model name"},
+        {"file": "aider/main.py", "line": 519, "note": "--no-verify-ssl replaces the litellm client sessions with verify=False clients"}
+      ]
+    },
+    {
+      "id": "analytics-py-log-sink",
+      "name": "PostHog analytics",
+      "lane": "external_deploy",
+      "kind": "log_sink",
+      "description": "Opt-in telemetry client; explicit event properties are redacted, but the client is constructed with automatic exception capture enabled.",
+      "evidence": [
+        {"file": "aider/analytics.py", "line": 102, "note": "Posthog(...) constructed with enable_exception_autocapture=True and super_properties=get_system_info(); no before-send scrubber"},
+        {"file": "aider/analytics.py", "line": 213, "note": "event() stringifies explicit properties only"},
+        {"file": "aider/analytics.py", "line": 195, "note": "_redact_model_name shows the redaction discipline the autocapture path bypasses"}
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "operator-entrypoint--io-py-client",
+      "from": "operator-entrypoint",
+      "to": "io-py-client",
+      "label": "typed instructions and slash commands",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/io.py", "line": 523, "note": "get_input renders the prompt and reads the line"},
+        {"file": "aider/io.py", "line": 732, "note": "self.user_input(inp) logs the typed line and get_input returns it"}
+      ]
+    },
+    {
+      "id": "io-py-client--base-coder-py-orchestrator",
+      "from": "io-py-client",
+      "to": "base-coder-py-orchestrator",
+      "label": "user message into the loop",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 898, "note": "Coder.get_input delegates to io.get_input"},
+        {"file": "aider/coders/base_coder.py", "line": 912, "note": "preproc_user_input routes the result to commands or into send_message"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--io-py-client",
+      "from": "base-coder-py-orchestrator",
+      "to": "io-py-client",
+      "label": "model replies and tool output",
+      "data": "model output, tool output",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1829, "note": "io.ai_output(self.partial_response_content) after every send"},
+        {"file": "aider/coders/base_coder.py", "line": 1694, "note": "lint_edited pushes the linter's stdout through io.tool_warning"}
+      ]
+    },
+    {
+      "id": "operator-entrypoint--gui-py-client",
+      "from": "operator-entrypoint",
+      "to": "gui-py-client",
+      "label": "prompts and file selections",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/gui.py", "line": 374, "note": "st.chat_input collects the prompt"},
+        {"file": "aider/gui.py", "line": 190, "note": "the file multiselect adds and drops repository files from the chat"}
+      ]
+    },
+    {
+      "id": "untrusted-network-entrypoint--gui-py-client",
+      "from": "untrusted-network-entrypoint",
+      "to": "gui-py-client",
+      "label": "unauthenticated HTTP to the port",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/main.py", "line": 233, "note": "launch_gui never passes --server.address, so Streamlit binds every interface"},
+        {"file": "aider/gui.py", "line": 374, "note": "the chat input accepts whatever reaches the page; no authentication is configured"}
+      ]
+    },
+    {
+      "id": "gui-py-client--base-coder-py-orchestrator",
+      "from": "gui-py-client",
+      "to": "base-coder-py-orchestrator",
+      "label": "browser prompt drives the coder",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/gui.py", "line": 412, "note": "process_chat calls coder.run_stream(prompt) on the live Coder"},
+        {"file": "aider/gui.py", "line": 70, "note": "get_coder swaps coder.commands.io for CaptureIO(yes=True)"}
+      ]
+    },
+    {
+      "id": "watch-py-entrypoint--io-py-client",
+      "from": "watch-py-entrypoint",
+      "to": "io-py-client",
+      "label": "AI comments returned as input",
+      "data": "file contents",
+      "evidence": [
+        {"file": "aider/io.py", "line": 674, "note": "get_input returns file_watcher.process_changes() as if it were the typed line"},
+        {"file": "aider/watch.py", "line": 218, "note": "process_changes concatenates the AI comment context from every tracked file into the prompt"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--commands-py-adapter",
+      "from": "base-coder-py-orchestrator",
+      "to": "commands-py-adapter",
+      "label": "slash-command dispatch",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 916, "note": "preproc_user_input hands anything starting with / or ! to commands.run"},
+        {"file": "aider/commands.py", "line": 312, "note": "Commands.run resolves and invokes the cmd_* method"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter--base-coder-py-orchestrator",
+      "from": "commands-py-adapter",
+      "to": "base-coder-py-orchestrator",
+      "label": "fetched and command output into context",
+      "data": "external content, command output",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 243, "note": "cmd_web prefixes 'Here is the content of {url}:' and appends it to cur_messages as role=user"},
+        {"file": "aider/commands.py", "line": 1036, "note": "cmd_run formats stdout with the run_output template and appends it as role=user"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter--scrape-py-tool",
+      "from": "commands-py-adapter",
+      "to": "scrape-py-tool",
+      "label": "URL to fetch",
+      "data": "url",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 237, "note": "cmd_web constructs the Scraper and calls scrape(url)"},
+        {"file": "aider/scrape.py", "line": 98, "note": "Scraper.scrape dispatches to the Playwright or httpx fetcher"}
+      ]
+    },
+    {
+      "id": "scrape-py-tool--commands-py-adapter",
+      "from": "scrape-py-tool",
+      "to": "commands-py-adapter",
+      "label": "page returned as markdown",
+      "data": "external content",
+      "evidence": [
+        {"file": "aider/scrape.py", "line": 116, "note": "HTML is converted to markdown and returned verbatim"},
+        {"file": "aider/commands.py", "line": 243, "note": "the returned content is used directly, with no filtering or labelling"}
+      ]
+    },
+    {
+      "id": "webpage-external-service--scrape-py-tool",
+      "from": "webpage-external-service",
+      "to": "scrape-py-tool",
+      "label": "remote page content",
+      "data": "external content",
+      "evidence": [
+        {"file": "aider/scrape.py", "line": 170, "note": "page.goto(url) then page.content() returns whatever the host served"},
+        {"file": "aider/scrape.py", "line": 202, "note": "the httpx path returns response.text with redirects followed"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--check-for-urls-base-coder-py-control",
+      "from": "base-coder-py-orchestrator",
+      "to": "check-for-urls-base-coder-py-control",
+      "label": "URLs detected in input text",
+      "data": "url",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 920, "note": "preproc_user_input calls check_for_urls on every incoming message"},
+        {"file": "aider/coders/base_coder.py", "line": 970, "note": "the URL regex runs over the whole input, including text pasted from untrusted sources"}
+      ]
+    },
+    {
+      "id": "check-for-urls-base-coder-py-control--commands-py-adapter",
+      "from": "check-for-urls-base-coder-py-control",
+      "to": "commands-py-adapter",
+      "label": "approved URL handed to cmd_web",
+      "data": "url",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 980, "note": "inp += self.commands.cmd_web(url, return_content=True) once the gate returns True"}
+      ]
+    },
+    {
+      "id": "check-for-urls-base-coder-py-control--confirm-ask-io-py-control",
+      "from": "check-for-urls-base-coder-py-control",
+      "to": "confirm-ask-io-py-control",
+      "label": "add-URL confirmation request",
+      "data": "approval",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 976, "note": "confirm_ask('Add URL to the chat?') with no explicit_yes_required"},
+        {"file": "aider/io.py", "line": 866, "note": "under --yes-always this branch returns 'y'"}
+      ]
+    },
+    {
+      "id": "base-prompts-py-prompt--base-coder-py-orchestrator",
+      "from": "base-prompts-py-prompt",
+      "to": "base-coder-py-orchestrator",
+      "label": "system prompt and content framing",
+      "data": "prompt text",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1333, "note": "format_messages assembles the system prompt, examples and content prefixes"},
+        {"file": "aider/coders/base_prompts.py", "line": 24, "note": "the available prefixes cover added files, the repo map and read-only files only"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--models-py-model",
+      "from": "base-coder-py-orchestrator",
+      "to": "models-py-model",
+      "label": "assembled messages",
+      "data": "prompts, file contents, repo map",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1795, "note": "Coder.send calls model.send_completion with the full message list"},
+        {"file": "aider/models.py", "line": 1015, "note": "send_completion builds the kwargs and hashes them before dispatch"}
+      ]
+    },
+    {
+      "id": "models-py-model--llm-provider-external-service",
+      "from": "models-py-model",
+      "to": "llm-provider-external-service",
+      "label": "prompt payload over HTTPS",
+      "data": "prompts, file contents, credentials",
+      "evidence": [
+        {"file": "aider/models.py", "line": 1036, "note": "litellm.completion(**kwargs) is the only outbound path carrying repository content"},
+        {"file": "aider/main.py", "line": 519, "note": "certificate verification is on unless --no-verify-ssl replaces the client sessions"}
+      ]
+    },
+    {
+      "id": "llm-provider-external-service--models-py-model",
+      "from": "llm-provider-external-service",
+      "to": "models-py-model",
+      "label": "completion response",
+      "data": "model output",
+      "evidence": [
+        {"file": "aider/models.py", "line": 1036, "note": "the completion object is returned to the caller for streaming or direct read"}
+      ]
+    },
+    {
+      "id": "models-py-model--base-coder-py-orchestrator",
+      "from": "models-py-model",
+      "to": "base-coder-py-orchestrator",
+      "label": "edit blocks and shell commands",
+      "data": "model output",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1806, "note": "the streamed response is accumulated into partial_response_content"},
+        {"file": "aider/coders/base_coder.py", "line": 1521, "note": "the accumulated reply becomes the input to edit parsing and shell-command extraction"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--allowed-to-edit-base-coder-py-control",
+      "from": "base-coder-py-orchestrator",
+      "to": "allowed-to-edit-base-coder-py-control",
+      "label": "model-chosen file path",
+      "data": "model output",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2296, "note": "apply_updates parses the edits and calls prepare_to_edit"},
+        {"file": "aider/coders/base_coder.py", "line": 2285, "note": "prepare_to_edit calls allowed_to_edit once per distinct path"}
+      ]
+    },
+    {
+      "id": "allowed-to-edit-base-coder-py-control--coders-init-py-tool",
+      "from": "allowed-to-edit-base-coder-py-control",
+      "to": "coders-init-py-tool",
+      "label": "approved edit applied to disk",
+      "data": "file contents",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2304, "note": "self.apply_edits(edits) runs only for paths allowed_to_edit approved"},
+        {"file": "aider/coders/editblock_coder.py", "line": 41, "note": "apply_edits writes the new content to the resolved absolute path"}
+      ]
+    },
+    {
+      "id": "allowed-to-edit-base-coder-py-control--confirm-ask-io-py-control",
+      "from": "allowed-to-edit-base-coder-py-control",
+      "to": "confirm-ask-io-py-control",
+      "label": "edit approval request",
+      "data": "approval",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2226, "note": "'Allow edits to file that has not been added to the chat?' with no explicit_yes_required"},
+        {"file": "aider/io.py", "line": 866, "note": "under --yes-always this gate auto-answers yes"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--handle-shell-commands-base-coder-py-control",
+      "from": "base-coder-py-orchestrator",
+      "to": "handle-shell-commands-base-coder-py-control",
+      "label": "shell commands parsed from the reply",
+      "data": "model output",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1609, "note": "run_shell_commands is called after edits are applied"},
+        {"file": "aider/coders/base_coder.py", "line": 2434, "note": "run_shell_commands iterates self.shell_commands collected from the model reply"}
+      ]
+    },
+    {
+      "id": "handle-shell-commands-base-coder-py-control--confirm-ask-io-py-control",
+      "from": "handle-shell-commands-base-coder-py-control",
+      "to": "confirm-ask-io-py-control",
+      "label": "explicit-yes approval request",
+      "data": "approval",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2456, "note": "confirm_ask(..., explicit_yes_required=True, allow_never=True)"},
+        {"file": "aider/io.py", "line": 867, "note": "explicit_yes_required gates answer 'n' under --yes-always"}
+      ]
+    },
+    {
+      "id": "handle-shell-commands-base-coder-py-control--run-cmd-py-tool",
+      "from": "handle-shell-commands-base-coder-py-control",
+      "to": "run-cmd-py-tool",
+      "label": "approved command string",
+      "data": "command",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2475, "note": "run_cmd(command, cwd=self.root) once the explicit-yes gate returns True"},
+        {"file": "aider/run_cmd.py", "line": 62, "note": "the string is handed to the shell verbatim"}
+      ]
+    },
+    {
+      "id": "run-cmd-py-tool--base-coder-py-orchestrator",
+      "from": "run-cmd-py-tool",
+      "to": "base-coder-py-orchestrator",
+      "label": "command output back into context",
+      "data": "command output",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2479, "note": "accumulated output is appended to cur_messages once the ordinary gate passes"},
+        {"file": "aider/prompts.py", "line": 36, "note": "the run_output template presents it in the operator's own voice"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter--run-cmd-py-tool",
+      "from": "commands-py-adapter",
+      "to": "run-cmd-py-tool",
+      "label": "/run and /test command line",
+      "data": "command",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 1015, "note": "cmd_run executes the operator's command string directly"},
+        {"file": "aider/commands.py", "line": 993, "note": "cmd_test routes the configured test command through cmd_run"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--linter-py-tool",
+      "from": "base-coder-py-orchestrator",
+      "to": "linter-py-tool",
+      "label": "auto-lint after every edit",
+      "data": "file paths",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1599, "note": "if edited and self.auto_lint: lint_errors = self.lint_edited(edited) -- executed before any confirmation"},
+        {"file": "aider/coders/base_coder.py", "line": 1686, "note": "lint_edited calls the Linter once per edited path"}
+      ]
+    },
+    {
+      "id": "linter-py-tool--base-coder-py-orchestrator",
+      "from": "linter-py-tool",
+      "to": "base-coder-py-orchestrator",
+      "label": "lint errors as a reflection message",
+      "data": "command output",
+      "evidence": [
+        {"file": "aider/linter.py", "line": 61, "note": "the lint command's stdout becomes the error text"},
+        {"file": "aider/coders/base_coder.py", "line": 1604, "note": "confirm_ask('Attempt to fix lint errors?') then reflected_message = lint_errors"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--repo-py-tool",
+      "from": "base-coder-py-orchestrator",
+      "to": "repo-py-tool",
+      "label": "auto-commit of edited files",
+      "data": "file contents",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 2375, "note": "auto_commit calls repo.commit(fnames=edited, aider_edits=True)"},
+        {"file": "aider/repo.py", "line": 271, "note": "commit builds the git command, appending --no-verify unless verification is enabled"}
+      ]
+    },
+    {
+      "id": "coders-init-py-tool--repo-py-tool",
+      "from": "coders-init-py-tool",
+      "to": "repo-py-tool",
+      "label": "written files staged for commit",
+      "data": "file contents",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 1585, "note": "the set of paths apply_updates wrote is passed straight to auto_commit"},
+        {"file": "aider/repo.py", "line": 280, "note": "each of those paths is git-added before the commit"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter--repo-py-tool",
+      "from": "commands-py-adapter",
+      "to": "repo-py-tool",
+      "label": "/git, /commit, /undo, /diff",
+      "data": "command",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 967, "note": "cmd_git runs an arbitrary operator-typed git command through the shell"},
+        {"file": "aider/commands.py", "line": 553, "note": "cmd_undo reverts only commits whose hash is in aider_commit_hashes"}
+      ]
+    },
+    {
+      "id": "repomap-py-tool--base-coder-py-orchestrator",
+      "from": "repomap-py-tool",
+      "to": "base-coder-py-orchestrator",
+      "label": "repository map summaries",
+      "data": "file contents",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 709, "note": "get_repo_map builds the map from tracked files not already in the chat"},
+        {"file": "aider/coders/base_coder.py", "line": 750, "note": "get_repo_messages inserts the map into the request as a user message"}
+      ]
+    },
+    {
+      "id": "io-py-client--aider-chat-history-md-memory",
+      "from": "io-py-client",
+      "to": "aider-chat-history-md-memory",
+      "label": "transcript append",
+      "data": "user text, model output, tool output",
+      "evidence": [
+        {"file": "aider/io.py", "line": 1128, "note": "the file is opened for append with no mode argument and no chmod"},
+        {"file": "aider/io.py", "line": 966, "note": "_tool_message writes every tool_output/tool_warning line, including linter stdout, to the transcript"}
+      ]
+    },
+    {
+      "id": "aider-chat-history-md-memory--base-coder-py-orchestrator",
+      "from": "aider-chat-history-md-memory",
+      "to": "base-coder-py-orchestrator",
+      "label": "restored transcript re-enters context",
+      "data": "prior conversation",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 519, "note": "with --restore-chat-history the transcript is split into done_messages and summarized"},
+        {"file": "aider/history.py", "line": 98, "note": "summarize_all rewrites the retained turns in the user's first person, dropping origin framing"}
+      ]
+    },
+    {
+      "id": "base-coder-py-orchestrator--analytics-py-log-sink",
+      "from": "base-coder-py-orchestrator",
+      "to": "analytics-py-log-sink",
+      "label": "session events",
+      "data": "telemetry",
+      "evidence": [
+        {"file": "aider/coders/base_coder.py", "line": 345, "note": "self.event is bound directly to Analytics.event"},
+        {"file": "aider/coders/base_coder.py", "line": 2113, "note": "message_send events carry model name, token counts and cost"}
+      ]
+    },
+    {
+      "id": "commands-py-adapter--help-py-tool",
+      "from": "commands-py-adapter",
+      "to": "help-py-tool",
+      "label": "/help question to the index",
+      "data": "user text",
+      "evidence": [
+        {"file": "aider/commands.py", "line": 1119, "note": "cmd_help builds the Help index on first use and queries it"},
+        {"file": "aider/help.py", "line": 145, "note": "Help.ask retrieves the top 20 nodes for the question"}
+      ]
+    },
+    {
+      "id": "help-py-tool--commands-py-adapter",
+      "from": "help-py-tool",
+      "to": "commands-py-adapter",
+      "label": "retrieved doc snippets",
+      "data": "retrieved content",
+      "evidence": [
+        {"file": "aider/help.py", "line": 148, "note": "retrieved node text is wrapped in <doc> tags and returned as context"}
+      ]
+    },
+    {
+      "id": "confirm-ask-io-py-control--io-py-client",
+      "from": "confirm-ask-io-py-control",
+      "to": "io-py-client",
+      "label": "approval prompt to the operator",
+      "data": "approval",
+      "evidence": [
+        {"file": "aider/io.py", "line": 874, "note": "the prompt session asks the question interactively when --yes-always is not set"},
+        {"file": "aider/io.py", "line": 922, "note": "the question and the answer are appended to the transcript"}
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Untrusted content entering the model's context",
+      "crossing_edges": [
+        "webpage-external-service--scrape-py-tool",
+        "scrape-py-tool--commands-py-adapter",
+        "commands-py-adapter--base-coder-py-orchestrator",
+        "run-cmd-py-tool--base-coder-py-orchestrator",
+        "linter-py-tool--base-coder-py-orchestrator",
+        "watch-py-entrypoint--io-py-client",
+        "check-for-urls-base-coder-py-control--commands-py-adapter"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "Aider MUST NOT treat instructions embedded in retrieved or untrusted content — scraped web pages, third-party file contents, or the stdout/stderr of executed commands — as authoritative directives",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-07",
+          "excerpt": "URLs auto-detected in untrusted content … MUST be confirmed by the operator before fetch, and that confirmation MUST resist `--yes-always`.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-19",
+          "excerpt": "Adding externally fetched or command-produced output into the LLM context MUST require user confirmation.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Scraped pages and command output are appended as role=user messages phrased in the operator's own voice, so instruction-shaped text inside them is indistinguishable from a genuine operator instruction.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "LLM01",
+          "summary": "An AI! or AI? comment inside a repository file the operator did not author is acted on as an operator instruction, and the watch prompt asserts 'I've written your instructions in comments in the code' (checked: watch.py:257-281 filters only by gitignore spec and file size, and watch_prompts.py:1-12 supplies no authorship or provenance qualifier).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM01",
+          "summary": "The two gates that decide whether fetched pages and command output enter the context are ordinary confirm_ask calls, so an unattended --yes-always or scripted --message run answers them itself and the URL gate additionally offers a persist-across-batch 'all' option.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Model decision to shell execution and file writes",
+      "crossing_edges": [
+        "base-coder-py-orchestrator--handle-shell-commands-base-coder-py-control",
+        "handle-shell-commands-base-coder-py-control--run-cmd-py-tool",
+        "base-coder-py-orchestrator--linter-py-tool",
+        "base-coder-py-orchestrator--allowed-to-edit-base-coder-py-control",
+        "allowed-to-edit-base-coder-py-control--coders-init-py-tool",
+        "commands-py-adapter--run-cmd-py-tool"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-17",
+          "excerpt": "All shell-command execution — `/run`, `/test`, auto-lint / auto-test, and any command originating from LLM output … MUST require explicit operator approval before it is executed and MUST NOT run silently.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-23",
+          "excerpt": "Destructive and code-executing actions MUST retain an explicit per-action confirmation gate (an `explicit_yes_required`-style check) even under non-interactive operation",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-18",
+          "excerpt": "Editing or creating files that the user has NOT added to the chat MUST require confirmation before aider modifies them.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-02",
+          "excerpt": "Aider may operate only within the operator-designated repository / working tree, and MUST honor the operator's `.aiderignore` / `--subtree-only` scope where set",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Auto-lint executes a shell command after every edit with no pre-execution confirmation and ships enabled by default; the only prompt appears after the command has already run, asking whether to fix its errors.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM10",
+          "summary": "A model-supplied edit path is joined to the repository root and resolved with no containment check, so an absolute path replaces the root and ../ segments walk out of it, and the operator's .aiderignore scope is never consulted on the write path.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The sole authorization on a model-chosen write is a confirm_ask that is not marked explicit_yes_required, so in an unattended --message or --watch-files run it answers itself and the write proceeds unreviewed.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "Shell commands the model proposes reach the user's login shell with shell=True, but the single confirmation on that path is marked explicit_yes_required and io.py answers such gates 'no' under --yes-always, and the group 'all' shortcut is disabled for them.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/coders/base_coder.py", "line": 2456}
+        }
+      ]
+    },
+    {
+      "id": "state-commit",
+      "name": "Edits committed into git history",
+      "crossing_edges": [
+        "base-coder-py-orchestrator--repo-py-tool",
+        "coders-init-py-tool--repo-py-tool",
+        "commands-py-adapter--repo-py-tool"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-22",
+          "excerpt": "Aider MUST NOT bypass the repository's configured git pre-commit hooks unless the operator has explicitly authorized skipping them.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-20",
+          "excerpt": "Aider MUST NOT discard, overwrite, or bury the user's uncommitted work; any pre-existing uncommitted changes MUST be preserved (committed separately) before aider applies its own edits.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-21",
+          "excerpt": "Aider MUST NOT rewrite or destroy git history; `/undo` MUST only revert a commit that aider itself created.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-26",
+          "excerpt": "Aider's own commits MUST remain attributable to it (author/committer attribution or a Co-authored-by trailer) so its changes are auditable in the git history.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM03",
+          "summary": "Every aider commit appends --no-verify because --git-commit-verify defaults to False, so whatever the repository wired into pre-commit — secret scanning, formatting, tests — never runs on AI-authored changes.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "D",
+          "owasp": null,
+          "summary": "An aider commit could bury the developer's uncommitted work, but any dirty file about to be edited is committed separately first so it stays independently recoverable.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/coders/base_coder.py", "line": 2175}
+        },
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "/undo could be steered into destroying operator history, but it reverts only commits whose hash aider recorded and refuses multi-parent commits, dirty files, and commits already pushed.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/commands.py", "line": 566}
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Transcript replayed into a later session",
+      "crossing_edges": [
+        "io-py-client--aider-chat-history-md-memory",
+        "aider-chat-history-md-memory--base-coder-py-orchestrator"
+      ],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "The transcript aider writes unattended can be read back as prior conversation with --restore-chat-history and re-summarized in the user's first person, so instruction-shaped text that reached it — model replies echoing fetched content, linter and tool output — returns in a later session with whatever origin framing it had stripped.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Local transcript and history files",
+      "crossing_edges": [
+        "io-py-client--aider-chat-history-md-memory"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-15",
+          "excerpt": "Local chat-history files SHOULD be gitignored and owner-readable, with credential-pattern redaction recommended.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The transcript is opened for append with no mode argument and there is no chmod anywhere in the scanned tree, so it lands world-readable under a typical umask, and nothing filters credential patterns that pass through the conversation into it.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "--llm-history-file writes the full request and response stream, including every added file's contents, to a plaintext file with the same default permissions and no redaction (checked: io.py:754-765 opens it with no mode argument; grep for chmod/0o600 across the scanned tree returns nothing).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Repository content to the model provider",
+      "crossing_edges": [
+        "models-py-model--llm-provider-external-service",
+        "llm-provider-external-service--models-py-model"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-11",
+          "excerpt": "Repository source, file contents, prompts, and credentials MUST NOT be transmitted to any destination other than the operator-configured LLM provider(s) required to perform the requested edits.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-06",
+          "excerpt": "Only operator-configured provider endpoint(s); connections MUST verify TLS certificates.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Prompts, added file contents and the repository map cross the network in the clear if certificate verification is turned off; verification is on by default.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/args.py", "line": 151},
+          "remainder": "a single --no-verify-ssl flag disables verification globally — the provider connection, the model-metadata fetch and the web scraper all drop certificate checking together"
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Repository source could leave for a destination other than the sanctioned provider, but there is exactly one completion call site and the endpoint comes from the operator's own model and environment configuration; no other outbound path carries repository content.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/models.py", "line": 1036}
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Provider credentials at rest and in the process environment",
+      "crossing_edges": [],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Provider keys are loaded from .env files and the OAuth key file into the process environment, and the shell tool spawns with that environment inherited, so any approved command can read every configured key (checked: run_cmd.py:62-73 and :116 pass no env argument, and commands.py:972-983 sets only GIT_EDITOR).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The OpenRouter OAuth flow appends the issued key to a file under the home directory opened with no mode argument, so it lands at the default umask (checked: onboarding.py:361-367; grep for chmod/0o600 across the scanned tree returns nothing).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Runtime-fetched metadata and dependencies",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-09",
+          "excerpt": "Integrity of what they return is still in scope (e.g., an unpinned metadata fetch is a supply-chain finding, not a trust expansion).",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "The price and context-window database that drives model selection and token budgeting is pulled from the main branch of a third-party repository and cached with no signature or digest check, and the /help embedding model is downloaded by bare name with no revision pin.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "A dependency version swap or confusion attack would reach the runtime, but all runtime dependencies are ==-pinned in a machine-compiled requirements file built against a shared constraints file.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "requirements.txt", "line": 1}
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Browser UI reachable off-host",
+      "crossing_edges": [
+        "untrusted-network-entrypoint--gui-py-client",
+        "operator-entrypoint--gui-py-client",
+        "gui-py-client--base-coder-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-05",
+          "excerpt": "Experimental web UI; it MUST bind to loopback only and MUST NOT be exposed to a public or otherwise untrusted network.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI03",
+          "summary": "Browser mode launches Streamlit with no --server.address and no authentication, so on a shared or untrusted network anyone who can route to the port is treated as the operator and can add files, drive the model and issue git and shell input.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The GUI constructs its command IO with yes=True, so confirmations raised by browser-issued slash commands answer themselves; the explicit-yes carve-out still refuses the model-suggested shell gate.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/io.py", "line": 866},
+          "remainder": "every gate not marked explicit_yes_required — edits to files not added to the chat, URL fetches, and command-output ingestion — auto-answers yes for commands issued through the browser"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Analytics and local audit record",
+      "crossing_edges": [
+        "base-coder-py-orchestrator--analytics-py-log-sink"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-13",
+          "excerpt": "Analytics telemetry MUST NOT include source code, prompt/chat content, API keys or credentials, or personal information.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-12",
+          "excerpt": "Analytics / PostHog telemetry is opt-in and OFF by default; aider MUST NOT send any analytics without explicit operator opt-in.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The PostHog client is constructed with automatic exception capture enabled and no before-send scrubber, so uncaught exceptions ship stack frames carrying absolute paths from the developer's machine — the one payload class the deliberate redaction helper never sees.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "The two highest-impact actions — running a command and writing a file — produce no structured event with a timestamp, path, exit status or approval outcome; the only durable trace is a free-form markdown transcript.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "Telemetry could be collected without the developer's knowledge, but the client disables itself unless the user has been asked and opted in, and a permanent opt-out is persisted.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {"file": "aider/analytics.py", "line": 85}
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "fetched-page-to-arbitrary-file-write",
+      "name": "A web page aider reads tells it to overwrite a file outside the repository",
+      "steps": [
+        {
+          "node": "webpage-external-service",
+          "finding_id": null,
+          "summary": "The page is served by whatever host the URL resolves to — attacker-authored content, and aider ships no domain allowlist"
+        },
+        {
+          "node": "scrape-py-tool",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "The HTML is converted to markdown with all text preserved and no trust labelling applied"
+        },
+        {
+          "node": "commands-py-adapter",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "cmd_web prefixes it with 'Here is the content of {url}:' and appends it to the conversation as a role=user message"
+        },
+        {
+          "node": "base-coder-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "The injected text arrives in the same role, register and position as a genuine operator instruction, so the model's next edit can be directed by it"
+        },
+        {
+          "node": "allowed-to-edit-base-coder-py-control",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "The model-chosen path is resolved with no repository-root containment and no .aiderignore check, and the single confirmation is one --yes-always answers for you"
+        },
+        {
+          "node": "coders-init-py-tool",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "The edit is written to any path the developer's account can reach, inside the repository or outside it"
+        }
+      ]
+    },
+    {
+      "id": "network-caller-to-committed-change",
+      "name": "A stranger on the network gets a change committed to the developer's repository",
+      "steps": [
+        {
+          "node": "untrusted-network-entrypoint",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "Browser mode listens on every interface with no authentication, so any host that can route to the port is unauthenticated and unidentified"
+        },
+        {
+          "node": "gui-py-client",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "The page accepts a chat prompt and lets the caller add repository files to the session"
+        },
+        {
+          "node": "base-coder-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "process_chat drives the live Coder with the caller's prompt, and the GUI's command IO is built with yes=True"
+        },
+        {
+          "node": "allowed-to-edit-base-coder-py-control",
+          "finding_id": null,
+          "summary": "Files the caller added through the UI are already in the chat set, so the gate returns immediately with no prompt at all"
+        },
+        {
+          "node": "coders-init-py-tool",
+          "finding_id": null,
+          "summary": "The model's replacement text is written into the developer's working tree"
+        },
+        {
+          "node": "repo-py-tool",
+          "finding_id": "PRAX-2026-08-12-006",
+          "summary": "auto_commit commits the change with --no-verify, so the repository's own pre-commit hooks never inspect it"
+        }
+      ]
+    },
+    {
+      "id": "planted-ai-comment-to-unattended-write",
+      "name": "A comment planted in third-party code makes aider edit files with nobody watching",
+      "steps": [
+        {
+          "node": "watch-py-entrypoint",
+          "finding_id": null,
+          "summary": "An AI! comment in a file the operator never authored — a vendored dependency, a teammate's commit, a checked-out branch — matches the watcher's pattern with no authorship check"
+        },
+        {
+          "node": "io-py-client",
+          "finding_id": null,
+          "summary": "process_changes returns the assembled comment text from get_input as though the operator had typed it"
+        },
+        {
+          "node": "base-coder-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "The watch prompt asserts 'I've written your instructions in comments in the code', so third-party text reaches the model in the operator's voice"
+        },
+        {
+          "node": "allowed-to-edit-base-coder-py-control",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "In an unattended watch run the edit gate is not explicit_yes_required, so it answers itself and the resolved path is never contained to the repository"
+        },
+        {
+          "node": "coders-init-py-tool",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "The edits land on disk with no operator in the loop at any point"
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Three placements strained. The fetched web page is filed in external_deploy as an external service although its only role in this model is as an untrusted input origin, which user_inputs also claims. io.py spans two lanes: its terminal surface is client_adapters while its confirmation gate is filed in agent_core under the control-lane rule, because the orchestrator is the process that calls it and keeping it there keeps the control chain local. The chat transcript is filed as agent_core memory because it re-enters the agent's own reasoning, even though it is simultaneously the target's only durable log and could equally be read as a log sink.",
+    "omissions": "Arbitration divergence: the stored finding PRAX-2026-08-12-004 carries ASI05 alongside LLM03; under the Agentic KB's compound table the more specific row is 'Missing/disabled approval gate on a consequential action', which makes LLM03 the primary and ASI05 a co-tag, so the tool-invocation threat is tagged LLM03. Tagging note: PRAX-2026-08-12-001 is stored LLM10 for the whole chain under the sink>input>grant order; the tool-invocation threat drawn from it names the auto-answering approval as its mechanism, which is grant evidence, so it is tagged LLM03 there — the sink half of the same chain is carried by the LLM10 threat backed by PRAX-2026-08-12-003 at the same boundary. Code-match scope: PRAX-2026-08-12-011 asserts the transcript 'receives scraped page text and command output verbatim via the cur_messages path'; in the snapshot the transcript writers are io.user_input (the raw typed line, logged before check_for_urls appends fetched content), io.ai_output (assistant replies) and io._tool_message (all tool_output/tool_warning lines, which do carry linter stdout via lint_edited) — cur_messages is not a writer to that file, so the stored-state threat is scoped to what the code supports and the finding is still cited. Components suspected but folded rather than given nodes: voice transcription (voice.py), clipboard/image paste (copypaste.py) and the OpenRouter OAuth onboarding flow (onboarding.py) are declared capabilities whose trust consequence at these boundaries is already carried by the ingest gates and the secret-material boundary; the per-format coder subclasses, chat-chunk assembly and the history summarizer are framework plumbing folded into the orchestrator and the memory node. Scope: aider/*.py top-level and aider/coders/ per the scan instructions, with requirements.txt cited only for the tree-wide dependency-pinning sweep; benchmark/, scripts/ and tests/ were not examined.",
+    "counts": {"nodes": 24, "edges": 40, "boundaries": 10, "threats": 24}
+  }
+}

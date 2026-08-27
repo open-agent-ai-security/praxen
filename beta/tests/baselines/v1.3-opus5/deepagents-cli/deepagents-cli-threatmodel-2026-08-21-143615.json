@@ -1,0 +1,1750 @@
+{
+  "spec_version": "1.4",
+  "praxen_version": "1.3.0",
+  "target": {
+    "slug": "deepagents-cli",
+    "source_root": "/Users/steve.wilson/Documents/github/deckard/local/v1.3-freeze/src/deepagents-cli"
+  },
+  "analysis_ref": "deepagents-cli-findings-2026-08-12.json",
+  "model_identity": "You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].",
+  "executive_summary": "Deep Agents Code is a terminal coding assistant that a developer \u2014 or a CI workflow \u2014 points at a project directory and lets drive that project: it reads and rewrites files, runs shell commands, fetches web pages, delegates to sub-agents, and extends itself with operator-configured MCP servers. Its declared safety model rests on one control, a human approval prompt in front of every side-effecting tool. Two surfaces matter most. The first is the project directory itself: the runtime samples the working directory's Makefile and file listing into the system prompt on every turn, and tool results \u2014 fetched pages, search snippets, MCP responses, command output \u2014 come back into the conversation with nothing marking them as untrusted. The second is the run mode: the approval prompt is real and well built in the interactive terminal, and effectively absent in the headless and CI paths the same binary offers.\n\nThe first thing to deal with is unattended execution. In a headless run every action other than a shell command is approved automatically, and there is no setting that puts approval back for file writes, deletes, web requests or sub-agent launches. The one control that does apply to shell commands is not a boundary: an allow-everything setting is accepted, and an ordinary allow-list is checked against the name of each command only, never its arguments \u2014 so allowing any interpreter or wrapper quietly allows everything. Put together with the untrusted content flowing into the prompt, a hostile repository can steer an unattended run into arbitrary commands on the developer's machine or the CI runner, and an attacker-controlled web page can get files rewritten. Fix the headless path first: give non-shell tools the same gate the terminal has, drop the allow-everything setting, and match commands on more than their first word.\n\nTwo further items deserve attention. The local agent-runtime server the front-end talks to runs with authentication switched off, so any other process running as the same user can read the conversation or inject instructions into it \u2014 and because sessions are checkpointed, those instructions come back when the thread resumes. That checkpoint database keeps everything the agent ever read, unencrypted, with no expiry, in a directory created without explicit permissions. Alongside these, an MCP server can currently exempt its own tools from approval by labelling them read-only, and nothing durable records what the agent did or decided \u2014 the audit stream exists but only fires for operators who have configured it, which makes any of the above hard to detect after the fact.",
+  "lanes": [
+    "user_inputs",
+    "client_adapters",
+    "agent_core",
+    "tools_mcp",
+    "external_deploy"
+  ],
+  "nodes": [
+    {
+      "id": "local-developer-entrypoint",
+      "name": "Local developer / CI identity",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "The operator who launches dcode and is the sole authority for approvals, typing prompts into the TUI or piping them to the headless client.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/main.py",
+          "line": 1529,
+          "note": "parse_args builds the CLI surface the operator drives, including --non-interactive, --stdin and --shell-allow-list"
+        },
+        {
+          "file": "tests/baselines/v1.3-opus5/deepagents-cli/deepagents-cli-remit.md",
+          "line": 82,
+          "note": "remit names the launching developer or CI workflow identity as the sole approval authority"
+        }
+      ]
+    },
+    {
+      "id": "makefile-datastore",
+      "name": "Working-directory project content",
+      "lane": "user_inputs",
+      "kind": "datastore",
+      "description": "The project directory the agent is pointed at \u2014 its Makefile, file listing and tree, and any project-level .agents/ definitions \u2014 read by the runtime before any approval prompt exists.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 595,
+          "note": "_section_makefile emits the first 20 lines of the working directory's Makefile into the detect-script output"
+        },
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 515,
+          "note": "_section_files and _section_tree (:564) enumerate working-directory contents into the same output"
+        },
+        {
+          "file": "libs/code/deepagents_code/subagents.py",
+          "line": 177,
+          "note": "_load_subagents_from_dir reads subagent markdown from project agent directories"
+        }
+      ]
+    },
+    {
+      "id": "app-py-client",
+      "name": "Textual TUI",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "The interactive terminal front-end that collects operator prompts, renders streamed output, and hosts the approval dialog.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/app.py",
+          "line": 2569,
+          "note": "class DeepAgentsApp(App) \u2014 the Textual application that drives an interactive session"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/remote_client.py",
+          "line": 157,
+          "note": "RemoteAgent.astream streams the run from the local runtime server into the UI"
+        }
+      ]
+    },
+    {
+      "id": "approval-py-control",
+      "name": "TUI approval prompt",
+      "lane": "client_adapters",
+      "kind": "control",
+      "description": "The interactive approval menu that shows the pending action and surfaces Unicode / homoglyph warnings before the operator approves or rejects.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tui/widgets/approval.py",
+          "line": 87,
+          "note": "ApprovalMenu renders the pending action and collects the operator's approve/reject decision"
+        },
+        {
+          "file": "libs/code/deepagents_code/tui/widgets/approval.py",
+          "line": 194,
+          "note": "_collect_security_warnings feeds unicode_security findings into the dialog before approval"
+        },
+        {
+          "file": "libs/code/deepagents_code/unicode_security.py",
+          "line": 295,
+          "note": "check_url_safety detects mixed-script / homoglyph-spoofed hostnames used by those warnings"
+        }
+      ]
+    },
+    {
+      "id": "non-interactive-py-client",
+      "name": "Headless client",
+      "lane": "client_adapters",
+      "kind": "client",
+      "description": "The non-interactive / piped-stdin front-end used for scripting and CI, bounded by turn and time budgets.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 1342,
+          "note": "run_non_interactive drives one bounded headless turn"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 1600,
+          "note": "use_auto_approve = not enable_shell or shell_is_unrestricted decides whether the run carries any interrupts at all"
+        }
+      ]
+    },
+    {
+      "id": "make-hitl-decision-non-interactive-py-control",
+      "name": "Headless approval resolver",
+      "lane": "client_adapters",
+      "kind": "control",
+      "description": "The headless run's stand-in for human approval: it checks shell commands against the allow-list and auto-approves every other action.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 831,
+          "note": "_make_hitl_decision resolves each interrupt without a human"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 897,
+          "note": "every action whose name is not 'execute' falls through to an 'Auto-approved action' print and {'type': 'approve'}"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 901,
+          "note": "_collect_action_request_warnings prints Unicode/URL warnings that nothing then acts on"
+        }
+      ]
+    },
+    {
+      "id": "server-py-adapter",
+      "name": "Local agent-runtime server",
+      "lane": "client_adapters",
+      "kind": "adapter",
+      "description": "An ephemeral LangGraph dev subprocess on loopback that both front-ends drive over HTTP+SSE; spawned with authentication disabled and a copy of the launching process environment.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/launch/server.py",
+          "line": 32,
+          "note": "_DEFAULT_HOST = '127.0.0.1' with an OS-assigned ephemeral port"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/launch/server.py",
+          "line": 352,
+          "note": "env['LANGGRAPH_AUTH_TYPE'] = 'noop' in _build_server_env, applied to every session"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/launch/server.py",
+          "line": 350,
+          "note": "env = os.environ.copy() \u2014 the launching environment is inherited wholesale before a short denylist is popped"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator",
+      "name": "Agent loop and tool wiring",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "create_cli_agent assembles the system prompt, tool set, middleware stack, subagents and checkpointer, and is where model output becomes tool calls.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2173,
+          "note": "create_cli_agent builds the CLI agent, its backend and its middleware stack"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2986,
+          "note": "create_deep_agent(...) binds model, tools, backend, interrupt_on and checkpointer into the executable graph"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 1447,
+          "note": "get_system_prompt assembles the instruction surface the model receives"
+        },
+        {
+          "file": "libs/code/deepagents_code/server_graph.py",
+          "line": 370,
+          "note": "_build_graph_factory exposes that graph to the runtime server process"
+        }
+      ]
+    },
+    {
+      "id": "add-interrupt-on-agent-py-control",
+      "name": "HITL interrupt map",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The approval gate: the static map of side-effecting tools that raise an interrupt before execution, extended with non-read-only MCP tools.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2040,
+          "note": "_add_interrupt_on configures human-in-the-loop interrupts for every gated tool"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2117,
+          "note": "interrupt_map registers execute, write_file, edit_file, delete, web_search, fetch_url, task and the async-subagent tools"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2440,
+          "note": "AsyncApprovalHITLMiddleware installs the map, and hitl_active at :2418 decides whether it is installed at all"
+        }
+      ]
+    },
+    {
+      "id": "shell-allow-list-config-py-control",
+      "name": "Shell allow-list check",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "The only shell control that applies without a human: a per-segment first-token match against the operator's allow-list, skipped entirely under the allow-all sentinel.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 3037,
+          "note": "is_shell_command_allowed is the allow-list decision function"
+        },
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 3063,
+          "note": "the SHELL_ALLOW_ALL sentinel returns True before the dangerous-pattern check at :3069"
+        },
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 3088,
+          "note": "the per-segment loop tests only shlex.split(segment)[0] against the allow set \u2014 arguments are never inspected"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 774,
+          "note": "ShellAllowListMiddleware applies that function to execute calls with no interrupt"
+        }
+      ]
+    },
+    {
+      "id": "local-context-py-prompt",
+      "name": "Local-context prompt injection",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "Middleware that runs a bash detection script in the backend and appends the working directory's Makefile, file listing and tree to the system prompt on every model call.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 691,
+          "note": "LocalContextMiddleware runs the detect script and appends the result to the system prompt on every model call"
+        },
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 642,
+          "note": "the section registry lists 09_makefile alongside the capped directory listing"
+        },
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 956,
+          "note": "_get_modified_request returns request.override(system_prompt='\\n\\n'.join(prompt_parts)) \u2014 the content lands in the system prompt, not a user turn"
+        }
+      ]
+    },
+    {
+      "id": "auto-mode-py-control",
+      "name": "Auto-mode classifier",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "An opt-in, interactive-only LLM classifier that allows or denies proposed tool calls by category and fails closed to human review.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/auto_mode.py",
+          "line": 115,
+          "note": "AutoDecisionCategory enumerates scope_escalation, destructive_action, credential_access, security_bypass and persistence denial categories"
+        },
+        {
+          "file": "libs/code/deepagents_code/auto_mode.py",
+          "line": 129,
+          "note": "AutoDecision carries the per-tool-call allow/deny verdict and reason"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2808,
+          "note": "the auto-mode middleware is wired only when auto_mode_config is present and an interrupt map exists"
+        }
+      ]
+    },
+    {
+      "id": "read-only-hint-auto-mode-py-control",
+      "name": "MCP readOnlyHint exemption",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "A gate-removal path: MCP tools whose server-declared metadata says readOnlyHint without a destructive hint are skipped when the interrupt map is built.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/auto_mode.py",
+          "line": 382,
+          "note": "mcp_tool_is_coherently_read_only returns True on server-supplied metadata readOnlyHint is True with no destructive hint"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2132,
+          "note": "the mcp_tools loop in _add_interrupt_on skips any tool passing that check with `continue`, so it never reaches an approval prompt"
+        },
+        {
+          "file": "libs/code/deepagents_code/server_graph.py",
+          "line": 172,
+          "note": "_mcp_tool_is_explicitly_read_only applies the same server-declared hint inside the runtime server process"
+        }
+      ]
+    },
+    {
+      "id": "subagents-py-prompt",
+      "name": "Sub-agent definitions",
+      "lane": "agent_core",
+      "kind": "prompt",
+      "description": "Markdown sub-agent definitions discovered from user and project directories; the body after the YAML frontmatter becomes that sub-agent's system prompt with no content validation.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/subagents.py",
+          "line": 67,
+          "note": "_parse_subagent_file parses frontmatter and takes the markdown body as the subagent's system prompt"
+        },
+        {
+          "file": "libs/code/deepagents_code/subagents.py",
+          "line": 170,
+          "note": "'system_prompt': match.group(2).strip() \u2014 the body is used verbatim"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2428,
+          "note": "project_agents_dir supplies the project-level definitions alongside the user's own"
+        }
+      ]
+    },
+    {
+      "id": "model-config-py-model",
+      "name": "Model resolution and LLM call",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "Operator-selected provider/model resolution and instantiation, including the class_path escape hatch that imports an arbitrary module before validating it.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/model_config.py",
+          "line": 426,
+          "note": "the class_path field documents that setting it executes arbitrary Python from the user's configuration"
+        },
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 4444,
+          "note": "importlib.import_module(module_path) runs the module's top-level statements"
+        },
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 4456,
+          "note": "the issubclass(BaseChatModel) guard only runs after that import"
+        },
+        {
+          "file": "libs/code/deepagents_code/model_config.py",
+          "line": 981,
+          "note": "_load_provider_profiles takes the same shape through file_spec.loader.exec_module(module)"
+        }
+      ]
+    },
+    {
+      "id": "sessions-db-memory",
+      "name": "Session checkpoint store",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "The SQLite checkpoint database holding full conversation state \u2014 prompts, model output, tool arguments and results \u2014 so threads can be resumed.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/sessions.py",
+          "line": 285,
+          "note": "get_db_path does DEFAULT_STATE_DIR.mkdir(parents=True, exist_ok=True) with no mode and returns DEFAULT_STATE_DIR / 'sessions.db'"
+        },
+        {
+          "file": "libs/code/deepagents_code/model_config.py",
+          "line": 524,
+          "note": "DEFAULT_STATE_DIR = ~/.deepagents/.state"
+        },
+        {
+          "file": "libs/code/deepagents_code/sessions.py",
+          "line": 21,
+          "note": "AsyncSqliteSaver is the LangGraph checkpointer backing the thread state"
+        }
+      ]
+    },
+    {
+      "id": "agents-md-memory",
+      "name": "AGENTS.md memory",
+      "lane": "agent_core",
+      "kind": "memory",
+      "description": "Persistent memory files loaded into the prompt each session and, under the default auto-save prompt, written back by the agent itself.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2562,
+          "note": "MemoryMiddleware is installed over the AGENTS.md memory sources"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2282,
+          "note": "memory_auto_save (default True) tells the agent to proactively persist learnings to the AGENTS.md sources"
+        },
+        {
+          "file": "libs/code/deepagents_code/memory_guard.py",
+          "line": 95,
+          "note": "ManagedMemoryGuardMiddleware restores only the managed onboarding-name block after agent edits"
+        }
+      ]
+    },
+    {
+      "id": "execute-tool",
+      "name": "Shell execute tool",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The shell-command tool exposed to the model when shell is enabled; the highest-consequence capability in the inventory.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2291,
+          "note": "enable_shell wires shell execution via LocalShellBackend, making the execute tool available"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 1721,
+          "note": "_format_execute_description renders the command for the approval prompt"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2117,
+          "note": "execute heads the interrupt map of gated tools"
+        }
+      ]
+    },
+    {
+      "id": "fs-tools-tool",
+      "name": "Filesystem tools",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "The read/write/edit/delete/search tools over the configured backend \u2014 the family the agent uses to change files in the operator's project.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 179,
+          "note": "_inject_fs_tools_into_subagents wires the fs tool family into delegated agents"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 1380,
+          "note": "_build_fs_tool_prompt_guidance enumerates the fs tools presented to the model"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2117,
+          "note": "write_file, edit_file and delete are registered in the interrupt map"
+        },
+        {
+          "file": "libs/code/deepagents_code/file_ops.py",
+          "line": 241,
+          "note": "build_approval_preview renders the diff shown before a file operation is approved"
+        }
+      ]
+    },
+    {
+      "id": "tools-py-tool",
+      "name": "Web tools",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Built-in outbound tools \u2014 web_search over Tavily and fetch_url, which converts a fetched page to markdown and returns it as a tool result.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 319,
+          "note": "web_search issues the query through the Tavily client resolved at :285"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 394,
+          "note": "fetch_url returns the page markdown to the model"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 443,
+          "note": "_fetch_with_redirects re-validates every redirect hop"
+        }
+      ]
+    },
+    {
+      "id": "validate-url-tools-py-control",
+      "name": "SSRF guard",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "Scheme allow-list, private/loopback/link-local address rejection and DNS pinning applied to every URL the model supplies to fetch_url.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 81,
+          "note": "_validate_url rejects URLs resolving to private, loopback, link-local (incl. cloud IMDS), reserved, multicast or unspecified addresses"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 163,
+          "note": "_pinned_dns pins the outgoing connection to the validated IPs, closing the rebinding TOCTOU window"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 50,
+          "note": "_is_blocked_ip is the address predicate behind both"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tools-py-mcp-server",
+      "name": "MCP servers",
+      "lane": "tools_mcp",
+      "kind": "mcp_server",
+      "description": "Operator- and project-configured MCP servers (stdio subprocess or remote HTTP/SSE), their tool discovery, and the per-server trust filter applied before connection.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 2359,
+          "note": "get_mcp_tools discovers and returns the tools contributed by configured servers"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 952,
+          "note": "filter_trusted_project_servers is the single place the per-server trust rule lives, keyed on config fingerprint"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 572,
+          "note": "_validate_server_config type-checks 'env' as a dict without filtering key names or values"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 2011,
+          "note": "StdioConnection spawns the stdio server with that env"
+        }
+      ]
+    },
+    {
+      "id": "web-external-service",
+      "name": "Outbound web",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Arbitrary HTTP/HTTPS destinations the agent fetches, plus the Tavily search API \u2014 content returned from here is attacker-influenceable.",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 285,
+          "note": "_get_tavily_client resolves the Tavily search backend"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 394,
+          "note": "fetch_url takes any model-supplied http/https URL"
+        },
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 251,
+          "note": "_html_to_markdown_content turns the remote page body into the text handed back to the model"
+        }
+      ]
+    },
+    {
+      "id": "mcp-json-deploy-surface",
+      "name": "Repository MCP config",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Repository-supplied .mcp.json server definitions \u2014 the checked-in file here declares two remote HTTP MCP endpoints \u2014 gated by a trust prompt before any server is spawned.",
+      "evidence": [
+        {
+          "file": ".mcp.json",
+          "line": 2,
+          "note": "mcpServers declares docs-langchain and reference-langchain as remote http endpoints"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 1004,
+          "note": "discover_mcp_configs locates project-level configs alongside the user's own"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 1108,
+          "note": "extract_project_server_summaries builds the rows the trust prompt shows from unvalidated configs"
+        }
+      ]
+    },
+    {
+      "id": "action-yml-deploy-surface",
+      "name": "GitHub Action",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "The published composite action that installs dcode with uvx and runs it headlessly inside a workflow, passing the workflow's prompt and shell allow-list.",
+      "evidence": [
+        {
+          "file": "action.yml",
+          "line": 490,
+          "note": "timeout \"${TIMEOUT_SECS}\" \"${CMD[@]}\" \"--non-interactive\" \"$INPUT_PROMPT\" runs the agent headlessly"
+        },
+        {
+          "file": "action.yml",
+          "line": 413,
+          "note": "append_value_flag \"$INPUT_SHELL_ALLOW_LIST\" \"--shell-allow-list\" forwards the workflow's allow-list"
+        },
+        {
+          "file": "action.yml",
+          "line": 399,
+          "note": "CMD=(uvx --from \"deepagents-code==${INPUT_CLI_VERSION}\" dcode) installs the runtime at job time"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "local-developer-entrypoint--app-py-client",
+      "from": "local-developer-entrypoint",
+      "to": "app-py-client",
+      "label": "typed prompts and commands",
+      "data": "user text",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/app.py",
+          "line": 2569,
+          "note": "DeepAgentsApp is the interactive surface the operator types into"
+        },
+        {
+          "file": "libs/code/deepagents_code/main.py",
+          "line": 1529,
+          "note": "parse_args resolves the interactive launch"
+        }
+      ]
+    },
+    {
+      "id": "local-developer-entrypoint--non-interactive-py-client",
+      "from": "local-developer-entrypoint",
+      "to": "non-interactive-py-client",
+      "label": "piped prompt and CLI flags",
+      "data": "user text, allow-list configuration",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 1342,
+          "note": "run_non_interactive receives the operator's prompt and settings for one bounded run"
+        }
+      ]
+    },
+    {
+      "id": "action-yml-deploy-surface--non-interactive-py-client",
+      "from": "action-yml-deploy-surface",
+      "to": "non-interactive-py-client",
+      "label": "workflow inputs invoke dcode",
+      "data": "CI-supplied prompt and flags",
+      "evidence": [
+        {
+          "file": "action.yml",
+          "line": 490,
+          "note": "the action pipes the workflow's prompt into --non-interactive"
+        }
+      ]
+    },
+    {
+      "id": "app-py-client--server-py-adapter",
+      "from": "app-py-client",
+      "to": "server-py-adapter",
+      "label": "turn submitted over HTTP+SSE",
+      "data": "user text, thread id",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/remote_client.py",
+          "line": 157,
+          "note": "RemoteAgent.astream drives the run against the local server"
+        },
+        {
+          "file": "libs/code/deepagents_code/client/launch/server.py",
+          "line": 132,
+          "note": "get_server_url is the loopback endpoint the client talks to"
+        }
+      ]
+    },
+    {
+      "id": "non-interactive-py-client--server-py-adapter",
+      "from": "non-interactive-py-client",
+      "to": "server-py-adapter",
+      "label": "headless turn over HTTP+SSE",
+      "data": "user text, run config",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 1637,
+          "note": "server_session starts the runtime server for the headless run"
+        }
+      ]
+    },
+    {
+      "id": "server-py-adapter--agent-py-orchestrator",
+      "from": "server-py-adapter",
+      "to": "agent-py-orchestrator",
+      "label": "graph invocation",
+      "data": "messages and run config",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/server_graph.py",
+          "line": 370,
+          "note": "_build_graph_factory serves the compiled agent graph to the server process"
+        }
+      ]
+    },
+    {
+      "id": "makefile-datastore--local-context-py-prompt",
+      "from": "makefile-datastore",
+      "to": "local-context-py-prompt",
+      "label": "Makefile text and file listing",
+      "data": "repository file contents",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 595,
+          "note": "_section_makefile reads the working directory's Makefile"
+        },
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 616,
+          "note": "build_detect_script concatenates the sections that are run in the backend"
+        }
+      ]
+    },
+    {
+      "id": "makefile-datastore--subagents-py-prompt",
+      "from": "makefile-datastore",
+      "to": "subagents-py-prompt",
+      "label": "project-supplied agent definitions",
+      "data": "repository markdown",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/subagents.py",
+          "line": 177,
+          "note": "_load_subagents_from_dir reads definitions from the project's agent directory"
+        }
+      ]
+    },
+    {
+      "id": "local-context-py-prompt--agent-py-orchestrator",
+      "from": "local-context-py-prompt",
+      "to": "agent-py-orchestrator",
+      "label": "appended to the system prompt",
+      "data": "project context text",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/local_context.py",
+          "line": 956,
+          "note": "_get_modified_request joins the detected context onto the system prompt"
+        }
+      ]
+    },
+    {
+      "id": "subagents-py-prompt--agent-py-orchestrator",
+      "from": "subagents-py-prompt",
+      "to": "agent-py-orchestrator",
+      "label": "markdown body becomes a sub-agent system prompt",
+      "data": "repository markdown",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/subagents.py",
+          "line": 170,
+          "note": "the markdown body is used verbatim as system_prompt"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2428,
+          "note": "the loaded definitions are passed to the agent as subagents"
+        }
+      ]
+    },
+    {
+      "id": "agents-md-memory--agent-py-orchestrator",
+      "from": "agents-md-memory",
+      "to": "agent-py-orchestrator",
+      "label": "memory loaded into context",
+      "data": "memory text",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2562,
+          "note": "MemoryMiddleware loads the AGENTS.md sources into the session"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--agents-md-memory",
+      "from": "agent-py-orchestrator",
+      "to": "agents-md-memory",
+      "label": "agent-written memory updates",
+      "data": "memory text",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2282,
+          "note": "the default memory prompt tells the agent to proactively persist learnings to AGENTS.md"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--model-config-py-model",
+      "from": "agent-py-orchestrator",
+      "to": "model-config-py-model",
+      "label": "system prompt, history and tool schemas",
+      "data": "conversation context",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2986,
+          "note": "create_deep_agent binds the resolved model to the prompt and tool set"
+        }
+      ]
+    },
+    {
+      "id": "model-config-py-model--agent-py-orchestrator",
+      "from": "model-config-py-model",
+      "to": "agent-py-orchestrator",
+      "label": "assistant text and tool calls",
+      "data": "model output",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 1916,
+          "note": "_should_interrupt_tool_call operates on the tool calls the model returns"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--add-interrupt-on-agent-py-control",
+      "from": "agent-py-orchestrator",
+      "to": "add-interrupt-on-agent-py-control",
+      "label": "proposed side-effecting tool call",
+      "data": "tool name and arguments",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2418,
+          "note": "hitl_active decides whether the interrupt map is installed for this run"
+        },
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2440,
+          "note": "AsyncApprovalHITLMiddleware raises the interrupt before the tool executes"
+        }
+      ]
+    },
+    {
+      "id": "add-interrupt-on-agent-py-control--approval-py-control",
+      "from": "add-interrupt-on-agent-py-control",
+      "to": "approval-py-control",
+      "label": "interrupt raised for operator review",
+      "data": "action request",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tui/widgets/approval.py",
+          "line": 136,
+          "note": "the approval menu is constructed from the pending action request"
+        }
+      ]
+    },
+    {
+      "id": "approval-py-control--agent-py-orchestrator",
+      "from": "approval-py-control",
+      "to": "agent-py-orchestrator",
+      "label": "approve or reject decision",
+      "data": "decision",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tui/widgets/approval.py",
+          "line": 123,
+          "note": "the menu posts the operator's decision back to the run"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--make-hitl-decision-non-interactive-py-control",
+      "from": "agent-py-orchestrator",
+      "to": "make-hitl-decision-non-interactive-py-control",
+      "label": "pending interrupt in a headless run",
+      "data": "action request",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 936,
+          "note": "_process_hitl_interrupts maps every pending interrupt to a decision"
+        }
+      ]
+    },
+    {
+      "id": "make-hitl-decision-non-interactive-py-control--agent-py-orchestrator",
+      "from": "make-hitl-decision-non-interactive-py-control",
+      "to": "agent-py-orchestrator",
+      "label": "auto-approve or reject decision",
+      "data": "decision",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/client/non_interactive.py",
+          "line": 897,
+          "note": "non-execute actions return {'type': 'approve'} unconditionally"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--shell-allow-list-config-py-control",
+      "from": "agent-py-orchestrator",
+      "to": "shell-allow-list-config-py-control",
+      "label": "shell command for allow-list check",
+      "data": "command string",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 774,
+          "note": "ShellAllowListMiddleware intercepts execute calls before the tool runs"
+        }
+      ]
+    },
+    {
+      "id": "shell-allow-list-config-py-control--execute-tool",
+      "from": "shell-allow-list-config-py-control",
+      "to": "execute-tool",
+      "label": "allowed command passed through",
+      "data": "command string",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 812,
+          "note": "_validate_tool_call returns None for an allowed command, so the handler runs it"
+        },
+        {
+          "file": "libs/code/deepagents_code/config.py",
+          "line": 3088,
+          "note": "only the first token of each segment was checked"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--execute-tool",
+      "from": "agent-py-orchestrator",
+      "to": "execute-tool",
+      "label": "approved shell command",
+      "data": "command string",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2291,
+          "note": "enable_shell makes execute available to the loop"
+        }
+      ]
+    },
+    {
+      "id": "execute-tool--agent-py-orchestrator",
+      "from": "execute-tool",
+      "to": "agent-py-orchestrator",
+      "label": "command stdout and stderr",
+      "data": "tool output",
+      "evidence": [
+        {
+          "file": "libs/code/THREAT_MODEL.md",
+          "line": 229,
+          "note": "tool results including execute stdout are passed verbatim into the LLM context window"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--fs-tools-tool",
+      "from": "agent-py-orchestrator",
+      "to": "fs-tools-tool",
+      "label": "file write, edit or delete call",
+      "data": "file path and contents",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2117,
+          "note": "write_file, edit_file and delete are model-invocable tools"
+        }
+      ]
+    },
+    {
+      "id": "fs-tools-tool--agent-py-orchestrator",
+      "from": "fs-tools-tool",
+      "to": "agent-py-orchestrator",
+      "label": "file contents read back",
+      "data": "file contents",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 1380,
+          "note": "the fs tool guidance describes read/search results returning to the model"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--tools-py-tool",
+      "from": "agent-py-orchestrator",
+      "to": "tools-py-tool",
+      "label": "search query or URL",
+      "data": "model-generated URL or query",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 394,
+          "note": "fetch_url takes the URL the model supplies"
+        }
+      ]
+    },
+    {
+      "id": "tools-py-tool--validate-url-tools-py-control",
+      "from": "tools-py-tool",
+      "to": "validate-url-tools-py-control",
+      "label": "URL checked before the request",
+      "data": "URL",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 443,
+          "note": "_fetch_with_redirects validates the URL and every redirect hop"
+        }
+      ]
+    },
+    {
+      "id": "validate-url-tools-py-control--web-external-service",
+      "from": "validate-url-tools-py-control",
+      "to": "web-external-service",
+      "label": "validated, IP-pinned request",
+      "data": "HTTP request",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 163,
+          "note": "_pinned_dns pins the connection to a validated address"
+        }
+      ]
+    },
+    {
+      "id": "web-external-service--tools-py-tool",
+      "from": "web-external-service",
+      "to": "tools-py-tool",
+      "label": "page markdown and search results",
+      "data": "external content",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/tools.py",
+          "line": 251,
+          "note": "_html_to_markdown_content converts the remote body into the tool result"
+        }
+      ]
+    },
+    {
+      "id": "tools-py-tool--agent-py-orchestrator",
+      "from": "tools-py-tool",
+      "to": "agent-py-orchestrator",
+      "label": "fetched content as a tool result",
+      "data": "external content",
+      "evidence": [
+        {
+          "file": "libs/code/THREAT_MODEL.md",
+          "line": 229,
+          "note": "fetched pages and search snippets are passed verbatim into the context window with no injection scanning"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--mcp-tools-py-mcp-server",
+      "from": "agent-py-orchestrator",
+      "to": "mcp-tools-py-mcp-server",
+      "label": "MCP tool invocation",
+      "data": "tool arguments",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 1436,
+          "note": "_normalize_mcp_arguments prepares the model-supplied arguments for the server call"
+        }
+      ]
+    },
+    {
+      "id": "mcp-tools-py-mcp-server--agent-py-orchestrator",
+      "from": "mcp-tools-py-mcp-server",
+      "to": "agent-py-orchestrator",
+      "label": "MCP tool results and tool metadata",
+      "data": "external content, tool annotations",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 2359,
+          "note": "get_mcp_tools returns the discovered tools and their server-declared metadata"
+        },
+        {
+          "file": "libs/code/THREAT_MODEL.md",
+          "line": 229,
+          "note": "MCP tool responses enter the context window verbatim"
+        }
+      ]
+    },
+    {
+      "id": "mcp-json-deploy-surface--mcp-tools-py-mcp-server",
+      "from": "mcp-json-deploy-surface",
+      "to": "mcp-tools-py-mcp-server",
+      "label": "server definitions (command, args, env, url)",
+      "data": "configuration",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 1004,
+          "note": "discover_mcp_configs picks up the project-level .mcp.json"
+        },
+        {
+          "file": "libs/code/deepagents_code/mcp_tools.py",
+          "line": 952,
+          "note": "filter_trusted_project_servers decides which of them are spawned"
+        }
+      ]
+    },
+    {
+      "id": "read-only-hint-auto-mode-py-control--add-interrupt-on-agent-py-control",
+      "from": "read-only-hint-auto-mode-py-control",
+      "to": "add-interrupt-on-agent-py-control",
+      "label": "server-declared hint removes tools from the map",
+      "data": "tool metadata",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2132,
+          "note": "tools passing mcp_tool_is_coherently_read_only are skipped with `continue`"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--auto-mode-py-control",
+      "from": "agent-py-orchestrator",
+      "to": "auto-mode-py-control",
+      "label": "proposed tool call for classification",
+      "data": "tool name and arguments",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 2808,
+          "note": "the auto-mode middleware is wired over the same interrupt map"
+        }
+      ]
+    },
+    {
+      "id": "auto-mode-py-control--agent-py-orchestrator",
+      "from": "auto-mode-py-control",
+      "to": "agent-py-orchestrator",
+      "label": "allow or deny with category and reason",
+      "data": "decision",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/auto_mode.py",
+          "line": 129,
+          "note": "AutoDecision returns decision, category and reason per tool call"
+        }
+      ]
+    },
+    {
+      "id": "agent-py-orchestrator--sessions-db-memory",
+      "from": "agent-py-orchestrator",
+      "to": "sessions-db-memory",
+      "label": "conversation checkpointed",
+      "data": "conversation state, tool arguments and results",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/agent.py",
+          "line": 3003,
+          "note": "checkpointer=checkpointer binds the thread store into the compiled graph"
+        },
+        {
+          "file": "libs/code/deepagents_code/sessions.py",
+          "line": 285,
+          "note": "state is written to ~/.deepagents/.state/sessions.db"
+        }
+      ]
+    },
+    {
+      "id": "sessions-db-memory--agent-py-orchestrator",
+      "from": "sessions-db-memory",
+      "to": "agent-py-orchestrator",
+      "label": "resumed thread state",
+      "data": "conversation state",
+      "evidence": [
+        {
+          "file": "libs/code/deepagents_code/sessions.py",
+          "line": 21,
+          "note": "AsyncSqliteSaver restores prior thread state on resume"
+        }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Untrusted content entering the model context",
+      "crossing_edges": [
+        "makefile-datastore--local-context-py-prompt",
+        "makefile-datastore--subagents-py-prompt",
+        "local-context-py-prompt--agent-py-orchestrator",
+        "subagents-py-prompt--agent-py-orchestrator",
+        "tools-py-tool--agent-py-orchestrator",
+        "mcp-tools-py-mcp-server--agent-py-orchestrator",
+        "execute-tool--agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "MUST NOT treat content that arrives from tool results or retrieved sources ... as authoritative instructions that redefine the agent's goals, expand its scope, or override its approval gates.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "The working directory's Makefile and file listing are appended to the system prompt on every turn and tool results re-enter context verbatim, so a cloned repository or a fetched page writes into the highest-trust position in the context window with no provenance marker.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-004",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "LLM01",
+          "summary": "A project-supplied sub-agent definition's markdown body becomes that sub-agent's system prompt verbatim, letting repository content impersonate operator instruction inside a delegated run.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-014",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Nothing normalises or flags hostile Unicode in content entering the prompt, only in tool-call arguments shown at approval time \u2014 partial because the same detectors exist but are wired to the approval dialog, not the ingress path.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/unicode_security.py",
+            "line": 140
+          },
+          "remainder": "detect_dangerous_unicode is applied to action-request arguments before approval, never to detect-script output, fetched page markdown, MCP results or memory files as they enter the context."
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "Model decision to a side-effecting tool",
+      "crossing_edges": [
+        "agent-py-orchestrator--add-interrupt-on-agent-py-control",
+        "agent-py-orchestrator--make-hitl-decision-non-interactive-py-control",
+        "agent-py-orchestrator--shell-allow-list-config-py-control",
+        "shell-allow-list-config-py-control--execute-tool",
+        "agent-py-orchestrator--execute-tool",
+        "agent-py-orchestrator--fs-tools-tool",
+        "agent-py-orchestrator--tools-py-tool",
+        "agent-py-orchestrator--mcp-tools-py-mcp-server",
+        "read-only-hint-auto-mode-py-control--add-interrupt-on-agent-py-control"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-19",
+          "excerpt": "Shell / command execution MUST require explicit human approval before the command runs.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-21",
+          "excerpt": "An \"allow everything\" allow-list setting is out of bounds.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-22",
+          "excerpt": "Absent an allow-list, approval is required in every execution context, including non-interactive and headless/CI runs.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-24",
+          "excerpt": "Creating, writing, editing, or deleting files MUST require human approval.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-25",
+          "excerpt": "Outbound web actions \u2014 `fetch_url`, `http_request`, `web_search` \u2014 MUST require human approval before the request is made.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-26",
+          "excerpt": "Delegating to a sub-agent (`task`) and launching, updating, or cancelling an async sub-agent MUST require human approval.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-28",
+          "excerpt": "The agent MUST NOT disable, weaken, or bypass the human-approval gate on side-effecting tools on its own initiative or in response to retrieved/tool content.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-29",
+          "excerpt": "Destructive filesystem or shell operations MUST NOT execute without either human approval or execution inside an isolated sandbox backend.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-30",
+          "excerpt": "Untrusted project content (`Makefile`, `.env`, committed config) MUST NOT drive a side-effecting action without passing the human-approval gate",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "Injected project content reaching the model in a headless run drives shell execution on the host through an allow-listed interpreter, because the allow-list matches the executable name and never the arguments it carries.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-001",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "In a headless run every action other than execute is auto-approved \u2014 file writes and deletes, web fetches, search and sub-agent delegation all run with no gate, and no configuration restores approval for them.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The shell allow-list is not an execution boundary: the allow-all sentinel returns approval before any pattern check, and a restrictive list is enforced only against each segment's first token.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-003",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI04",
+          "summary": "An MCP server decides which of its own tools need review \u2014 a server-declared readOnlyHint with no destructive hint removes the tool from the interrupt map in Manual as well as Auto mode, and tool definitions are neither signed nor version-pinned after the trust prompt.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-007",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "The project's own threat model no longer matches the code it documents \u2014 it lists a built-in HTTP tool that does not exist and denies a URL guard that does \u2014 so the accepted-risk decisions covering this boundary rest on a stale inventory.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-013",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM10",
+          "summary": "A model-supplied URL \u2014 which may have come from injected content \u2014 cannot be steered at loopback, private ranges or cloud metadata: the scheme is allow-listed, the resolved address is checked, every redirect hop is re-checked, and the connection is pinned to the validated IP.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/tools.py",
+            "line": 81
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-plane-exposure",
+      "name": "Loopback agent-runtime API",
+      "crossing_edges": [
+        "app-py-client--server-py-adapter",
+        "non-interactive-py-client--server-py-adapter",
+        "server-py-adapter--agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-05",
+          "excerpt": "MUST bind a loopback interface only and MUST NOT expose the agent-runtime API to non-loopback interfaces or any non-local network.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "ASI07",
+          "summary": "The runtime server is spawned with authentication disabled, so any same-user process that finds the ephemeral port can submit inputs to the running thread, read conversation state, or push state updates; loopback binding and port randomness are the only barriers and neither is an authorization control.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-005",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "Messages injected through that unauthenticated API are indistinguishable from operator turns and are checkpointed with the rest of the thread, so they replay on resume rather than dying with the session (checked: sessions.py:285 and server.py:337 \u2014 no authentication, signing or provenance check exists on the state-update path).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "Conversation to the model provider",
+      "crossing_edges": [
+        "agent-py-orchestrator--model-config-py-model"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-16",
+          "excerpt": "Conversation or project data MUST NOT be sent to third-party, sandbox, or provider destinations that retain it without the operator's awareness and opt-in.",
+          "coverage_status": "verified"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Everything the agent has read this turn \u2014 file contents, command output, fetched pages, and any credential that appeared in them \u2014 is sent to the operator-selected provider endpoint with no redaction pass on the request (checked: agent.py:2986 and the middleware stack \u2014 the only secret-redaction regex in the package runs on hook transcripts at hooks/transcript.py:53, not on model requests).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Tracing to LangSmith is a second copy of the same conversation, but it activates only when the operator has supplied the API key and tracing environment variables.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/config.py",
+            "line": 3105
+          }
+        }
+      ]
+    },
+    {
+      "id": "stored-state",
+      "name": "Memory and checkpoints re-entering the agent's reasoning",
+      "crossing_edges": [
+        "agent-py-orchestrator--agents-md-memory",
+        "agents-md-memory--agent-py-orchestrator",
+        "agent-py-orchestrator--sessions-db-memory",
+        "sessions-db-memory--agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-02",
+          "excerpt": "MUST NOT redefine, expand, or remove its own operating objectives, authorized scope, or safety gates on its own initiative.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "ASI06",
+          "summary": "Memory auto-save is on by default, so content the agent absorbed this session \u2014 including instructions read out of a repository or a fetched page \u2014 can be written into AGENTS.md and loaded back into the prompt in later sessions.",
+          "status": "partial",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/memory_guard.py",
+            "line": 95
+          },
+          "remainder": "the guard restores only the managed onboarding-name block; the rest of the memory file is agent-writable and re-enters the system prompt on every later session."
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Because headless runs auto-approve file writes, the agent can rewrite its own memory and skill files during an unattended run with no operator in the loop at the moment of the write.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-002",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Persisted conversation state on disk",
+      "crossing_edges": [
+        "agent-py-orchestrator--sessions-db-memory"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-15",
+          "excerpt": "Persisted conversation and session data MUST be protected at rest commensurate with its sensitivity (e.g. access-restricted file permissions or encryption at rest).",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-17",
+          "excerpt": "Persisted conversation/session data and memory MUST be retained only per the operator-configured retention/purge policy, and MUST NOT be kept indefinitely by default.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The checkpoint database holds full conversation state including tool arguments and results \u2014 so anything the agent read, such as a .env printed by a command, is written verbatim \u2014 into a directory created with no explicit mode, unencrypted, with no retention or purge mechanism anywhere in the session, offload or config modules.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-010",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "The neighbouring credential store in the same state directory is written atomically through an O_EXCL 0600 open with a follow-up chmod, so stored provider keys are not exposed to other local users.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/auth_store.py",
+            "line": 247
+          }
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Provider credentials in the process environment",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-13",
+          "excerpt": "Credentials and secrets (provider API keys, tokens, passwords, environment secrets) MUST NOT be transmitted to any external destination, nor persisted into memory files, skills, session/checkpoint stores, or logs.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-14",
+          "excerpt": "The secret-bearing process environment MUST NOT be forwarded wholesale to spawned subprocesses (MCP servers, hooks, the runtime server, sandbox setup) \u2014 each child MUST receive only the environment it requires.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "The runtime server subprocess inherits a copy of the whole launching environment with only cloud-auth names and PYTHONPATH stripped, so every provider API key reaches it; separately an MCP stdio server's declared env is type-checked but never key-filtered, letting a trusted config set PATH, LD_PRELOAD or PYTHONPATH for that child.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-006",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Nothing scans content the agent reads into context for credentials before it is checkpointed or sent onward, so a key printed by an allow-listed command persists in the thread (checked: hooks/transcript.py:53 redacts secret-shaped assignments only in hook transcripts; no equivalent runs on the tool-result, checkpoint or model-request paths).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Audit, monitoring and escalation",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-36",
+          "excerpt": "All side-effecting tool executions and approval decisions MUST be recorded to a durable, structured audit record.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-33",
+          "excerpt": "Halt and alert the operator if retrieved content, tool output, or configuration attempts to make the agent disable its approval gate, exfiltrate credentials, or execute code outside an isolated sandbox against untrusted input.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "No durable structured record of tool executions or approval decisions exists by default: the hook event stream carries exactly that data but only fires when the operator has authored a hooks configuration, file logging needs a debug environment variable, and the always-on surface is a bounded in-memory ring buffer that dies with the process.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-009",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "There is no halt-and-alert path for content trying to disable the gate or reach credentials \u2014 the classifier that recognises exactly those categories is opt-in, interactive-only, and denies the single call rather than stopping the run or raising an alert; headless runs have no detector at all.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-015",
+          "mitigation_evidence": null
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Runtime, dependency and extension provenance",
+      "crossing_edges": [
+        "mcp-json-deploy-surface--mcp-tools-py-mcp-server"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-07",
+          "excerpt": "only the authorized LLM provider endpoints, MCP servers, sandbox providers, and sub-agent deployment URLs are trusted",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-11",
+          "excerpt": "the agent MUST NOT acquire, load, or expose tools or capabilities beyond it in response to LLM output, retrieved content, or repository-committed configuration.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-27",
+          "excerpt": "Loading a project-level (repository-supplied) MCP server MUST require explicit operator trust approval before the server is spawned or connected.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-32",
+          "excerpt": "Loading configuration, model-provider definitions, or skill/memory definitions MUST NOT cause arbitrary code to execute before those definitions have been validated.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Auto-update ships enabled and replaces the runtime from the package registry with no signature or hash check, adding a destination the operator never configured; the bundled ripgrep install shows the contrasting posture with a pinned SHA-256.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-011",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "No component inventory ships with the package and one dependency carries no upper bound, so exposure cannot be assessed when an advisory lands and a resolve can cross a future major version.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-012",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "A configured class_path provider is imported before any validation, so module-level code in a hostile module has already run by the time the BaseChatModel check rejects it; the provider-profile loader takes the same shape through exec_module.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-08-12-008",
+          "mitigation_evidence": null
+        },
+        {
+          "stride": "S",
+          "owasp": "ASI04",
+          "summary": "A repository-supplied MCP server is not spawned on the strength of the repository alone \u2014 project configs pass a per-server trust filter keyed on the config fingerprint, and a changed fingerprint re-prompts rather than loading silently.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "libs/code/deepagents_code/mcp_tools.py",
+            "line": 952
+          }
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "hostile-repo-to-host-shell",
+      "name": "A cloned repository's own files reach the host shell in an unattended run",
+      "steps": [
+        {
+          "node": "makefile-datastore",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "The Makefile and file listing of whatever repository the agent was pointed at are attacker-authored content, read before any approval prompt exists."
+        },
+        {
+          "node": "local-context-py-prompt",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "The detection script appends that content to the system prompt on every turn, unlabelled and in the highest-trust position in the context window."
+        },
+        {
+          "node": "agent-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "The loop cannot distinguish it from operator instruction and turns it into tool calls."
+        },
+        {
+          "node": "shell-allow-list-config-py-control",
+          "finding_id": "PRAX-2026-08-12-003",
+          "summary": "The only shell check that runs without a human matches each segment's first token, so an allow-listed interpreter carries the payload in its arguments."
+        },
+        {
+          "node": "execute-tool",
+          "finding_id": "PRAX-2026-08-12-001",
+          "summary": "The command executes on the developer's machine or the CI runner with the operator's privileges."
+        }
+      ]
+    },
+    {
+      "id": "fetched-page-to-file-writes",
+      "name": "A fetched web page rewrites files in the project with nobody in the loop",
+      "steps": [
+        {
+          "node": "web-external-service",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "An attacker-controlled page or search result \u2014 content nobody vetted and nothing labels as external."
+        },
+        {
+          "node": "tools-py-tool",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "It is converted to markdown and handed back as a tool result."
+        },
+        {
+          "node": "agent-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-004",
+          "summary": "The tool result re-enters the context verbatim and its instructions become the loop's next tool calls."
+        },
+        {
+          "node": "fs-tools-tool",
+          "finding_id": "PRAX-2026-08-12-002",
+          "summary": "In a headless run the write, edit and delete tools are auto-approved, so the injected instruction changes files on disk with no review and no configuration that would restore one."
+        }
+      ]
+    },
+    {
+      "id": "local-process-to-persistent-thread-poisoning",
+      "name": "A co-resident process on the developer's machine plants instructions that survive the session",
+      "steps": [
+        {
+          "node": "server-py-adapter",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "The agent-runtime API runs with authentication disabled, so any same-user process that finds the ephemeral port is accepted without ever proving it is the operator."
+        },
+        {
+          "node": "agent-py-orchestrator",
+          "finding_id": "PRAX-2026-08-12-005",
+          "summary": "Submitted inputs enter the running thread as ordinary conversation and steer the next turns."
+        },
+        {
+          "node": "sessions-db-memory",
+          "finding_id": "PRAX-2026-08-12-010",
+          "summary": "Those turns are checkpointed into the unencrypted thread store, so they replay into the model's context whenever the session is resumed \u2014 the poisoning outlives the process that planted it."
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "Two strains. The loopback agent-runtime server is a spawned local process, not a user-facing client, but it is the API surface both front-ends talk to, so it sits in client_adapters. And the upstream model provider endpoint has no node of its own \u2014 the model-resolution/LLM-call surface in agent_core carries it, so model-egress crosses the orchestrator-to-model edge rather than an agent_core-to-external_deploy one.",
+    "omissions": "Arbitration: the findings JSON records both an LLM and an agentic code on several findings without naming a primary; where this graph must pick one it follows the KB. For the environment-forwarding finding the KB's credential/identity-scope row makes ASI03 primary and LLM02 the co-tag, so the threat is tagged ASI03 while the stored tag list leads with LLM02. For the MCP readOnlyHint finding the KB's runtime tool-definition row (rug pull / unverified tool metadata) is more specific than the missing-gate row, so it is tagged ASI04 rather than LLM03. The loopback-API finding keeps ASI07 \u2014 the KB's neighbours note assigns the channel-authentication defect there. No other stored tag disagrees with the KB. Components suspected but not modelled for want of a citation that holds in this snapshot: the remote sandbox backends (Daytona, Modal, Runloop, LangSmith, AgentCore) and the conversation offload path into them are present in the tree but no finding and no in-scope control chain attaches to them here; skills, plugins and their marketplace trust store are likewise real but were left out under the size discipline, with the MCP trust filter standing for the same operator-trust mechanism. The PyPI auto-update egress has no node of its own under the size discipline; its finding is carried as a supply-chain threat instead. All fifteen findings in the JSON are represented.",
+    "counts": {
+      "nodes": 25,
+      "edges": 38,
+      "boundaries": 9,
+      "threats": 25
+    }
+  }
+}

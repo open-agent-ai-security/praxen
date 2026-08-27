@@ -1,0 +1,214 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    CraftBot
+Analysis: August 12, 2026, 17:20 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is policy declared in prompt, with no code-level
+enforcement behind it. CraftBot's operating manual, its POLICY_PROMPT, and its
+documented permission tiers all describe approval gates, confirmation before
+irreversible actions, and refusal to act on injected instructions — yet a
+repo-wide search finds no approval mechanism at all, permission_tier is
+written and range-validated but never read at execution time, and the one
+module named for input sanitization, PromptSanitizer, has zero call sites and
+would not block anything if it had them. The concrete consequence is a
+single-hop chain: content fetched by web_fetch, read from disk, or returned by
+an MCP server enters the model context with no provenance label, and the model
+can answer with a run_shell call that executes on the host through shell=True
+with os.environ.copy() — handing the inherited LLM provider keys to whatever
+the command does. Set against that, the team has built genuinely strong
+controls where it chose to build them in code: a deterministic gate that stops
+third-party messages from ever opening a session, SSRF filtering on outbound
+HTTP, a budget circuit-breaker, and an idempotency ledger — which makes the
+absent approval layer look like an omission rather than a capability the
+project cannot build.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.30 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 8   Medium: 5   Low: 0   Informational: 0
+  Total: 17
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 12   Gap: 13   Partial: 5   Vague: 0   Enforcement-not-possible: 0   (of 30 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   4
+  LLM03  Excessive Agency                                   2
+  LLM04  Supply Chain                                       3
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    1
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       1
+  ASI03  Identity and Privilege Abuse                       3
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 1
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Unlabeled external content reaches host shell execution
+            in one hop, with the parent process environment and its provider
+            API keys inherited.
+      Action 1: Gate run_shell behind an owner approval prompt that displays
+                the exact rendered command, and add a per-command policy check
+                before the Popen calls in app/data/action/run_shell.py.
+      Action 2: Replace env = os.environ.copy() at run_shell.py:112 with an
+                explicit allowlist of variables the command needs, so provider
+                API keys are never inherited by shell children.
+
+  PRAX-2026-08-12-002  Live third-party OAuth client secrets and a Telegram
+            API hash are shipped in source, deliberately split to evade secret
+            scanning.
+      Action 1: Treat every value in _EMBEDDED_CREDENTIALS as compromised and
+                rotate it at each provider before any other remediation, since
+                the repository is public.
+      Action 2: Remove the embedded registry and require operator-supplied
+                client credentials via environment variables (the env-var
+                branch at :106-109 already exists), keeping a shared client
+                only where a provider lacks PKCE and then storing it
+                unobfuscated so scanners can see it.
+
+  PRAX-2026-08-12-003  The documented approval architecture is enforced
+            nowhere in code — permission_tier is written and validated but
+            never read at execution time.
+      Action 1: Make permission_tier load-bearing: in the proactive and
+                scheduler execution paths, block tier 2 and tier 3 tasks
+                behind an owner approval prompt before the first action runs,
+                and fail closed when the tier is missing.
+      Action 2: Add a deterministic approval checkpoint for actions already
+                flagged irreversible=True (74 integration senders plus
+                send_message), reusing the Continue/Abort pause mechanism in
+                app/agent_base.py:1665 rather than relying on AGENT.md's
+                prompt choreography.
+
+  PRAX-2026-08-12-004  The documented Docker deployment mounts the host Docker
+            socket into the agent container, dissolving the isolation boundary
+            it provides.
+      Action: Remove the /var/run/docker.sock mount from the agent service in
+              docker-compose.yml; if container lifecycle control is genuinely
+              needed, front it with a narrow broker service exposing only the
+              specific operations required, rather than the raw daemon socket.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-005  The repository's only prompt-injection filter is dead
+            code, and would not block an injection even if it were called.
+      Action 1: Either delete app/security/prompt_sanitizer.py and
+                app/security/error_handler.py so the codebase stops implying a
+                control that does not run, or wire the sanitizer into the
+                context-assembly path and make it reject or quarantine matches
+                rather than log them.
+      Action 2: Prefer structural defence over pattern matching: label
+                untrusted spans by provenance where external content is
+                assembled into the prompt, since a seven-pattern regex list
+                cannot bound injection on its own.
+
+  PRAX-2026-08-12-006  File-reading actions accept any absolute host path, so
+            the credential and configuration stores are readable straight into
+            model context.
+      Action 1: Add a deny-list check in read_file, grep_files and find_files
+                that refuses paths resolving inside .credentials/ or
+                app/config/settings.json, and returns a redacted notice
+                instead of file contents.
+      Action 2: Confine the file actions to the agent workspace by default
+                with resolve() plus a containment check, requiring an explicit
+                owner-granted path for reads outside it.
+
+  PRAX-2026-08-12-007  No outbound destination control — the agent can POST to
+            any public URL and email any address with no allowlist and no
+            approval.
+      Action 1: Derive an outbound destination allowlist from the owner's
+                connected integrations and enforce it in http_request before
+                the request is issued, requiring explicit owner approval for
+                any host outside it.
+      Action 2: Gate the 74 irreversible=True senders behind an owner
+                confirmation that displays the rendered recipient and body,
+                rather than treating irreversible purely as a deduplication
+                key.
+
+  PRAX-2026-08-12-008  Living UI HTTP surfaces bind 0.0.0.0 with wildcard CORS
+            and no authentication, contrary to the remit's loopback
+            requirement.
+      Action 1: Change the sidecar proxy and the Living UI backend template to
+                bind 127.0.0.1 by default, making any wider bind an explicit
+                owner-set option.
+      Action 2: Replace the wildcard CORS policy at proxy.py:125-126 with an
+                origin allowlist covering the local UI only, and require a
+                session token on the proxy's routes.
+
+  PRAX-2026-08-12-009  Both default-enabled MCP servers resolve unpinned
+            upstream packages on every start, placing them outside the remit's
+            closed set.
+      Action 1: Pin both default servers to exact versions in
+                app/config/mcp_config.json and record the resolved integrity
+                hash, updating them deliberately rather than on every process
+                start.
+      Action 2: Narrow the filesystem server's "." argument to the agent
+                workspace directory so it cannot serve the repository's own
+                configuration and credential paths.
+
+  PRAX-2026-08-12-010  The ChromaDB memory index ingests agent-written content
+            with no validation, authenticated write path, or hidden-content
+            detection.
+      Action 1: Record a provenance field per chunk at ingest in
+                agent_core/core/impl/memory/manager.py and surface it in
+                memory_search results, so retrieved external text is
+                distinguishable from owner-authored memory.
+      Action 2: Screen content for instruction-like and hidden-character
+                payloads before it is embedded, and exclude agent-written
+                scratch files containing raw fetched content from the indexed
+                set.
+
+  PRAX-2026-08-12-011  The desktop container ships a default password with
+            seccomp disabled and its remote-desktop port published to all host
+            interfaces.
+      Action 1: Replace the hardcoded PASSWORD with a required environment
+                variable that has no default, so the stack refuses to start
+                until the operator sets one.
+      Action 2: Bind the published port to loopback as "127.0.0.1:3001:3000"
+                and remove security_opt seccomp:unconfined, adding a targeted
+                profile only if a specific syscall is genuinely required.
+
+  PRAX-2026-08-12-017  Session-loaded identity and memory files are
+            agent-writable with no code guard, giving injected content a
+            one-hop persistence path.
+      Action 1: Add a protected-path denylist to write_file and stream_edit
+                covering MEMORY.md, SOUL.md, AGENT.md and the memory index, so
+                harness-managed state changes only through the pipelines that
+                own it.
+      Action 2: Version-control or hash the session-loaded files and log a
+                diff whenever one changes, so an unexpected rewrite is
+                detectable rather than silent.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
