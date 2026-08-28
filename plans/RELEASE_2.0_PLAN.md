@@ -151,6 +151,35 @@ modeling: a threat model with receipts."* Bump discipline as usual:
 `bump_version.py --dry-run` first; remits are the seventh version surface
 (re-render after bump); PRAXEN_SPEC version read by release.yml.
 
+## Beta channel runbook (2026-08-28; Steve: beta = dry run of the GA vendored-install route)
+
+The 2.0 beta installs from the community catalog as a payload **vendored
+into the plugins repo** (`"source": "./praxen-beta"`, ~1 MB) rather than a
+whole-repo clone (plugins repo PRs #9 validator + #7 entry). Beta installs
+under its own plugin key `praxen-beta@open-agent-ai-security`, side by side
+with production. Packaging is scripted, not by hand:
+
+- `scripts/release/dist_manifest.txt` — single source of truth for
+  distribution contents; read by `build.sh` (zip, all entries) and by
+  `scripts/release/stage_plugin_payload.sh` (payload, minus `zip-only`
+  entries and the legacy in-repo marketplace mirror).
+- CI enforces the stager (`tests/render/test_stage_plugin_payload.py`):
+  allowlist entries exist, payload shape/runtime refs hold, no symlinks,
+  `--check` drift detection works.
+
+**Beta cut N:** merge `v2` → `v2-beta` → `bump_version.py 2.0.0-beta.N` →
+`docs_build.py` → commit/push `v2-beta` →
+`scripts/release/stage_plugin_payload.sh --force <plugins-clone>/praxen-beta`
+→ PR in the plugins repo (verify with `--check` after) → re-sync any
+changed pages into praxen `main`'s `beta/` dir via PR.
+
+**At GA:** the flip for production is the same move with the `praxen`
+entry — vendor the payload as `plugins/praxen/`, switch its source to
+`"./praxen"`; same key, same install commands. Then delete the beta entry
++ `praxen-beta/` payload dir, the `beta/` Pages dir, and archive the
+orphaned praxen-beta mirror repo (superseded scaffolding from the
+first beta design; deletion is Steve's call).
+
 ## Non-goals
 
 No score movement, no freeze, no re-baseline, no findings-schema change,
