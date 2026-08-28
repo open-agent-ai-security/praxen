@@ -92,13 +92,15 @@ def main():
     # (open-agent-ai-security/plugins), where version is deliberately absent —
     # each plugin repo's plugin.json is its version authority.
     for e in (plugins if isinstance(plugins, list) else []):
-        required = ("name", "source", "version") if e.get("name") == "praxen" else ("name", "source")
+        required = ("name", "source", "version") if e.get("name") == "praxen-beta" else ("name", "source")
         check(f"marketplace plugin {e.get('name')!r} has " + " + ".join(required),
               all(e.get(k) for k in required))
 
-    # Name consistency across the three manifests.
-    check("plugin name 'praxen' is consistent across the three manifests",
-          cp.get("name") == "praxen" and xp.get("name") == "praxen" and entry.get("name") == "praxen",
+    # Name consistency across the three manifests. (v2-beta overlay: the beta
+    # channel installs under its own key so it coexists with a production
+    # praxen install — never merge this expectation back to v2.)
+    check("plugin name 'praxen-beta' is consistent across the three manifests",
+          cp.get("name") == "praxen-beta" and xp.get("name") == "praxen-beta" and entry.get("name") == "praxen-beta",
           f"claude={cp.get('name')} codex={xp.get('name')} marketplace={entry.get('name')}")
 
     # Version consistency — the 4-way guard build.sh enforces, here as a unit test

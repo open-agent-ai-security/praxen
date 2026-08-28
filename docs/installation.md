@@ -6,10 +6,13 @@
 # Installation
 
 > **🧪 You are on the Praxen 2.0 beta channel.** These instructions install
-> the `praxen-beta` marketplace entry, which tracks the pre-release `v2-beta`
-> branch (threat modeling). It installs alongside nothing — a machine runs
-> one Praxen at a time, so installing the beta replaces a production install
-> and reinstalling `praxen` restores it. Report anything odd on
+> the `praxen-beta` marketplace entry, which tracks the pre-release 2.0 beta
+> (threat modeling). It installs under its own plugin key, side by side with
+> a production `praxen` install — but run one at a time: if you have
+> production Praxen installed, disable it while testing
+> (`claude plugin disable praxen@open-agent-ai-security`) so both plugins
+> don't answer a "run a Praxen analysis" request, and re-enable it when
+> you're done. Report anything odd on
 > [GitHub issues](https://github.com/open-agent-ai-security/praxen/issues).
 
 Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce the same JSON / HTML / TXT report format — only the install/packaging differs. On the same inputs, findings should cover the same major themes, but exact counts, grouping, and RAISE maturity scores can vary by model and context (see [Understanding Run-to-Run Variability](understanding-variability.md)). Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
@@ -30,15 +33,15 @@ Install from the community plugin marketplace ([open-agent-ai-security/plugins](
 ```bash
 claude plugin marketplace add open-agent-ai-security/plugins
 claude plugin install praxen-beta@open-agent-ai-security
-claude plugin list      # confirm: praxen@open-agent-ai-security, enabled, v2.0.0-beta.1
+claude plugin list      # confirm: praxen-beta@open-agent-ai-security, enabled, v2.0.0-beta.1
 ```
 
 > **Added the marketplace from `open-agent-ai-security/praxen` previously?** That path still
 > works — this repo carries a synced mirror of the community index — but the community
-> marketplace is the canonical source. To migrate: `claude plugin marketplace remove
-> open-agent-ai-security` (note: this also uninstalls the plugins that came from it), then run
-> the add + install commands above. Your plugin key (`praxen@open-agent-ai-security`) and
-> settings are unchanged.
+> marketplace is the canonical source, and the `praxen-beta` entry only exists there. Run the
+> add + install commands above; your existing production install and its
+> `praxen@open-agent-ai-security` key are untouched — the beta lands under its own
+> `praxen-beta@open-agent-ai-security` key (see the disable note at the top).
 
 The skill registers as `behavior-verifier`. The in-session equivalents — `/plugin marketplace add …`, `/plugin install …`, `/plugin list` — do exactly the same thing; if you install from within a Claude Code session, run `/reload-plugins` (or restart) to activate the skill. (When scripting, prefer the terminal form — it behaves identically everywhere.)
 
@@ -49,12 +52,12 @@ Codex has its own plugin marketplace, and Praxen installs from the **same commun
 ```bash
 codex plugin marketplace add open-agent-ai-security/plugins
 codex plugin add praxen-beta@open-agent-ai-security
-codex plugin list      # confirm: praxen@open-agent-ai-security, installed, enabled, v2.0.0-beta.1
+codex plugin list      # confirm: praxen-beta@open-agent-ai-security, installed, enabled, v2.0.0-beta.1
 ```
 
 This installs and enables the plugin in Codex's local config; the bundled `behavior-verifier` skill is then available to every Codex session. Running an analysis is the same as on any agent — see [Usage](usage.md).
 
-> **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, so your `praxen@open-agent-ai-security` plugin key is unchanged. Then `codex plugin marketplace upgrade open-agent-ai-security` and re-run `codex plugin add praxen-beta@open-agent-ai-security` to pick up the catalog's copy. The legacy per-repo path keeps working via the in-repo mirror, so this is optional.
+> **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, and the `praxen-beta` entry only exists in the community catalog. Your production `praxen@open-agent-ai-security` install is untouched; the beta lands under its own `praxen-beta@open-agent-ai-security` key (disable production Praxen while testing, per the note at the top).
 
 ## Any other agent
 
