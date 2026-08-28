@@ -32,16 +32,20 @@ if [[ "$VERSION" != "$PLUGIN_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, plugin.json says $PLUGIN_VERSION" >&2
   exit 1
 fi
-# Look the praxen entry up BY NAME, never positionally: the mirror is
-# praxen-only today (#235), but a by-name read stays correct if entries are
-# ever added or reordered, rather than silently checking the wrong one.
+# Look the entry up BY NAME, never positionally: the mirror is a
+# single-entry file today (#235), but a by-name read stays correct if entries
+# are ever added or reordered, rather than silently checking the wrong one.
+# The expected name comes from plugin.json rather than a literal so the same
+# guard holds on branches where the plugin ships under another key (the
+# 2.0 beta channel's manifests all say praxen-beta).
 MARKET_VERSION="$(python3 -c "import json, sys
+name = json.load(open('.claude-plugin/plugin.json'))['name']
 m = json.load(open('.claude-plugin/marketplace.json'))
-e = next((p for p in m['plugins'] if p.get('name') == 'praxen'), None)
+e = next((p for p in m['plugins'] if p.get('name') == name), None)
 if e is None:
-    sys.exit('error: marketplace.json has no praxen entry')
+    sys.exit(f'error: marketplace.json has no {name} entry')
 if 'version' not in e:
-    sys.exit('error: marketplace.json praxen entry has no version')
+    sys.exit(f'error: marketplace.json {name} entry has no version')
 print(e['version'])")"
 if [[ "$VERSION" != "$MARKET_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, marketplace.json praxen entry says $MARKET_VERSION" >&2
@@ -98,27 +102,22 @@ echo "Building Praxen v$VERSION"
 rm -rf "$STAGE_DIR" "$ZIP_PATH"
 mkdir -p "$STAGE_DIR"
 
-# Files and directories that ship in the distribution.
-# Add here if a new distributable artifact is introduced.
-INCLUDE=(
-  ".claude-plugin"
-  ".codex-plugin"
-  "README.md"
-  "PRAXEN_SPEC.md"
-  "LICENSE"
-  "NOTICE"
-  "CHANGELOG.md"
-  "CONTRIBUTING.md"
-  "WORKER_REMIT_template.md"
-  "skills"
-  "docs"
-  "examples"
-  "graphics"
-)
-
-# Note: tests/ is in the source repository but intentionally NOT included in the
-# distribution zip. Tests are for contributors; users of the shipped scanner
-# don't need the regression harness.
+# Files and directories that ship in the distribution — the shared manifest
+# (also read by scripts/release/stage_plugin_payload.sh, which stages the
+# vendored plugin payload for the community catalog). The zip takes every
+# entry, including the `zip-only`-tagged ones. Add new distributable
+# artifacts there, not here. Portable read loop: macOS ships bash 3.2,
+# which has no mapfile.
+DIST_MANIFEST="scripts/release/dist_manifest.txt"
+if [[ ! -f "$DIST_MANIFEST" ]]; then
+  echo "error: $DIST_MANIFEST not found — the distribution allowlist is gone" >&2
+  exit 1
+fi
+INCLUDE=()
+while read -r item tag _; do
+  case "$item" in ''|'#'*) continue ;; esac
+  INCLUDE+=("$item")
+done < "$DIST_MANIFEST"
 
 # Copy each item; skip missing optional ones (e.g., LICENSE not yet added)
 for item in "${INCLUDE[@]}"; do
