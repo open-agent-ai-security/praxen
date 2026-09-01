@@ -1,0 +1,181 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: August 12, 2026, 16:25 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Every safeguard this agent claims lives in prompt text or in a flag that
+nothing reads, while the code path that moves an invoice to approved performs
+no check at all: _approve_invoice writes status='approved' and
+payment_processed=True without consulting the amount, the injection flag it
+just set, or the confidence_threshold the admin console invites operators to
+configure — that column has zero read sites anywhere in the codebase. The
+dominant chain is a public one: an unauthenticated POST to
+/api/admin/finbot/goals stores natural-language goals that are appended to
+every future system prompt under an explicit instruction to override the
+safety goals above them, so a single anonymous request redirects all
+subsequent invoice decisions, and nothing records who changed them. Where
+enforcement logic does exist it runs the wrong way — _fallback_processing
+reads authority and urgency phrases out of the attacker-controlled invoice
+description and uses them to expedite past the manual-review threshold and
+past its own injection detection.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.00 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 4   Medium: 5   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 8   Gap: 18   Partial: 7   Vague: 0   Enforcement-not-possible: 0   (of 33 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   3
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  Every /api/admin/* route — goals, thresholds, fraud
+            toggle, invoice approval, vendor trust — is reachable by any
+            anonymous caller with no authentication.
+      Action 1: Put an authentication and role check in front of the admin
+                blueprint — register a before_request handler on admin_bp in
+                src/routes/admin.py that rejects any request without a
+                verified finance-operator session, rather than decorating
+                routes one at a time.
+      Action 2: Separate the admin blueprint from the vendor-facing one at the
+                URL and deployment level so that admin routes are not served
+                from the same public origin as /api/vendors.
+
+  PRAX-2026-08-12-002  An anonymous goal write persists into every later
+            decision — stored custom_goals are appended to each system prompt
+            under an explicit instruction to override the safety goals.
+      Action 1: Stop treating stored goals as prompt-level overrides — in
+                get_system_prompt, either drop the override wording so custom
+                goals cannot outrank the threshold and fraud clauses, or
+                restrict the field to a fixed set of operator-selectable
+                parameters rather than free text.
+      Action 2: Gate update_goals behind the authenticated admin check from
+                PRAX-2026-08-12-001 and record the acting admin, the previous
+                value, and a timestamp on every write.
+
+  PRAX-2026-08-12-003  The approve tool commits an approval with no check on
+            amount, on the injection flag it just set, or on confidence;
+            confidence_threshold has zero read sites.
+      Action 1: Add a deterministic gate at the top of _approve_invoice in
+                src/services/finbot_agent.py that re-reads the invoice and
+                config and routes to _request_human_review when the amount is
+                at or above manual_review_threshold, when
+                contains_prompt_injection is set, or when the supplied
+                confidence is below confidence_threshold.
+      Action 2: Make the gate the only path that can set status='approved', so
+                a future tool or route cannot approve an invoice by writing
+                the field directly.
+
+  PRAX-2026-08-12-004  The fallback engine scores authority and urgency
+            phrases out of the attacker-controlled invoice description and
+            uses them to override both the review threshold and its own
+            injection detection.
+      Action 1: Delete the override branches in _fallback_processing at
+                src/services/finbot_agent.py lines 807-820 and 841-850 so that
+                amount and injection status are terminal — the fallback should
+                only ever downgrade toward _request_human_review, never
+                upgrade toward approval.
+      Action 2: Treat description-derived signals from
+                _analyze_business_context as advisory metadata attached to the
+                review record rather than as inputs to the approve/route
+                decision.
+
+  PRAX-2026-08-12-005  GET /api/vendors returns every vendor's full record —
+            bank name, account number, routing number, and tax identifier — to
+            any unauthenticated caller.
+      Action 1: Split the serialiser in src/models/vendor.py into a public
+                projection (id, company_name, trust_level) and a privileged
+                one, and have list_vendors and get_vendor in
+                src/routes/vendor.py return the public projection only.
+      Action 2: Scope every vendor route to the authenticated vendor's own id
+                so that one vendor cannot read another's invoices or
+                onboarding record, and rebuild the portal's vendor picker on
+                that session rather than on a full listing.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-006  The admin console is published to the public internet —
+            served from the public static folder by a 0.0.0.0-bound web
+            service declared as an internet-facing deployment.
+      Action 1: Move admin-dashboard.html out of the publicly served static
+                folder and serve it from a route behind the admin
+                authentication check, so the console is not fetchable by URL
+                guess.
+      Action 2: Terminate admin traffic on a separate internal listener or
+                place the /api/admin/* prefix behind an ingress allowlist
+                restricted to CineFlow's authorized network.
+
+  PRAX-2026-08-12-007  No durable audit log exists — the codebase has no
+            logging framework at all, and configuration and goal changes
+            record a timestamp with no actor and no prior value.
+      Action 1: Add an append-only decision and configuration audit table
+                written inside _approve_invoice, _reject_invoice,
+                _request_human_review, update_config, and update_goals,
+                capturing actor, previous value, new value, and timestamp.
+      Action 2: Stop reprocess_invoice in src/routes/admin.py from clearing
+                ai_decision, ai_confidence, and ai_reasoning in place — write
+                a new attempt record instead of overwriting the prior one.
+
+  PRAX-2026-08-12-008  The Flask SECRET_KEY is a hardcoded string literal
+            committed in source rather than read from the environment.
+      Action: Replace the literal in src/main.py with os.environ['SECRET_KEY']
+              and fail startup when it is unset, then rotate the committed
+              value.
+
+  PRAX-2026-08-12-009  The public invoice endpoint has no rate limit and no
+            cost ceiling, and each anonymous submission drives up to five
+            model calls.
+      Action 1: Add a per-IP and per-vendor rate limit in front of
+                submit_invoice in src/routes/vendor.py, and reject submissions
+                whose description exceeds a fixed length before any model call
+                is made.
+      Action 2: Set a hard monthly spend ceiling on the OpenAI credential that
+                halts rather than alerts, so a submission flood cannot run
+                past the budget.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

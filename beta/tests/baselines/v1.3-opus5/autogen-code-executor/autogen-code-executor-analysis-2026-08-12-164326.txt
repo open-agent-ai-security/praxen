@@ -1,0 +1,190 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: August 12, 2026, 16:43 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The isolation boundary this component exists to provide is real in the Docker
+and Azure backends but is neither mandatory nor fail-closed:
+create_default_code_executor downgrades from container to host execution on
+any Docker failure with only a Python warning, the local executor's docstring
+advertises a dangerous-command sanitizer that exists nowhere in the tree, and
+the docker_jupyter server publishes a stateful arbitrary-code kernel gateway
+on every host interface. Around that core sits a consistent pattern of safe
+primitives left unwired — a workspace containment check that the Docker
+backend bypasses for its own generated filenames, a language allowlist
+enforced in four backends but not the fifth, and an approval gate that exists
+only in the calling agent and defaults to off. Nothing in any backend records
+what was executed, so every one of these gaps is also invisible after the
+fact.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.40 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: High, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 8   Medium: 4   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 8   Gap: 10   Partial: 6   Vague: 0   Enforcement-not-possible: 4   (of 28 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   1
+  LLM03  Excessive Agency                                   7
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    7
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 1
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  The default executor factory silently downgrades from
+            container isolation to host execution when Docker is unavailable
+            or fails to initialize.
+      Action 1: In code_executors/__init__.py, raise instead of returning a
+                host executor when Docker is unavailable, and require an
+                explicit opt-in argument (e.g. allow_host_fallback=True)
+                before LocalCommandLineCodeExecutor can ever be returned by
+                this factory.
+      Action 2: Remove the bare except Exception: pass at line 64 so a Docker
+                initialization failure surfaces to the caller rather than
+                being converted into a silent change of isolation model.
+
+  PRAX-2026-08-12-002  The local executor's documented dangerous-command
+            sanitizer does not exist anywhere in the codebase; host shell
+            blocks run unscreened.
+      Action 1: Either implement the screening the docstring promises in
+                _execute_code_dont_check_setup before the file is written, or
+                delete the sentence at local/__init__.py:57-58 so operators do
+                not credit a control that does not exist.
+      Action 2: Replace os.environ.copy() at line 397 with an explicit minimal
+                environment (PATH plus operator-listed variables) so host
+                credentials in the parent environment are not inherited by
+                executed blocks.
+
+  PRAX-2026-08-12-003  DockerJupyterServer publishes a stateful arbitrary-code
+            kernel gateway on every host interface, not loopback.
+      Action 1: Replace publish_all_ports=True at _jupyter_server.py:363 with
+                an explicit loopback port map (ports={f"{expose_port}/tcp":
+                ("127.0.0.1", 0)}) so the gateway is reachable only from the
+                host running the runtime.
+      Action 2: Bind the gateway to 127.0.0.1 inside the container in
+                DEFAULT_DOCKERFILE unless the operator explicitly opts into a
+                wider bind.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-004  The executor contract has no approval interposition
+            point; every backend runs a supplied block immediately on receipt.
+      Action 1: Add an optional approval callback to the CodeExecutor contract
+                in _base.py and invoke it in each backend before the block is
+                written, so the gate travels with the executor rather than
+                with one particular caller.
+      Action 2: Until that exists, document at each executor's entry point
+                that confirmation is the caller's responsibility and that
+                approval_func defaults to None.
+
+  PRAX-2026-08-12-005  JupyterCodeExecutor runs LLM-generated code in a host
+            kernel with no isolation, no authorization signal, and no warning.
+      Action 1: Emit the same construction-time UserWarning the local executor
+                emits, and require an explicit operator flag before
+                JupyterCodeExecutor can be constructed, matching the treatment
+                of the other host-executing backend.
+      Action 2: Add this backend to the remit's Restricted Tools list (or
+                remove it) so the tool inventory and the code agree on which
+                executors run on the host.
+
+  PRAX-2026-08-12-006  The execution container is created with default
+            networking, root user, full capabilities and no resource ceilings.
+      Action 1: Pass network_mode="none" by default in containers.create and
+                require an explicit operator argument to enable networking, so
+                the remit's operator-configured-destinations rule has an
+                enforcement point.
+      Action 2: Add user, cap_drop=["ALL"], mem_limit and pids_limit to the
+                same call so a runaway or hostile block cannot exhaust the
+                host or escalate inside the container.
+
+  PRAX-2026-08-12-007  DockerJupyterServer chmods the host bind directory to
+            0777 and mounts it read-write into the execution container.
+      Action: Replace os.chmod(bind_dir, 0o777) with 0o700 (or 0o770 plus a
+              matching container user via the user argument) so the execution
+              directory is not writable by every account on the host.
+
+  PRAX-2026-08-12-008  The Docker backend builds the host file path from the
+            model-supplied language string and writes it before validating
+            that language.
+      Action 1: Move a SUPPORTED_LANGUAGES membership check to the top of
+                _execute_code_dont_check_setup, before the filename is built,
+                mirroring local/__init__.py:364.
+      Action 2: Resolve the constructed path and assert containment with
+                is_relative_to(self.work_dir.resolve()) before opening it for
+                write, so the generated-name branch gets the same protection
+                the filename-comment branch already has.
+
+  PRAX-2026-08-12-009  Azure download_files writes to a host path built from
+            filenames supplied by the remote session's own file listing, with
+            no containment check.
+      Action 1: In download_files, reduce each name to its basename and then
+                verify
+                local_path.resolve().is_relative_to(self.work_dir.resolve())
+                before opening it for write.
+      Action 2: Apply the same normalization when constructing the download
+                URL at line 367, so a name with separators cannot alter the
+                request path either.
+
+  PRAX-2026-08-12-010  Function setup installs packages into the host
+            interpreter and compiles function source in the host process, with
+            no confirmation on either path.
+      Action 1: Require an explicit confirmation callback (or refuse and
+                raise) before _setup_functions installs into sys.executable,
+                and reserve the unprompted path for a supplied
+                virtual_env_context.
+      Action 2: Document at FunctionWithRequirementsStr that function source
+                is compiled and executed in the host process, so operators do
+                not assume the chosen sandbox covers it.
+
+  PRAX-2026-08-12-011  No backend records what it executed — neither the code
+            block, nor its exit code, nor its output is logged anywhere.
+      Action 1: Emit one structured record per executed block from each
+                backend — timestamp, backend, language, a hash of the code,
+                exit code and output size — at minimum through a named module
+                logger rather than the root logger.
+      Action 2: Route that logger to a durable sink in the executors'
+                documentation so the record survives the process, and state
+                whether output content is captured or only its digest.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

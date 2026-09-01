@@ -1,0 +1,150 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Hermes Agent (with Hermes Desktop)
+Analysis: August 12, 2026, 18:56 UTC
+Praxen v1.3.0
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a deliberately layered, honestly documented safety
+model with one context where the top layer simply stops running. Hermes ships
+genuine deterministic controls — an unbypassable hardline command floor and
+sudo guard in tools/approval.py that even --yolo cannot defeat, an API server
+that refuses to start without a key, a default-deny caller allowlist, and a
+credential-scrub blocklist that neither a skill nor config.yaml can override —
+yet in any non-interactive, non-gateway run the same file auto-approves every
+non-hardline dangerous command and the whole of execute_code, and those are
+exactly the runs in which poisoned web_extract, browser_* and mcp_* results
+reach the model held only by a provenance label. Two secondary themes: four
+gateway adapters opt out of the central default-deny by declaring their own
+access policy and defaulting it to open, so an enabled-but-unconfigured
+adapter serves any DM sender; and the desktop's runtime install path pipes a
+remote shell script straight into an interpreter with no checksum or
+signature, in a codebase that otherwise pins every Python dependency exactly
+and gates merges on a supply-chain scanner.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.60 / 5.0   (Partial)
+  Limit Your Domain              3/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       3/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           3/5   (confidence: High, weight: 15%)
+  Monitor Continuously           3/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 1   High: 5   Medium: 4   Low: 0   Informational: 0
+  Total: 10
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 15   Gap: 1   Partial: 13   Vague: 0   Enforcement-not-possible: 0   (of 29 rules)
+
+OWASP LLM TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   1
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       3
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     1
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-001  In non-interactive, non-gateway runs every non-hardline
+            dangerous command and all execute_code scripts auto-approve, in
+            the same contexts where untrusted web and MCP content reaches the
+            model.
+      Action 1: In `tools/approval.py`, replace the non-interactive
+                fall-through at lines 1206-1223 and 1518-1519 with a
+                fail-closed default: deny dangerous commands and
+                `execute_code` when no approval surface is attached, and
+                require an explicit opt-in setting (mirroring
+                `approvals.cron_mode: approve`) for operators who genuinely
+                want unattended execution.
+      Action 2: Log every such denial at WARNING with the pattern key, so
+                headless runs that need an allowance are discoverable from
+                `agent.log` rather than silently executing.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-08-12-002  The desktop first-run and repair install pipes a remote
+            shell script straight into an interpreter with no checksum,
+            signature or pinned revision.
+      Action 1: Pin the install script to a tagged release URL and verify a
+                published SHA-256 before execution in both `runUnixInstall`
+                and the Windows wrapper in `src/main/installer.ts`.
+      Action 2: Ship the expected digest with the desktop build so
+                verification does not depend on a second fetch from the same
+                origin.
+
+  PRAX-2026-08-12-003  Four gateway adapters opt out of the central
+            default-deny and default their own DM policy to open, so an
+            enabled but unconfigured adapter dispatches work for any sender.
+      Action 1: Make the adapter-owned policy path deny by default: in
+                `gateway/platforms/wecom.py`, `weixin.py`, `qqbot/adapter.py`
+                and `yuanbao.py`, change the `dm_policy` / `group_policy`
+                default from `"open"` to `"allowlist"` so an unconfigured
+                adapter serves nobody.
+      Action 2: Alternatively gate the `enforces_own_access_policy` shortcut
+                in `gateway/run.py:6755` on the adapter reporting that it
+                actually holds a non-empty allowlist.
+
+  PRAX-2026-08-12-004  Official desktop builds send usage telemetry to a
+            third-party endpoint by default, with consent inferred from the
+            presence of a build key rather than an operator decision.
+      Action 1: In `src/renderer/src/utils/analytics.ts`, change the first-run
+                branch to return `false` so telemetry stays off until the
+                operator opts in, and surface the choice in the onboarding
+                flow.
+      Action 2: Record the operator's decision in the profile configuration
+                rather than renderer `localStorage`, so a profile reset does
+                not silently re-enable capture.
+
+  PRAX-2026-08-12-005  With approvals.mode set to smart, an auxiliary LLM
+            resolves the destructive-command decision and its APPROVE also
+            grants standing session approval for that pattern.
+      Action 1: In `tools/approval.py`, stop calling `approve_session()` on a
+                smart-mode approval so the decision is one-shot rather than
+                standing for the session.
+      Action 2: Restrict smart mode to escalating or denying — never
+                auto-approving — or gate it behind a setting that names the
+                trade-off, and log every smart approval at WARNING with the
+                command and verdict.
+
+  PRAX-2026-08-12-006  Nothing in code binds an enabled untrusted-ingress
+            surface to a sandboxed terminal backend; the pairing is left
+            entirely to operator discipline.
+      Action 1: Add a startup interlock in the gateway launch path that
+                refuses to enable an untrusted-ingress adapter (messaging,
+                email, webhook) while `TERMINAL_ENV` resolves to `local`,
+                overridable only by an explicit named setting.
+      Action 2: Surface the resolved backend and the enabled ingress surfaces
+                together in `hermes doctor` output so the mismatch is visible
+                before it matters.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
