@@ -26,7 +26,7 @@ import schema as _s
 from schema import SchemaError  # re-exported: callers catch one error type
 
 # ── version ──────────────────────────────────────────────────────────────────
-SPEC_VERSION = "1.4"
+SPEC_VERSION = "1.5"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 LANES = [
@@ -85,7 +85,7 @@ def _validate_top(data):
     _s._obj(data, "$")
     _closed(data, "$", {
         "spec_version", "praxen_version", "target", "analysis_ref",
-        "model_identity", "executive_summary", "lanes", "nodes", "edges",
+        "model_identity", "lanes", "nodes", "edges",
         "trust_boundaries", "attack_paths", "notes", "remit_version",
     })
     version = _s._nonempty_str(data, "spec_version", "$")
@@ -104,7 +104,6 @@ def _validate_top(data):
     if "remit_version" in data:
         _s._nonempty_str(data, "remit_version", "$")
     _s._nonempty_str(data, "model_identity", "$")
-    _s._nonempty_str(data, "executive_summary", "$")
     lanes = _s._get(data, "lanes", "$")
     if lanes != LANES:
         _s._err("$.lanes", f"must be exactly {LANES}")

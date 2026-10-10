@@ -55,11 +55,10 @@ def expect_valid(name, mutate=None):
 
 
 def make_graph():
-    """Minimal valid v1.0 graph: 2 nodes, 1 edge, 1 boundary exercising all
+    """Minimal valid v1.5 graph: 2 nodes, 1 edge, 1 boundary exercising all
     four statuses, 1 attack path."""
     return {
-        "spec_version": "1.4",
-        "executive_summary": "A demo agent for tests. Untrusted user text enters the loop; the one path to watch is prompt injection reaching the tool surface.",
+        "spec_version": "1.5",
         "praxen_version": "2.0.0",
         "target": {"slug": "demo", "source_root": "/tmp/demo"},
         "analysis_ref": "demo-findings-2026-08-17.json",
@@ -233,6 +232,29 @@ def main():
           all(f"`{a}`" in spec for a in tms.BOUNDARY_ARCHETYPES))
     check("statuses named in spec doc",
           all(f"`{st}`" in spec for st in tms.THREAT_STATUSES))
+
+    # The contract version lives in three places that must not drift: the
+    # validator constant, the published contract doc, and the extraction brief
+    # that tells the model what to stamp. The brief is the dangerous one — it
+    # is invisible to every other test in this file, because the fixtures and
+    # make_graph() carry their own spec_version, so a stale stamp instruction
+    # ships green while every freshly generated graph fails validation on
+    # arrival. That is exactly what the v1.4 -> v1.5 cut nearly shipped.
+    brief = open(os.path.join(SKILL_DIR, "THREAT_MODEL.md")).read()
+    check("spec doc header states the validator's contract version",
+          f"contract v{tms.SPEC_VERSION}" in spec,
+          f"THREAT_MODEL_SPEC.md header disagrees with SPEC_VERSION={tms.SPEC_VERSION!r}")
+    check("spec doc pins spec_version to the validator's version",
+          f'`"{tms.SPEC_VERSION}"`' in spec,
+          f"THREAT_MODEL_SPEC.md body disagrees with SPEC_VERSION={tms.SPEC_VERSION!r}")
+    check("extraction brief stamps the validator's version",
+          f'"spec_version": "{tms.SPEC_VERSION}"' in brief,
+          f"THREAT_MODEL.md stamp instruction disagrees with "
+          f"SPEC_VERSION={tms.SPEC_VERSION!r}")
+    check("extraction brief names exactly one spec_version",
+          brief.count('"spec_version"') == 1,
+          f"found {brief.count(chr(34) + 'spec_version' + chr(34))} — a second "
+          f"stamp instruction can go stale unnoticed")
 
     print(f"\n{_passed} passed, {_failed} failed")
     sys.exit(1 if _failed else 0)
