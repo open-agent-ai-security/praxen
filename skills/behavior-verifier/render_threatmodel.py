@@ -21,8 +21,8 @@ Design contract (RELEASE_2.0_PLAN.md item 4):
   variants) are asserted against the template text by the test suite.
 * **Static-completeness.** The page reads complete on paper: printed legend,
   boundary key table, kind icons, role-marked attack-path nodes
-  (source / pass-through / failed-control / target), the executive summary,
-  and the component inventory with citations; print CSS keeps it legible on
+  (source / pass-through / failed-control / target), and the component
+  inventory with citations; print CSS keeps it legible on
   paper. Attack paths are drawn bold red on a faint grey substrate so the
   dangerous flows dominate. Hover behaviors (red-path flow animation,
   disciplined tooltips) are an enhancement layer only.
@@ -597,21 +597,6 @@ def render(graph, template_text, analysis_html=None):
         aref_html = f' · built against <b>{esc(aref)}</b>'
     else:
         aref_html = ' · no analysis reference (standalone extraction)'
-    # The contract assigns the summary's paragraphs fixed roles (para 1 = what
-    # the agent is; paras 2-3 = the threats to deal with first, led by the
-    # attack paths), so the section split is mechanical, matching the labeled
-    # summary boxes of the analysis report.
-    _pars = [f"<p>{esc(par.strip())}</p>"
-             for par in g.get("executive_summary", "").split("\n\n")
-             if par.strip()]
-    summary_html = (f'<div class="exec-sum-box"><div class="label">'
-                    f'The Agent (as modeled)</div>{_pars[0]}</div>'
-                    if _pars else "")
-    if len(_pars) > 1:
-        summary_html += (f'<div class="exec-sum-box exec-sum-threats">'
-                         f'<div class="label">Priority Threats (led by attack '
-                         f'paths)</div>{"".join(_pars[1:])}</div>')
-
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -638,11 +623,6 @@ def render(graph, template_text, analysis_html=None):
   .section {{ margin-bottom:40px; }}
   .section-title {{ font-size:13px; font-weight:800; color:var(--blue-dark); text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:10px; }}
   .section-desc {{ color:#555; font-size:13px; margin:0 0 18px; line-height:1.6; }}
-  .exec-summary {{ display:flex; flex-direction:column; gap:14px; }}
-  .exec-sum-box {{ background:var(--surface-alt); border-left:4px solid var(--blue-dark); border-radius:0 8px 8px 0; padding:14px 22px 16px; font-size:14.5px; line-height:1.65; color:var(--text); }}
-  .exec-sum-box.exec-sum-threats {{ border-left-color:var(--sev-critical); }}
-  .exec-sum-box .label {{ font-size:11.5px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }}
-  .exec-sum-box p {{ margin:0 0 12px; }} .exec-sum-box p:last-child {{ margin-bottom:0; }}
   .section-fullbleed {{ max-width:none; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:32px; padding-right:32px; }}
   .svgwrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:8px; }}
   .svgwrap svg {{ max-width:100%; height:auto; }}
@@ -758,10 +738,8 @@ def render(graph, template_text, analysis_html=None):
     </div>
   </div>
 </div></div>
-<nav class="jumpnav"><a href="#s-summary">Summary</a><a href="#s-attack">Attack Paths</a><a href="#s-boundaries">Trust Boundaries</a><a href="#s-inventory">Component Inventory</a></nav>
+<nav class="jumpnav"><a href="#s-attack">Attack Paths</a><a href="#s-boundaries">Trust Boundaries</a><a href="#s-inventory">Component Inventory</a></nav>
 <div class="content">
-<div class="section" id="s-summary"><div class="section-title">Summary</div>
-<div class="exec-summary">{summary_html}</div></div>
 <div class="section section-fullbleed" id="s-arch">
 <div class="section-title">Architecture &amp; Trust Boundaries</div>
 <div class="section-desc" style="max-width:1100px;margin-left:auto;margin-right:auto">Attack paths are drawn in <b style="color:var(--sev-critical)">red</b>, running from where an attacker gets in to what they reach. Click any box to jump to its inventory row, or a <b>B</b>-badge to jump to that boundary; hover a box to reveal its data flows. Everything reads statically below — the key resolves every mark and the tables carry every citation.</div>
