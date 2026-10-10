@@ -122,6 +122,24 @@ as input, so the generator work is *better* after this ships.
   unaffected; full test
   suite green; `claude plugin validate` clean; `v1.3-opus5` baselines
   untouched (byte-gates hold — nothing in 2.0 re-scans or re-scores).
+  **Rider (#266, 2026-10-09):** that exception was reasoned about the
+  runtime validator only — the published `findings.schema.json` was never
+  updated, and because `scan` is `additionalProperties: false` there, any
+  findings JSON from a remit that declares a version passed `schema.py`
+  and was **rejected by every draft-07 consumer**. Fixed by declaring
+  `scan.remit_version` as an optional non-empty string, plus a
+  converter-table ↔ published-schema field-inventory cross-check in
+  `test_render.py` §4e-bis (§4e compared only enums, which is why nothing
+  caught it). **`schema_version` deliberately stays `3.0`.** `STABILITY.md`
+  would argue an additive field belongs in a schema MINOR, but `schema.py`
+  pins exactly (`sv != SCHEMA_VERSION` → error), so a 3.1 bump would
+  invalidate all 24 baseline JSONs declaring 3.0 and force a re-stamp and
+  re-render of frozen, byte-gated artifacts — straight through this gate's
+  own "baselines untouched" clause. The schema-minor signal is therefore
+  **deferred to 2.1**, where re-stamping is already in scope. Note the
+  residual: `3.0` now denotes two shapes (with and without
+  `remit_version`), distinguishable only by `STABILITY.md`'s standing
+  instruction that consumers tolerate unknown additive fields.
 - **Cost documentation:** extraction ≈ 0.4–0.5× a standard scan (probe
   measurement) — publish as budgeting guidance like the thinking-modes
   cost section, from measured runs.
@@ -142,7 +160,7 @@ as input, so the generator work is *better* after this ships.
 
 ## Release mechanics
 
-Branch `design/threat-model` (already pushed) → squash to `dev` after the
+Branch `v2` (already pushed; formerly `design/threat-model`) → squash to `dev` after the
 1.3 promotion settles → promotion PR (merge commit, FF `dev`) → tag
 `v2.0.0` → post-tag sandboxed install smoke (must stamp exactly 2.0.0) +
 fresh-agent scan check (standard scan unchanged) + one threat-model
