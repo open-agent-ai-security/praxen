@@ -160,7 +160,7 @@ as input, so the generator work is *better* after this ships.
 
 ## Release mechanics
 
-Branch `design/threat-model` (already pushed) → squash to `dev` after the
+Branch `v2` (already pushed; formerly `design/threat-model`) → squash to `dev` after the
 1.3 promotion settles → promotion PR (merge commit, FF `dev`) → tag
 `v2.0.0` → post-tag sandboxed install smoke (must stamp exactly 2.0.0) +
 fresh-agent scan check (standard scan unchanged) + one threat-model
