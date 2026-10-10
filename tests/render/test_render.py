@@ -411,6 +411,72 @@ def main():
     check("findings.schema.json enums agree with the Python validator constants",
           not disagreements, f"diverged: {disagreements}")
 
+    # 4e-bis. Every flat field the manifest converter can emit into an object is
+    #         DECLARED in the published JSON Schema for that object.
+    #
+    #         The two validators are deliberately asymmetric: schema.py is
+    #         open-world (it checks the fields it knows and ignores anything
+    #         else) while findings.schema.json is closed — `additionalProperties:
+    #         false` at 16 sites, and its own schema_version description says it
+    #         "validates 3.0 documents exactly and is strict". So an additive
+    #         output field that lands in schema.py and the converter but NOT in
+    #         the published doc passes the runtime validator while every draft-07
+    #         consumer rejects the document. That is #266: 2.0 added
+    #         scan.remit_version to the converter table and schema.py:237, never
+    #         to this schema, and §4e above only compared ENUMS — so nothing
+    #         caught it. The converter's per-section tables are the emission-side
+    #         source of truth, so containment against them catches the next one.
+    #
+    #         One-way containment on purpose: the schema legitimately declares
+    #         fields the flat tables never carry — nested arrays assembled
+    #         elsewhere (findings[].evidence, findings[].tags) and ids derived
+    #         during conversion (rules[].rule_id) — so equality would false-fail.
+    import manifest_to_findings as mtf  # noqa: E402
+
+    # Parsed from the manifest but popped before output: manifest plumbing, not
+    # document fields (manifest_to_findings.py:471, 481-482).
+    manifest_only = {"manifest_format_version", "schema_version", "praxen_version"}
+    sp = js["properties"]
+    table_to_schema = [
+        ("_SCAN_FIELD_TYPES",             "$.scan",                       lambda: sp["scan"]),
+        ("_RAISE_POSTURE_FIELD_TYPES",    "$.raise_posture",              lambda: sp["raise_posture"]),
+        ("_RAISE_CATEGORY_FIELD_TYPES",   "$.raise_posture.categories[]", lambda: sp["raise_posture"]["properties"]["categories"]["items"]),
+        ("_REMIT_STAT_COUNT_FIELD_TYPES", "$.remit_coverage.stat_counts", lambda: sp["remit_coverage"]["properties"]["stat_counts"]),
+        ("_RULE_FIELD_TYPES",             "$.remit_coverage.rules[]",     lambda: sp["remit_coverage"]["properties"]["rules"]["items"]),
+        ("_FINDING_FIELD_TYPES",          "$.findings[]",                 lambda: sp["findings"]["items"]),
+        ("_EVIDENCE_ITEM_FIELD_TYPES",    "$.findings[].evidence[]",      lambda: sp["findings"]["items"]["properties"]["evidence"]["items"]),
+        ("_POSITIVE_ITEM_FIELD_TYPES",    "$.positives[]",                lambda: sp["positives"]["items"]),
+        ("_LOG_FILES_FIELD_TYPES",        "$.log_files",                  lambda: sp["log_files"]),
+        ("_LOG_ROW_FIELD_TYPES",          "$.log_files.rows[]",           lambda: sp["log_files"]["properties"]["rows"]["items"]),
+        ("_FOOTER_SEVERITY_FIELD_TYPES",  "$.footer.severity_counts",     lambda: sp["footer"]["properties"]["severity_counts"]),
+    ]
+    # If a table is renamed or a schema path moves, say so rather than crashing —
+    # a silently skipped cross-check is how this class of drift got in.
+    broken = []
+    for name, path, node_fn in table_to_schema:
+        if not hasattr(mtf, name):
+            broken.append(f"{name} (converter table missing/renamed)")
+            continue
+        try:
+            node_fn()
+        except (KeyError, TypeError):
+            broken.append(f"{path} (schema path missing/moved)")
+    check("field-inventory cross-check wiring is intact (tables + schema paths resolve)",
+          not broken, f"unresolved: {broken}")
+
+    undeclared = []
+    for name, path, node_fn in table_to_schema:
+        if not hasattr(mtf, name):
+            continue
+        try:
+            declared = set(node_fn().get("properties", {}))
+        except (KeyError, TypeError):
+            continue
+        emitted = set(getattr(mtf, name)) - manifest_only
+        undeclared += [f"{path}.{f} (converter {name})" for f in sorted(emitted - declared)]
+    check("findings.schema.json declares every field the converter can emit (#266)",
+          not undeclared, f"emitted but undeclared in the published schema: {undeclared}")
+
     # 4f. SECURITY — XSS / HTML-injection hardening. Praxen renders UNTRUSTED
     #     evidence (a scanned agent's own code, prompts, and session-loaded files
     #     like SOUL.md / AGENTS.md) into a shareable, self-contained HTML report.
