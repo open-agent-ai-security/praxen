@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SKILL_DIR = os.path.join(REPO_ROOT, "skills", "behavior-verifier")
@@ -130,6 +131,83 @@ def main():
         check("CLI renders end-to-end", r.returncode == 0, r.stderr)
         check("CLI output matches golden",
               open(out_path, encoding="utf-8").read() == golden)
+
+    # ── committed baseline threat models ────────────────────────────────────
+    # The byte-render gate the findings baselines have (test_render.py), applied
+    # to the threat-model pairs. Without it nothing noticed that the twelve
+    # v1.3-opus5 graphs sat at contract 1.4 for the whole v1.5 cut, publishing a
+    # Summary section the product no longer produces — the staleness was found
+    # by hand, which is exactly what a sweep is for.
+    #
+    # Sets at an older `spec_version` are exempt and reported as archival, the
+    # same treatment the findings sweep gives schema-2.0 baselines: the dated
+    # gate-run graphs under tests/runs/ are evidence of what a specific gate
+    # produced and must not be rewritten to satisfy a validator.
+    #
+    # The committed HTML was rendered with --analysis-html, so a byte-identical
+    # re-render has to pass the same reference; it is derived from the sibling
+    # analysis report rather than hardcoded.
+    import glob
+    graphs = sorted(glob.glob(os.path.join(
+        REPO_ROOT, "tests", "baselines", "*", "*", "*threatmodel*.json")))
+    check("found committed baseline threat models", bool(graphs),
+          "no *threatmodel*.json under tests/baselines/")
+
+    # Guard the guard, the same way the findings sweep does (#208): exempting
+    # non-current contract versions is what makes archival sets possible, but
+    # applied naively it also exempts a STALE file in the current set — it would
+    # quietly lose its whole regression net while printing green. That is not
+    # hypothetical here: the twelve v1.3-opus5 graphs really did sit at contract
+    # 1.4 through the v1.5 cut, and a version-keyed exemption would have called
+    # them archival rather than failing. So the exemption is keyed on the
+    # baseline SET, read from the same CURRENT marker test_render.py uses.
+    current_set = (Path(REPO_ROOT) / "tests" / "baselines" / "CURRENT").read_text(
+        encoding="utf-8").strip()
+    assert (Path(REPO_ROOT) / "tests" / "baselines" / current_set).is_dir(), \
+        f"CURRENT names {current_set!r} but tests/baselines/{current_set}/ does not exist"
+    in_current = [g for g in graphs if os.sep + current_set + os.sep in g]
+    stale = [os.path.relpath(g, REPO_ROOT) for g in in_current
+             if json.load(open(g, encoding="utf-8")).get("spec_version") != tms.SPEC_VERSION]
+    check(f"every threat model in the CURRENT set ({current_set}) is at contract "
+          f"{tms.SPEC_VERSION}", not stale,
+          f"stale — they would be skipped as archival and lose every gate below: {stale}")
+
+    for gpath in graphs:
+        rel = os.path.relpath(gpath, REPO_ROOT)
+        bdir = os.path.dirname(gpath)
+        doc = json.load(open(gpath, encoding="utf-8"))
+        if doc.get("spec_version") != tms.SPEC_VERSION:
+            check(f"baseline {rel}: archival set (contract "
+                  f"{doc.get('spec_version')}) — not gated at "
+                  f"{tms.SPEC_VERSION}", True)
+            continue
+
+        try:
+            tms.validate(json.load(open(gpath, encoding="utf-8")))
+            check(f"baseline {rel}: validates against the current contract", True)
+        except SchemaError as e:
+            check(f"baseline {rel}: validates against the current contract",
+                  False, str(e))
+            continue
+
+        hpath = gpath[:-len(".json")] + ".html"
+        has_html = os.path.exists(hpath)
+        check(f"baseline {rel}: has a committed .html alongside it", has_html)
+        if not has_html:
+            continue
+
+        siblings = sorted(glob.glob(os.path.join(bdir, "*-analysis-*.html")))
+        aref = os.path.basename(siblings[0]) if len(siblings) == 1 else None
+        rendered = rtm.render(json.load(open(gpath, encoding="utf-8")),
+                              template, analysis_html=aref)
+        check(f"baseline {rel}: HTML re-renders byte-identical from its JSON",
+              rendered == open(hpath, encoding="utf-8").read(),
+              "regenerate with: python3 skills/behavior-verifier/"
+              f"render_threatmodel.py --graph {rel} --template "
+              "skills/behavior-verifier/report_template.html --out-html "
+              f"{os.path.relpath(hpath, REPO_ROOT)}"
+              + (f" --analysis-html {aref}" if aref else "")
+              + " (only when the change is intentional)")
 
     print(f"\n{_passed} passed, {_failed} failed")
     sys.exit(1 if _failed else 0)
