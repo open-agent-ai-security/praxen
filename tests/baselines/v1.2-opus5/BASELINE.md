@@ -17,7 +17,9 @@ prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
   end; **zero classifier switches across ~90 scans** — Praxen's cybersecurity workload does
   not trigger the Opus 5 fallback.
 - **Knowledge bases:** OWASP LLM/Agentic **2026**; skill branch `1.2`.
-  `praxen_version 1.2.0`, `schema_version 3.0` (activates the remit-verbatim render invariant).
+  `praxen_version 1.2.0`, `schema_version 3.0` as frozen — **re-stamped to 4.0 by 2.0**
+  so the set keeps its byte-render gate (scores untouched; see `../v1.3-opus5/BASELINE.md`)
+  (activates the remit-verbatim render invariant).
 - **Remits:** fully re-authored — **blind generation from each agent's docs** →
   Open-Questions resolution → redundancy polish → FP-driven over-reach fixes. See provenance
   below.

@@ -44,22 +44,47 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 → Full document: **[OWASP Top 10 for LLM Applications 2026](https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final)**
 
-### <a id="owasp-top-10-for-llm-applications-2025"></a>2025 → 2026: what changed
+### <a id="owasp-top-10-for-llm-applications-2025"></a>OWASP Top 10 for LLM Applications 2025 (superseded)
+
+Kept because Praxen reports are archived and read later. A report scored against
+the 2025 list links its chips here, so the entry a reader lands on is the one
+their report meant — the numbering was reordered for 2026, so resolving a 2025
+code against the current list gives the wrong risk. Every 2.0+ report names its
+edition in the footer and in `standards`; see
+[Legacy anchors](#legacy-anchors) for pre-2.0 reports, which name none.
+
+**Superseded — do not use for new work.** The current list is
+[2026](#owasp-top-10-for-llm-applications-2026) above.
+
+| ID | Risk (2025 wording) |
+|---|---|
+| <a id="llm01-2025-prompt-injection"></a>**LLM01** | Prompt Injection |
+| <a id="llm02-2025-sensitive-information-disclosure"></a>**LLM02** | Sensitive Information Disclosure |
+| <a id="llm03-2025-supply-chain"></a>**LLM03** | Supply Chain |
+| <a id="llm04-2025-data-and-model-poisoning"></a>**LLM04** | Data and Model Poisoning |
+| <a id="llm05-2025-improper-output-handling"></a>**LLM05** | Improper Output Handling |
+| <a id="llm06-2025-excessive-agency"></a>**LLM06** | Excessive Agency |
+| <a id="llm07-2025-system-prompt-leakage"></a>**LLM07** | System Prompt Leakage |
+| <a id="llm08-2025-vector-and-embedding-weaknesses"></a>**LLM08** | Vector and Embedding Weaknesses |
+| <a id="llm09-2025-misinformation"></a>**LLM09** | Misinformation |
+| <a id="llm10-2025-unbounded-consumption"></a>**LLM10** | Unbounded Consumption |
+
+### 2025 → 2026: what changed
 
 The 2026 revision kept the same ten risk concepts but **reordered them and renamed one**. Praxen reports and frozen baselines produced before v1.2 carry 2025 numbering — when comparing across that boundary, match categories by **name**, never by number:
 
 | 2026 | Name | Was (2025) |
 |---|---|---|
-| <a id="llm01-2025-prompt-injection"></a>LLM01 | Prompt Injection | LLM01 |
-| <a id="llm02-2025-sensitive-information-disclosure"></a>LLM02 | Sensitive Information Disclosure | LLM02 |
-| <a id="llm06-2025-excessive-agency"></a>LLM03 | Excessive Agency | LLM06 |
-| <a id="llm03-2025-supply-chain"></a>LLM04 | Supply Chain | LLM03 |
-| <a id="llm04-2025-data-and-model-poisoning"></a>LLM05 | Data and Model Poisoning | LLM04 |
-| <a id="llm10-2025-unbounded-consumption"></a>LLM06 | Unbounded Consumption | LLM10 |
-| <a id="llm09-2025-misinformation"></a>LLM07 | Misinformation | LLM09 |
-| <a id="llm07-2025-system-prompt-leakage"></a>LLM08 | Hidden Context Exposure | LLM07 (*System Prompt Leakage*, broadened) |
-| <a id="llm08-2025-vector-and-embedding-weaknesses"></a>LLM09 | Vector and Embedding Weaknesses | LLM08 |
-| <a id="llm05-2025-improper-output-handling"></a>LLM10 | Improper Output Handling | LLM05 |
+| LLM01 | Prompt Injection | LLM01 |
+| LLM02 | Sensitive Information Disclosure | LLM02 |
+| LLM03 | Excessive Agency | LLM06 |
+| LLM04 | Supply Chain | LLM03 |
+| LLM05 | Data and Model Poisoning | LLM04 |
+| LLM06 | Unbounded Consumption | LLM10 |
+| LLM07 | Misinformation | LLM09 |
+| LLM08 | Hidden Context Exposure | LLM07 (*System Prompt Leakage*, broadened) |
+| LLM09 | Vector and Embedding Weaknesses | LLM08 |
+| LLM10 | Improper Output Handling | LLM05 |
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 

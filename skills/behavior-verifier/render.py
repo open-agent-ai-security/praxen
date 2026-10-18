@@ -440,13 +440,23 @@ def owasp_entry_anchor(kind, code, edition) -> str:
     several editions at once. The name makes the link self-describing, and the
     name is fixed within an edition, so the anchor is stable.
 
-    Shared with the docs generator (``docs_build.py`` imports this) so the
-    anchors a report links TO and the anchors the page defines cannot drift.
+    The docs anchors are hand-written in ``docs/owasp.md``; nothing imports this
+    function to generate them. What keeps the two sides from drifting is the
+    link-integrity check in ``tests/render/test_render.py``, which requires the
+    published page to define every anchor this function can produce.
+
+    An edition with no title vocabulary yields a name-less anchor that the page
+    will not define, so warn rather than emit a dead link silently.
     """
     code = str(code).upper()
     titles = (schema.OWASP_LLM_TITLES.get(str(edition), {}) if kind == "owasp_llm"
               else schema.OWASP_AGENTIC_TITLES)
     title = titles.get(code)
+    if title is None:
+        print(f"render.py: WARNING — no {kind} title for {code} in edition "
+              f"{edition!r}; emitting the anchor '{code.lower()}-{edition}', "
+              f"which the docs page is unlikely to define (dead link)",
+              file=sys.stderr)
     tail = f"-{_doc_slug(title)}" if title else ""
     return f"{code.lower()}-{edition}{tail}"
 
@@ -1050,7 +1060,10 @@ def _scrub_secrets(data) -> None:
 # regardless of the authoring model. Conservative: only the separator between a
 # *recognised* OWASP code prefix and the name is rewritten; hyphens/dashes inside
 # the name are left alone, and any non-OWASP label passes through untouched.
-_OWASP_TAG_LABEL_RE = re.compile(r"^\s*((?:LLM|ASI)\d{2})\s*[-–—:]\s*(.+?)\s*$", re.IGNORECASE)
+# Aliased from schema.py, which validates tag labels with the same parser —
+# a second copy here is how the validator and the canonicaliser came to
+# disagree about which labels are even parseable.
+_OWASP_TAG_LABEL_RE = schema.OWASP_TAG_LABEL_RE
 
 
 def _canon_owasp_tag_label(label):

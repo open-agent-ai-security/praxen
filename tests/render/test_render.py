@@ -419,6 +419,27 @@ def main():
     check("an empty scan.remit_version is rejected",
           not schema_accepts(rv_empty),
           "empty string accepted, but minLength 1 is declared")
+    # 4d-quinquies. The CURRENT findings baseline set must name the editions this
+    #               release scores against. The threat-model sweep gained this
+    #               check; the findings side had none, so rewriting all twelve
+    #               v1.3-opus5 findings JSONs to `owasp_llm: "2025"` passed the
+    #               whole suite. A release-wide mis-injection, or a future
+    #               schema.STANDARDS bump that misses the findings set, would
+    #               ship green.
+    cur_findings = sorted(glob.glob(os.path.join(
+        REPO_ROOT, "tests", "baselines", CURRENT_BASELINE, "*", "*-findings-*.json")))
+    check(f"found the CURRENT findings baseline set ({CURRENT_BASELINE})",
+          bool(cur_findings), "no *-findings-*.json in the CURRENT set")
+    edition_drift = []
+    for bj in cur_findings:
+        std = load_json(bj).get("standards") or {}
+        for key, expected in sorted(schema.STANDARDS.items()):
+            if std.get(key) != expected:
+                edition_drift.append(
+                    f"{os.path.relpath(bj, REPO_ROOT)}: {key}={std.get(key)!r} "
+                    f"(release scores against {expected!r})")
+    check("every findings baseline in the CURRENT set names this release's "
+          "OWASP editions", not edition_drift, f"{edition_drift}")
 
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
@@ -750,6 +771,39 @@ def main():
               hit and not schema_accepts(mutant),
               f"{code} labelled {wrong!r} validated, but the recorded edition "
               f"calls it {right!r}")
+
+    # The guard must survive separator and case variance, because it is parsed
+    # BEFORE render.py canonicalises `[-–—:]` to an em-dash (#111 — Codex emits
+    # an ASCII hyphen). A stricter parser here was a hole, not safety: a label
+    # skipped for the "wrong" dash still reached the page with its title
+    # rewritten from the edition, so the same page showed both meanings.
+    for variant in ("LLM03 - Supply Chain", "llm03 — Supply Chain",
+                    "LLM03: Supply Chain", "LLM03 – Supply Chain"):
+        mutant = load_json(FIXTURE)          # fixture records owasp_llm 2025 …
+        mutant["standards"]["owasp_llm"] = "2026"   # … so 2025's LLM03 is wrong here
+        for f in mutant["findings"]:
+            for t in f.get("tags") or []:
+                if t.get("kind") == "owasp_llm":
+                    t["label"] = variant
+        check(f"a contradicting label is caught despite separator/case variance "
+              f"({variant!r})",
+              not schema_accepts(mutant),
+              "the label parser is stricter than render.py's canonicaliser, so "
+              "the guard can be stepped around")
+
+    # A dropped parenthetical qualifier is cosmetic, not an edition difference.
+    paren = load_json(FIXTURE)
+    hit = False
+    for f in paren["findings"]:
+        for t in f.get("tags") or []:
+            if t.get("kind") == "owasp_agentic" and "(" in t["label"]:
+                t["label"] = t["label"].split("(")[0].strip()
+                hit = True
+    if hit:
+        check("a dropped parenthetical qualifier is tolerated",
+              schema_accepts(paren),
+              "'Unexpected Code Execution' was rejected against "
+              "'Unexpected Code Execution (RCE)'")
 
     # Cosmetic variance is not a contradiction: committed reports write
     # "Identity & Privilege Abuse" for "Identity and Privilege Abuse", and

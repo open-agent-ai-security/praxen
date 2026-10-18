@@ -95,6 +95,15 @@ _FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
 # this, an archived finding tagged LLM03 is ambiguous to every consumer that
 # is not render.py. Bump these together with the KB files; a test asserts they
 # match the KB headers.
+# One tolerant parser for an OWASP tag label, `<CODE> <sep> <Name>`. Separator
+# and case vary in real output — Codex emits an ASCII hyphen (#111) and
+# render.py canonicalises `[-–—:]` to an em-dash — and that canonicalisation
+# runs AFTER validation. A stricter parser here is therefore a hole, not safety:
+# a label the validator skipped for having the "wrong" dash still reached the
+# page with its title rewritten. render.py aliases this.
+OWASP_TAG_LABEL_RE = re.compile(
+    r"^\s*((?:LLM|ASI)\d{2})\s*[-\u2013\u2014:]\s*(.+?)\s*$", re.IGNORECASE)
+
 # OWASP title vocabularies, keyed by edition. These live here rather than in
 # render.py because they are taxonomy facts the VALIDATOR needs: a tag whose
 # label disagrees with the document's recorded edition is a self-contradicting
@@ -591,12 +600,15 @@ def _norm_title(text):
     """Compare OWASP titles ignoring cosmetic variance, not meaning.
 
     Committed reports carry punctuation variants of the same category name —
-    "Identity & Privilege Abuse" for "Identity and Privilege Abuse" — and
+    "Identity & Privilege Abuse" for "Identity and Privilege Abuse", or a
+    dropped parenthetical qualifier ("Unexpected Code Execution" for
+    "Unexpected Code Execution (RCE)") — and
     failing those would be noise, not a caught defect. A real edition mismatch
     is a different category entirely ("Supply Chain" vs "Excessive Agency"), so
     folding case, "&"/"and" and whitespace cannot mask one.
     """
-    return " ".join(str(text).lower().replace("&", "and").split())
+    text = re.sub(r"\([^)]*\)", " ", str(text))   # "(RCE)" is a qualifier, not a category
+    return " ".join(text.lower().replace("&", "and").split())
 
 
 def _validate_tag_editions(data, findings):
@@ -629,10 +641,12 @@ def _validate_tag_editions(data, findings):
             if not table:
                 continue
             label = tag.get("label")
-            if not isinstance(label, str) or "\u2014" not in label:
+            if not isinstance(label, str):
                 continue
-            code, _, title = label.partition("\u2014")
-            code, title = code.strip(), title.strip()
+            m = OWASP_TAG_LABEL_RE.match(label)
+            if not m:
+                continue
+            code, title = m.group(1).upper(), m.group(2)
             expected = table.get(code)
             if expected and _norm_title(title) != _norm_title(expected):
                 edition = (std.get("owasp_llm") if tag["kind"] == "owasp_llm"

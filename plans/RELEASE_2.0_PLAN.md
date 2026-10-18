@@ -156,9 +156,12 @@ as input, so the generator work is *better* after this ships.
   re-rendered, which the gate above now records. The residual the rider
   worried about — one version string denoting two shapes — does not arise:
   4.0 denotes exactly one.
-- **Cost documentation:** extraction ≈ 0.4–0.5× a standard scan (probe
-  measurement) — publish as budgeting guidance like the thinking-modes
-  cost section, from measured runs.
+- **Cost documentation:** extraction ≈ **0.5–1×** a standard scan,
+  typically ~0.75× — published as budgeting guidance like the
+  thinking-modes cost section, from measured runs. (This gate was drafted
+  at "≈ 0.4–0.5×" from the Phase-0 probe; the figure that shipped in
+  `docs/threat-modeling.md` and `PRAXEN_SPEC.md` is the later measured one.
+  Corrected here 2026-10-18 so the plan and the product agree.)
 
 ## Open decisions — RESOLVED (Steve, 2026-08-22)
 
@@ -190,8 +193,13 @@ template literal and the MCP edition appeared nowhere at all.
   the new `schema.STANDARDS` — never authored. Shape-checked, not
   value-pinned, so a document recording an older edition stays valid.
 - **Threat-model graph:** same block, folded into the unreleased contract
-  **v1.5**. Values *are* pinned there, because a graph is written directly
-  by the extraction pass with no converter to inject them.
+  **v1.5**. Shape-checked, not value-pinned — the same as the findings
+  side. Pinning was tried first and reversed: it would have meant a graph
+  could never record an older edition, and that the day the knowledge bases
+  move, every already-valid graph at an unchanged `spec_version` becomes
+  invalid — the "one version, two shapes" defect this contract bump exists
+  to avoid. Staleness in the committed set is caught by the test suite
+  instead.
 - **Schema 3.0 -> 4.0, not 3.1.** `STABILITY.md` makes adding a required
   field a schema MAJOR, and 2.0 is a product MAJOR — the right release to
   spend one in. The interim 3.1 was never merged and is not part of the

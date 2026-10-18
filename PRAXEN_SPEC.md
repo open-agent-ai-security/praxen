@@ -6,7 +6,7 @@
 # Praxen — Specification
 
 **Version:** 2.0.0
-**Status:** Public release (1.0 GA)
+**Status:** Public release (2.0 GA)
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
 ---

@@ -14,7 +14,8 @@ baselines/
   README.md                       ← this file
   owasp_coverage.py                ← cross-baseline OWASP-coverage HTML report generator
   owasp-coverage-report.html       ← committed snapshot; live at GitHub Pages (link below)
-  v1.2-opus5/                      ← CURRENT — fresh Opus-5 freeze, OWASP-2026 KBs, schema 3.0, re-authored remits
+  v1.3-opus5/                      ← CURRENT (per the CURRENT marker) — 1.3 scoring re-freeze, schema 4.0
+  v1.2-opus5/                      ← superseded — Opus-5 freeze, OWASP-2026 KBs, re-authored remits, schema 4.0
   v1.1-claude48/                   ← archival (superseded; v1.0.2 findings OWASP re-tagged under the 1.1 KBs)
   v1.0.2-claude48/                 ← archival (superseded; 12 targets, median-of-3, schema 2.0)
   v0.7.7-claude48/                 ← archival (superseded; remit-verbatim not re-checked)

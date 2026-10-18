@@ -50,7 +50,8 @@ Roster prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
   code → uncapped), opt-in/default-off controls as capability not posture, and the provenance
   test — adversarial material counts only when the project attacks its **own** defences.
 - **Model unchanged:** Claude Opus 5 (`claude-opus-5[1m]`). `praxen_version 1.3.0`,
-  `schema_version 3.0` (unchanged — nothing serialised changed).
+  `schema_version 3.0` as frozen — **re-stamped to 4.0 by 2.0**, see the
+  re-stamp note above; nothing serialised changed *at the freeze itself*.
 - **Remits: 7 unchanged, 5 materially revised** by the #200/#201 over-reach cleanups landed
   pre-freeze (see the attribution note above). Each target dir pins its freeze-state remit as
   `<slug>-remit.md`, verified byte-identical to the `tests/remits/<slug>.md` the scans
