@@ -57,6 +57,7 @@ assert (Path(REPO_ROOT) / "tests" / "baselines" / CURRENT_BASELINE).is_dir(), \
 sys.path.insert(0, SKILL_DIR)
 import schema  # noqa: E402
 import render  # noqa: E402
+import manifest_to_findings as mtf  # noqa: E402
 
 _passed = 0
 _failed = 0
@@ -80,6 +81,16 @@ def run_render(args):
 # Small file-I/O helpers — Path.read_*/write_* open, (de)serialise, and close in
 # one call, so no bare `open(...).read()` is left dangling (matters in the
 # baseline loop in section 6, and keeps the file uniform).
+def schema_accepts(doc) -> bool:
+    """True if schema.validate accepts doc — for mutation checks where the
+    raise is the expected outcome."""
+    try:
+        schema.validate(doc)
+        return True
+    except schema.SchemaError:
+        return False
+
+
 def read_text(path) -> str:
     return Path(path).read_text(encoding="utf-8")
 
@@ -390,6 +401,25 @@ def main():
     except schema.SchemaError:
         check("absent policy_rule_ids/policy_rule_text keys are rejected (not silently passed)", True)
 
+    # 4d-quater. scan.remit_version end-to-end on a real document. The field is
+    #            the subject of #266 and no fixture carried it, so until now its
+    #            declared shape was only ever asserted as a dict key — the
+    #            cross-checks below compare declarations, not behaviour.
+    rv_doc = load_json(FIXTURE)
+    rv_doc["scan"]["remit_version"] = "2.1"
+    check("a document carrying scan.remit_version validates",
+          schema_accepts(rv_doc), "the runtime validator rejected it")
+    rv_html = render.render_html(read_text(TEMPLATE), rv_doc)
+    check("the rendered masthead names the remit version",
+          "Remit v2.1" in rv_html, "no remit-version suffix in the masthead")
+    check("a document without it renders no remit-version suffix",
+          "Remit v" not in html, "suffix leaked onto a document with no remit_version")
+    rv_empty = load_json(FIXTURE)
+    rv_empty["scan"]["remit_version"] = ""
+    check("an empty scan.remit_version is rejected",
+          not schema_accepts(rv_empty),
+          "empty string accepted, but minLength 1 is declared")
+
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
     js = load_json(sch_path)
@@ -410,6 +440,231 @@ def main():
     disagreements = [name for (jenum, penum, name) in pairs if list(jenum) != list(penum)]
     check("findings.schema.json enums agree with the Python validator constants",
           not disagreements, f"diverged: {disagreements}")
+
+    # 4e-bis. Every flat field the manifest converter can emit into an object is
+    #         DECLARED in the published JSON Schema for that object.
+    #
+    #         The two validators are deliberately asymmetric: schema.py is
+    #         open-world (it checks the fields it knows and ignores anything
+    #         else) while findings.schema.json is closed — `additionalProperties:
+    #         false` at 16 sites, and its own schema_version description says it
+    #         "validates 3.0 documents exactly and is strict". So an additive
+    #         output field that lands in schema.py and the converter but NOT in
+    #         the published doc passes the runtime validator while every draft-07
+    #         consumer rejects the document. That is #266: 2.0 added
+    #         scan.remit_version to the converter table and schema.py:237, never
+    #         to this schema, and §4e above only compared ENUMS — so nothing
+    #         caught it. The converter's per-section tables are the emission-side
+    #         source of truth, so containment against them catches the next one.
+    #
+    #         One-way containment on purpose: the schema legitimately declares
+    #         fields the flat tables never carry — nested arrays assembled
+    #         elsewhere (findings[].evidence, findings[].tags) and ids derived
+    #         during conversion (rules[].rule_id) — so equality would false-fail.
+    # Parsed from the manifest but popped before output: manifest plumbing, not
+    # document fields (manifest_to_findings.py:471, 481-482).
+    manifest_only = {"manifest_format_version", "schema_version", "praxen_version"}
+    sp = js["properties"]
+    table_to_schema = [
+        ("_SCAN_FIELD_TYPES",             "$.scan",                       lambda: sp["scan"]),
+        ("_RAISE_POSTURE_FIELD_TYPES",    "$.raise_posture",              lambda: sp["raise_posture"]),
+        ("_RAISE_CATEGORY_FIELD_TYPES",   "$.raise_posture.categories[]", lambda: sp["raise_posture"]["properties"]["categories"]["items"]),
+        ("_REMIT_STAT_COUNT_FIELD_TYPES", "$.remit_coverage.stat_counts", lambda: sp["remit_coverage"]["properties"]["stat_counts"]),
+        ("_RULE_FIELD_TYPES",             "$.remit_coverage.rules[]",     lambda: sp["remit_coverage"]["properties"]["rules"]["items"]),
+        ("_FINDING_FIELD_TYPES",          "$.findings[]",                 lambda: sp["findings"]["items"]),
+        ("_EVIDENCE_ITEM_FIELD_TYPES",    "$.findings[].evidence[]",      lambda: sp["findings"]["items"]["properties"]["evidence"]["items"]),
+        ("_POSITIVE_ITEM_FIELD_TYPES",    "$.positives[]",                lambda: sp["positives"]["items"]),
+        ("_LOG_FILES_FIELD_TYPES",        "$.log_files",                  lambda: sp["log_files"]),
+        ("_LOG_ROW_FIELD_TYPES",          "$.log_files.rows[]",           lambda: sp["log_files"]["properties"]["rows"]["items"]),
+        ("_FOOTER_SEVERITY_FIELD_TYPES",  "$.footer.severity_counts",     lambda: sp["footer"]["properties"]["severity_counts"]),
+    ]
+    # If a table is renamed or a schema path moves, say so rather than crashing —
+    # a silently skipped cross-check is how this class of drift got in.
+    broken = []
+    for name, path, node_fn in table_to_schema:
+        if not hasattr(mtf, name):
+            broken.append(f"{name} (converter table missing/renamed)")
+            continue
+        try:
+            node = node_fn()
+        except Exception as exc:                      # noqa: BLE001 — report, don't abort
+            broken.append(f"{path} (schema path unresolved: {type(exc).__name__})")
+            continue
+        # A path that resolves to something other than an object with
+        # `properties` silently makes the containment check below vacuous: every
+        # field reads as "undeclared" or nothing is compared at all.
+        if not isinstance(node, dict) or "properties" not in node:
+            broken.append(f"{path} (resolved to a non-object; moved behind $ref?)")
+    check("field-inventory cross-check wiring is intact (tables + schema paths resolve)",
+          not broken, f"unresolved: {broken}")
+
+    # Guard the guard: the mapping above is hand-maintained, so a new converter
+    # table added without a matching entry would be skipped in silence and the
+    # fields it introduces would never be checked against the published schema.
+    CONVERTER_TO_JSON_TYPE = {
+        "str": {"string"},
+        "str_allow_empty": {"string"},
+        "int": {"integer"},
+        "float": {"number"},
+        "bool": {"boolean"},
+        "str_or_none": {"string", "null"},
+        "int_or_none": {"integer", "null"},
+    }
+
+    mapped = {name for name, _, _ in table_to_schema}
+    # Detect tables by SHAPE, not by name. Keying off `_FIELD_TYPES` meant a
+    # table called `_WIDGET_TYPES` carrying an undeclared field was invisible:
+    # a field-type table is a dict whose values are all converter type names.
+    declared = set()
+    for n in dir(mtf):
+        v = getattr(mtf, n, None)
+        if (isinstance(v, dict) and v
+                and all(isinstance(k, str) for k in v)
+                and all(x in CONVERTER_TO_JSON_TYPE for x in v.values())):
+            declared.add(n)
+    check("every converter field table is covered by the cross-check",
+          declared <= mapped,
+          f"unmapped converter field tables: {sorted(declared - mapped)}")
+
+    # Names alone are not enough. A field declared with the WRONG TYPE
+    # reproduces #266 exactly — schema.py accepts the value, every draft-07
+    # consumer rejects the document — and a name-only check is blind to it.
+    # Verified: swapping the remit_version declaration for
+    # {"type": "integer"} passed a name-only sweep.
+    # Fields whose serialised type legitimately differs from the converter's
+    # parse type. Each needs a reason; an empty-reason entry is a bug, not a
+    # waiver.
+    TYPE_EXCEPTIONS = {
+        ("_FINDING_FIELD_TYPES", "policy_rule_ids"):
+            "schema 3.0 parallel arrays (#7) — the converter parses one string "
+            "and splits it, so its parse type is str_or_none while the "
+            "serialised type is ['array','null']",
+        ("_FINDING_FIELD_TYPES", "policy_rule_text"):
+            "same as policy_rule_ids — parsed as a joined string, serialised "
+            "as a parallel array",
+        ("_FINDING_FIELD_TYPES", "description"):
+            "str_or_none is a MANIFEST parse type here, not a serialised one: "
+            "`- description: null` means omit the key entirely "
+            "(manifest_to_findings.py:782-784), so the serialised field is an "
+            "optional non-nullable string and the schema is right to declare "
+            "type 'string' without 'null'",
+    }
+    type_drift = []
+    for name, path, node_fn in table_to_schema:
+        if not hasattr(mtf, name):
+            continue
+        try:
+            props = node_fn().get("properties", {})
+        except Exception:                             # noqa: BLE001
+            continue
+        for field, ctype in getattr(mtf, name).items():
+            if field in manifest_only or (name, field) in TYPE_EXCEPTIONS:
+                continue
+            decl = props.get(field)
+            if not isinstance(decl, dict):
+                continue            # absent entirely — the containment check above owns it
+            if "type" not in decl:
+                # Do NOT skip. Every JSON-Schema idiom that is not a literal
+                # `type` — $ref, anyOf, allOf, enum-only, type-less — used to be
+                # waved through in silence, so a declaration of
+                # {"anyOf":[{"type":"integer"}]} on a string field passed while
+                # every draft-07 consumer rejected real documents. That is #266
+                # again, and a silently skipped comparison is how it hid.
+                type_drift.append(
+                    f"{path}.{field}: declaration has no literal `type` "
+                    f"(keys: {sorted(decl)}) — this cross-check cannot compare "
+                    f"it, so it would pass vacuously; declare `type`, or add a "
+                    f"reasoned TYPE_EXCEPTIONS entry if the indirection is "
+                    f"deliberate")
+                continue
+            want = CONVERTER_TO_JSON_TYPE.get(ctype)
+            if want is None:
+                type_drift.append(f"{path}.{field}: converter type {ctype!r} "
+                                  f"has no JSON-Schema mapping — extend "
+                                  f"CONVERTER_TO_JSON_TYPE")
+                continue
+            got = decl["type"]
+            got = set(got) if isinstance(got, list) else {got}
+            if got != want:
+                type_drift.append(f"{path}.{field}: converter says {ctype!r} "
+                                  f"(expects {sorted(want)}), schema declares "
+                                  f"{sorted(got)}")
+    check("findings.schema.json declares every converter field with the right "
+          "type", not type_drift, f"{type_drift}")
+    check("every type exception carries a reason",
+          all(TYPE_EXCEPTIONS.values()),
+          f"blank waivers: {[k for k, v in TYPE_EXCEPTIONS.items() if not v]}")
+
+    # Required-ness must agree too, and in BOTH directions. Declaring a field
+    # `required` that schema.py treats as optional is #266 with the polarity
+    # flipped: every draft-07 consumer then rejects documents the runtime
+    # validator accepts. Nothing compared the two, so adding `remit_version` to
+    # $.scan.required passed the whole suite.
+    #
+    # Checked behaviourally rather than against a declarative list, because
+    # schema.py's requiredness is imperative: delete each declared field from a
+    # valid document and the two validators must agree on whether that document
+    # is still valid.
+    doc_at = {
+        "$.scan": lambda d: d["scan"],
+        "$.raise_posture": lambda d: d["raise_posture"],
+        "$.raise_posture.categories[]": lambda d: d["raise_posture"]["categories"][0],
+        "$.remit_coverage.stat_counts": lambda d: d["remit_coverage"]["stat_counts"],
+        "$.remit_coverage.rules[]": lambda d: d["remit_coverage"]["rules"][0],
+        "$.findings[]": lambda d: d["findings"][0],
+        "$.findings[].evidence[]": lambda d: d["findings"][0]["evidence"][0],
+        "$.positives[]": lambda d: d["positives"][0],
+        "$.log_files": lambda d: d["log_files"],
+        "$.log_files.rows[]": lambda d: d["log_files"]["rows"][0],
+        "$.footer.severity_counts": lambda d: d["footer"]["severity_counts"],
+    }
+    check("every cross-checked path has a document accessor for the "
+          "required-ness comparison",
+          {p for _, p, _ in table_to_schema} <= set(doc_at),
+          f"missing: {sorted({p for _, p, _ in table_to_schema} - set(doc_at))}")
+
+    req_drift = []
+    for name, path, node_fn in table_to_schema:
+        if path not in doc_at:
+            continue
+        try:
+            node = node_fn()
+        except Exception:                             # noqa: BLE001
+            continue
+        declared_req = set(node.get("required") or [])
+        for field in sorted(node.get("properties") or {}):
+            mutant = load_json(FIXTURE)
+            try:
+                target = doc_at[path](mutant)
+            except (KeyError, IndexError):
+                continue                 # fixture has no element at this path
+            if field not in target:
+                continue                 # optional and absent — nothing to delete
+            del target[field]
+            runtime_rejects = not schema_accepts(mutant)
+            schema_requires = field in declared_req
+            if runtime_rejects != schema_requires:
+                req_drift.append(
+                    f"{path}.{field}: published schema "
+                    f"{'requires' if schema_requires else 'treats as optional'}"
+                    f", schema.py "
+                    f"{'rejects' if runtime_rejects else 'accepts'} the document "
+                    f"without it")
+    check("findings.schema.json and schema.py agree on which fields are required",
+          not req_drift, f"{req_drift}")
+
+    undeclared = []
+    for name, path, node_fn in table_to_schema:
+        if not hasattr(mtf, name):
+            continue
+        try:
+            declared = set(node_fn().get("properties", {}))
+        except (KeyError, TypeError):
+            continue
+        emitted = set(getattr(mtf, name)) - manifest_only
+        undeclared += [f"{path}.{f} (converter {name})" for f in sorted(emitted - declared)]
+    check("findings.schema.json declares every field the converter can emit (#266)",
+          not undeclared, f"emitted but undeclared in the published schema: {undeclared}")
 
     # 4f. SECURITY — XSS / HTML-injection hardening. Praxen renders UNTRUSTED
     #     evidence (a scanned agent's own code, prompts, and session-loaded files
