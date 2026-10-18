@@ -52,6 +52,11 @@ if [[ "$VERSION" != "$CODEX_VERSION" ]]; then
   echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, .codex-plugin/plugin.json says $CODEX_VERSION" >&2
   exit 1
 fi
+AGY_VERSION="$(python3 -c "import json; print(json.load(open('plugin.json'))['version'])")"
+if [[ "$VERSION" != "$AGY_VERSION" ]]; then
+  echo "error: version mismatch — PRAXEN_SPEC.md says $VERSION, plugin.json says $AGY_VERSION" >&2
+  exit 1
+fi
 
 # Freshness backstop: rebuild the GitHub Pages docs (guide/) from docs/*.md.
 # These pages are NOT packaged — Pages serves them from the repo — but rebuilding
@@ -64,10 +69,10 @@ if python3 -c "import markdown" >/dev/null 2>&1; then
   echo "Rebuilding docs site (guide/) from docs/*.md…"
   python3 docs_build.py >/dev/null
   if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    if [[ -n "$(git status --porcelain -- guide/)" ]]; then
+    if [[ -n "$(git diff --name-only -- guide/)" ]]; then
       echo "error: guide/ is out of date with docs/*.md (or the shared theme)." >&2
       echo "       run 'python3 docs_build.py' and commit the updated guide/*.html." >&2
-      git status --porcelain -- guide/ >&2
+      git diff --stat -- guide/ >&2
       exit 1
     fi
   fi
@@ -103,6 +108,7 @@ mkdir -p "$STAGE_DIR"
 INCLUDE=(
   ".claude-plugin"
   ".codex-plugin"
+  "plugin.json"
   "README.md"
   "PRAXEN_SPEC.md"
   "LICENSE"

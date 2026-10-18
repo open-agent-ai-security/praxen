@@ -5,14 +5,14 @@
 
 # Installation
 
-Praxen ships as a portable **agent skill**, packaged for both **Claude Code** and **OpenAI Codex**. Both platforms load the same `skills/behavior-verifier` engine and produce the same JSON / HTML / TXT report format — only the install/packaging differs. On the same inputs, findings should cover the same major themes, but exact counts, grouping, and RAISE maturity scores can vary by model and context (see [Understanding Run-to-Run Variability](understanding-variability.md)). Claude Code is the most common path; Codex is supported as a first-class agent-skills platform.
+Praxen ships as a portable **agent skill**, packaged for **Claude Code**, **OpenAI Codex**, and **Google Antigravity (AGY CLI)**. All platforms load the same `skills/behavior-verifier` engine and produce the same JSON / HTML / TXT report format — only the install/packaging differs. On the same inputs, findings should cover the same major themes, but exact counts, grouping, and RAISE maturity scores can vary by model and context (see [Understanding Run-to-Run Variability](understanding-variability.md)). Claude Code is the most common path; Codex and Google Antigravity are supported as first-class agent-skills platforms.
 
 ## Prerequisites
 
-- **A coding agent** capable of tool use and multi-step instruction-following. Praxen is tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); other coding agents that can read a skill markdown file and call tools (Read, Grep, Glob, Bash, Write) should also work.
+- **A coding agent** capable of tool use and multi-step instruction-following. Praxen is tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), [OpenAI Codex](https://developers.openai.com/codex/skills), and [Google Antigravity](https://antigravity.google/); other coding agents that can read a skill markdown file and call tools (Read, Grep, Glob, Bash, Write) should also work.
 - **Python 3.9 or newer on the PATH** — for the bundled report renderer (`render.py`), which is standard-library only (nothing to `pip install`). You almost certainly already have it: 3.9 ships as the macOS Command Line Tools system Python, and on Windows `py -3` works. (If `python3` isn't found, the renderer falls back to `python`.)
 - **Network access for your coding agent's LLM provider** during analysis. Praxen itself does not phone home, but the LLM calls your coding agent makes during analysis follow whatever provider configuration the agent uses.
-- **Workspace write permission for the agent.** Praxen writes its report files to a `./reports/` directory and runs two bundled Python scripts during a scan, so the agent must be allowed to write within the working directory. Claude Code allows this by default; agents that sandbox file writes need that permission granted (per your agent's own docs).
+- **Workspace write permission for the agent.** Praxen writes its report files to a `./reports/` directory and runs two bundled Python scripts during a scan, so the agent must be allowed to write within the working directory. Claude Code and Antigravity allow this by default; agents that sandbox file writes need that permission granted (per your agent's own docs).
 
 That's the entire dependency surface.
 
@@ -49,6 +49,17 @@ This installs and enables the plugin in Codex's local config; the bundled `behav
 
 > **Already added the Codex marketplace from `open-agent-ai-security/praxen`?** Run the `marketplace add` above — it registers under the same marketplace name, so your `praxen@open-agent-ai-security` plugin key is unchanged. Then `codex plugin marketplace upgrade open-agent-ai-security` and re-run `codex plugin add praxen@open-agent-ai-security` to pick up the catalog's copy. The legacy per-repo path keeps working via the in-repo mirror, so this is optional.
 
+## Google Antigravity (AGY CLI)
+
+Google Antigravity ([plugin docs](https://antigravity.google/docs/plugins/)) installs plugins directly from GitHub repositories into `~/.gemini/config/plugins/`. From your terminal:
+
+```bash
+agy plugin install https://github.com/open-agent-ai-security/praxen
+agy plugin list      # confirm: "name": "praxen", "components": ["skills"]
+```
+
+This clones the repository, installs the plugin into `~/.gemini/config/plugins/praxen/`, and enables the bundled `behavior-verifier` skill across Antigravity CLI (`agy`) and IDE sessions. Restart your active session after initial installation (or use `/plugin` in-session) so the new skill is discovered. (If installing from a local clone, `agy plugin install .` and `agy plugin validate .` also work.)
+
 ## Any other agent
 
 No marketplace, no download step — Praxen is just a skill folder in a public repo, so any capable coding agent can fetch and run it from a plain-English instruction. (This also works on Claude Code or Codex if you'd rather skip the marketplace.) In your agent session, say something like:
@@ -75,6 +86,12 @@ Both steps matter: without the first, `plugin update` only sees your local (poss
 ```bash
 codex plugin marketplace upgrade open-agent-ai-security
 codex plugin add praxen@open-agent-ai-security
+```
+
+**Google Antigravity (AGY CLI)** — re-run `agy plugin install` against the repository URL to update the installed plugin in place with the latest release (your enabled/disabled preference in `~/.gemini/config/config.json` is preserved):
+
+```bash
+agy plugin install https://github.com/open-agent-ai-security/praxen
 ```
 
 **Any other agent** — `git pull` the clone (or re-clone), or download a newer release `.zip`. Praxen is stateless across analyses, so there's no migration step.
@@ -116,6 +133,12 @@ The marketplace is removed by its registered name (`open-agent-ai-security`, fro
 ```bash
 codex plugin remove praxen@open-agent-ai-security
 codex plugin marketplace remove open-agent-ai-security
+```
+
+**Google Antigravity (AGY CLI):**
+
+```bash
+agy plugin uninstall praxen
 ```
 
 **Any other agent:** delete the cloned (or unzipped) folder. No system state is left behind.

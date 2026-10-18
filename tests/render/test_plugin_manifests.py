@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 CLAUDE_PLUGIN = REPO_ROOT / ".claude-plugin" / "plugin.json"
 CODEX_PLUGIN = REPO_ROOT / ".codex-plugin" / "plugin.json"
+AGY_PLUGIN = REPO_ROOT / "plugin.json"
 SPEC = REPO_ROOT / "PRAXEN_SPEC.md"
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+")
@@ -58,10 +59,12 @@ def main():
     mp, e1 = load(MARKETPLACE)
     cp, e2 = load(CLAUDE_PLUGIN)
     xp, e3 = load(CODEX_PLUGIN)
+    ap, e4 = load(AGY_PLUGIN)
     check("marketplace.json is valid JSON", mp is not None, e1 or "")
     check(".claude-plugin/plugin.json is valid JSON", cp is not None, e2 or "")
     check(".codex-plugin/plugin.json is valid JSON", xp is not None, e3 or "")
-    if not (mp and cp and xp):
+    check("plugin.json is valid JSON", ap is not None, e4 or "")
+    if not (mp and cp and xp and ap):
         return summary()
 
     plugins = mp.get("plugins")
@@ -81,7 +84,7 @@ def main():
     # Required keys.
     check("marketplace has name + owner + metadata.version",
           bool(mp.get("name") and mp.get("owner") and (mp.get("metadata") or {}).get("version")))
-    for label, m in (("claude plugin.json", cp), ("codex plugin.json", xp)):
+    for label, m in (("claude plugin.json", cp), ("codex plugin.json", xp), ("agy plugin.json", ap)):
         check(f"{label} has name + version + skills",
               bool(m.get("name") and m.get("version") and m.get("skills")))
     iface = xp.get("interface") or {}
@@ -96,12 +99,12 @@ def main():
         check(f"marketplace plugin {e.get('name')!r} has " + " + ".join(required),
               all(e.get(k) for k in required))
 
-    # Name consistency across the three manifests.
-    check("plugin name 'praxen' is consistent across the three manifests",
-          cp.get("name") == "praxen" and xp.get("name") == "praxen" and entry.get("name") == "praxen",
-          f"claude={cp.get('name')} codex={xp.get('name')} marketplace={entry.get('name')}")
+    # Name consistency across the four manifests.
+    check("plugin name 'praxen' is consistent across manifests",
+          cp.get("name") == "praxen" and xp.get("name") == "praxen" and ap.get("name") == "praxen" and entry.get("name") == "praxen",
+          f"claude={cp.get('name')} codex={xp.get('name')} agy={ap.get('name')} marketplace={entry.get('name')}")
 
-    # Version consistency — the 4-way guard build.sh enforces, here as a unit test
+    # Version consistency — the guard build.sh enforces, here as a unit test
     # (so it runs on every PR, even when build.sh's docs-freshness path is skipped).
     # Capture the full version INCLUDING any SemVer pre-release suffix (e.g.
     # 1.0.0-rc.1). A numeric-only capture silently drops the suffix and makes
@@ -126,6 +129,7 @@ def main():
     versions = {
         "claude plugin.json": cp.get("version"),
         "codex plugin.json": xp.get("version"),
+        "agy plugin.json": ap.get("version"),
         "marketplace plugins[0]": entry.get("version"),
         "marketplace metadata": (mp.get("metadata") or {}).get("version"),
         "PRAXEN_SPEC.md": spec_ver,
@@ -141,7 +145,7 @@ def main():
     # License + the skills path actually resolving to the real skill.
     check("license is Apache-2.0 across the plugin manifests",
           cp.get("license") == "Apache-2.0" and xp.get("license") == "Apache-2.0"
-          and entry.get("license") == "Apache-2.0")
+          and ap.get("license") == "Apache-2.0" and entry.get("license") == "Apache-2.0")
     skill_dir = REPO_ROOT / "skills" / "behavior-verifier"
     check("the skills/ path resolves to the real behavior-verifier skill",
           skill_dir.is_dir() and (skill_dir / "SKILL.md").is_file())

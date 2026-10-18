@@ -24,9 +24,10 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 ---
 
-**📦 Install** — Praxen runs on **Claude Code** and **OpenAI Codex** (same skill, platform-specific packaging):
+**📦 Install** — Praxen runs on **Claude Code**, **OpenAI Codex**, and **Google Antigravity (AGY CLI)** (same skill, platform-specific packaging):
 - **Claude Code:** two short commands — `claude plugin marketplace add open-agent-ai-security/plugins && claude plugin install praxen@open-agent-ai-security`
 - **OpenAI Codex:** two short commands — `codex plugin marketplace add open-agent-ai-security/plugins && codex plugin add praxen@open-agent-ai-security`
+- **Google Antigravity (AGY CLI):** one short command — `agy plugin install https://github.com/open-agent-ai-security/praxen`
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 
@@ -89,7 +90,7 @@ Praxen produces an **expert review that focuses human attention** — a senior r
 
 ## Get started
 
-- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin marketplace), or any other agent (point it at the repo)
+- [**Installation**](docs/installation.md) — Claude Code or OpenAI Codex (plugin marketplace), Google Antigravity (AGY CLI), or any other agent (point it at the repo)
 - [**Quickstart**](docs/quickstart.md) — your first end-to-end report in about 15 minutes: have Claude author a remit for the FinBot demo agent, scan it, and read the report
 - [**Writing Worker Remits**](docs/writing-remits.md) — authoring the policy document
 - [**Usage**](docs/usage.md) — running an analysis end-to-end
@@ -97,7 +98,7 @@ Praxen produces an **expert review that focuses human attention** — a senior r
 - [**Challenging and Revising Findings**](docs/challenging-findings.md) — what to do when you disagree
 - [**Full documentation index**](docs/index.md)
 
-**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [OpenAI Codex](https://developers.openai.com/codex/skills); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
+**Prerequisites:** a coding agent (tested against [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), [OpenAI Codex](https://developers.openai.com/codex/skills), and [Google Antigravity](https://antigravity.google/); any agent with tool-use and multi-step instruction-following works) and Python 3.9+ on the PATH for the report renderer. No `pip install` needed.
 
 **Model tier matters.** Praxen runs on a **frontier model** — Anthropic Sonnet-class or higher on Claude Code, a comparable tier (validated on GPT-5-class) on OpenAI Codex. Smaller models don't reliably do the remit-to-implementation cross-referencing Praxen depends on. And because the RAISE maturity bands are calibrated per model tier, **compare scores only within a fixed model** — a score produced on one model tier is not directly comparable to one from another. See [Understanding Run-to-Run Variability](docs/understanding-variability.md).
 
