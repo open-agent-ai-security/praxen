@@ -153,7 +153,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - tags:
   - kind=raise, label=Manage Your Supply Chain
   - kind=owasp_llm, label=LLM02 — Sensitive Information Disclosure
-  - kind=owasp_llm, label=LLM07 — System Prompt Leakage
+  - kind=owasp_llm, label=LLM08 — Hidden Context Exposure
 - policy_rule_ids: R-07
 - evidence:
   - file: src/llm/prompts.js
@@ -176,7 +176,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - tags:
   - kind=raise, label=Implement Zero Trust
   - kind=owasp_llm, label=LLM01 — Prompt Injection
-  - kind=owasp_llm, label=LLM06 — Excessive Agency
+  - kind=owasp_llm, label=LLM03 — Excessive Agency
   - kind=owasp_agentic, label=ASI01 — Agent Goal Hijack
   - kind=owasp_agentic, label=ASI05 — Unexpected Code Execution (RCE)
 - policy_rule_ids: R-02, R-05
@@ -266,7 +266,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - description: The remit requires workspace confirmation before every file read or write. The write_file path in executeMcpTool() checks only that the resolved path is within the broad sandbox root (sandbox.root); it does not confirm the path falls within HelperBot's specific designated output directory. A user can direct writes to any location within the sandbox, including other agents' home directories or planted credential files.
 - tags:
   - kind=raise, label=Implement Zero Trust
-  - kind=owasp_llm, label=LLM06 — Excessive Agency
+  - kind=owasp_llm, label=LLM03 — Excessive Agency
   - kind=owasp_agentic, label=ASI02 — Tool Misuse and Exploitation
 - policy_rule_ids: R-01, R-03
 - evidence:
@@ -280,7 +280,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - Define an explicit per-agent outputDir for HelperBot in its agent definition (e.g., sandbox.home/helperbot-output/).
   - In executeMcpTool() for write_file, add a second boundary check: resolved path must start with the agent's specific outputDir, not just sandbox.root.
 - raise_category: implement_zero_trust
-- owasp_llm: LLM06
+- owasp_llm: LLM03
 - owasp_agentic: ASI02
 - confidence: High
 - related_findings: PRAX-2026-05-25-002
@@ -292,7 +292,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - description: The remit requires every tool call, its parameters, and its outcome to be recorded for audit. auditLogging: false is set in agents.js. The only logging mechanism is an in-memory ring buffer (ATTACK_LOG_MAX=500) in src/index.js that captures attack-pattern events for the training dashboard, not all tool calls, and is not persisted between sessions.
 - tags:
   - kind=raise, label=Monitor Continuously
-  - kind=owasp_llm, label=LLM06 — Excessive Agency
+  - kind=owasp_llm, label=LLM03 — Excessive Agency
   - kind=owasp_agentic, label=ASI10 — Rogue Agents
 - policy_rule_ids: R-04
 - evidence:
@@ -309,7 +309,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - Enable structured, durable audit logging for HelperBot: write a JSON-lines record to a persistent log file for every tool invocation (tool name, parameters, agent ID, timestamp, outcome).
   - Separate the training-dashboard attack log from the compliance audit log so disabling one does not disable the other.
 - raise_category: monitor_continuously
-- owasp_llm: LLM06
+- owasp_llm: LLM03
 - owasp_agentic: ASI10
 - confidence: High
 - related_findings: 
@@ -321,7 +321,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - description: The remit requires a per-session tool-call limit of approximately 20 calls. No such cap exists in HelperBot's configuration or in the shared request handler in src/index.js. The only bound is the ATTACK_LOG_MAX ring buffer, which limits logged events, not actual tool executions.
 - tags:
   - kind=raise, label=Monitor Continuously
-  - kind=owasp_llm, label=LLM10 — Unbounded Consumption
+  - kind=owasp_llm, label=LLM06 — Unbounded Consumption
   - kind=owasp_agentic, label=ASI08 — Cascading Failures
 - policy_rule_ids: R-13
 - evidence:
@@ -335,7 +335,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - Implement a per-session call counter in the HTTP request handler; reject (HTTP 429) and log any session that exceeds ~20 tool calls.
   - Enable rateLimiting: true for HelperBot and wire it to the session counter.
 - raise_category: monitor_continuously
-- owasp_llm: LLM10
+- owasp_llm: LLM06
 - owasp_agentic: ASI08
 - confidence: High
 - related_findings: 
@@ -373,7 +373,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - description: All four runtime dependencies in package.json use caret version specifiers (^0.74.0, ^6.21.0, ^0.11.0, 0.4.0, 0.1.2). Three of the four allow minor/patch version float. This creates exposure to dependency confusion and version-swap supply chain attacks where a malicious minor release of a dependency could be automatically adopted.
 - tags:
   - kind=raise, label=Manage Your Supply Chain
-  - kind=owasp_llm, label=LLM03 — Supply Chain
+  - kind=owasp_llm, label=LLM04 — Supply Chain
 - policy_rule_ids: null
 - evidence:
   - file: package.json
@@ -383,7 +383,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - Pin all dependencies to exact versions in package.json and commit the package-lock.json to source control.
   - Run npm audit on each release and review dependency changes in CI before merging.
 - raise_category: manage_your_supply_chain
-- owasp_llm: LLM03
+- owasp_llm: LLM04
 - owasp_agentic: null
 - confidence: High
 - related_findings: 
@@ -395,7 +395,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
 - description: The dataExfiltration flag is enabled with leakSystemPrompt: true and leakContextSize: true in the HelperBot agent definition. In practice this means the agent will respond to direct questions about its instructions, token count, and system configuration with actual content from its context — which in LLM mode includes the embedded API key.
 - tags:
   - kind=raise, label=Limit Your Domain
-  - kind=owasp_llm, label=LLM07 — System Prompt Leakage
+  - kind=owasp_llm, label=LLM08 — Hidden Context Exposure
   - kind=owasp_llm, label=LLM02 — Sensitive Information Disclosure
 - policy_rule_ids: R-07
 - evidence:
@@ -409,7 +409,7 @@ Ad hoc posture (floor 0) across the framework. Implement Zero Trust and Monitor 
   - Disable dataExfiltration for HelperBot (set enabled: false).
   - Add output filtering that scans responses for system prompt fragments or API key patterns before returning them to the user.
 - raise_category: limit_your_domain
-- owasp_llm: LLM07
+- owasp_llm: LLM08
 - owasp_agentic: null
 - confidence: High
 - related_findings: PRAX-2026-05-25-001

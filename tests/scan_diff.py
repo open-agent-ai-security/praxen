@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # Copyright 2026 Exabeam, Inc.
 # SPDX-License-Identifier: Apache-2.0
-"""Scan-vs-scan diff for Praxen findings JSON (schema 3.0).
+"""Scan-vs-scan diff for Praxen findings JSON (schema 3.0 or later).
 
 Joins two runs of the *same target* mechanically and reports what held, what
 dropped, and what is new — the regression check the 1.2 "comparability" work
 exists to make automatic (the 2026-07-12 clean run needed hand-matching).
 
-**Why this needs schema 3.0.** Finding ids (`PRAX-…`) and remit rule ids
+**Why this needs schema 3.0 or later.** Finding ids (`PRAX-…`) and remit rule ids
 (`R-NN`) are re-enumerated every scan, so neither is a stable join key (see
 tests/baselines/README.md and the run-local-rule-id note). What *is* stable is
 the exact remit **rule text** a finding quotes — fixed by the remit. Schema 3.0
@@ -214,7 +214,7 @@ def _print_report(d, path_a, path_b):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="scan_diff.py",
-        description="Mechanical scan-vs-scan diff for Praxen findings JSON (schema 3.0).")
+        description="Mechanical scan-vs-scan diff for Praxen findings JSON (schema 3.0 or later).")
     ap.add_argument("run_a", metavar="RUN_A.json")
     ap.add_argument("run_b", metavar="RUN_B.json")
     ap.add_argument("--threshold", type=float, default=0.40,

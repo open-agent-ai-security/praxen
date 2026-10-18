@@ -95,6 +95,52 @@ _FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
 # this, an archived finding tagged LLM03 is ambiguous to every consumer that
 # is not render.py. Bump these together with the KB files; a test asserts they
 # match the KB headers.
+# OWASP title vocabularies, keyed by edition. These live here rather than in
+# render.py because they are taxonomy facts the VALIDATOR needs: a tag whose
+# label disagrees with the document's recorded edition is a self-contradicting
+# report, and catching that is validation, not presentation.
+OWASP_LLM_TITLES = {
+    "2025": {
+        'LLM01': 'Prompt Injection',
+        'LLM02': 'Sensitive Information Disclosure',
+        'LLM03': 'Supply Chain',
+        'LLM04': 'Data and Model Poisoning',
+        'LLM05': 'Improper Output Handling',
+        'LLM06': 'Excessive Agency',
+        'LLM07': 'System Prompt Leakage',
+        'LLM08': 'Vector and Embedding Weaknesses',
+        'LLM09': 'Misinformation',
+        'LLM10': 'Unbounded Consumption',
+    },
+    "2026": {
+        'LLM01': 'Prompt Injection',
+        'LLM02': 'Sensitive Information Disclosure',
+        'LLM03': 'Excessive Agency',
+        'LLM04': 'Supply Chain',
+        'LLM05': 'Data and Model Poisoning',
+        'LLM06': 'Unbounded Consumption',
+        'LLM07': 'Misinformation',
+        'LLM08': 'Hidden Context Exposure',
+        'LLM09': 'Vector and Embedding Weaknesses',
+        'LLM10': 'Improper Output Handling',
+    },
+}
+
+# The agentic list has only ever had the 2026 edition (the ASI namespace is new
+# with it), so there is nothing to key by.
+OWASP_AGENTIC_TITLES = {
+    'ASI01': 'Agent Goal Hijack',
+    'ASI02': 'Tool Misuse and Exploitation',
+    'ASI03': 'Identity and Privilege Abuse',
+    'ASI04': 'Agentic Supply Chain Vulnerabilities',
+    'ASI05': 'Unexpected Code Execution (RCE)',
+    'ASI06': 'Memory and Context Poisoning',
+    'ASI07': 'Insecure Inter-Agent Communication',
+    'ASI08': 'Cascading Failures',
+    'ASI09': 'Human-Agent Trust Exploitation',
+    'ASI10': 'Rogue Agents',
+}
+
 STANDARDS = {
     "owasp_llm": "2026",
     "owasp_agentic": "2026",
@@ -541,6 +587,63 @@ def _validate_consistency(data, findings, finding_ids):
 
 
 # ── public API ───────────────────────────────────────────────────────────────
+def _norm_title(text):
+    """Compare OWASP titles ignoring cosmetic variance, not meaning.
+
+    Committed reports carry punctuation variants of the same category name —
+    "Identity & Privilege Abuse" for "Identity and Privilege Abuse" — and
+    failing those would be noise, not a caught defect. A real edition mismatch
+    is a different category entirely ("Supply Chain" vs "Excessive Agency"), so
+    folding case, "&"/"and" and whitespace cannot mask one.
+    """
+    return " ".join(str(text).lower().replace("&", "and").split())
+
+
+def _validate_tag_editions(data, findings):
+    """Every OWASP tag label must match the edition the document records.
+
+    A report whose `standards` block says 2026 while a tag reads
+    "LLM03 — Supply Chain" (the 2025 meaning; 2026 calls LLM03 "Excessive
+    Agency") contradicts itself: the card title is rendered from the edition
+    and the chip from the label, so the two disagree on the same page. That
+    defeats the point of recording the edition at all, and shape-checking
+    `standards` alone cannot see it.
+
+    Only codes present in the recorded edition's vocabulary are checked, so a
+    document naming an edition this release does not carry is left alone rather
+    than failed on titles it cannot know.
+    """
+    std = data.get("standards")
+    if not isinstance(std, dict):
+        return
+    titles = {
+        "owasp_llm": OWASP_LLM_TITLES.get(str(std.get("owasp_llm"))),
+        "owasp_agentic": OWASP_AGENTIC_TITLES,
+    }
+    for i, f in enumerate(findings):
+        p = f"$.findings[{i}]"
+        for j, tag in enumerate(f.get("tags") or []):
+            if not isinstance(tag, dict):
+                continue
+            table = titles.get(tag.get("kind"))
+            if not table:
+                continue
+            label = tag.get("label")
+            if not isinstance(label, str) or "\u2014" not in label:
+                continue
+            code, _, title = label.partition("\u2014")
+            code, title = code.strip(), title.strip()
+            expected = table.get(code)
+            if expected and _norm_title(title) != _norm_title(expected):
+                edition = (std.get("owasp_llm") if tag["kind"] == "owasp_llm"
+                           else std.get("owasp_agentic"))
+                _err(f"{p}.tags[{j}].label",
+                     f"label says {code} is {title!r}, but the "
+                     f"{tag['kind']} edition this document records "
+                     f"({edition!r}) calls it {expected!r} — the tag and the "
+                     f"recorded edition disagree")
+
+
 def validate(data):
     """Validate a parsed canonical findings JSON. Raises SchemaError on any problem.
 
@@ -557,6 +660,7 @@ def validate(data):
     _validate_behavior_summary(data)
     _validate_remit_coverage(data)
     findings, finding_ids = _validate_findings(data)
+    _validate_tag_editions(data, findings)
     _validate_positives(data)
     _validate_log_files(data)
     _validate_raise_posture(data)

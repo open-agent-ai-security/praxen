@@ -93,31 +93,16 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # 4.0 exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
-_OWASP_LLM_TITLES_2025 = {
-    "LLM01": "Prompt Injection",
-    "LLM02": "Sensitive Information Disclosure",
-    "LLM03": "Supply Chain",
-    "LLM04": "Data and Model Poisoning",
-    "LLM05": "Improper Output Handling",
-    "LLM06": "Excessive Agency",
-    "LLM07": "System Prompt Leakage",
-    "LLM08": "Vector and Embedding Weaknesses",
-    "LLM09": "Misinformation",
-    "LLM10": "Unbounded Consumption",
-}
-_OWASP_LLM_TITLES_2026 = {
-    "LLM01": "Prompt Injection",
-    "LLM02": "Sensitive Information Disclosure",
-    "LLM03": "Excessive Agency",
-    "LLM04": "Supply Chain",
-    "LLM05": "Data and Model Poisoning",
-    "LLM06": "Unbounded Consumption",
-    "LLM07": "Misinformation",
-    "LLM08": "Hidden Context Exposure",
-    "LLM09": "Vector and Embedding Weaknesses",
-    "LLM10": "Improper Output Handling",
-}
 
+
+# The OWASP title vocabularies live in schema.py, which also validates tag
+# labels against the document's recorded edition. Aliased here so this module
+# keeps its existing names without holding a second copy of the taxonomy —
+# duplicated taxonomy data is the drift class the `standards` block exists to
+# close.
+_OWASP_LLM_TITLES_2025 = schema.OWASP_LLM_TITLES["2025"]
+_OWASP_LLM_TITLES_2026 = schema.OWASP_LLM_TITLES["2026"]
+_OWASP_AGENTIC_TITLES = schema.OWASP_AGENTIC_TITLES
 
 _OWASP_LLM_TITLES_BY_EDITION = {
     "2025": _OWASP_LLM_TITLES_2025,
@@ -156,28 +141,27 @@ def _standards_for(data):
 def _llm_titles_for(data):
     """The OWASP LLM title vocabulary for this document's recorded edition.
 
-    An unrecognised edition falls back to the newest vocabulary this renderer
-    knows rather than erroring: a newer document rendered by an older Praxen
-    should still read, and the heading beside the cards always names the
-    edition the document actually declared, so the two cannot silently
-    disagree about what the reader is looking at.
+    An edition this renderer has no vocabulary for falls back to the newest one
+    it knows, so a document from a future Praxen still reads rather than
+    failing outright. Be clear about the cost: in that case the heading names
+    the declared edition while the titles come from a different one, which is
+    a real disagreement on the page — so it warns on stderr rather than
+    passing silently. The fallback is for forward compatibility, not a second
+    source of truth; the fix is to teach this renderer the new edition.
     """
     edition = _standards_for(data)["owasp_llm"]
-    return _OWASP_LLM_TITLES_BY_EDITION.get(edition, _OWASP_LLM_TITLES_2026)
+    titles = _OWASP_LLM_TITLES_BY_EDITION.get(edition)
+    if titles is None:
+        print(f"render.py: WARNING — no title vocabulary for OWASP LLM edition "
+              f"{edition!r}; falling back to "
+              f"{max(_OWASP_LLM_TITLES_BY_EDITION)!r} titles, so the coverage "
+              f"heading and the card titles will name different editions",
+              file=sys.stderr)
+        titles = _OWASP_LLM_TITLES_BY_EDITION[max(_OWASP_LLM_TITLES_BY_EDITION)]
+    return titles
 _OWASP_AGENTIC_CODES = ("ASI01", "ASI02", "ASI03", "ASI04", "ASI05",
                         "ASI06", "ASI07", "ASI08", "ASI09", "ASI10")
-_OWASP_AGENTIC_TITLES = {
-    "ASI01": "Agent Goal Hijack",
-    "ASI02": "Tool Misuse and Exploitation",
-    "ASI03": "Identity and Privilege Abuse",
-    "ASI04": "Agentic Supply Chain Vulnerabilities",
-    "ASI05": "Unexpected Code Execution (RCE)",
-    "ASI06": "Memory and Context Poisoning",
-    "ASI07": "Insecure Inter-Agent Communication",
-    "ASI08": "Cascading Failures",
-    "ASI09": "Human-Agent Trust Exploitation",
-    "ASI10": "Rogue Agents",
-}
+
 # Highest severity present in a card's top-3 -> CSS class on the card. Empty
 # cells use " empty" instead (handled below).
 _WORST_SEV_CLASS = {"Critical": "worst-critical", "High": "worst-high",
@@ -875,10 +859,14 @@ def render_txt(data: dict) -> str:
     # OWASP coverage tables — full counts per category (not capped), em-dash
     # for empty cells. The HTML grid caps per-card chips at three; this is
     # the summary, so the number reflects all findings in each category.
+    # Each table names its edition, as the HTML headings do. Without it a 2025
+    # document lists 2025 titles under an undated heading and the reader has to
+    # scroll to the footer to learn which taxonomy they are reading.
+    _ed = _standards_for(data)
     for heading, key, codes, titles in (
-        ("OWASP LLM TOP 10 COVERAGE", "owasp_llm",
+        (f"OWASP LLM TOP 10 ({_ed['owasp_llm']}) COVERAGE", "owasp_llm",
          _OWASP_LLM_CODES, _llm_titles_for(data)),
-        ("OWASP AGENTIC TOP 10 COVERAGE", "owasp_agentic",
+        (f"OWASP AGENTIC TOP 10 ({_ed['owasp_agentic']}) COVERAGE", "owasp_agentic",
          _OWASP_AGENTIC_CODES, _OWASP_AGENTIC_TITLES),
     ):
         counts = {c: 0 for c in codes}

@@ -724,6 +724,48 @@ def main():
     check("praxen_version is untouched by the flip (it is not the signal)",
           flipped["praxen_version"] == fx["praxen_version"] == "0.3.0")
 
+    # 4e-quinquies. A tag label must agree with the edition the document records.
+    #               Shape-checking `standards` cannot see this: a 2026 document
+    #               whose tag reads "LLM03 — Supply Chain" (the 2025 meaning)
+    #               renders the card title from the edition and the chip from the
+    #               label, so the same page states both. Found exactly that in
+    #               tests/fixtures/helperbot.from_manifest.json, and found a
+    #               second, older instance in the canonical fixture, whose
+    #               agentic tags carried a superseded ASI numbering
+    #               ("Memory & Context Poisoning" at ASI04, now ASI06).
+    for kind, code, wrong, right in (
+            ("owasp_llm", "LLM03", "Excessive Agency", "Supply Chain"),
+            ("owasp_agentic", "ASI06", "Rogue Agents", "Memory and Context Poisoning")):
+        mutant = load_json(FIXTURE)
+        hit = False
+        for f in mutant["findings"]:
+            for t in f.get("tags") or []:
+                if t.get("kind") == kind:
+                    t["label"] = f"{code} \u2014 {wrong}"
+                    hit = True
+                    break
+            if hit:
+                break
+        check(f"a {kind} label contradicting the recorded edition is rejected",
+              hit and not schema_accepts(mutant),
+              f"{code} labelled {wrong!r} validated, but the recorded edition "
+              f"calls it {right!r}")
+
+    # Cosmetic variance is not a contradiction: committed reports write
+    # "Identity & Privilege Abuse" for "Identity and Privilege Abuse", and
+    # failing those would be noise rather than a caught defect.
+    cosmetic = load_json(FIXTURE)
+    touched = False
+    for f in cosmetic["findings"]:
+        for t in f.get("tags") or []:
+            if t.get("kind") == "owasp_agentic":
+                c, _, ti = t["label"].partition("\u2014")
+                t["label"] = f"{c.strip()} \u2014 {ti.strip().replace(' and ', ' & ')}"
+                touched = True
+    check("an '&'-for-'and' title variant is tolerated",
+          touched and schema_accepts(cosmetic),
+          "cosmetic punctuation variance was rejected")
+
     # 4e-ter. The OWASP editions schema.STANDARDS claims must be the editions the
     #         shipped knowledge bases actually describe. This is the drift that
     #         created the gap in the first place: the KBs moved to the 2026 lists
