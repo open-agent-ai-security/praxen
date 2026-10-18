@@ -501,17 +501,6 @@ def main():
     # Guard the guard: the mapping above is hand-maintained, so a new converter
     # table added without a matching entry would be skipped in silence and the
     # fields it introduces would never be checked against the published schema.
-    mapped = {name for name, _, _ in table_to_schema}
-    declared = {n for n in dir(mtf) if n.endswith("_FIELD_TYPES")}
-    check("every converter field table is covered by the cross-check",
-          declared <= mapped,
-          f"unmapped converter tables: {sorted(declared - mapped)}")
-
-    # Names alone are not enough. A field declared with the WRONG TYPE
-    # reproduces #266 exactly — schema.py accepts the value, every draft-07
-    # consumer rejects the document — and a name-only check is blind to it.
-    # Verified: swapping the remit_version declaration for
-    # {"type": "integer"} passed a name-only sweep.
     CONVERTER_TO_JSON_TYPE = {
         "str": {"string"},
         "str_allow_empty": {"string"},
@@ -521,6 +510,27 @@ def main():
         "str_or_none": {"string", "null"},
         "int_or_none": {"integer", "null"},
     }
+
+    mapped = {name for name, _, _ in table_to_schema}
+    # Detect tables by SHAPE, not by name. Keying off `_FIELD_TYPES` meant a
+    # table called `_WIDGET_TYPES` carrying an undeclared field was invisible:
+    # a field-type table is a dict whose values are all converter type names.
+    declared = set()
+    for n in dir(mtf):
+        v = getattr(mtf, n, None)
+        if (isinstance(v, dict) and v
+                and all(isinstance(k, str) for k in v)
+                and all(x in CONVERTER_TO_JSON_TYPE for x in v.values())):
+            declared.add(n)
+    check("every converter field table is covered by the cross-check",
+          declared <= mapped,
+          f"unmapped converter field tables: {sorted(declared - mapped)}")
+
+    # Names alone are not enough. A field declared with the WRONG TYPE
+    # reproduces #266 exactly — schema.py accepts the value, every draft-07
+    # consumer rejects the document — and a name-only check is blind to it.
+    # Verified: swapping the remit_version declaration for
+    # {"type": "integer"} passed a name-only sweep.
     # Fields whose serialised type legitimately differs from the converter's
     # parse type. Each needs a reason; an empty-reason entry is a bug, not a
     # waiver.
@@ -551,7 +561,21 @@ def main():
             if field in manifest_only or (name, field) in TYPE_EXCEPTIONS:
                 continue
             decl = props.get(field)
-            if not isinstance(decl, dict) or "type" not in decl:
+            if not isinstance(decl, dict):
+                continue            # absent entirely — the containment check above owns it
+            if "type" not in decl:
+                # Do NOT skip. Every JSON-Schema idiom that is not a literal
+                # `type` — $ref, anyOf, allOf, enum-only, type-less — used to be
+                # waved through in silence, so a declaration of
+                # {"anyOf":[{"type":"integer"}]} on a string field passed while
+                # every draft-07 consumer rejected real documents. That is #266
+                # again, and a silently skipped comparison is how it hid.
+                type_drift.append(
+                    f"{path}.{field}: declaration has no literal `type` "
+                    f"(keys: {sorted(decl)}) — this cross-check cannot compare "
+                    f"it, so it would pass vacuously; declare `type`, or add a "
+                    f"reasoned TYPE_EXCEPTIONS entry if the indirection is "
+                    f"deliberate")
                 continue
             want = CONVERTER_TO_JSON_TYPE.get(ctype)
             if want is None:
@@ -570,6 +594,64 @@ def main():
     check("every type exception carries a reason",
           all(TYPE_EXCEPTIONS.values()),
           f"blank waivers: {[k for k, v in TYPE_EXCEPTIONS.items() if not v]}")
+
+    # Required-ness must agree too, and in BOTH directions. Declaring a field
+    # `required` that schema.py treats as optional is #266 with the polarity
+    # flipped: every draft-07 consumer then rejects documents the runtime
+    # validator accepts. Nothing compared the two, so adding `remit_version` to
+    # $.scan.required passed the whole suite.
+    #
+    # Checked behaviourally rather than against a declarative list, because
+    # schema.py's requiredness is imperative: delete each declared field from a
+    # valid document and the two validators must agree on whether that document
+    # is still valid.
+    doc_at = {
+        "$.scan": lambda d: d["scan"],
+        "$.raise_posture": lambda d: d["raise_posture"],
+        "$.raise_posture.categories[]": lambda d: d["raise_posture"]["categories"][0],
+        "$.remit_coverage.stat_counts": lambda d: d["remit_coverage"]["stat_counts"],
+        "$.remit_coverage.rules[]": lambda d: d["remit_coverage"]["rules"][0],
+        "$.findings[]": lambda d: d["findings"][0],
+        "$.findings[].evidence[]": lambda d: d["findings"][0]["evidence"][0],
+        "$.positives[]": lambda d: d["positives"][0],
+        "$.log_files": lambda d: d["log_files"],
+        "$.log_files.rows[]": lambda d: d["log_files"]["rows"][0],
+        "$.footer.severity_counts": lambda d: d["footer"]["severity_counts"],
+    }
+    check("every cross-checked path has a document accessor for the "
+          "required-ness comparison",
+          {p for _, p, _ in table_to_schema} <= set(doc_at),
+          f"missing: {sorted({p for _, p, _ in table_to_schema} - set(doc_at))}")
+
+    req_drift = []
+    for name, path, node_fn in table_to_schema:
+        if path not in doc_at:
+            continue
+        try:
+            node = node_fn()
+        except Exception:                             # noqa: BLE001
+            continue
+        declared_req = set(node.get("required") or [])
+        for field in sorted(node.get("properties") or {}):
+            mutant = load_json(FIXTURE)
+            try:
+                target = doc_at[path](mutant)
+            except (KeyError, IndexError):
+                continue                 # fixture has no element at this path
+            if field not in target:
+                continue                 # optional and absent — nothing to delete
+            del target[field]
+            runtime_rejects = not schema_accepts(mutant)
+            schema_requires = field in declared_req
+            if runtime_rejects != schema_requires:
+                req_drift.append(
+                    f"{path}.{field}: published schema "
+                    f"{'requires' if schema_requires else 'treats as optional'}"
+                    f", schema.py "
+                    f"{'rejects' if runtime_rejects else 'accepts'} the document "
+                    f"without it")
+    check("findings.schema.json and schema.py agree on which fields are required",
+          not req_drift, f"{req_drift}")
 
     undeclared = []
     for name, path, node_fn in table_to_schema:
