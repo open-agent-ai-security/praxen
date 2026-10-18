@@ -32,7 +32,7 @@ from datetime import datetime
 # too: a document must declare this version. A future MINOR ships an additive schema
 # and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
 # to read a version we cannot actually validate.
-SCHEMA_VERSION = "3.1"
+SCHEMA_VERSION = "4.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder

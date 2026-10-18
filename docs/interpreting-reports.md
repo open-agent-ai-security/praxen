@@ -168,8 +168,8 @@ Severity and confidence answer different questions: severity is *how bad, if rea
 
 | Key | What's in it |
 |---|---|
-| `schema_version`, `praxen_version` | `"3.1"` and the Praxen version that produced the file |
-| `standards` | Which **edition** of each OWASP framework the tags refer to — `owasp_llm`, `owasp_agentic`, `owasp_mcp`. Required from schema 3.1, and the reason an archived report is still readable: the codes are not stable across editions (`LLM03` is *Supply Chain* in 2025 and *Excessive Agency* in 2026), so a tag without its edition is ambiguous. Both reports state the editions in the footer. |
+| `schema_version`, `praxen_version` | `"4.0"` and the Praxen version that produced the file |
+| `standards` | Which **edition** of each OWASP framework the tags refer to — `owasp_llm`, `owasp_agentic`, `owasp_mcp`. Required from schema 4.0, and the reason an archived report is still readable: the codes are not stable across editions (`LLM03` is *Supply Chain* in 2025 and *Excessive Agency* in 2026), so a tag without its edition is ambiguous. Both reports state the editions in the footer. |
 | `scan` | agent name and slug, scan date and timestamp, the analyzed workspace path, artifact count |
 | `intro_band` | the two short prose summaries — `agent_remit_summary`, `agent_structure_summary` |
 | `behavior_summary` | the dominant-pattern narrative (same text as the report's Behavior Summary section) |

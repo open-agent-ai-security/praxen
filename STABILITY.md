@@ -5,7 +5,7 @@
 
 # Praxen Stability Contract
 
-From **1.0**, Praxen follows semantic versioning across two independently-versioned surfaces — the **product version** (`praxen_version`, e.g. `1.0.0`) and the **findings-schema version** (`schema_version`, currently `3.1`). This document defines what each major line guarantees. **Anything not listed as Stable is explicitly Evolving and may change in a minor release.**
+From **1.0**, Praxen follows semantic versioning across two independently-versioned surfaces — the **product version** (`praxen_version`, e.g. `1.0.0`) and the **findings-schema version** (`schema_version`, currently `4.0`). This document defines what each major line guarantees. **Anything not listed as Stable is explicitly Evolving and may change in a minor release.**
 
 ## Semver / compatibility policy
 
@@ -23,13 +23,7 @@ Within a given `schema_version` MAJOR, the published JSON is a stable contract f
 - The **required sections**: `scan`, `intro_band`, `behavior_summary`, `remit_coverage`, `findings`, `positives`, `log_files`, `raise_posture`, `footer`.
 - The **fixed enumerations**: `SEVERITIES`, `REMIT_STATUSES`, `CONFIDENCES`, `TAG_KINDS`, `ESCALATIONS`, and the finding-ID grammar `PRAX-YYYY-MM-DD-NNN`.
 
-**Strict today; additive by policy.** The published schema and the bundled validator (`schema.py`) are **strict** to the current `schema_version` (`3.1`): objects are closed (`additionalProperties: false`) and enums are fixed, so they validate Praxen's own output exactly and reject anything they don't recognize. The **compatibility policy** for future minors is additive — a new *optional* field or enum *value* may ship in a schema MINOR (e.g. `3.1`), and when one does, the published schema and validator are updated in lockstep to accept it. Removing a field, removing/renaming an enum value, or changing a type or required-ness is a schema-MAJOR (`4.0`) change — as `3.0` itself was, in Praxen 1.2, when `policy_rule_ids` / `policy_rule_text` became required arrays. **Adding a brand-new required field is the one case that lands in a MINOR**, and
-only alongside a product MAJOR: `3.1` did exactly that in Praxen 2.0 with the `standards` block. The
-distinction is who breaks — making an *existing* field required invalidates documents that were
-valid under the same major, whereas a new required field is purely additive for consumers (they
-ignore what they do not recognise) and binds only Praxen's own producer, which the strict validator
-already pins to one exact `schema_version`. A consumer pinned to schema MAJOR 3 and tolerating
-unknown fields, as advised below, reads a `3.1` document unchanged. **Downstream consumers** should pin to the schema MAJOR and tolerate fields/values they don't recognize *in their own parsing*; Praxen's strict validator exists to check Praxen's output, not to read a future minor.
+**Strict today; additive by policy.** The published schema and the bundled validator (`schema.py`) are **strict** to the current `schema_version` (`4.0`): objects are closed (`additionalProperties: false`) and enums are fixed, so they validate Praxen's own output exactly and reject anything they don't recognize. The **compatibility policy** for future minors is additive — a new *optional* field or enum *value* may ship in a schema MINOR (e.g. `3.1`), and when one does, the published schema and validator are updated in lockstep to accept it. Removing a field, removing/renaming an enum value, adding a required field, or changing a type or required-ness is a schema-MAJOR change — as `3.0` was, in Praxen 1.2, when `policy_rule_ids` / `policy_rule_text` became required arrays, and as `4.0` is, in Praxen 2.0, which adds the required `standards` block naming the OWASP editions a scan was scored against. Both landed with a product MAJOR, which is where a schema MAJOR belongs. **Downstream consumers** should pin to the schema MAJOR and tolerate fields/values they don't recognize *in their own parsing*; Praxen's strict validator exists to check Praxen's output, not to read a future minor.
 
 ### 2. The RAISE six-category set and weights
 

@@ -83,14 +83,14 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
 # The LLM list was renumbered in its 2026 revision; a document is rendered with
 # the vocabulary its findings were tagged under (see _llm_titles_for), so a
-# 2025-tagged code is never shown with its 2026 name. From schema 3.1 that
+# 2025-tagged code is never shown with its 2026 name. From schema 4.0 that
 # promise rests on the document's own `standards.owasp_llm`, not on a version
 # heuristic: the renderer shows the edition the document declares (the
 # retro-fitted finbot fixture golden records "2025" and renders the 2025
 # titles, while carrying 2026 for the agentic and MCP lists). Documents at
 # schema_version 2.0 or 3.0 — every actually-frozen pre-2.0 report — do NOT
 # render here at all: validate() rejects them ("renderer understands schema
-# 3.1 exactly"); see #206 for the 2.0-compat question.
+# 4.0 exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
 _OWASP_LLM_TITLES_2025 = {
@@ -128,11 +128,11 @@ _OWASP_LLM_TITLES_BY_EDITION = {
 def _standards_for(data):
     """The OWASP editions this document was scored against.
 
-    Schema >= 3.1 records them in `standards`, and the renderer honours what is
+    Schema >= 4.0 records them in `standards`, and the renderer honours what is
     written rather than deciding for itself — the document is the authority on
     which taxonomy its codes belong to.
 
-    Pre-3.1 documents carry no such block, so fall back to the inference this
+    Pre-4.0 documents carry no such block, so fall back to the inference this
     function used to be: findings tagged by Praxen >= 1.2 used the 2026 LLM
     numbering, earlier ones the 2025 numbering. The fallback exists only so
     archived reports keep rendering correctly; it is not a second source of
@@ -722,7 +722,7 @@ def _global_ctx(data):
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
         # OWASP edition labels for the section headings and the footer. Read from
-        # the document's `standards` block (schema >= 3.1) so a heading can never
+        # the document's `standards` block (schema >= 4.0) so a heading can never
         # disagree with the numbering shown in the cards, nor with what the JSON
         # says the scan was scored against.
         "OWASP_LLM_YEAR": esc(_standards_for(data)["owasp_llm"]),
