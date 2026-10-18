@@ -766,6 +766,50 @@ def main():
           touched and schema_accepts(cosmetic),
           "cosmetic punctuation variance was rejected")
 
+    # 4e-sexies. Every docs link a report can emit must resolve in the published
+    #            guide page. Report chips used to link to a bare `#llm03`, which
+    #            cannot be right for both editions (Supply Chain in 2025,
+    #            Excessive Agency in 2026) — a 2025 report's chip landed on the
+    #            2026 entry. Anchors are now edition-qualified and descriptive,
+    #            so this sweeps every (kind, code, edition) a document could
+    #            carry and fails if the page does not define it. Without this,
+    #            renaming an entry or adding an edition rots every link silently.
+    guide_html = read_text(os.path.join(REPO_ROOT, "guide", "owasp.html"))
+    page_ids = set(re.findall(r'id="([^"]+)"', guide_html))
+
+    missing = []
+    for edition in sorted(schema.OWASP_LLM_TITLES):
+        for code in schema.OWASP_LLM_TITLES[edition]:
+            a = render.owasp_entry_anchor("owasp_llm", code, edition)
+            if a not in page_ids:
+                missing.append(a)
+    for code in schema.OWASP_AGENTIC_TITLES:
+        a = render.owasp_entry_anchor("owasp_agentic", code, "2026")
+        if a not in page_ids:
+            missing.append(a)
+    check("guide/owasp.html defines every edition-qualified entry anchor",
+          not missing, f"undefined in the page: {missing}")
+
+    # Legacy bare anchors are kept so an archived report's links still resolve —
+    # to the disambiguation table, not to whichever edition the page documents.
+    legacy_missing = [c.lower() for c in
+                      list(schema.OWASP_LLM_TITLES["2026"]) + list(schema.OWASP_AGENTIC_TITLES)
+                      if c.lower() not in page_ids]
+    check("guide/owasp.html keeps the legacy bare-code anchors for pre-2.0 reports",
+          not legacy_missing, f"dropped: {legacy_missing}")
+
+    # And the links actually in the rendered report resolve, including the
+    # section-level ones the template builds from the recorded edition.
+    report_anchors = set(
+        re.findall(r'href="https://[^"]*?/guide/owasp\.html#([^"]+)"', html))
+    unresolved = sorted(a for a in report_anchors if a not in page_ids)
+    check("every owasp.html link in the rendered report resolves in the guide",
+          not unresolved, f"dangling: {unresolved}")
+    check("the 2025-edition fixture links to the 2025 entry, not the 2026 one",
+          "owasp.html#llm03-2025-supply-chain" in html
+          and "owasp.html#llm03-2026" not in html,
+          "a 2025 document is still linking at 2026 entries")
+
     # 4e-ter. The OWASP editions schema.STANDARDS claims must be the editions the
     #         shipped knowledge bases actually describe. This is the drift that
     #         created the gap in the first place: the KBs moved to the 2026 lists

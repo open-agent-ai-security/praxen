@@ -31,35 +31,35 @@ The risk landscape for any system that puts an LLM in the loop. Each finding Pra
 
 | ID | Risk | One-line gloss |
 |---|---|---|
-| <a id="llm01"></a>**LLM01** | Prompt Injection | Untrusted input (direct or smuggled in via external content) overrides the model's instructions. |
-| <a id="llm02"></a>**LLM02** | Sensitive Information Disclosure | The model leaks PII, secrets, or proprietary data through its outputs. |
-| <a id="llm03"></a>**LLM03** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
-| <a id="llm04"></a>**LLM04** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
-| <a id="llm05"></a>**LLM05** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
-| <a id="llm06"></a>**LLM06** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
-| <a id="llm07"></a>**LLM07** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
-| <a id="llm08"></a>**LLM08** | Hidden Context Exposure | Hidden, non-user-facing context — system prompt, tool schemas, control logic, roles — is extracted or reconstructed. |
-| <a id="llm09"></a>**LLM09** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
-| <a id="llm10"></a>**LLM10** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
+| <a id="llm01-2026-prompt-injection"></a>**LLM01** | Prompt Injection | Untrusted input (direct or smuggled in via external content) overrides the model's instructions. |
+| <a id="llm02-2026-sensitive-information-disclosure"></a>**LLM02** | Sensitive Information Disclosure | The model leaks PII, secrets, or proprietary data through its outputs. |
+| <a id="llm03-2026-excessive-agency"></a>**LLM03** | Excessive Agency | The model is granted more capability, permission, or autonomy than the task needs. |
+| <a id="llm04-2026-supply-chain"></a>**LLM04** | Supply Chain | Compromised or untrusted models, datasets, plugins, or dependencies enter the system. |
+| <a id="llm05-2026-data-and-model-poisoning"></a>**LLM05** | Data and Model Poisoning | Training, fine-tuning, or RAG data is manipulated to bias or backdoor the model. |
+| <a id="llm06-2026-unbounded-consumption"></a>**LLM06** | Unbounded Consumption | Unconstrained inference (cost, compute, rate) enables denial-of-wallet or denial-of-service. |
+| <a id="llm07-2026-misinformation"></a>**LLM07** | Misinformation | The model produces confident, plausible, wrong output that users act on. |
+| <a id="llm08-2026-hidden-context-exposure"></a>**LLM08** | Hidden Context Exposure | Hidden, non-user-facing context — system prompt, tool schemas, control logic, roles — is extracted or reconstructed. |
+| <a id="llm09-2026-vector-and-embedding-weaknesses"></a>**LLM09** | Vector and Embedding Weaknesses | Flaws in embeddings or vector stores enable injection, poisoning, or data leakage via RAG. |
+| <a id="llm10-2026-improper-output-handling"></a>**LLM10** | Improper Output Handling | Model output is passed downstream (shell, SQL, HTML, eval) without validation. |
 
 → Full document: **[OWASP Top 10 for LLM Applications 2026](https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final)**
 
-### 2025 → 2026: what changed
+### <a id="owasp-top-10-for-llm-applications-2025"></a>2025 → 2026: what changed
 
 The 2026 revision kept the same ten risk concepts but **reordered them and renamed one**. Praxen reports and frozen baselines produced before v1.2 carry 2025 numbering — when comparing across that boundary, match categories by **name**, never by number:
 
 | 2026 | Name | Was (2025) |
 |---|---|---|
-| LLM01 | Prompt Injection | LLM01 |
-| LLM02 | Sensitive Information Disclosure | LLM02 |
-| LLM03 | Excessive Agency | LLM06 |
-| LLM04 | Supply Chain | LLM03 |
-| LLM05 | Data and Model Poisoning | LLM04 |
-| LLM06 | Unbounded Consumption | LLM10 |
-| LLM07 | Misinformation | LLM09 |
-| LLM08 | Hidden Context Exposure | LLM07 (*System Prompt Leakage*, broadened) |
-| LLM09 | Vector and Embedding Weaknesses | LLM08 |
-| LLM10 | Improper Output Handling | LLM05 |
+| <a id="llm01-2025-prompt-injection"></a>LLM01 | Prompt Injection | LLM01 |
+| <a id="llm02-2025-sensitive-information-disclosure"></a>LLM02 | Sensitive Information Disclosure | LLM02 |
+| <a id="llm06-2025-excessive-agency"></a>LLM03 | Excessive Agency | LLM06 |
+| <a id="llm03-2025-supply-chain"></a>LLM04 | Supply Chain | LLM03 |
+| <a id="llm04-2025-data-and-model-poisoning"></a>LLM05 | Data and Model Poisoning | LLM04 |
+| <a id="llm10-2025-unbounded-consumption"></a>LLM06 | Unbounded Consumption | LLM10 |
+| <a id="llm09-2025-misinformation"></a>LLM07 | Misinformation | LLM09 |
+| <a id="llm07-2025-system-prompt-leakage"></a>LLM08 | Hidden Context Exposure | LLM07 (*System Prompt Leakage*, broadened) |
+| <a id="llm08-2025-vector-and-embedding-weaknesses"></a>LLM09 | Vector and Embedding Weaknesses | LLM08 |
+| <a id="llm05-2025-improper-output-handling"></a>LLM10 | Improper Output Handling | LLM05 |
 
 ## OWASP Top 10 for Agentic AI Applications 2026
 
@@ -67,16 +67,16 @@ Risks that emerge once an LLM is wired to tools, memory, other agents, and the a
 
 | ID | Risk | One-line gloss |
 |---|---|---|
-| <a id="asi01"></a>**ASI01** | Agent Goal Hijack | An attacker redirects the agent's objective so it pursues their goal instead of yours. |
-| <a id="asi02"></a>**ASI02** | Tool Misuse and Exploitation | The agent is steered into using its legitimate tools for illegitimate ends. |
-| <a id="asi03"></a>**ASI03** | Identity and Privilege Abuse | The agent's identity, tokens, or delegated permissions are abused or over-broad. |
-| <a id="asi04"></a>**ASI04** | Agentic Supply Chain Vulnerabilities | Malicious or compromised plugins, MCP servers, skills, or sub-agents enter the agent's stack. |
-| <a id="asi05"></a>**ASI05** | Unexpected Code Execution (RCE) | The agent runs attacker-influenced code on the host or in connected systems. |
-| <a id="asi06"></a>**ASI06** | Memory and Context Poisoning | Persistent memory or retrieved context is seeded with content that corrupts future behavior. |
-| <a id="asi07"></a>**ASI07** | Insecure Inter-Agent Communication | Messages between agents are unauthenticated, unvalidated, or trusted blindly. |
-| <a id="asi08"></a>**ASI08** | Cascading Failures | One bad action or output propagates through a chain of agents/tools and amplifies. |
-| <a id="asi09"></a>**ASI09** | Human-Agent Trust Exploitation | The agent's perceived authority is used to manipulate the humans who rely on it (or vice versa). |
-| <a id="asi10"></a>**ASI10** | Rogue Agents | An agent operates outside its remit — compromised, misconfigured, or deliberately planted. |
+| <a id="asi01-2026-agent-goal-hijack"></a>**ASI01** | Agent Goal Hijack | An attacker redirects the agent's objective so it pursues their goal instead of yours. |
+| <a id="asi02-2026-tool-misuse-and-exploitation"></a>**ASI02** | Tool Misuse and Exploitation | The agent is steered into using its legitimate tools for illegitimate ends. |
+| <a id="asi03-2026-identity-and-privilege-abuse"></a>**ASI03** | Identity and Privilege Abuse | The agent's identity, tokens, or delegated permissions are abused or over-broad. |
+| <a id="asi04-2026-agentic-supply-chain-vulnerabilities"></a>**ASI04** | Agentic Supply Chain Vulnerabilities | Malicious or compromised plugins, MCP servers, skills, or sub-agents enter the agent's stack. |
+| <a id="asi05-2026-unexpected-code-execution-rce"></a>**ASI05** | Unexpected Code Execution (RCE) | The agent runs attacker-influenced code on the host or in connected systems. |
+| <a id="asi06-2026-memory-and-context-poisoning"></a>**ASI06** | Memory and Context Poisoning | Persistent memory or retrieved context is seeded with content that corrupts future behavior. |
+| <a id="asi07-2026-insecure-inter-agent-communication"></a>**ASI07** | Insecure Inter-Agent Communication | Messages between agents are unauthenticated, unvalidated, or trusted blindly. |
+| <a id="asi08-2026-cascading-failures"></a>**ASI08** | Cascading Failures | One bad action or output propagates through a chain of agents/tools and amplifies. |
+| <a id="asi09-2026-human-agent-trust-exploitation"></a>**ASI09** | Human-Agent Trust Exploitation | The agent's perceived authority is used to manipulate the humans who rely on it (or vice versa). |
+| <a id="asi10-2026-rogue-agents"></a>**ASI10** | Rogue Agents | An agent operates outside its remit — compromised, misconfigured, or deliberately planted. |
 
 → Full document: **[OWASP Top 10 for Agentic AI Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)**
 
@@ -114,3 +114,48 @@ The OWASP frameworks above answer *"what kind of risk is this finding?"* The [RA
 - [The RAISE Framework](RAISE.md) — the maturity-scoring side of the analysis
 - [Interpreting Reports](interpreting-reports.md) — where these tags show up in a Praxen report
 - [Challenging and Revising Findings](challenging-findings.md) — what to do when you disagree with a finding
+
+## <a id="legacy-anchors"></a>Legacy anchors — where old report links land
+
+Praxen reports **before 2.0** linked each risk chip to a bare code anchor
+(`owasp.html#llm03`). A bare code cannot be edition-correct: the LLM numbering
+was reordered for 2026, so `LLM03` means *Supply Chain* in a 2025-era report
+and *Excessive Agency* in a 2026 one. Following such a link used to land on
+whichever edition this page happened to document — silently the wrong entry for
+half of them.
+
+From 2.0, reports link to edition-qualified anchors
+(`#llm03-2026-excessive-agency`), which is why this page can carry several
+editions at once. The bare anchors are kept here rather than deleted, so an
+archived report's links still resolve — to an honest disambiguation instead of a
+wrong answer. Check which edition your report was scored against: every 2.0+
+report states it in the footer, and in the JSON under `standards`.
+
+| Legacy anchor | If your report is 2025 | If your report is 2026 |
+|---|---|---|
+| <a id="llm01"></a>`LLM01` | [Prompt Injection](#llm01-2025-prompt-injection) | [Prompt Injection](#llm01-2026-prompt-injection) — unchanged |
+| <a id="llm02"></a>`LLM02` | [Sensitive Information Disclosure](#llm02-2025-sensitive-information-disclosure) | [Sensitive Information Disclosure](#llm02-2026-sensitive-information-disclosure) — unchanged |
+| <a id="llm03"></a>`LLM03` | [Supply Chain](#llm03-2025-supply-chain) | [Excessive Agency](#llm03-2026-excessive-agency) |
+| <a id="llm04"></a>`LLM04` | [Data and Model Poisoning](#llm04-2025-data-and-model-poisoning) | [Supply Chain](#llm04-2026-supply-chain) |
+| <a id="llm05"></a>`LLM05` | [Improper Output Handling](#llm05-2025-improper-output-handling) | [Data and Model Poisoning](#llm05-2026-data-and-model-poisoning) |
+| <a id="llm06"></a>`LLM06` | [Excessive Agency](#llm06-2025-excessive-agency) | [Unbounded Consumption](#llm06-2026-unbounded-consumption) |
+| <a id="llm07"></a>`LLM07` | [System Prompt Leakage](#llm07-2025-system-prompt-leakage) | [Misinformation](#llm07-2026-misinformation) |
+| <a id="llm08"></a>`LLM08` | [Vector and Embedding Weaknesses](#llm08-2025-vector-and-embedding-weaknesses) | [Hidden Context Exposure](#llm08-2026-hidden-context-exposure) |
+| <a id="llm09"></a>`LLM09` | [Misinformation](#llm09-2025-misinformation) | [Vector and Embedding Weaknesses](#llm09-2026-vector-and-embedding-weaknesses) |
+| <a id="llm10"></a>`LLM10` | [Unbounded Consumption](#llm10-2025-unbounded-consumption) | [Improper Output Handling](#llm10-2026-improper-output-handling) |
+
+The agentic list has only ever had the 2026 edition, so a bare `ASI` anchor is
+unambiguous and simply forwards:
+
+| Legacy anchor | Entry |
+|---|---|
+| <a id="asi01"></a>`ASI01` | [Agent Goal Hijack](#asi01-2026-agent-goal-hijack) |
+| <a id="asi02"></a>`ASI02` | [Tool Misuse and Exploitation](#asi02-2026-tool-misuse-and-exploitation) |
+| <a id="asi03"></a>`ASI03` | [Identity and Privilege Abuse](#asi03-2026-identity-and-privilege-abuse) |
+| <a id="asi04"></a>`ASI04` | [Agentic Supply Chain Vulnerabilities](#asi04-2026-agentic-supply-chain-vulnerabilities) |
+| <a id="asi05"></a>`ASI05` | [Unexpected Code Execution (RCE)](#asi05-2026-unexpected-code-execution-rce) |
+| <a id="asi06"></a>`ASI06` | [Memory and Context Poisoning](#asi06-2026-memory-and-context-poisoning) |
+| <a id="asi07"></a>`ASI07` | [Insecure Inter-Agent Communication](#asi07-2026-insecure-inter-agent-communication) |
+| <a id="asi08"></a>`ASI08` | [Cascading Failures](#asi08-2026-cascading-failures) |
+| <a id="asi09"></a>`ASI09` | [Human-Agent Trust Exploitation](#asi09-2026-human-agent-trust-exploitation) |
+| <a id="asi10"></a>`ASI10` | [Rogue Agents](#asi10-2026-rogue-agents) |

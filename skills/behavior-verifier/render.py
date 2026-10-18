@@ -426,16 +426,47 @@ _DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide/"
 _MCP_ANCHOR = "a-practical-guide-for-secure-mcp-server-development-2026"
 
 
-def _tag_href(tag) -> str:
+def _doc_slug(text) -> str:
+    """Slugify a framework entry's name for a docs anchor."""
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+
+
+def owasp_entry_anchor(kind, code, edition) -> str:
+    """The docs anchor for one OWASP entry: ``llm03-2026-excessive-agency``.
+
+    Code, edition and name together. A bare ``#llm03`` cannot be correct for
+    both editions — LLM03 is Supply Chain in 2025 and Excessive Agency in 2026
+    — so the edition is part of the anchor, which also lets the docs carry
+    several editions at once. The name makes the link self-describing, and the
+    name is fixed within an edition, so the anchor is stable.
+
+    Shared with the docs generator (``docs_build.py`` imports this) so the
+    anchors a report links TO and the anchors the page defines cannot drift.
+    """
+    code = str(code).upper()
+    titles = (schema.OWASP_LLM_TITLES.get(str(edition), {}) if kind == "owasp_llm"
+              else schema.OWASP_AGENTIC_TITLES)
+    title = titles.get(code)
+    tail = f"-{_doc_slug(title)}" if title else ""
+    return f"{code.lower()}-{edition}{tail}"
+
+
+def _tag_href(tag, standards=None) -> str:
     """Resolve a finding tag to the exact entry in Praxen's own framework docs
     on GitHub Pages — derived from the tag's kind + label, so no schema field is
-    needed. OWASP LLM/Agentic tags lead with their code (``LLM02``/``ASI05``) →
-    ``owasp.html#llm02``; MCP tags → the MCP-guide section (no per-entry granularity);
-    RAISE tags carry the category name → its ``RAISE.html`` heading anchor."""
+    needed. OWASP LLM/Agentic tags lead with their code (``LLM02``/``ASI05``) and
+    resolve against the document's recorded edition →
+    ``owasp.html#llm02-2026-sensitive-information-disclosure``; MCP tags → the
+    MCP-guide section (no per-entry granularity); RAISE tags carry the category
+    name → its ``RAISE.html`` heading anchor."""
     kind, label = tag["kind"], tag["label"]
     if kind in ("owasp_llm", "owasp_agentic"):
         m = re.match(r"\s*([A-Za-z]+\d+)", label)
-        return f"{_DOCS_BASE}owasp.html#{m.group(1).lower()}" if m else f"{_DOCS_BASE}owasp.html"
+        if not m:
+            return f"{_DOCS_BASE}owasp.html"
+        edition = (standards or {}).get(kind) or max(schema.OWASP_LLM_TITLES)
+        return (f"{_DOCS_BASE}owasp.html#"
+                f"{owasp_entry_anchor(kind, m.group(1), edition)}")
     if kind == "mcp":
         return f"{_DOCS_BASE}owasp.html#{_MCP_ANCHOR}"
     if kind == "raise":
@@ -444,7 +475,7 @@ def _tag_href(tag) -> str:
     return _DOCS_BASE  # unreachable: kinds are schema-constrained
 
 
-def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
+def _finding_tag_ctx(tag, _idx, primary_codes=frozenset(), standards=None):
     """Render one finding tag chip. An OWASP chip whose code is NOT the finding's
     primary (dominant) classification — i.e. a co-applicable secondary recorded in
     tags[] — gets an extra ``tag-secondary`` class so it shows outlined rather than
@@ -455,7 +486,7 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
         if m and m.group(1).upper() not in primary_codes:
             cls += " tag-secondary"
     return {"TAG_CLASS": cls, "TAG_LABEL": esc(tag["label"]),
-            "TAG_HREF": esc(_tag_href(tag))}
+            "TAG_HREF": esc(_tag_href(tag, standards))}
 
 
 def _policy_ctx(finding, _idx):
@@ -468,7 +499,7 @@ def _policy_ctx(finding, _idx):
     }
 
 
-def _expand_finding_inner(block, finding):
+def _expand_finding_inner(block, finding, standards=None):
     """Expand the nested REPEAT blocks of a finding card.
 
     `finding_tag` repeats once per tag. `finding_policy` is a 0-or-1 block: it
@@ -476,7 +507,8 @@ def _expand_finding_inner(block, finding):
     `policy_rule_ids` is null (a RAISE-category / detection-pattern finding)."""
     primary_codes = frozenset(c for c in (finding.get("owasp_llm"), finding.get("owasp_agentic")) if c)
     block = expand_repeat(block, "finding_tag", finding["tags"],
-                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes))
+                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes,
+                                                         standards))
     has_rule = finding["policy_rule_ids"] is not None
     block = expand_repeat(block, "finding_policy",
                           [finding] if has_rule else [], _policy_ctx)
@@ -763,7 +795,8 @@ def render_html(template: str, data: dict) -> str:
         tpl = expand_repeat(tpl, "log_row", data["log_files"]["rows"], _log_row_ctx)
     tpl = expand_repeat(tpl, "remit_row", data["remit_coverage"]["rules"], _remit_row_ctx)
     findings_sorted = sorted(data["findings"], key=lambda f: _SEV_RANK[f["severity"]])  # stable
-    tpl = expand_repeat(tpl, "finding", findings_sorted, _finding_ctx, inner=_expand_finding_inner)
+    tpl = expand_repeat(tpl, "finding", findings_sorted, _finding_ctx,
+                        inner=lambda b, f: _expand_finding_inner(b, f, _standards_for(data)))
     tpl = expand_repeat(
         tpl, "positive", data["positives"], _positive_ctx,
         empty_replacement='<div class="none-found">No confirmed positive controls '
