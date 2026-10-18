@@ -172,6 +172,22 @@ def main():
           f"{tms.SPEC_VERSION}", not stale,
           f"stale — they would be skipped as archival and lose every gate below: {stale}")
 
+    # The contract shape-checks `standards` rather than pinning it, so that a
+    # graph can record an older edition and stay valid. That freedom has to be
+    # paid for here: the CURRENT set must name the editions this release
+    # actually scores against, or the committed exemplars drift away from the
+    # knowledge bases with nothing to notice.
+    off_edition = []
+    for g in in_current:
+        std = json.load(open(g, encoding="utf-8")).get("standards") or {}
+        for key, expected in sorted(tms._s.STANDARDS.items()):
+            if std.get(key) != expected:
+                off_edition.append(
+                    f"{os.path.relpath(g, REPO_ROOT)}: {key}={std.get(key)!r} "
+                    f"(release scores against {expected!r})")
+    check(f"every threat model in the CURRENT set names this release's OWASP "
+          f"editions", not off_edition, f"{off_edition}")
+
     for gpath in graphs:
         rel = os.path.relpath(gpath, REPO_ROOT)
         bdir = os.path.dirname(gpath)

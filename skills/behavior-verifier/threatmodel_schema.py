@@ -110,20 +110,19 @@ def _validate_top(data):
     # Agency" in 2026), so a graph without this is ambiguous to any reader who
     # is not holding the release that produced it.
     #
-    # Unlike the findings JSON — where manifest_to_findings.py injects the
-    # block — a graph is written directly by the extraction pass, so there is
-    # no converter to inject it. Values are therefore PINNED to the release's
-    # own editions rather than merely shape-checked: this validator already
-    # understands exactly one `spec_version`, so a graph claiming an edition
-    # this release does not score against is incoherent, and pinning turns a
-    # transcription slip into a loud failure instead of a wrong citation.
+    # Shape-checked, NOT pinned to this release's editions — matching the
+    # findings JSON. Pinning was the first design and it was wrong: a graph
+    # could then never record an older edition, and the day the knowledge bases
+    # move to a newer list every already-valid graph at an unchanged
+    # `spec_version` becomes invalid. That is the same "one version denoting two
+    # shapes" defect that justified the v1.4 -> v1.5 bump, so pinning here would
+    # have contradicted the reason for the bump. A graph records the editions it
+    # was extracted against; staleness in the committed set is caught by the
+    # test suite, which is where that belongs rather than in the contract.
     std = _s._obj(_s._get(data, "standards", "$"), "$.standards")
     _closed(std, "$.standards", set(_s.STANDARDS))
-    for key, expected in sorted(_s.STANDARDS.items()):
-        got = _s._nonempty_str(std, key, "$.standards")
-        if got != expected:
-            _s._err(f"$.standards.{key}",
-                    f"this release scores against {expected!r}; got {got!r}")
+    for key in sorted(_s.STANDARDS):
+        _s._nonempty_str(std, key, "$.standards")
     lanes = _s._get(data, "lanes", "$")
     if lanes != LANES:
         _s._err("$.lanes", f"must be exactly {LANES}")

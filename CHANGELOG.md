@@ -9,6 +9,41 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 
 ---
 
+## [2.0.0] — unreleased
+
+**A threat model with receipts, and reports that say which standards they were scored against.** The first new product surface since 1.0, plus the provenance fix that surface made unavoidable. Ships a **findings-schema major (`4.0`)** and a **threat-model graph contract bump (v1.5)**. **No score moves:** nothing re-scans or re-scores, `v1.3-opus5` stays the comparison point for 2.1, and every `weighted_overall` and severity count in it is byte-identical to the freeze — its artifacts were re-serialised, not re-measured (see `tests/baselines/v1.3-opus5/BASELINE.md`).
+
+> The release date is stamped at tag time by `scripts/release/bump_version.py`.
+
+### Threat modeling — the new surface
+- **An evidence-derived threat model**: data-flow graph with trust boundaries, STRIDE×OWASP threat enumeration (`confirmed` / `potential` / `partial` / `mitigated`), remit-rule overlay and attack paths, where every node, edge, boundary and threat cites `file:line`. Derived from the workspace, not drawn by hand or prompted from a description.
+- **Attack paths must be walks over real edges**, from an untrusted origin to a consequence — no teleporting past the orchestrator. Validator-enforced.
+- Runs from a completed scan's artifacts or as a scan add-on. Extraction costs roughly **0.5–1×** a standard scan's tokens.
+- **Quiet-mode diagram**: generic flows recede to a faint grey substrate so the red attack paths dominate; role-marked on-path nodes, `prefers-reduced-motion` fallback. Reads on paper.
+- Stability gate passed on its third pre-declared run; evidence in `tests/runs/v2.0.0-threatmodel-gate/GATE.md`.
+
+### Reports name the OWASP editions they were scored against
+- **New required `standards` block** in the findings JSON (`owasp_llm`, `owasp_agentic`, `owasp_mcp`) and in the threat-model graph. **Why it is required:** the taxonomy codes are not stable across editions — `LLM03` is *Supply Chain* in the 2025 LLM Top 10 and *Excessive Agency* in 2026, and `LLM04`/`LLM10` also changed meaning — so an archived report tagged `LLM03` was ambiguous. The edition was previously *inferred* at render time from `praxen_version` and recorded nowhere, the agentic edition was a hardcoded template literal, and the MCP edition appeared on no surface at all. Any consumer other than `render.py` could not resolve a tag.
+- **Injected, never authored.** `manifest_to_findings.py` writes the block from `schema.STANDARDS`, as it already did for `schema_version` and `praxen_version` — the editions are a fact about which knowledge bases shipped, not a judgement.
+- **The renderer honours what the document declares** instead of inferring it. Editions appear in the findings HTML footer, both coverage headings, the TXT `Built on` and coverage headings, and the threat-model masthead and footer.
+- **Tag labels are validated against the recorded edition.** A document claiming 2026 while a tag reads `LLM03 — Supply Chain` is a report that contradicts itself on the page, and shape-checking the block alone could not see it.
+
+### Docs links are edition-qualified — and old links still resolve
+- Anchors are now **code + edition + name** (`#llm03-2026-excessive-agency`), built by one shared function so the anchors a report links to and the anchors the page defines cannot drift. A report links at the edition it was scored against; `docs/owasp.md` can carry several editions at once.
+- **Pre-2.0 reports linked to bare codes** (`#llm03`), which cannot be correct for both editions. Those anchors are **kept**, in a new *Legacy anchors* section, so an archived report's links still resolve — to a disambiguation table naming the code's meaning in **both** editions, rather than silently to the wrong entry.
+
+### Breaking
+- **`schema_version` 3.0 → 4.0.** Adding a required field is a schema MAJOR under `STABILITY.md`, and this is the product MAJOR to spend one in. Consumers pinned to schema 3 should read the `standards` block and re-pin; nothing else in the shape changed.
+- **Threat-model graph contract v1.4 → v1.5.** `executive_summary` is removed along with the report's **Summary** section — everything it asserted is carried, with citations, by the masthead counts, the attack-path table and the boundary tables, so the prose was a second uncited copy of the model.
+- Graphs at contract 1.4 or earlier are rejected by the v1.5 validator; the dated gate-run graphs are retained as archival evidence.
+
+### Also
+- Optional `scan.remit_version` is declared in the published `findings.schema.json`, which previously rejected output the runtime validator accepted (#266).
+- `STABILITY.md` names adding a required field as a schema-MAJOR trigger, with `3.0` and `4.0` as the two instances.
+- Regression nets added for each gap that had none: converter-table ↔ published-schema field inventory, `schema.STANDARDS` ↔ knowledge-base headings, contract version ↔ extraction brief, byte-render gate for the committed threat-model pairs, and link integrity for every anchor a report can emit.
+
+---
+
 ## [1.3.0] — 2026-08-19
 
 **Thinking modes, and scores that come from evidence you can check.** Two features that turn out to depend on each other: the **high** and **x-high** thinking modes (#197), and a structural fix to how RAISE scores are formed (#195). **This is a scoring release, not a score-inert one** — it ships a fresh frozen baseline, **`v1.3-opus5`**, and its numbers are not comparable to `v1.2-opus5` scan-for-scan. `schema_version` stays **3.0**; nothing serialised changed.

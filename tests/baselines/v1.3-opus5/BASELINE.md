@@ -16,6 +16,26 @@ remit those targets were scanned against also changed. Their deltas (−0.15, �
 
 Roster prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
 
+> **Re-stamped by 2.0 (2026-10-18) — scores untouched.** The committed artifacts in this
+> set were re-stamped and re-rendered by the 2.0 release. **No target was re-scanned or
+> re-scored**: every `weighted_overall`, every category score and every severity count is
+> byte-identical to the freeze. What changed is serialisation and provenance:
+>
+> - **Findings JSON → `schema_version` 4.0**, carrying the new required `standards` block
+>   (`owasp_llm` / `owasp_agentic` / `owasp_mcp`, all `2026` — the editions these scans
+>   really did run against). HTML and TXT re-rendered, which also picked up the
+>   edition-qualified docs links and the edition-named coverage headings.
+> - **Threat-model graphs → contract 1.5**, dropping `executive_summary` with the report's
+>   Summary section, and carrying the same `standards` block.
+> - **`praxen_version` in the threat-model graphs reads `2.0.0`**, at the maintainer's
+>   direction, so the rendered mastheads say "Praxen 2.0.0". Note the asymmetry this
+>   creates inside one set: the findings JSONs still carry `1.3.0`, which is the release
+>   that produced the scan data. A graph's masthead therefore names 2.0.0 while the
+>   analysis it was built against names 1.3.0.
+>
+> The scores in this document remain the v1.3 freeze and stay the comparison point for
+> 2.1. Treat the artifacts as re-serialised, not re-measured.
+
 ## What changed from v1.2
 
 - **#195 — RAISE scores are assigned from committed evidence, not working memory.** In v1.2

@@ -311,14 +311,20 @@ pill without naming its edition is ambiguous to every reader who is not
 holding the release that produced it — which is exactly the position a reader
 of an archived report is in.
 
-Write the values **exactly** as shown. Unlike the findings JSON, where
-`manifest_to_findings.py` injects the block from `schema.STANDARDS`, a graph
-is written directly by the extraction pass, so there is no converter to
-inject it. The validator therefore pins the values to the release's own
-editions rather than merely checking the shape: this validator already
-understands exactly one `spec_version`, so a graph claiming an edition this
-release does not score against is incoherent, and pinning turns a
-transcription slip into a loud failure instead of a wrong citation.
+Write the values **exactly** as shown — they are the editions this release's
+knowledge bases describe, not a judgement call. Unlike the findings JSON,
+where `manifest_to_findings.py` injects the block from `schema.STANDARDS`, a
+graph is written directly by the extraction pass, so there is no converter to
+inject it.
+
+The validator checks the **shape**, not the values, exactly as the findings
+schema does. A graph records the editions it was extracted against, so a graph
+naming an older edition stays valid; pinning the values would mean that the
+day the knowledge bases move to a newer list, every already-valid graph at an
+unchanged `spec_version` becomes invalid — the same "one version denoting two
+shapes" problem that motivated this contract bump in the first place. Staleness
+in the committed baseline graphs is caught by the test suite instead, which is
+where it belongs.
 
 The rendered report states the editions in the masthead and again in the
 footer.
