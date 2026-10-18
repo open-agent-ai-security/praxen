@@ -94,7 +94,51 @@ mermaid.initialize({{
   themeVariables: {{ primaryColor: '#13233b', primaryBorderColor: '#2a3b57',
     primaryTextColor: '#e8eef7', lineColor: '#8aa0bd', fontSize: '14px' }},
 }});
-mermaid.run({{ querySelector: '.prose pre.mermaid' }});
+(function () {{
+  var blocks = document.querySelectorAll('.prose pre.mermaid');
+  // Keep each diagram's source so it can be drawn a second time: Mermaid marks
+  // rendered blocks `data-processed` and skips them, so a redraw needs the
+  // original text put back.
+  blocks.forEach(function (b) {{ b.dataset.mermaidSrc = b.textContent; }});
+
+  function run() {{ mermaid.run({{ querySelector: '.prose pre.mermaid' }}); }}
+  function redraw() {{
+    blocks.forEach(function (b) {{
+      if (!b.dataset.mermaidSrc) return;
+      b.textContent = b.dataset.mermaidSrc;
+      b.removeAttribute('data-processed');
+    }});
+    run();
+  }}
+
+  // Mermaid sizes every node by MEASURING its label text, so it must not draw
+  // in a face other than the one the page will paint. This page requests Inter
+  // through a CSS `@import` with `display=swap`, so the fallback is painted
+  // until Inter arrives; drawing first and swapping later leaves every label
+  // overflowing the box it was measured for, clipped by its last glyph (#264).
+  if (!document.fonts || !document.fonts.ready) {{ run(); return; }}
+
+  // Priming the specific faces is belt-and-braces, not the load-bearing part:
+  // in Chrome the parser blocks this script until the @imported sheet has
+  // loaded, so the faces are already registered and `fonts.ready` alone would
+  // do. It costs nothing and covers engines that do not block.
+  var faces = ['400 14px Inter', '500 14px Inter', '600 14px Inter'];
+  var settled = Promise.all(faces.map(function (f) {{
+    return document.fonts.load(f).catch(function () {{}});
+  }})).then(function () {{ return document.fonts.ready; }});
+
+  // Never leave the page with a bare code block: if the font is slow or
+  // blocked, draw at the deadline in whatever face is current. That render can
+  // still be wrong — if Inter only arrives afterwards it will clip exactly as
+  // #264 described — so when the deadline wins, draw again once the font
+  // actually lands. A blocked font never resolves, and the fallback render
+  // stands.
+  var deadline = new Promise(function (resolve) {{ setTimeout(resolve, 3000); }});
+  Promise.race([settled, deadline]).then(function () {{
+    run();
+    if (!document.fonts.check(faces[2])) settled.then(redraw);
+  }}, run);
+}})();
 </script>"""
 
 
