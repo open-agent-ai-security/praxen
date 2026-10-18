@@ -152,8 +152,8 @@ as input, so the generator work is *better* after this ships.
   schema-version signal should be deferred to 2.1. 2.0 instead ships
   **schema 4.0** (Steve, 2026-10-18) — adding a required field is a schema
   MAJOR under `STABILITY.md`, and a product MAJOR is the right place to
-  spend one. All 24 current-schema baseline sets were re-stamped and
-  re-rendered, which the gate above now records. The residual the rider
+  spend one. All 24 findings baselines across both
+  current-schema sets were re-stamped and re-rendered, which the gate above now records. The residual the rider
   worried about — one version string denoting two shapes — does not arise:
   4.0 denotes exactly one.
 - **Cost documentation:** extraction ≈ **0.5–1×** a standard scan,
