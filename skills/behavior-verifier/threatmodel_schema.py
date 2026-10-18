@@ -26,7 +26,7 @@ import schema as _s
 from schema import SchemaError  # re-exported: callers catch one error type
 
 # ── version ──────────────────────────────────────────────────────────────────
-SPEC_VERSION = "1.4"
+SPEC_VERSION = "1.5"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 LANES = [
@@ -85,7 +85,7 @@ def _validate_top(data):
     _s._obj(data, "$")
     _closed(data, "$", {
         "spec_version", "praxen_version", "target", "analysis_ref",
-        "model_identity", "executive_summary", "lanes", "nodes", "edges",
+        "model_identity", "standards", "lanes", "nodes", "edges",
         "trust_boundaries", "attack_paths", "notes", "remit_version",
     })
     version = _s._nonempty_str(data, "spec_version", "$")
@@ -104,7 +104,25 @@ def _validate_top(data):
     if "remit_version" in data:
         _s._nonempty_str(data, "remit_version", "$")
     _s._nonempty_str(data, "model_identity", "$")
-    _s._nonempty_str(data, "executive_summary", "$")
+    # Which OWASP editions the threats are tagged against. Threats carry bare
+    # `owasp` codes mixing the LLM and ASI namespaces, and those codes are not
+    # stable across editions (LLM03 is "Supply Chain" in 2025 and "Excessive
+    # Agency" in 2026), so a graph without this is ambiguous to any reader who
+    # is not holding the release that produced it.
+    #
+    # Shape-checked, NOT pinned to this release's editions — matching the
+    # findings JSON. Pinning was the first design and it was wrong: a graph
+    # could then never record an older edition, and the day the knowledge bases
+    # move to a newer list every already-valid graph at an unchanged
+    # `spec_version` becomes invalid. That is the same "one version denoting two
+    # shapes" defect that justified the v1.4 -> v1.5 bump, so pinning here would
+    # have contradicted the reason for the bump. A graph records the editions it
+    # was extracted against; staleness in the committed set is caught by the
+    # test suite, which is where that belongs rather than in the contract.
+    std = _s._obj(_s._get(data, "standards", "$"), "$.standards")
+    _closed(std, "$.standards", set(_s.STANDARDS))
+    for key in sorted(_s.STANDARDS):
+        _s._nonempty_str(std, key, "$.standards")
     lanes = _s._get(data, "lanes", "$")
     if lanes != LANES:
         _s._err("$.lanes", f"must be exactly {LANES}")

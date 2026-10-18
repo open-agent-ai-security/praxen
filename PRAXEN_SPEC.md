@@ -5,8 +5,8 @@
 
 # Praxen — Specification
 
-**Version:** 1.3.0
-**Status:** Public release (1.0 GA)
+**Version:** 2.0.0
+**Status:** Public release (2.0 GA)
 **Tagline:** *Make sure your agent does its job — and only its job.*
 
 ---
@@ -137,7 +137,7 @@ Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs 
 
 **Thinking modes.** The invocation may name a higher **thinking mode** — the effort dial reasoning models expose, applied to a whole scan — **high** (scan → context-unaware findings audit → cleaned re-render, ~2× cost) or **x-high** (three independent scans → evidence adjudication → one super-run report, ~4–5× cost) — selected per-invocation in natural language, with no config file or standing state. Mode orchestration lives in `skills/behavior-verifier/THINKING_MODES.md`, read only when a mode is named; with no mode named the skill runs the standard single-scan pipeline unchanged.
 
-**Threat model.** The invocation may ask for a **threat model** — an evidence-derived architecture view (data-flow graph, trust boundaries, STRIDE×OWASP threat enumeration with confirmed / potential / partial / mitigated statuses, remit-rule overlay, attack paths), every element citing file:line evidence. One extraction pass (in our testing ~0.5–1× a standard scan's tokens, typically ~0.75×) against a completed analysis's artifacts produces a graph JSON conforming to `THREAT_MODEL_SPEC.md` (contract v1.4, validated by `threatmodel_schema.py`), rendered by `render_threatmodel.py` to a self-contained HTML report that shares the analysis report's brand chrome. Score-inert by construction: no finding, score, or analysis artifact changes, and no mode or standard scan is altered. Artifacts: `reports/<agent-slug>-threatmodel-<timestamp>.json` / `.html`; `analysis_ref` in the graph names the findings JSON it was built against. Modes add verification around the pipeline, never new findings or schema fields: final scores are re-derived from the adjudicated evidence — the audited finding set plus the maturity record and category evidence notes that the scoring step (SKILL.md 9.4) requires, since a finding set alone cannot see practice — raw artifacts are preserved alongside the final report, and every audit verdict is logged in a per-run adjudication record (`reports/<agent-slug>-adjudication-<timestamp>.md`).
+**Threat model.** The invocation may ask for a **threat model** — an evidence-derived architecture view (data-flow graph, trust boundaries, STRIDE×OWASP threat enumeration with confirmed / potential / partial / mitigated statuses, remit-rule overlay, attack paths), every element citing file:line evidence. One extraction pass (in our testing ~0.5–1× a standard scan's tokens, typically ~0.75×) against a completed analysis's artifacts produces a graph JSON conforming to `THREAT_MODEL_SPEC.md` (contract v1.5, validated by `threatmodel_schema.py`), rendered by `render_threatmodel.py` to a self-contained HTML report that shares the analysis report's brand chrome. Score-inert by construction: no finding, score, or analysis artifact changes, and no mode or standard scan is altered. Artifacts: `reports/<agent-slug>-threatmodel-<timestamp>.json` / `.html`; `analysis_ref` in the graph names the findings JSON it was built against. Modes add verification around the pipeline, never new findings or schema fields: final scores are re-derived from the adjudicated evidence — the audited finding set plus the maturity record and category evidence notes that the scoring step (SKILL.md 9.4) requires, since a finding set alone cannot see practice — raw artifacts are preserved alongside the final report, and every audit verdict is logged in a per-run adjudication record (`reports/<agent-slug>-adjudication-<timestamp>.md`).
 
 ### Inputs
 
@@ -148,7 +148,7 @@ Praxen is an agent skill, run by Claude Code or OpenAI Codex. The operator runs 
 | Knowledge base | `knowledge/` directory alongside the skill file |
 | Bundled scripts and template | `manifest_to_findings.py` (Step 10 converter), `render.py` (Step 11 renderer), `schema.py` (shared validator), `report_template.html` — all alongside the skill file in `skills/behavior-verifier/` |
 | Thinking-mode instructions | `THINKING_MODES.md` alongside the skill file — read only when the invocation names a high / x-high thinking mode |
-| Threat-model instructions and contract | `THREAT_MODEL.md` (orchestration, read only when a threat model is asked for), `THREAT_MODEL_SPEC.md` (graph contract v1.0), `threatmodel_schema.py` (validator), `render_threatmodel.py` (renderer) — alongside the skill file |
+| Threat-model instructions and contract | `THREAT_MODEL.md` (orchestration, read only when a threat model is asked for), `THREAT_MODEL_SPEC.md` (graph contract v1.5), `threatmodel_schema.py` (validator), `render_threatmodel.py` (renderer) — alongside the skill file |
 
 ### Outputs
 
@@ -278,8 +278,13 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 ```json
 {
-  "schema_version": "3.0",
-  "praxen_version": "1.3.0",
+  "schema_version": "4.0",
+  "praxen_version": "2.0.0",
+  "standards": {
+    "owasp_llm": "2026",
+    "owasp_agentic": "2026",
+    "owasp_mcp": "2026"
+  },
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -371,7 +376,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 - `escalation` is `alert` for Critical/High, `log_only` for Medium/Low/Informational. `related_findings` lists the ids of findings that combine with this one (compound signal). Every finding that maps to a remit rule carries the exact quoted text in `policy_rule_text`, not just a section name.
 - `findings` may be empty (a genuinely clean agent); `positives` may be empty; `log_files.rows` is empty exactly when `present` is false.
 - **`evidence` is structured.** Each item is `{ file, line, snippet }`: `file` is a workspace-relative path (or workspace-relative identifier); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context. The renderer formats each item as `file:line — snippet` (or `file — snippet` when `line` is `null`). **`recommended_actions` is an array** of one or more concrete actions — the renderer renders single-item arrays as inline text and multi-item arrays as a bulleted list.
-- This is the **v3.0** schema, introduced with Praxen 1.2. Difference from v2.0: `policy_rule_ids` and `policy_rule_text` are now **parallel arrays** (element i of one is the id whose text is element i of the other), where 2.0 carried them as scalar strings (a single id string, and multiple rule texts joined with `" / "`). The array shape lets a finding's rule references be joined mechanically for scan-to-scan regression diffing and cross-checked against `remit_coverage.rules[]`, instead of parsed out of a delimiter-joined string. v2.0 (introduced at Praxen 0.3.0: structured `evidence`, array `recommended_actions`, optional `description`), v1.0, and the pre-0.2 bare-list format are all legacy — none is read by the current renderer, which validates `schema_version` `"3.0"` exactly.
+- This is the **v4.0** schema, introduced with Praxen 2.0: it adds the required `standards` block naming the OWASP edition each tag namespace refers to, plus the optional `scan.remit_version`. The editions matter because the codes are not stable across them — `LLM03` is *Supply Chain* in the 2025 LLM Top 10 and *Excessive Agency* in 2026, and `LLM04` / `LLM10` also changed meaning — so a tag read without its edition is ambiguous. `standards` is injected by `manifest_to_findings.py` from `schema.STANDARDS`, never authored. Adding a required field is a schema MAJOR under `STABILITY.md`, which is why this is 4.0 and not a 3.x minor. v3.0 arrived with Praxen 1.2. Difference from v2.0: `policy_rule_ids` and `policy_rule_text` are now **parallel arrays** (element i of one is the id whose text is element i of the other), where 2.0 carried them as scalar strings (a single id string, and multiple rule texts joined with `" / "`). The array shape lets a finding's rule references be joined mechanically for scan-to-scan regression diffing and cross-checked against `remit_coverage.rules[]`, instead of parsed out of a delimiter-joined string. v2.0 (introduced at Praxen 0.3.0: structured `evidence`, array `recommended_actions`, optional `description`), v1.0, and the pre-0.2 bare-list format are all legacy — none is read by the current renderer, which validates `schema_version` `"4.0"` exactly.
 
 ### Severity model
 

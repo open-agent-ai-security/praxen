@@ -32,7 +32,7 @@ from datetime import datetime
 # too: a document must declare this version. A future MINOR ships an additive schema
 # and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
 # to read a version we cannot actually validate.
-SCHEMA_VERSION = "3.0"
+SCHEMA_VERSION = "4.0"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder
@@ -86,6 +86,76 @@ _TIMESTAMP_RE = re.compile(
 # implicit ceiling is 999 findings in a single scan. No real target has come
 # close; if one ever does, widen the sequence here and in findings.schema.json.
 _FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
+# The OWASP editions this Praxen release scores against — the single source of
+# truth for the `standards` block, injected by manifest_to_findings.py rather
+# than written by the SKILL author (editions are a fact about which knowledge
+# bases shipped, not a judgement). A report MUST name its editions because the
+# codes are not stable across them: LLM03 is "Supply Chain" in 2025 and
+# "Excessive Agency" in 2026, and LLM04/LLM10 also changed meaning. Without
+# this, an archived finding tagged LLM03 is ambiguous to every consumer that
+# is not render.py. Bump these together with the KB files; a test asserts they
+# match the KB headers.
+# One tolerant parser for an OWASP tag label, `<CODE> <sep> <Name>`. Separator
+# and case vary in real output — Codex emits an ASCII hyphen (#111) and
+# render.py canonicalises `[-–—:]` to an em-dash — and that canonicalisation
+# runs AFTER validation. A stricter parser here is therefore a hole, not safety:
+# a label the validator skipped for having the "wrong" dash still reached the
+# page with its title rewritten. render.py aliases this.
+OWASP_TAG_LABEL_RE = re.compile(
+    r"^\s*((?:LLM|ASI)\d{2})\s*[-\u2013\u2014:]\s*(.+?)\s*$", re.IGNORECASE)
+
+# OWASP title vocabularies, keyed by edition. These live here rather than in
+# render.py because they are taxonomy facts the VALIDATOR needs: a tag whose
+# label disagrees with the document's recorded edition is a self-contradicting
+# report, and catching that is validation, not presentation.
+OWASP_LLM_TITLES = {
+    "2025": {
+        'LLM01': 'Prompt Injection',
+        'LLM02': 'Sensitive Information Disclosure',
+        'LLM03': 'Supply Chain',
+        'LLM04': 'Data and Model Poisoning',
+        'LLM05': 'Improper Output Handling',
+        'LLM06': 'Excessive Agency',
+        'LLM07': 'System Prompt Leakage',
+        'LLM08': 'Vector and Embedding Weaknesses',
+        'LLM09': 'Misinformation',
+        'LLM10': 'Unbounded Consumption',
+    },
+    "2026": {
+        'LLM01': 'Prompt Injection',
+        'LLM02': 'Sensitive Information Disclosure',
+        'LLM03': 'Excessive Agency',
+        'LLM04': 'Supply Chain',
+        'LLM05': 'Data and Model Poisoning',
+        'LLM06': 'Unbounded Consumption',
+        'LLM07': 'Misinformation',
+        'LLM08': 'Hidden Context Exposure',
+        'LLM09': 'Vector and Embedding Weaknesses',
+        'LLM10': 'Improper Output Handling',
+    },
+}
+
+# The agentic list has only ever had the 2026 edition (the ASI namespace is new
+# with it), so there is nothing to key by.
+OWASP_AGENTIC_TITLES = {
+    'ASI01': 'Agent Goal Hijack',
+    'ASI02': 'Tool Misuse and Exploitation',
+    'ASI03': 'Identity and Privilege Abuse',
+    'ASI04': 'Agentic Supply Chain Vulnerabilities',
+    'ASI05': 'Unexpected Code Execution (RCE)',
+    'ASI06': 'Memory and Context Poisoning',
+    'ASI07': 'Insecure Inter-Agent Communication',
+    'ASI08': 'Cascading Failures',
+    'ASI09': 'Human-Agent Trust Exploitation',
+    'ASI10': 'Rogue Agents',
+}
+
+STANDARDS = {
+    "owasp_llm": "2026",
+    "owasp_agentic": "2026",
+    "owasp_mcp": "2026",
+}
+
 # OWASP taxonomy codes, canonical form: LLM01–LLM10, ASI01–ASI10. The `tags[]`
 # label carries the full "CODE — Name" string; these scalar fields carry the
 # code alone (or null).
@@ -206,6 +276,24 @@ def _validate_version(data):
         _err("$.schema_version",
              f"renderer understands schema {SCHEMA_VERSION} exactly; got {sv!r}")
     _nonempty_str(data, "praxen_version", "$")
+
+
+def _validate_standards(data):
+    """Validate the `standards` block — which OWASP editions this scan used.
+
+    Shape is checked, values are NOT pinned to `STANDARDS`: a document records
+    the editions it was actually scored against, so an archived report naming
+    an older edition (or a future one naming a newer) must stay valid. That is
+    the entire point of recording it — the renderer honours what is written
+    here instead of inferring the vocabulary from `praxen_version`.
+    """
+    std = _obj(_get(data, "standards", "$"), "$.standards")
+    for key in STANDARDS:
+        _nonempty_str(std, key, "$.standards")
+    unknown = sorted(set(std) - set(STANDARDS))
+    if unknown:
+        _err("$.standards", f"unknown standard(s) {unknown}; expected exactly "
+                            f"{sorted(STANDARDS)}")
 
 
 def _validate_scan(data):
@@ -508,6 +596,68 @@ def _validate_consistency(data, findings, finding_ids):
 
 
 # ── public API ───────────────────────────────────────────────────────────────
+def _norm_title(text):
+    """Compare OWASP titles ignoring cosmetic variance, not meaning.
+
+    Committed reports carry punctuation variants of the same category name —
+    "Identity & Privilege Abuse" for "Identity and Privilege Abuse", or a
+    dropped parenthetical qualifier ("Unexpected Code Execution" for
+    "Unexpected Code Execution (RCE)") — and
+    failing those would be noise, not a caught defect. A real edition mismatch
+    is a different category entirely ("Supply Chain" vs "Excessive Agency"), so
+    folding case, "&"/"and" and whitespace cannot mask one.
+    """
+    text = re.sub(r"\([^)]*\)", " ", str(text))   # "(RCE)" is a qualifier, not a category
+    return " ".join(text.lower().replace("&", "and").split())
+
+
+def _validate_tag_editions(data, findings):
+    """Every OWASP tag label must match the edition the document records.
+
+    A report whose `standards` block says 2026 while a tag reads
+    "LLM03 — Supply Chain" (the 2025 meaning; 2026 calls LLM03 "Excessive
+    Agency") contradicts itself: the card title is rendered from the edition
+    and the chip from the label, so the two disagree on the same page. That
+    defeats the point of recording the edition at all, and shape-checking
+    `standards` alone cannot see it.
+
+    Only codes present in the recorded edition's vocabulary are checked, so a
+    document naming an edition this release does not carry is left alone rather
+    than failed on titles it cannot know.
+    """
+    std = data.get("standards")
+    if not isinstance(std, dict):
+        return
+    titles = {
+        "owasp_llm": OWASP_LLM_TITLES.get(str(std.get("owasp_llm"))),
+        "owasp_agentic": OWASP_AGENTIC_TITLES,
+    }
+    for i, f in enumerate(findings):
+        p = f"$.findings[{i}]"
+        for j, tag in enumerate(f.get("tags") or []):
+            if not isinstance(tag, dict):
+                continue
+            table = titles.get(tag.get("kind"))
+            if not table:
+                continue
+            label = tag.get("label")
+            if not isinstance(label, str):
+                continue
+            m = OWASP_TAG_LABEL_RE.match(label)
+            if not m:
+                continue
+            code, title = m.group(1).upper(), m.group(2)
+            expected = table.get(code)
+            if expected and _norm_title(title) != _norm_title(expected):
+                edition = (std.get("owasp_llm") if tag["kind"] == "owasp_llm"
+                           else std.get("owasp_agentic"))
+                _err(f"{p}.tags[{j}].label",
+                     f"label says {code} is {title!r}, but the "
+                     f"{tag['kind']} edition this document records "
+                     f"({edition!r}) calls it {expected!r} — the tag and the "
+                     f"recorded edition disagree")
+
+
 def validate(data):
     """Validate a parsed canonical findings JSON. Raises SchemaError on any problem.
 
@@ -518,11 +668,13 @@ def validate(data):
                           f"(got {type(data).__name__}). This looks like a legacy "
                           "bare-list findings file, which the v1 renderer does not support.")
     _validate_version(data)
+    _validate_standards(data)
     _validate_scan(data)
     _validate_intro_band(data)
     _validate_behavior_summary(data)
     _validate_remit_coverage(data)
     findings, finding_ids = _validate_findings(data)
+    _validate_tag_editions(data, findings)
     _validate_positives(data)
     _validate_log_files(data)
     _validate_raise_posture(data)

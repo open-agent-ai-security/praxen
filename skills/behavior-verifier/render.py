@@ -83,65 +83,85 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
 # The LLM list was renumbered in its 2026 revision; a document is rendered with
 # the vocabulary its findings were tagged under (see _llm_titles_for), so a
-# 2025-tagged code is never shown with its 2026 name. Scope of that promise:
-# it applies to schema-3.0 documents carrying a pre-1.2 praxen_version (e.g.
-# the retro-fitted finbot fixture golden, praxen 0.3.0). Documents at
-# schema_version 2.0 — every actually-frozen pre-1.2 report — do NOT render
-# here at all: validate() rejects them ("renderer understands schema 3.0
-# exactly"); see #206 for the 2.0-compat question.
+# 2025-tagged code is never shown with its 2026 name. From schema 4.0 that
+# promise rests on the document's own `standards.owasp_llm`, not on a version
+# heuristic: the renderer shows the edition the document declares (the
+# retro-fitted finbot fixture golden records "2025" and renders the 2025
+# titles, while carrying 2026 for the agentic and MCP lists). Documents at
+# schema_version 2.0 or 3.0 — every actually-frozen pre-2.0 report — do NOT
+# render here at all: validate() rejects them ("renderer understands schema
+# 4.0 exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
-_OWASP_LLM_TITLES_2025 = {
-    "LLM01": "Prompt Injection",
-    "LLM02": "Sensitive Information Disclosure",
-    "LLM03": "Supply Chain",
-    "LLM04": "Data and Model Poisoning",
-    "LLM05": "Improper Output Handling",
-    "LLM06": "Excessive Agency",
-    "LLM07": "System Prompt Leakage",
-    "LLM08": "Vector and Embedding Weaknesses",
-    "LLM09": "Misinformation",
-    "LLM10": "Unbounded Consumption",
-}
-_OWASP_LLM_TITLES_2026 = {
-    "LLM01": "Prompt Injection",
-    "LLM02": "Sensitive Information Disclosure",
-    "LLM03": "Excessive Agency",
-    "LLM04": "Supply Chain",
-    "LLM05": "Data and Model Poisoning",
-    "LLM06": "Unbounded Consumption",
-    "LLM07": "Misinformation",
-    "LLM08": "Hidden Context Exposure",
-    "LLM09": "Vector and Embedding Weaknesses",
-    "LLM10": "Improper Output Handling",
+
+
+# The OWASP title vocabularies live in schema.py, which also validates tag
+# labels against the document's recorded edition. Aliased here so this module
+# keeps its existing names without holding a second copy of the taxonomy —
+# duplicated taxonomy data is the drift class the `standards` block exists to
+# close.
+_OWASP_LLM_TITLES_2025 = schema.OWASP_LLM_TITLES["2025"]
+_OWASP_LLM_TITLES_2026 = schema.OWASP_LLM_TITLES["2026"]
+_OWASP_AGENTIC_TITLES = schema.OWASP_AGENTIC_TITLES
+
+_OWASP_LLM_TITLES_BY_EDITION = {
+    "2025": _OWASP_LLM_TITLES_2025,
+    "2026": _OWASP_LLM_TITLES_2026,
 }
 
 
-def _llm_titles_for(data):
-    """Pick the OWASP LLM title vocabulary for this document by the Praxen
-    version that produced it: findings tagged by Praxen >= 1.2 use the 2026
-    numbering; earlier documents keep the 2025 numbering they were tagged
-    under."""
+def _standards_for(data):
+    """The OWASP editions this document was scored against.
+
+    Schema >= 4.0 records them in `standards`, and the renderer honours what is
+    written rather than deciding for itself — the document is the authority on
+    which taxonomy its codes belong to.
+
+    Pre-4.0 documents carry no such block, so fall back to the inference this
+    function used to be: findings tagged by Praxen >= 1.2 used the 2026 LLM
+    numbering, earlier ones the 2025 numbering. The fallback exists only so
+    archived reports keep rendering correctly; it is not a second source of
+    truth, and anything it guesses about the agentic/MCP editions is the only
+    edition those lists have ever had.
+    """
+    std = data.get("standards")
+    if isinstance(std, dict) and std.get("owasp_llm"):
+        return {k: str(std.get(k) or "2026")
+                for k in ("owasp_llm", "owasp_agentic", "owasp_mcp")}
     try:
         parts = str(data.get("praxen_version", "0")).split(".")
         major, minor = int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
     except (ValueError, IndexError):
         major, minor = 0, 0
-    return _OWASP_LLM_TITLES_2026 if (major, minor) >= (1, 2) else _OWASP_LLM_TITLES_2025
+    return {"owasp_llm": "2026" if (major, minor) >= (1, 2) else "2025",
+            "owasp_agentic": "2026",
+            "owasp_mcp": "2026"}
+
+
+def _llm_titles_for(data):
+    """The OWASP LLM title vocabulary for this document's recorded edition.
+
+    An edition this renderer has no vocabulary for falls back to the newest one
+    it knows, so a document from a future Praxen still reads rather than
+    failing outright. Be clear about the cost: in that case the heading names
+    the declared edition while the titles come from a different one, which is
+    a real disagreement on the page — so it warns on stderr rather than
+    passing silently. The fallback is for forward compatibility, not a second
+    source of truth; the fix is to teach this renderer the new edition.
+    """
+    edition = _standards_for(data)["owasp_llm"]
+    titles = _OWASP_LLM_TITLES_BY_EDITION.get(edition)
+    if titles is None:
+        print(f"render.py: WARNING — no title vocabulary for OWASP LLM edition "
+              f"{edition!r}; falling back to "
+              f"{max(_OWASP_LLM_TITLES_BY_EDITION)!r} titles, so the coverage "
+              f"heading and the card titles will name different editions",
+              file=sys.stderr)
+        titles = _OWASP_LLM_TITLES_BY_EDITION[max(_OWASP_LLM_TITLES_BY_EDITION)]
+    return titles
 _OWASP_AGENTIC_CODES = ("ASI01", "ASI02", "ASI03", "ASI04", "ASI05",
                         "ASI06", "ASI07", "ASI08", "ASI09", "ASI10")
-_OWASP_AGENTIC_TITLES = {
-    "ASI01": "Agent Goal Hijack",
-    "ASI02": "Tool Misuse and Exploitation",
-    "ASI03": "Identity and Privilege Abuse",
-    "ASI04": "Agentic Supply Chain Vulnerabilities",
-    "ASI05": "Unexpected Code Execution (RCE)",
-    "ASI06": "Memory and Context Poisoning",
-    "ASI07": "Insecure Inter-Agent Communication",
-    "ASI08": "Cascading Failures",
-    "ASI09": "Human-Agent Trust Exploitation",
-    "ASI10": "Rogue Agents",
-}
+
 # Highest severity present in a card's top-3 -> CSS class on the card. Empty
 # cells use " empty" instead (handled below).
 _WORST_SEV_CLASS = {"Critical": "worst-critical", "High": "worst-high",
@@ -406,16 +426,57 @@ _DOCS_BASE = "https://open-agent-ai-security.github.io/praxen/guide/"
 _MCP_ANCHOR = "a-practical-guide-for-secure-mcp-server-development-2026"
 
 
-def _tag_href(tag) -> str:
+def _doc_slug(text) -> str:
+    """Slugify a framework entry's name for a docs anchor."""
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+
+
+def owasp_entry_anchor(kind, code, edition) -> str:
+    """The docs anchor for one OWASP entry: ``llm03-2026-excessive-agency``.
+
+    Code, edition and name together. A bare ``#llm03`` cannot be correct for
+    both editions — LLM03 is Supply Chain in 2025 and Excessive Agency in 2026
+    — so the edition is part of the anchor, which also lets the docs carry
+    several editions at once. The name makes the link self-describing, and the
+    name is fixed within an edition, so the anchor is stable.
+
+    The docs anchors are hand-written in ``docs/owasp.md``; nothing imports this
+    function to generate them. What keeps the two sides from drifting is the
+    link-integrity check in ``tests/render/test_render.py``, which requires the
+    published page to define every anchor this function can produce.
+
+    An edition with no title vocabulary yields a name-less anchor that the page
+    will not define, so warn rather than emit a dead link silently.
+    """
+    code = str(code).upper()
+    titles = (schema.OWASP_LLM_TITLES.get(str(edition), {}) if kind == "owasp_llm"
+              else schema.OWASP_AGENTIC_TITLES)
+    title = titles.get(code)
+    if title is None:
+        print(f"render.py: WARNING — no {kind} title for {code} in edition "
+              f"{edition!r}; emitting the anchor '{code.lower()}-{edition}', "
+              f"which the docs page is unlikely to define (dead link)",
+              file=sys.stderr)
+    tail = f"-{_doc_slug(title)}" if title else ""
+    return f"{code.lower()}-{edition}{tail}"
+
+
+def _tag_href(tag, standards=None) -> str:
     """Resolve a finding tag to the exact entry in Praxen's own framework docs
     on GitHub Pages — derived from the tag's kind + label, so no schema field is
-    needed. OWASP LLM/Agentic tags lead with their code (``LLM02``/``ASI05``) →
-    ``owasp.html#llm02``; MCP tags → the MCP-guide section (no per-entry granularity);
-    RAISE tags carry the category name → its ``RAISE.html`` heading anchor."""
+    needed. OWASP LLM/Agentic tags lead with their code (``LLM02``/``ASI05``) and
+    resolve against the document's recorded edition →
+    ``owasp.html#llm02-2026-sensitive-information-disclosure``; MCP tags → the
+    MCP-guide section (no per-entry granularity); RAISE tags carry the category
+    name → its ``RAISE.html`` heading anchor."""
     kind, label = tag["kind"], tag["label"]
     if kind in ("owasp_llm", "owasp_agentic"):
         m = re.match(r"\s*([A-Za-z]+\d+)", label)
-        return f"{_DOCS_BASE}owasp.html#{m.group(1).lower()}" if m else f"{_DOCS_BASE}owasp.html"
+        if not m:
+            return f"{_DOCS_BASE}owasp.html"
+        edition = (standards or {}).get(kind) or max(schema.OWASP_LLM_TITLES)
+        return (f"{_DOCS_BASE}owasp.html#"
+                f"{owasp_entry_anchor(kind, m.group(1), edition)}")
     if kind == "mcp":
         return f"{_DOCS_BASE}owasp.html#{_MCP_ANCHOR}"
     if kind == "raise":
@@ -424,7 +485,7 @@ def _tag_href(tag) -> str:
     return _DOCS_BASE  # unreachable: kinds are schema-constrained
 
 
-def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
+def _finding_tag_ctx(tag, _idx, primary_codes=frozenset(), standards=None):
     """Render one finding tag chip. An OWASP chip whose code is NOT the finding's
     primary (dominant) classification — i.e. a co-applicable secondary recorded in
     tags[] — gets an extra ``tag-secondary`` class so it shows outlined rather than
@@ -435,7 +496,7 @@ def _finding_tag_ctx(tag, _idx, primary_codes=frozenset()):
         if m and m.group(1).upper() not in primary_codes:
             cls += " tag-secondary"
     return {"TAG_CLASS": cls, "TAG_LABEL": esc(tag["label"]),
-            "TAG_HREF": esc(_tag_href(tag))}
+            "TAG_HREF": esc(_tag_href(tag, standards))}
 
 
 def _policy_ctx(finding, _idx):
@@ -448,7 +509,7 @@ def _policy_ctx(finding, _idx):
     }
 
 
-def _expand_finding_inner(block, finding):
+def _expand_finding_inner(block, finding, standards=None):
     """Expand the nested REPEAT blocks of a finding card.
 
     `finding_tag` repeats once per tag. `finding_policy` is a 0-or-1 block: it
@@ -456,7 +517,8 @@ def _expand_finding_inner(block, finding):
     `policy_rule_ids` is null (a RAISE-category / detection-pattern finding)."""
     primary_codes = frozenset(c for c in (finding.get("owasp_llm"), finding.get("owasp_agentic")) if c)
     block = expand_repeat(block, "finding_tag", finding["tags"],
-                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes))
+                          lambda tag, i: _finding_tag_ctx(tag, i, primary_codes,
+                                                         standards))
     has_rule = finding["policy_rule_ids"] is not None
     block = expand_repeat(block, "finding_policy",
                           [finding] if has_rule else [], _policy_ctx)
@@ -685,10 +747,20 @@ def _global_ctx(data):
         "SCAN_TIMESTAMP": esc(_format_timestamp(scan["scan_timestamp"])),
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
-        # OWASP LLM list year for the section heading — version-gated the same way
-        # as the category titles (2026 for Praxen >= 1.2, 2025 for archival docs),
-        # so the heading can never disagree with the numbering shown in the cards.
-        "OWASP_LLM_YEAR": "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025",
+        # OWASP edition labels for the section headings and the footer. Read from
+        # the document's `standards` block (schema >= 4.0) so a heading can never
+        # disagree with the numbering shown in the cards, nor with what the JSON
+        # says the scan was scored against.
+        "OWASP_LLM_YEAR": esc(_standards_for(data)["owasp_llm"]),
+        "OWASP_AGENTIC_YEAR": esc(_standards_for(data)["owasp_agentic"]),
+        "OWASP_MCP_YEAR": esc(_standards_for(data)["owasp_mcp"]),
+        "STANDARDS_LINE": (
+            "OWASP Top 10 for LLM Applications "
+            + esc(_standards_for(data)["owasp_llm"])
+            + " &nbsp;&middot;&nbsp; OWASP Top 10 for Agentic Applications "
+            + esc(_standards_for(data)["owasp_agentic"])
+            + " &nbsp;&middot;&nbsp; OWASP Secure MCP Server Development "
+            + esc(_standards_for(data)["owasp_mcp"])),
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
         "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
@@ -733,7 +805,8 @@ def render_html(template: str, data: dict) -> str:
         tpl = expand_repeat(tpl, "log_row", data["log_files"]["rows"], _log_row_ctx)
     tpl = expand_repeat(tpl, "remit_row", data["remit_coverage"]["rules"], _remit_row_ctx)
     findings_sorted = sorted(data["findings"], key=lambda f: _SEV_RANK[f["severity"]])  # stable
-    tpl = expand_repeat(tpl, "finding", findings_sorted, _finding_ctx, inner=_expand_finding_inner)
+    tpl = expand_repeat(tpl, "finding", findings_sorted, _finding_ctx,
+                        inner=lambda b, f: _expand_finding_inner(b, f, _standards_for(data)))
     tpl = expand_repeat(
         tpl, "positive", data["positives"], _positive_ctx,
         empty_replacement='<div class="none-found">No confirmed positive controls '
@@ -829,10 +902,14 @@ def render_txt(data: dict) -> str:
     # OWASP coverage tables — full counts per category (not capped), em-dash
     # for empty cells. The HTML grid caps per-card chips at three; this is
     # the summary, so the number reflects all findings in each category.
+    # Each table names its edition, as the HTML headings do. Without it a 2025
+    # document lists 2025 titles under an undated heading and the reader has to
+    # scroll to the footer to learn which taxonomy they are reading.
+    _ed = _standards_for(data)
     for heading, key, codes, titles in (
-        ("OWASP LLM TOP 10 COVERAGE", "owasp_llm",
+        (f"OWASP LLM TOP 10 ({_ed['owasp_llm']}) COVERAGE", "owasp_llm",
          _OWASP_LLM_CODES, _llm_titles_for(data)),
-        ("OWASP AGENTIC TOP 10 COVERAGE", "owasp_agentic",
+        (f"OWASP AGENTIC TOP 10 ({_ed['owasp_agentic']}) COVERAGE", "owasp_agentic",
          _OWASP_AGENTIC_CODES, _OWASP_AGENTIC_TITLES),
     ):
         counts = {c: 0 for c in codes}
@@ -867,8 +944,10 @@ def render_txt(data: dict) -> str:
             out.append("")
 
     out.append(bar)
-    llm_year = "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025"
-    out.append(f"Built on OWASP Top 10 for LLM Applications {llm_year}  |  OWASP Top 10 for Agentic Applications 2026"
+    _std = _standards_for(data)
+    out.append(f"Built on OWASP Top 10 for LLM Applications {_std['owasp_llm']}"
+               f"  |  OWASP Top 10 for Agentic Applications {_std['owasp_agentic']}"
+               f"  |  OWASP Secure MCP Server Development {_std['owasp_mcp']}"
                "  |  RAISE Framework")
     out.append("Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)")
     out.append("github.com/open-agent-ai-security/praxen  |  Apache-2.0")
@@ -981,7 +1060,10 @@ def _scrub_secrets(data) -> None:
 # regardless of the authoring model. Conservative: only the separator between a
 # *recognised* OWASP code prefix and the name is rewritten; hyphens/dashes inside
 # the name are left alone, and any non-OWASP label passes through untouched.
-_OWASP_TAG_LABEL_RE = re.compile(r"^\s*((?:LLM|ASI)\d{2})\s*[-–—:]\s*(.+?)\s*$", re.IGNORECASE)
+# Aliased from schema.py, which validates tag labels with the same parser —
+# a second copy here is how the validator and the canonicaliser came to
+# disagree about which labels are even parseable.
+_OWASP_TAG_LABEL_RE = schema.OWASP_TAG_LABEL_RE
 
 
 def _canon_owasp_tag_label(label):

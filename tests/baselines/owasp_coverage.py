@@ -91,33 +91,22 @@ TARGETS = [
      "Salesforce Agentforce customer-service agent (Knowledge-article RAG)"),
 ]
 
-# OWASP LLM Top 10 2026 numbering. Baseline JSONs frozen before v1.2 carry the
-# 2025 numbering — when reading those, compare categories by NAME, never by code
-# (see docs/owasp.md "2025 → 2026: what changed" for the map).
-LLM_TITLES = [
-    ("LLM01", "Prompt Injection"),
-    ("LLM02", "Sensitive Information Disclosure"),
-    ("LLM03", "Excessive Agency"),
-    ("LLM04", "Supply Chain"),
-    ("LLM05", "Data and Model Poisoning"),
-    ("LLM06", "Unbounded Consumption"),
-    ("LLM07", "Misinformation"),
-    ("LLM08", "Hidden Context Exposure"),
-    ("LLM09", "Vector and Embedding Weaknesses"),
-    ("LLM10", "Improper Output Handling"),
-]
-ASI_TITLES = [
-    ("ASI01", "Agent Goal Hijack"),
-    ("ASI02", "Tool Misuse and Exploitation"),
-    ("ASI03", "Identity and Privilege Abuse"),
-    ("ASI04", "Agentic Supply Chain Vulnerabilities"),
-    ("ASI05", "Unexpected Code Execution (RCE)"),
-    ("ASI06", "Memory and Context Poisoning"),
-    ("ASI07", "Insecure Inter-Agent Communication"),
-    ("ASI08", "Cascading Failures"),
-    ("ASI09", "Human-Agent Trust Exploitation"),
-    ("ASI10", "Rogue Agents"),
-]
+# Derived from skills/behavior-verifier/schema.py — the single source of truth
+# for the OWASP vocabularies. This file used to carry its own hardcoded copy,
+# which sat outside the STANDARDS-vs-knowledge-base guard and would have gone
+# stale silently the next time an edition moved.
+#
+# The current edition is whatever `schema.STANDARDS` names. Baseline JSONs
+# frozen before v1.2 carry the 2025 numbering — when reading those, compare
+# categories by NAME, never by code (see docs/owasp.md "2025 -> 2026: what
+# changed" for the map).
+_SKILL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "..", "..", "skills", "behavior-verifier")
+sys.path.insert(0, os.path.abspath(_SKILL_DIR))
+import schema as _schema  # noqa: E402
+
+LLM_TITLES = list(_schema.OWASP_LLM_TITLES[_schema.STANDARDS["owasp_llm"]].items())
+ASI_TITLES = list(_schema.OWASP_AGENTIC_TITLES.items())
 
 # Card / chrome components (shared with the report's target cards). The bar
 # components are defined in OWASP_V2_CSS below; base elements, hero, sections and

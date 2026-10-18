@@ -362,7 +362,9 @@ from a single run").
   cross-run disagreements resolved by rule, so it is the tier that damps
   *score* variance. Do not present a high-mode score as more stable than a
   standard score; present it as better-verified.
-- The canonical findings JSON stays **schema 3.0, no new fields**; the
+- The canonical findings JSON is **schema 4.0**, and the modes add no fields of their
+  own — 4.0's additions (the required `standards` block, optional `scan.remit_version`)
+  come from the 2.0 release, not from any mode; the
   renderer and template are untouched. Mode provenance lives in the
   adjudication artifact and the `-raw` / run-directory naming, not in the
   schema.

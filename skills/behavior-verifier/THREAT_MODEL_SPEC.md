@@ -3,7 +3,7 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Praxen Threat-Model Graph — contract v1.4
+# Praxen Threat-Model Graph — contract v1.5
 
 One JSON object per analyzed agent. This is the published contract for the
 threat-model graph that the extraction pass writes and `render_threatmodel.py`
@@ -13,8 +13,12 @@ the pre-ship gate's findings — the `stored-state` archetype, `partial`
 calibration, and coinage rules; **v1.2 (2026-08-17)** makes attack paths
 run untrusted-origin → consequence; **v1.3 (2026-08-17)** adds the
 required plain-English `executive_summary`; **v1.4 (2026-08-17)** requires
-every attack path to be a WALK over real edges (no skipped hijack step) —
-see
+every attack path to be a WALK over real edges (no skipped hijack step);
+**v1.5 (2026-10-09)** removes `executive_summary` and the report's Summary
+section, and adds the required `standards` block naming the OWASP editions
+the threats are tagged against — every claim it carried is held, with citations, by the masthead
+counts, the attack-path table and the boundary tables, so the prose was a
+second uncited copy of the model — see
 `plans/RESULTS_THREAT_MODEL_PROBE.md` and
 `tests/runs/v2.0.0-threatmodel-gate/GATE.md` for the evidence.
 
@@ -26,13 +30,13 @@ cannot cite it, leave it out and record the omission in `notes`.
 
 ```json
 {
-  "spec_version": "1.4",
+  "spec_version": "1.5",
   "praxen_version": "<mirrors .claude-plugin/plugin.json>",
   "target": { "slug": "<slug>", "source_root": "<abs path analyzed>" },
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
   "remit_version": "<string, OPTIONAL — the remit's own declared version (Identity table \"Remit Version\"); omit when the remit declares none>",
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
-  "executive_summary": "<2-3 short paragraphs of plain English — see Executive summary>",
+  "standards": {"owasp_llm": "2026", "owasp_agentic": "2026", "owasp_mcp": "2026"},
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
   "nodes": [],
   "edges": [],
@@ -42,7 +46,7 @@ cannot cite it, leave it out and record the omission in `notes`.
 }
 ```
 
-`spec_version` is exactly `"1.4"`. Legacy probe statuses
+`spec_version` is exactly `"1.5"`. Legacy probe statuses
 (`finding`/`residual`/`open`) are not valid — emit only
 the canonical status set below.
 
@@ -291,30 +295,39 @@ distinguish in `name`.
     remainder.
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
 
-## Executive summary
+## Standards
 
-`executive_summary` is a required plain-English string (2–3 short
-paragraphs, no markup) — the first thing a reader sees, before the diagram,
-the way the analysis report leads with its behavior summary. Write it for a
-hurried operator who may read nothing else, and write it LAST, once the
-graph, boundaries, and attack paths are settled, so it reflects them.
+`standards` is a required object naming the edition of each OWASP framework
+the graph's `owasp` codes belong to:
 
-- **Paragraph 1 — what this agent is and how it's shaped.** What it does,
-  where its untrusted inputs come from, what it can reach and act on, and
-  the one or two trust surfaces that matter most. Concrete, not generic
-  ("A SOC investigation agent driven by a Claude Code skill over a bundled
-  Exabeam MCP; its only untrusted input is tenant telemetry it treats as
-  data, and its most consequential capability is case suppression.").
-- **Paragraph 2 (and optionally 3) — the threats to deal with first**, in
-  priority order, in the operator's language. Lead with the attack paths
-  (origin → consequence) and the confirmed high-severity boundaries; say
-  plainly what an attacker gets and what to fix. Do not list every threat —
-  name the few that matter. If the picture is genuinely clean, say that and
-  say what keeps it clean.
+```json
+"standards": {"owasp_llm": "2026", "owasp_agentic": "2026", "owasp_mcp": "2026"}
+```
 
-Ground every claim in the graph — the summary asserts nothing the nodes,
-boundaries, and paths don't already support. No finding IDs or file paths
-in the prose; those live in the tables.
+It is required because the codes are **not stable between editions**. `LLM03`
+is *Supply Chain* in the 2025 LLM Top 10 and *Excessive Agency* in 2026;
+`LLM04` and `LLM10` also changed meaning. A graph that prints a bare `LLM03`
+pill without naming its edition is ambiguous to every reader who is not
+holding the release that produced it — which is exactly the position a reader
+of an archived report is in.
+
+Write the values **exactly** as shown — they are the editions this release's
+knowledge bases describe, not a judgement call. Unlike the findings JSON,
+where `manifest_to_findings.py` injects the block from `schema.STANDARDS`, a
+graph is written directly by the extraction pass, so there is no converter to
+inject it.
+
+The validator checks the **shape**, not the values, exactly as the findings
+schema does. A graph records the editions it was extracted against, so a graph
+naming an older edition stays valid; pinning the values would mean that the
+day the knowledge bases move to a newer list, every already-valid graph at an
+unchanged `spec_version` becomes invalid — the same "one version denoting two
+shapes" problem that motivated this contract bump in the first place. Staleness
+in the committed baseline graphs is caught by the test suite instead, which is
+where it belongs.
+
+The rendered report states the editions in the masthead and again in the
+footer.
 
 ## Attack paths
 

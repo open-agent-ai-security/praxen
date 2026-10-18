@@ -419,6 +419,27 @@ def main():
     check("an empty scan.remit_version is rejected",
           not schema_accepts(rv_empty),
           "empty string accepted, but minLength 1 is declared")
+    # 4d-quinquies. The CURRENT findings baseline set must name the editions this
+    #               release scores against. The threat-model sweep gained this
+    #               check; the findings side had none, so rewriting all twelve
+    #               v1.3-opus5 findings JSONs to `owasp_llm: "2025"` passed the
+    #               whole suite. A release-wide mis-injection, or a future
+    #               schema.STANDARDS bump that misses the findings set, would
+    #               ship green.
+    cur_findings = sorted(glob.glob(os.path.join(
+        REPO_ROOT, "tests", "baselines", CURRENT_BASELINE, "*", "*-findings-*.json")))
+    check(f"found the CURRENT findings baseline set ({CURRENT_BASELINE})",
+          bool(cur_findings), "no *-findings-*.json in the CURRENT set")
+    edition_drift = []
+    for bj in cur_findings:
+        std = load_json(bj).get("standards") or {}
+        for key, expected in sorted(schema.STANDARDS.items()):
+            if std.get(key) != expected:
+                edition_drift.append(
+                    f"{os.path.relpath(bj, REPO_ROOT)}: {key}={std.get(key)!r} "
+                    f"(release scores against {expected!r})")
+    check("every findings baseline in the CURRENT set names this release's "
+          "OWASP editions", not edition_drift, f"{edition_drift}")
 
     # 4e. The published JSON-Schema doc and the Python validator agree on enum values.
     sch_path = os.path.join(SKILL_DIR, "findings.schema.json")
@@ -665,6 +686,209 @@ def main():
         undeclared += [f"{path}.{f} (converter {name})" for f in sorted(emitted - declared)]
     check("findings.schema.json declares every field the converter can emit (#266)",
           not undeclared, f"emitted but undeclared in the published schema: {undeclared}")
+
+    # 4e-quater. The document's recorded `standards` block — not praxen_version,
+    #            and not the newest list Praxen knows — decides which OWASP LLM
+    #            vocabulary a report is rendered with.
+    #
+    #            The canonical fixture is a retro-fitted praxen 0.3.0 document
+    #            whose findings were tagged under the 2025 numbering, and it
+    #            records owasp_llm "2025" while carrying 2026 for the agentic and
+    #            MCP lists (which have only ever had one edition). So it also
+    #            proves a MIXED edition set renders correctly.
+    #
+    #            This guards a promise that had no test. Stamping the fixture
+    #            2026 while adding this block silently relabelled its LLM03 from
+    #            "Supply Chain" to "Excessive Agency" — a 2025-tagged finding
+    #            shown under its 2026 name, the precise failure the standards
+    #            block exists to prevent — and the whole suite stayed green.
+    fx = load_json(FIXTURE)
+    check("canonical fixture records the 2025 LLM edition it was tagged under",
+          fx["standards"]["owasp_llm"] == "2025",
+          f'got {fx["standards"]["owasp_llm"]!r}')
+    check("report heading names the recorded LLM edition",
+          "OWASP LLM Top 10 (2025) Coverage" in html,
+          "heading does not match standards.owasp_llm")
+    # Pair each code with its own card title — a bare substring search is not
+    # enough, because "Excessive Agency" is a legitimate 2025 title (LLM06); it
+    # is the code it sits NEXT TO that differs between editions.
+    def owasp_card_titles(doc_html):
+        return dict(re.findall(
+            r'owasp-code">(LLM[0-9]+)</span>.{0,200}?owasp-title">([^<]+)</span>',
+            doc_html, re.S))
+
+    titles_2025 = owasp_card_titles(html)
+    check("LLM03 card carries its 2025 meaning (Supply Chain, not Excessive Agency)",
+          titles_2025.get("LLM03") == "Supply Chain",
+          f'LLM03 -> {titles_2025.get("LLM03")!r}')
+    check("LLM10 card carries its 2025 meaning (Unbounded Consumption)",
+          titles_2025.get("LLM10") == "Unbounded Consumption",
+          f'LLM10 -> {titles_2025.get("LLM10")!r}')
+    check("footer states the editions the scan was scored against",
+          "Scored against" in html and "LLM Applications 2025" in html)
+
+    # The recorded value, not the version heuristic, is what moves it: flip only
+    # standards.owasp_llm and the whole vocabulary follows, with praxen_version
+    # untouched. Before 3.1 this was derived from praxen_version, so a document
+    # could not say which taxonomy it meant.
+    flipped = load_json(FIXTURE)
+    flipped["standards"]["owasp_llm"] = "2026"
+    flipped_html = render.render_html(read_text(TEMPLATE), flipped)
+    titles_2026 = owasp_card_titles(flipped_html)
+    check("flipping standards.owasp_llm re-labels the vocabulary (the document "
+          "is the authority, not praxen_version)",
+          "OWASP LLM Top 10 (2026) Coverage" in flipped_html
+          and titles_2026.get("LLM03") == "Excessive Agency"
+          and titles_2026.get("LLM04") == "Supply Chain",
+          f'LLM03 -> {titles_2026.get("LLM03")!r}, '
+          f'LLM04 -> {titles_2026.get("LLM04")!r}')
+    check("praxen_version is untouched by the flip (it is not the signal)",
+          flipped["praxen_version"] == fx["praxen_version"] == "0.3.0")
+
+    # 4e-quinquies. A tag label must agree with the edition the document records.
+    #               Shape-checking `standards` cannot see this: a 2026 document
+    #               whose tag reads "LLM03 — Supply Chain" (the 2025 meaning)
+    #               renders the card title from the edition and the chip from the
+    #               label, so the same page states both. Found exactly that in
+    #               tests/fixtures/helperbot.from_manifest.json, and found a
+    #               second, older instance in the canonical fixture, whose
+    #               agentic tags carried a superseded ASI numbering
+    #               ("Memory & Context Poisoning" at ASI04, now ASI06).
+    for kind, code, wrong, right in (
+            ("owasp_llm", "LLM03", "Excessive Agency", "Supply Chain"),
+            ("owasp_agentic", "ASI06", "Rogue Agents", "Memory and Context Poisoning")):
+        mutant = load_json(FIXTURE)
+        hit = False
+        for f in mutant["findings"]:
+            for t in f.get("tags") or []:
+                if t.get("kind") == kind:
+                    t["label"] = f"{code} \u2014 {wrong}"
+                    hit = True
+                    break
+            if hit:
+                break
+        check(f"a {kind} label contradicting the recorded edition is rejected",
+              hit and not schema_accepts(mutant),
+              f"{code} labelled {wrong!r} validated, but the recorded edition "
+              f"calls it {right!r}")
+
+    # The guard must survive separator and case variance, because it is parsed
+    # BEFORE render.py canonicalises `[-–—:]` to an em-dash (#111 — Codex emits
+    # an ASCII hyphen). A stricter parser here was a hole, not safety: a label
+    # skipped for the "wrong" dash still reached the page with its title
+    # rewritten from the edition, so the same page showed both meanings.
+    for variant in ("LLM03 - Supply Chain", "llm03 — Supply Chain",
+                    "LLM03: Supply Chain", "LLM03 – Supply Chain"):
+        mutant = load_json(FIXTURE)          # fixture records owasp_llm 2025 …
+        mutant["standards"]["owasp_llm"] = "2026"   # … so 2025's LLM03 is wrong here
+        for f in mutant["findings"]:
+            for t in f.get("tags") or []:
+                if t.get("kind") == "owasp_llm":
+                    t["label"] = variant
+        check(f"a contradicting label is caught despite separator/case variance "
+              f"({variant!r})",
+              not schema_accepts(mutant),
+              "the label parser is stricter than render.py's canonicaliser, so "
+              "the guard can be stepped around")
+
+    # A dropped parenthetical qualifier is cosmetic, not an edition difference.
+    paren = load_json(FIXTURE)
+    hit = False
+    for f in paren["findings"]:
+        for t in f.get("tags") or []:
+            if t.get("kind") == "owasp_agentic" and "(" in t["label"]:
+                t["label"] = t["label"].split("(")[0].strip()
+                hit = True
+    if hit:
+        check("a dropped parenthetical qualifier is tolerated",
+              schema_accepts(paren),
+              "'Unexpected Code Execution' was rejected against "
+              "'Unexpected Code Execution (RCE)'")
+
+    # Cosmetic variance is not a contradiction: committed reports write
+    # "Identity & Privilege Abuse" for "Identity and Privilege Abuse", and
+    # failing those would be noise rather than a caught defect.
+    cosmetic = load_json(FIXTURE)
+    touched = False
+    for f in cosmetic["findings"]:
+        for t in f.get("tags") or []:
+            if t.get("kind") == "owasp_agentic":
+                c, _, ti = t["label"].partition("\u2014")
+                t["label"] = f"{c.strip()} \u2014 {ti.strip().replace(' and ', ' & ')}"
+                touched = True
+    check("an '&'-for-'and' title variant is tolerated",
+          touched and schema_accepts(cosmetic),
+          "cosmetic punctuation variance was rejected")
+
+    # 4e-sexies. Every docs link a report can emit must resolve in the published
+    #            guide page. Report chips used to link to a bare `#llm03`, which
+    #            cannot be right for both editions (Supply Chain in 2025,
+    #            Excessive Agency in 2026) — a 2025 report's chip landed on the
+    #            2026 entry. Anchors are now edition-qualified and descriptive,
+    #            so this sweeps every (kind, code, edition) a document could
+    #            carry and fails if the page does not define it. Without this,
+    #            renaming an entry or adding an edition rots every link silently.
+    guide_html = read_text(os.path.join(REPO_ROOT, "guide", "owasp.html"))
+    page_ids = set(re.findall(r'id="([^"]+)"', guide_html))
+
+    missing = []
+    for edition in sorted(schema.OWASP_LLM_TITLES):
+        for code in schema.OWASP_LLM_TITLES[edition]:
+            a = render.owasp_entry_anchor("owasp_llm", code, edition)
+            if a not in page_ids:
+                missing.append(a)
+    for code in schema.OWASP_AGENTIC_TITLES:
+        a = render.owasp_entry_anchor("owasp_agentic", code, "2026")
+        if a not in page_ids:
+            missing.append(a)
+    check("guide/owasp.html defines every edition-qualified entry anchor",
+          not missing, f"undefined in the page: {missing}")
+
+    # Legacy bare anchors are kept so an archived report's links still resolve —
+    # to the disambiguation table, not to whichever edition the page documents.
+    legacy_missing = [c.lower() for c in
+                      list(schema.OWASP_LLM_TITLES["2026"]) + list(schema.OWASP_AGENTIC_TITLES)
+                      if c.lower() not in page_ids]
+    check("guide/owasp.html keeps the legacy bare-code anchors for pre-2.0 reports",
+          not legacy_missing, f"dropped: {legacy_missing}")
+
+    # And the links actually in the rendered report resolve, including the
+    # section-level ones the template builds from the recorded edition.
+    report_anchors = set(
+        re.findall(r'href="https://[^"]*?/guide/owasp\.html#([^"]+)"', html))
+    unresolved = sorted(a for a in report_anchors if a not in page_ids)
+    check("every owasp.html link in the rendered report resolves in the guide",
+          not unresolved, f"dangling: {unresolved}")
+    check("the 2025-edition fixture links to the 2025 entry, not the 2026 one",
+          "owasp.html#llm03-2025-supply-chain" in html
+          and "owasp.html#llm03-2026" not in html,
+          "a 2025 document is still linking at 2026 entries")
+
+    # 4e-ter. The OWASP editions schema.STANDARDS claims must be the editions the
+    #         shipped knowledge bases actually describe. This is the drift that
+    #         created the gap in the first place: the KBs moved to the 2026 lists
+    #         while nothing in the report named an edition, so a finding tagged
+    #         LLM03 could mean "Supply Chain" (2025) or "Excessive Agency" (2026)
+    #         with no way to tell. If someone bumps a KB to a later edition
+    #         without bumping the constant, every report then cites the wrong
+    #         taxonomy while passing every other test here.
+    kb_for_standard = {
+        "owasp_llm": "KB_LLM_TOP10.md",
+        "owasp_agentic": "KB_AGENTIC_TOP10.md",
+        "owasp_mcp": "KB_MCP_SECURITY.md",
+    }
+    check("every standard in schema.STANDARDS maps to a knowledge base",
+          sorted(kb_for_standard) == sorted(schema.STANDARDS),
+          f"STANDARDS={sorted(schema.STANDARDS)} vs mapped={sorted(kb_for_standard)}")
+    for std_key, kb_name in sorted(kb_for_standard.items()):
+        edition = schema.STANDARDS.get(std_key, "")
+        kb_path = os.path.join(SKILL_DIR, "knowledge", kb_name)
+        heading = next((ln for ln in read_text(kb_path).splitlines()
+                        if ln.startswith("# ")), "")
+        check(f"{kb_name} heading names the {std_key} edition "
+              f"schema.STANDARDS claims ({edition})",
+              bool(edition) and edition in heading,
+              f"heading is {heading!r} — bump schema.STANDARDS and the KB together")
 
     # 4f. SECURITY — XSS / HTML-injection hardening. Praxen renders UNTRUSTED
     #     evidence (a scanned agent's own code, prompts, and session-loaded files
