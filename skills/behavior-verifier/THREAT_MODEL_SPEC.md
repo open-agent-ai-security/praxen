@@ -15,7 +15,8 @@ run untrusted-origin → consequence; **v1.3 (2026-08-17)** adds the
 required plain-English `executive_summary`; **v1.4 (2026-08-17)** requires
 every attack path to be a WALK over real edges (no skipped hijack step);
 **v1.5 (2026-10-09)** removes `executive_summary` and the report's Summary
-section — every claim it carried is held, with citations, by the masthead
+section, and adds the required `standards` block naming the OWASP editions
+the threats are tagged against — every claim it carried is held, with citations, by the masthead
 counts, the attack-path table and the boundary tables, so the prose was a
 second uncited copy of the model — see
 `plans/RESULTS_THREAT_MODEL_PROBE.md` and
@@ -35,6 +36,7 @@ cannot cite it, leave it out and record the omission in `notes`.
   "analysis_ref": "<filename of the findings JSON this graph was built against, or null>",
   "remit_version": "<string, OPTIONAL — the remit's own declared version (Identity table \"Remit Version\"); omit when the remit declares none>",
   "model_identity": "<verbatim 'You are powered by ...' declaration>",
+  "standards": {"owasp_llm": "2026", "owasp_agentic": "2026", "owasp_mcp": "2026"},
   "lanes": ["user_inputs", "client_adapters", "agent_core", "tools_mcp", "external_deploy"],
   "nodes": [],
   "edges": [],
@@ -292,6 +294,34 @@ distinguish in `name`.
     by reachable configuration is `partial` with the bypass named as the
     remainder.
 - Do not pad. A boundary with 2 real threats beats one with 8 generic ones.
+
+## Standards
+
+`standards` is a required object naming the edition of each OWASP framework
+the graph's `owasp` codes belong to:
+
+```json
+"standards": {"owasp_llm": "2026", "owasp_agentic": "2026", "owasp_mcp": "2026"}
+```
+
+It is required because the codes are **not stable between editions**. `LLM03`
+is *Supply Chain* in the 2025 LLM Top 10 and *Excessive Agency* in 2026;
+`LLM04` and `LLM10` also changed meaning. A graph that prints a bare `LLM03`
+pill without naming its edition is ambiguous to every reader who is not
+holding the release that produced it — which is exactly the position a reader
+of an archived report is in.
+
+Write the values **exactly** as shown. Unlike the findings JSON, where
+`manifest_to_findings.py` injects the block from `schema.STANDARDS`, a graph
+is written directly by the extraction pass, so there is no converter to
+inject it. The validator therefore pins the values to the release's own
+editions rather than merely checking the shape: this validator already
+understands exactly one `spec_version`, so a graph claiming an edition this
+release does not score against is incoherent, and pinning turns a
+transcription slip into a loud failure instead of a wrong citation.
+
+The rendered report states the editions in the masthead and again in the
+footer.
 
 ## Attack paths
 

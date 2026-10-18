@@ -85,7 +85,7 @@ def _validate_top(data):
     _s._obj(data, "$")
     _closed(data, "$", {
         "spec_version", "praxen_version", "target", "analysis_ref",
-        "model_identity", "lanes", "nodes", "edges",
+        "model_identity", "standards", "lanes", "nodes", "edges",
         "trust_boundaries", "attack_paths", "notes", "remit_version",
     })
     version = _s._nonempty_str(data, "spec_version", "$")
@@ -104,6 +104,26 @@ def _validate_top(data):
     if "remit_version" in data:
         _s._nonempty_str(data, "remit_version", "$")
     _s._nonempty_str(data, "model_identity", "$")
+    # Which OWASP editions the threats are tagged against. Threats carry bare
+    # `owasp` codes mixing the LLM and ASI namespaces, and those codes are not
+    # stable across editions (LLM03 is "Supply Chain" in 2025 and "Excessive
+    # Agency" in 2026), so a graph without this is ambiguous to any reader who
+    # is not holding the release that produced it.
+    #
+    # Unlike the findings JSON — where manifest_to_findings.py injects the
+    # block — a graph is written directly by the extraction pass, so there is
+    # no converter to inject it. Values are therefore PINNED to the release's
+    # own editions rather than merely shape-checked: this validator already
+    # understands exactly one `spec_version`, so a graph claiming an edition
+    # this release does not score against is incoherent, and pinning turns a
+    # transcription slip into a loud failure instead of a wrong citation.
+    std = _s._obj(_s._get(data, "standards", "$"), "$.standards")
+    _closed(std, "$.standards", set(_s.STANDARDS))
+    for key, expected in sorted(_s.STANDARDS.items()):
+        got = _s._nonempty_str(std, key, "$.standards")
+        if got != expected:
+            _s._err(f"$.standards.{key}",
+                    f"this release scores against {expected!r}; got {got!r}")
     lanes = _s._get(data, "lanes", "$")
     if lanes != LANES:
         _s._err("$.lanes", f"must be exactly {LANES}")

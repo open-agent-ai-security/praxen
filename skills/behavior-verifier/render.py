@@ -83,12 +83,14 @@ _SCORE_CLASS = {0: "score-0-1", 1: "score-0-1", 2: "score-2",
 # `knowledge/KB_LLM_TOP10.md` and `knowledge/KB_AGENTIC_TOP10.md` headings).
 # The LLM list was renumbered in its 2026 revision; a document is rendered with
 # the vocabulary its findings were tagged under (see _llm_titles_for), so a
-# 2025-tagged code is never shown with its 2026 name. Scope of that promise:
-# it applies to schema-3.0 documents carrying a pre-1.2 praxen_version (e.g.
-# the retro-fitted finbot fixture golden, praxen 0.3.0). Documents at
-# schema_version 2.0 — every actually-frozen pre-1.2 report — do NOT render
-# here at all: validate() rejects them ("renderer understands schema 3.0
-# exactly"); see #206 for the 2.0-compat question.
+# 2025-tagged code is never shown with its 2026 name. From schema 3.1 that
+# promise rests on the document's own `standards.owasp_llm`, not on a version
+# heuristic: the renderer shows the edition the document declares (the
+# retro-fitted finbot fixture golden records "2025" and renders the 2025
+# titles, while carrying 2026 for the agentic and MCP lists). Documents at
+# schema_version 2.0 or 3.0 — every actually-frozen pre-2.0 report — do NOT
+# render here at all: validate() rejects them ("renderer understands schema
+# 3.1 exactly"); see #206 for the 2.0-compat question.
 _OWASP_LLM_CODES = ("LLM01", "LLM02", "LLM03", "LLM04", "LLM05",
                     "LLM06", "LLM07", "LLM08", "LLM09", "LLM10")
 _OWASP_LLM_TITLES_2025 = {
@@ -117,17 +119,51 @@ _OWASP_LLM_TITLES_2026 = {
 }
 
 
-def _llm_titles_for(data):
-    """Pick the OWASP LLM title vocabulary for this document by the Praxen
-    version that produced it: findings tagged by Praxen >= 1.2 use the 2026
-    numbering; earlier documents keep the 2025 numbering they were tagged
-    under."""
+_OWASP_LLM_TITLES_BY_EDITION = {
+    "2025": _OWASP_LLM_TITLES_2025,
+    "2026": _OWASP_LLM_TITLES_2026,
+}
+
+
+def _standards_for(data):
+    """The OWASP editions this document was scored against.
+
+    Schema >= 3.1 records them in `standards`, and the renderer honours what is
+    written rather than deciding for itself — the document is the authority on
+    which taxonomy its codes belong to.
+
+    Pre-3.1 documents carry no such block, so fall back to the inference this
+    function used to be: findings tagged by Praxen >= 1.2 used the 2026 LLM
+    numbering, earlier ones the 2025 numbering. The fallback exists only so
+    archived reports keep rendering correctly; it is not a second source of
+    truth, and anything it guesses about the agentic/MCP editions is the only
+    edition those lists have ever had.
+    """
+    std = data.get("standards")
+    if isinstance(std, dict) and std.get("owasp_llm"):
+        return {k: str(std.get(k) or "2026")
+                for k in ("owasp_llm", "owasp_agentic", "owasp_mcp")}
     try:
         parts = str(data.get("praxen_version", "0")).split(".")
         major, minor = int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
     except (ValueError, IndexError):
         major, minor = 0, 0
-    return _OWASP_LLM_TITLES_2026 if (major, minor) >= (1, 2) else _OWASP_LLM_TITLES_2025
+    return {"owasp_llm": "2026" if (major, minor) >= (1, 2) else "2025",
+            "owasp_agentic": "2026",
+            "owasp_mcp": "2026"}
+
+
+def _llm_titles_for(data):
+    """The OWASP LLM title vocabulary for this document's recorded edition.
+
+    An unrecognised edition falls back to the newest vocabulary this renderer
+    knows rather than erroring: a newer document rendered by an older Praxen
+    should still read, and the heading beside the cards always names the
+    edition the document actually declared, so the two cannot silently
+    disagree about what the reader is looking at.
+    """
+    edition = _standards_for(data)["owasp_llm"]
+    return _OWASP_LLM_TITLES_BY_EDITION.get(edition, _OWASP_LLM_TITLES_2026)
 _OWASP_AGENTIC_CODES = ("ASI01", "ASI02", "ASI03", "ASI04", "ASI05",
                         "ASI06", "ASI07", "ASI08", "ASI09", "ASI10")
 _OWASP_AGENTIC_TITLES = {
@@ -685,10 +721,20 @@ def _global_ctx(data):
         "SCAN_TIMESTAMP": esc(_format_timestamp(scan["scan_timestamp"])),
         "ARTIFACT_COUNT": str(scan["artifact_count"]),
         "PRAXEN_VERSION": esc(data["praxen_version"]),
-        # OWASP LLM list year for the section heading — version-gated the same way
-        # as the category titles (2026 for Praxen >= 1.2, 2025 for archival docs),
-        # so the heading can never disagree with the numbering shown in the cards.
-        "OWASP_LLM_YEAR": "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025",
+        # OWASP edition labels for the section headings and the footer. Read from
+        # the document's `standards` block (schema >= 3.1) so a heading can never
+        # disagree with the numbering shown in the cards, nor with what the JSON
+        # says the scan was scored against.
+        "OWASP_LLM_YEAR": esc(_standards_for(data)["owasp_llm"]),
+        "OWASP_AGENTIC_YEAR": esc(_standards_for(data)["owasp_agentic"]),
+        "OWASP_MCP_YEAR": esc(_standards_for(data)["owasp_mcp"]),
+        "STANDARDS_LINE": (
+            "OWASP Top 10 for LLM Applications "
+            + esc(_standards_for(data)["owasp_llm"])
+            + " &nbsp;&middot;&nbsp; OWASP Top 10 for Agentic Applications "
+            + esc(_standards_for(data)["owasp_agentic"])
+            + " &nbsp;&middot;&nbsp; OWASP Secure MCP Server Development "
+            + esc(_standards_for(data)["owasp_mcp"])),
         "OVERALL_STATUS_CLASS": status_cls,
         "OVERALL_STATUS_LABEL": status_label,
         "SEVERITY_BLOCKS": _severity_blocks(sc, len(data["findings"])),
@@ -867,8 +913,10 @@ def render_txt(data: dict) -> str:
             out.append("")
 
     out.append(bar)
-    llm_year = "2026" if _llm_titles_for(data) is _OWASP_LLM_TITLES_2026 else "2025"
-    out.append(f"Built on OWASP Top 10 for LLM Applications {llm_year}  |  OWASP Top 10 for Agentic Applications 2026"
+    _std = _standards_for(data)
+    out.append(f"Built on OWASP Top 10 for LLM Applications {_std['owasp_llm']}"
+               f"  |  OWASP Top 10 for Agentic Applications {_std['owasp_agentic']}"
+               f"  |  OWASP Secure MCP Server Development {_std['owasp_mcp']}"
                "  |  RAISE Framework")
     out.append("Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)")
     out.append("github.com/open-agent-ai-security/praxen  |  Apache-2.0")

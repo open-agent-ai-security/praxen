@@ -60,6 +60,8 @@ def make_graph():
     return {
         "spec_version": "1.5",
         "praxen_version": "2.0.0",
+        "standards": {"owasp_llm": "2026", "owasp_agentic": "2026",
+                      "owasp_mcp": "2026"},
         "target": {"slug": "demo", "source_root": "/tmp/demo"},
         "analysis_ref": "demo-findings-2026-08-17.json",
         "model_identity": "You are powered by the model named Test.",
@@ -251,6 +253,19 @@ def main():
           f'"spec_version": "{tms.SPEC_VERSION}"' in brief,
           f"THREAT_MODEL.md stamp instruction disagrees with "
           f"SPEC_VERSION={tms.SPEC_VERSION!r}")
+    # A graph's standards block is written by the extraction pass, not injected
+    # by a converter, so the brief must spell out the exact editions. The
+    # validator pins the values, which means a stale brief does not produce a
+    # wrong citation — it produces a hard failure on every scan. Catch it here
+    # instead, the same reasoning as the spec_version stamp above.
+    for _k, _v in sorted(tms._s.STANDARDS.items()):
+        check(f"extraction brief states standards.{_k} = {_v!r}",
+              f'"{_k}": "{_v}"' in brief,
+              f"THREAT_MODEL.md disagrees with schema.STANDARDS[{_k!r}]={_v!r}")
+    check("spec doc states the standards block",
+          '"standards"' in spec,
+          "THREAT_MODEL_SPEC.md does not document the standards block")
+
     check("extraction brief names exactly one spec_version",
           brief.count('"spec_version"') == 1,
           f"found {brief.count(chr(34) + 'spec_version' + chr(34))} — a second "

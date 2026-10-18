@@ -461,9 +461,10 @@ def _read_tag_array(lines, i, item_indent, lineno_base):
 def _parse_scan_section(lines, i):
     """Parse `## scan`. Returns (new_i, {scan: {...}}).
 
-    `schema_version` and `praxen_version` are not read from the manifest —
-    they come from canonical sources (`schema.SCHEMA_VERSION` and
-    `.claude-plugin/plugin.json` respectively), populated in `parse_manifest`.
+    `schema_version`, `praxen_version` and `standards` are not read from the
+    manifest — they come from canonical sources (`schema.SCHEMA_VERSION`,
+    `.claude-plugin/plugin.json` and `schema.STANDARDS` respectively),
+    populated in `parse_manifest`.
     Only `manifest_format_version` is parsed and validated here.
     """
     i = _skip_blank(lines, i)
@@ -1105,6 +1106,11 @@ def parse_manifest(text):
     # manifest. Single source of truth — the SKILL author writes neither.
     data["schema_version"] = schema.SCHEMA_VERSION
     data["praxen_version"] = _load_praxen_version()
+    # Which OWASP editions this release scores against. Injected, never
+    # authored: the editions are a fact about the shipped knowledge bases, and
+    # asking the SKILL author to retype them is how a report ends up naming an
+    # edition it was not actually scored against.
+    data["standards"] = dict(schema.STANDARDS)
 
     # Compute mechanically-derivable values (counts, category names/weights,
     # escalation, policy_rule_text by rule_id lookup). This is the second
@@ -1120,7 +1126,7 @@ def parse_manifest(text):
     # diff stability across re-renders.
     canonical = {}
     for key in (
-        "schema_version", "praxen_version", "scan",
+        "schema_version", "praxen_version", "standards", "scan",
         "intro_band", "behavior_summary",
         "remit_coverage", "findings", "positives", "log_files",
         "raise_posture", "footer",

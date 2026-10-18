@@ -32,7 +32,7 @@ from datetime import datetime
 # too: a document must declare this version. A future MINOR ships an additive schema
 # and bumps this constant in lockstep (see STABILITY.md); until then we do not claim
 # to read a version we cannot actually validate.
-SCHEMA_VERSION = "3.0"
+SCHEMA_VERSION = "3.1"
 
 # ── fixed enumerations ───────────────────────────────────────────────────────
 RAISE_KEYS = [                       # canonical category order — never reorder
@@ -86,6 +86,21 @@ _TIMESTAMP_RE = re.compile(
 # implicit ceiling is 999 findings in a single scan. No real target has come
 # close; if one ever does, widen the sequence here and in findings.schema.json.
 _FINDING_ID_RE = re.compile(r"^PRAX-\d{4}-\d{2}-\d{2}-\d{3}$")
+# The OWASP editions this Praxen release scores against — the single source of
+# truth for the `standards` block, injected by manifest_to_findings.py rather
+# than written by the SKILL author (editions are a fact about which knowledge
+# bases shipped, not a judgement). A report MUST name its editions because the
+# codes are not stable across them: LLM03 is "Supply Chain" in 2025 and
+# "Excessive Agency" in 2026, and LLM04/LLM10 also changed meaning. Without
+# this, an archived finding tagged LLM03 is ambiguous to every consumer that
+# is not render.py. Bump these together with the KB files; a test asserts they
+# match the KB headers.
+STANDARDS = {
+    "owasp_llm": "2026",
+    "owasp_agentic": "2026",
+    "owasp_mcp": "2026",
+}
+
 # OWASP taxonomy codes, canonical form: LLM01–LLM10, ASI01–ASI10. The `tags[]`
 # label carries the full "CODE — Name" string; these scalar fields carry the
 # code alone (or null).
@@ -206,6 +221,24 @@ def _validate_version(data):
         _err("$.schema_version",
              f"renderer understands schema {SCHEMA_VERSION} exactly; got {sv!r}")
     _nonempty_str(data, "praxen_version", "$")
+
+
+def _validate_standards(data):
+    """Validate the `standards` block — which OWASP editions this scan used.
+
+    Shape is checked, values are NOT pinned to `STANDARDS`: a document records
+    the editions it was actually scored against, so an archived report naming
+    an older edition (or a future one naming a newer) must stay valid. That is
+    the entire point of recording it — the renderer honours what is written
+    here instead of inferring the vocabulary from `praxen_version`.
+    """
+    std = _obj(_get(data, "standards", "$"), "$.standards")
+    for key in STANDARDS:
+        _nonempty_str(std, key, "$.standards")
+    unknown = sorted(set(std) - set(STANDARDS))
+    if unknown:
+        _err("$.standards", f"unknown standard(s) {unknown}; expected exactly "
+                            f"{sorted(STANDARDS)}")
 
 
 def _validate_scan(data):
@@ -518,6 +551,7 @@ def validate(data):
                           f"(got {type(data).__name__}). This looks like a legacy "
                           "bare-list findings file, which the v1 renderer does not support.")
     _validate_version(data)
+    _validate_standards(data)
     _validate_scan(data)
     _validate_intro_band(data)
     _validate_behavior_summary(data)

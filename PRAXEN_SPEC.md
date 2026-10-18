@@ -278,8 +278,13 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 
 ```json
 {
-  "schema_version": "3.0",
+  "schema_version": "3.1",
   "praxen_version": "2.0.0",
+  "standards": {
+    "owasp_llm": "2026",
+    "owasp_agentic": "2026",
+    "owasp_mcp": "2026"
+  },
   "scan": {
     "agent": "<agent name>",
     "agent_slug": "<agent-slug>",
@@ -371,7 +376,7 @@ Every analysis emits one JSON file — the **canonical, complete record** of the
 - `escalation` is `alert` for Critical/High, `log_only` for Medium/Low/Informational. `related_findings` lists the ids of findings that combine with this one (compound signal). Every finding that maps to a remit rule carries the exact quoted text in `policy_rule_text`, not just a section name.
 - `findings` may be empty (a genuinely clean agent); `positives` may be empty; `log_files.rows` is empty exactly when `present` is false.
 - **`evidence` is structured.** Each item is `{ file, line, snippet }`: `file` is a workspace-relative path (or workspace-relative identifier); `line` is an integer (1-indexed) or `null` for file-level evidence; `snippet` is the actual observation or quoted context. The renderer formats each item as `file:line — snippet` (or `file — snippet` when `line` is `null`). **`recommended_actions` is an array** of one or more concrete actions — the renderer renders single-item arrays as inline text and multi-item arrays as a bulleted list.
-- This is the **v3.0** schema, introduced with Praxen 1.2. Difference from v2.0: `policy_rule_ids` and `policy_rule_text` are now **parallel arrays** (element i of one is the id whose text is element i of the other), where 2.0 carried them as scalar strings (a single id string, and multiple rule texts joined with `" / "`). The array shape lets a finding's rule references be joined mechanically for scan-to-scan regression diffing and cross-checked against `remit_coverage.rules[]`, instead of parsed out of a delimiter-joined string. v2.0 (introduced at Praxen 0.3.0: structured `evidence`, array `recommended_actions`, optional `description`), v1.0, and the pre-0.2 bare-list format are all legacy — none is read by the current renderer, which validates `schema_version` `"3.0"` exactly.
+- This is the **v3.1** schema, introduced with Praxen 2.0: it adds the required `standards` block naming the OWASP edition each tag namespace refers to, plus the optional `scan.remit_version`. The editions matter because the codes are not stable across them — `LLM03` is *Supply Chain* in the 2025 LLM Top 10 and *Excessive Agency* in 2026, and `LLM04` / `LLM10` also changed meaning — so a tag read without its edition is ambiguous. `standards` is injected by `manifest_to_findings.py` from `schema.STANDARDS`, never authored. v3.0 arrived with Praxen 1.2. Difference from v2.0: `policy_rule_ids` and `policy_rule_text` are now **parallel arrays** (element i of one is the id whose text is element i of the other), where 2.0 carried them as scalar strings (a single id string, and multiple rule texts joined with `" / "`). The array shape lets a finding's rule references be joined mechanically for scan-to-scan regression diffing and cross-checked against `remit_coverage.rules[]`, instead of parsed out of a delimiter-joined string. v2.0 (introduced at Praxen 0.3.0: structured `evidence`, array `recommended_actions`, optional `description`), v1.0, and the pre-0.2 bare-list format are all legacy — none is read by the current renderer, which validates `schema_version` `"3.1"` exactly.
 
 ### Severity model
 

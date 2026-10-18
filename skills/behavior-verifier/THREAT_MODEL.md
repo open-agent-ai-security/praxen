@@ -110,7 +110,10 @@ about the target.
 > `"praxen_version": "{PRAXEN_VERSION}"`, `"analysis_ref":
 > {ANALYSIS_REF_OR_NULL}`, `"remit_version"` set to the remit Identity
 > table's "Remit Version" value (omit the field if the remit declares
-> none), and your verbatim "You are powered by ..."
+> none), `"standards": {"owasp_llm": "2026", "owasp_agentic": "2026",
+> "owasp_mcp": "2026"}` **exactly as written** — these are the OWASP
+> editions this release scores against, not a judgement call, and the
+> validator rejects any other value — and your verbatim "You are powered by ..."
 > declaration as `model_identity`. Before writing, self-check: all edge
 > node-refs resolve, all boundary edge-refs resolve, every cited
 > `finding_id` exists in the findings JSON, `notes.counts` match the

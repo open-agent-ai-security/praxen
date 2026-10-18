@@ -337,7 +337,7 @@ assert_parse_error(
 print("\n7. Canonical JSON key order")
 keys = list(data.keys())
 expected_keys = [
-    "schema_version", "praxen_version", "scan",
+    "schema_version", "praxen_version", "standards", "scan",
     "intro_band", "behavior_summary",
     "remit_coverage", "findings", "positives", "log_files",
     "raise_posture", "footer",

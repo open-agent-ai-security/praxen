@@ -666,6 +666,90 @@ def main():
     check("findings.schema.json declares every field the converter can emit (#266)",
           not undeclared, f"emitted but undeclared in the published schema: {undeclared}")
 
+    # 4e-quater. The document's recorded `standards` block — not praxen_version,
+    #            and not the newest list Praxen knows — decides which OWASP LLM
+    #            vocabulary a report is rendered with.
+    #
+    #            The canonical fixture is a retro-fitted praxen 0.3.0 document
+    #            whose findings were tagged under the 2025 numbering, and it
+    #            records owasp_llm "2025" while carrying 2026 for the agentic and
+    #            MCP lists (which have only ever had one edition). So it also
+    #            proves a MIXED edition set renders correctly.
+    #
+    #            This guards a promise that had no test. Stamping the fixture
+    #            2026 while adding this block silently relabelled its LLM03 from
+    #            "Supply Chain" to "Excessive Agency" — a 2025-tagged finding
+    #            shown under its 2026 name, the precise failure the standards
+    #            block exists to prevent — and the whole suite stayed green.
+    fx = load_json(FIXTURE)
+    check("canonical fixture records the 2025 LLM edition it was tagged under",
+          fx["standards"]["owasp_llm"] == "2025",
+          f'got {fx["standards"]["owasp_llm"]!r}')
+    check("report heading names the recorded LLM edition",
+          "OWASP LLM Top 10 (2025) Coverage" in html,
+          "heading does not match standards.owasp_llm")
+    # Pair each code with its own card title — a bare substring search is not
+    # enough, because "Excessive Agency" is a legitimate 2025 title (LLM06); it
+    # is the code it sits NEXT TO that differs between editions.
+    def owasp_card_titles(doc_html):
+        return dict(re.findall(
+            r'owasp-code">(LLM[0-9]+)</span>.{0,200}?owasp-title">([^<]+)</span>',
+            doc_html, re.S))
+
+    titles_2025 = owasp_card_titles(html)
+    check("LLM03 card carries its 2025 meaning (Supply Chain, not Excessive Agency)",
+          titles_2025.get("LLM03") == "Supply Chain",
+          f'LLM03 -> {titles_2025.get("LLM03")!r}')
+    check("LLM10 card carries its 2025 meaning (Unbounded Consumption)",
+          titles_2025.get("LLM10") == "Unbounded Consumption",
+          f'LLM10 -> {titles_2025.get("LLM10")!r}')
+    check("footer states the editions the scan was scored against",
+          "Scored against" in html and "LLM Applications 2025" in html)
+
+    # The recorded value, not the version heuristic, is what moves it: flip only
+    # standards.owasp_llm and the whole vocabulary follows, with praxen_version
+    # untouched. Before 3.1 this was derived from praxen_version, so a document
+    # could not say which taxonomy it meant.
+    flipped = load_json(FIXTURE)
+    flipped["standards"]["owasp_llm"] = "2026"
+    flipped_html = render.render_html(read_text(TEMPLATE), flipped)
+    titles_2026 = owasp_card_titles(flipped_html)
+    check("flipping standards.owasp_llm re-labels the vocabulary (the document "
+          "is the authority, not praxen_version)",
+          "OWASP LLM Top 10 (2026) Coverage" in flipped_html
+          and titles_2026.get("LLM03") == "Excessive Agency"
+          and titles_2026.get("LLM04") == "Supply Chain",
+          f'LLM03 -> {titles_2026.get("LLM03")!r}, '
+          f'LLM04 -> {titles_2026.get("LLM04")!r}')
+    check("praxen_version is untouched by the flip (it is not the signal)",
+          flipped["praxen_version"] == fx["praxen_version"] == "0.3.0")
+
+    # 4e-ter. The OWASP editions schema.STANDARDS claims must be the editions the
+    #         shipped knowledge bases actually describe. This is the drift that
+    #         created the gap in the first place: the KBs moved to the 2026 lists
+    #         while nothing in the report named an edition, so a finding tagged
+    #         LLM03 could mean "Supply Chain" (2025) or "Excessive Agency" (2026)
+    #         with no way to tell. If someone bumps a KB to a later edition
+    #         without bumping the constant, every report then cites the wrong
+    #         taxonomy while passing every other test here.
+    kb_for_standard = {
+        "owasp_llm": "KB_LLM_TOP10.md",
+        "owasp_agentic": "KB_AGENTIC_TOP10.md",
+        "owasp_mcp": "KB_MCP_SECURITY.md",
+    }
+    check("every standard in schema.STANDARDS maps to a knowledge base",
+          sorted(kb_for_standard) == sorted(schema.STANDARDS),
+          f"STANDARDS={sorted(schema.STANDARDS)} vs mapped={sorted(kb_for_standard)}")
+    for std_key, kb_name in sorted(kb_for_standard.items()):
+        edition = schema.STANDARDS.get(std_key, "")
+        kb_path = os.path.join(SKILL_DIR, "knowledge", kb_name)
+        heading = next((ln for ln in read_text(kb_path).splitlines()
+                        if ln.startswith("# ")), "")
+        check(f"{kb_name} heading names the {std_key} edition "
+              f"schema.STANDARDS claims ({edition})",
+              bool(edition) and edition in heading,
+              f"heading is {heading!r} — bump schema.STANDARDS and the KB together")
+
     # 4f. SECURITY — XSS / HTML-injection hardening. Praxen renders UNTRUSTED
     #     evidence (a scanned agent's own code, prompts, and session-loaded files
     #     like SOUL.md / AGENTS.md) into a shareable, self-contained HTML report.
