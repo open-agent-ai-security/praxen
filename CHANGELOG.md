@@ -32,6 +32,13 @@ All notable changes to Praxen will be recorded here. Format roughly follows [Kee
 - Anchors are now **code + edition + name** (`#llm03-2026-excessive-agency`), built by one shared function so the anchors a report links to and the anchors the page defines cannot drift. A report links at the edition it was scored against; `docs/owasp.md` can carry several editions at once.
 - **Pre-2.0 reports linked to bare codes** (`#llm03`), which cannot be correct for both editions. Those anchors are **kept**, in a new *Legacy anchors* section, so an archived report's links still resolve — to a disambiguation table naming the code's meaning in **both** editions, rather than silently to the wrong entry.
 
+### Baseline — `v2.0-opus55`
+- **The reference model moves to Claude Opus 5.5** (`claude-opus-5-5`). A fresh **median-of-3** freeze of all 12 targets (36 runs, all standard mode), graded against `v1.3-opus5` with sources, remits and scoring held fixed — the model is the one variable. Details in `tests/baselines/v2.0-opus55/BASELINE.md`.
+- **Mean weighted RAISE 1.41** (v1.3: 1.49); 1 target up, 6 flat, 5 down. Hermes's −0.60 is mostly method — v1.3 froze it at a high-mode run; like-for-like it is ≈ −0.30. Opus 5.5 raises more Criticals (+15%) and Highs (+23%) across the 36 runs.
+- **Critical-theme gate: 0 dropped.** 23 of v1.3's 28 Critical themes carried at Critical, 5 at a lower severity — each consistent across runs, so accepted as the new calibration.
+- **Pins are committed now** (`SOURCES.md`). v1.3 kept them in a gitignored file that was lost; they were reconstructed forensically from the v1.3 evidence citations.
+- **Ties at the median are broken by Critical-theme consensus**, not run number, and bands get a ±0.15 floor so a zero-spread target does not get a zero-width band.
+
 ### Breaking
 - **`schema_version` 3.0 → 4.0.** Adding a required field is a schema MAJOR under `STABILITY.md`, and this is the product MAJOR to spend one in. Consumers pinned to schema 3 should read the `standards` block and re-pin; nothing else in the shape changed.
 - **Threat-model graph contract v1.4 → v1.5.** `executive_summary` is removed along with the report's **Summary** section — everything it asserted is carried, with citations, by the masthead counts, the attack-path table and the boundary tables, so the prose was a second uncited copy of the model.

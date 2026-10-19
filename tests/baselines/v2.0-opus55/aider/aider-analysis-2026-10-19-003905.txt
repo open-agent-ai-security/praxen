@@ -1,0 +1,175 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    aider
+Analysis: October 19, 2026, 00:39 UTC
+Praxen v2.0.0
+Remit v1.3
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a confirmation layer that is real at its centre and
+soft at its edges. LLM-suggested shell commands are the one action class
+hard-gated with explicit_yes_required, yet everything else funnels through
+confirm_ask() prompts that --yes-always — or a closed stdin — answers "yes":
+out-of-chat and out-of-repo file creation, URL fetches, pip/Playwright
+installs and analytics opt-in. Meanwhile auto-lint and auto-test run commands
+with no prompt at all, and pre-commit hooks are skipped by default via
+--no-verify. These combine into one compound chain: scraped pages, command
+output and watched-file AI comments enter context unlabeled, the model can
+name any absolute or ../ path because abs_root_path() has no containment
+check, and a planted ~/.aider.conf.yml with a lint-cmd executes silently on
+the next session's first edit. The patch format's move_path and the
+all-interfaces, auto-approving GUI widen the same gap from separate
+directions.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 2   High: 7   Medium: 4   Low: 2   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 6   Gap: 3   Partial: 19   Vague: 0   Enforcement-not-possible: 0   (of 28 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    3
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  Every aider commit skips the repository's pre-commit
+            hooks by default — --git-commit-verify defaults to False, so
+            GitRepo.commit() always appends --no-verify.
+      Action 1: Change the --git-commit-verify default in aider/args.py to
+                True so hooks run unless the operator passes
+                --no-git-commit-verify.
+      Action 2: When hooks are skipped, print a one-time warning naming the
+                skipped hooks so the bypass is visible.
+
+  PRAX-2026-10-19-002  Injected content can steer model edits to any absolute
+            or ../ path — e.g. ~/.aider.conf.yml — which --yes-always
+            auto-creates, planting a lint/test command that next session runs
+            silently.
+      Action 1: In allowed_to_edit() resolve the target and refuse any path
+                not is_relative_to(self.root) or matching repo.ignored_file(),
+                with no prompt path that can override it.
+      Action 2: Treat writes to aider's own config files (.aider.conf.yml,
+                .env, .aiderignore) as protected — require
+                explicit_yes_required=True even when inside the repo.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-003  The --gui/--browser mode launches Streamlit with no
+            server.address, so it listens beyond loopback with no
+            authentication, and its coder runs with yes_always forced on.
+      Action 1: Add --server.address=127.0.0.1 (and
+                --server.enableXsrfProtection=true) to st_args in
+                launch_gui(), and refuse to start if the operator overrides it
+                to a non-loopback address without an explicit flag.
+      Action 2: Do not force yes_always=True for the GUI coder; surface
+                confirmations in the web UI instead.
+
+  PRAX-2026-10-19-004  In the patch edit format, a model-supplied "Move to"
+            target is written with no allowed_to_edit check or prompt —
+            parents created, existing files overwritten — and "Delete File"
+            unlinks files.
+      Action 1: Have PatchCoder.get_edits() emit the move target as its own
+                edit entry so prepare_to_edit() runs allowed_to_edit() (and
+                the containment check from PRAX-2026-10-19-002) on it, and
+                refuse to overwrite an existing target.
+      Action 2: Gate ActionType.DELETE behind an explicit_yes_required
+                confirmation naming the file.
+
+  PRAX-2026-10-19-005  Scraped web pages and failing /test or auto-test output
+            are appended to the chat as user turns with no confirmation and no
+            untrusted-content framing.
+      Action 1: Wrap all fetched and command-produced content in an explicit
+                untrusted-data envelope (e.g. fenced block plus a system note
+                that it carries no instructions) in cmd_web() and
+                prompts.run_output.
+      Action 2: Ask "Add N lines of output to the chat?" before appending /web
+                and non-zero-exit test output, mirroring
+                handle_shell_commands().
+
+  PRAX-2026-10-19-006  With --watch-files, any non-ignored file containing an
+            "AI!" comment — including third-party or pulled-in content — is
+            auto-added and its comments sent to the model as "follow their
+            instructions".
+      Action 1: Before acting on a new AI comment, show the comment text and
+                file and require operator confirmation, and only treat
+                comments introduced by an uncommitted working-tree change (not
+                pulled or checked-out content) as triggers.
+      Action 2: Reword watch_code_prompt to present the comments as operator
+                requests to evaluate, not instructions to follow verbatim.
+
+  PRAX-2026-10-19-007  Only LLM shell commands use explicit_yes_required;
+            --yes-always auto-approves URL fetches, pip/Playwright installs,
+            out-of-chat edits and analytics opt-in, and stdin EOF answers
+            "yes" even explicit prompts.
+      Action 1: Pass explicit_yes_required=True for URL fetch, package/browser
+                installs, out-of-chat or new-file edits and analytics opt-in,
+                and give analytics opt-in a default of "n".
+      Action 2: In confirm_ask(), treat EOFError as "n" whenever
+                explicit_yes_required is set (or the default is not an
+                explicit operator choice).
+
+  PRAX-2026-10-19-008  Auto-lint (on by default) and auto-test execute the
+            configured lint/test commands after every edit with no operator
+            approval, including commands supplied by a repo-local
+            .aider.conf.yml.
+      Action 1: Confirm the resolved lint/test command once per session (with
+                explicit_yes_required=True) before the first automatic run,
+                showing the exact command and the config file it came from.
+      Action 2: Ignore lint-cmd, test-cmd and auto-test keys from a
+                repository-root .aider.conf.yml unless the operator has marked
+                that repository trusted.
+
+  PRAX-2026-10-19-009  A repository's own .env and .aider.conf.yml are loaded
+            with override precedence over the operator's home config, so a
+            cloned repo can redirect the LLM API base and exfiltrate source
+            and keys.
+      Action 1: Load repository-local .env / .aider.conf.yml without
+                overriding endpoint, model, key and command settings already
+                set by the operator, and print any such repo-supplied values
+                for confirmation on first use.
+      Action 2: Warn when the effective API base differs from the provider
+                default or the operator's home config.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

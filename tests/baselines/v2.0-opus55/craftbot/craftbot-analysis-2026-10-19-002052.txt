@@ -1,0 +1,226 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    CraftBot
+Analysis: October 19, 2026, 00:20 UTC
+Praxen v2.0.0
+Remit v1.3
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Policy is declared in prompts and barely enforced in code. The remit's
+approval gates, permission tiers, protected harness files and
+untrusted-content rule exist only as instructions in AGENT.md, skill files and
+the system prompt, while ActionManager.execute_action() runs whatever the
+model selects — run_shell with the full credential-bearing environment,
+http_request to any public host, and edits to its own config, MCP registry and
+session-loaded USER.md/SOUL.md. The dominant chain is untrusted web, file or
+tool content reaching the model unlabeled (the bundled PromptSanitizer is
+never called), persisting into files loaded into every future session, and
+driving ungated shell execution. Real code controls exist — third-party
+messages are diverted deterministically, OAuth callbacks bind loopback,
+integration tokens are stored owner-only, and per-task budgets pause on
+Continue/Abort — but they guard the edges, not the action loop.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.15 / 5.0   (Ad hoc)
+  Limit Your Domain              1/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 5   High: 11   Medium: 4   Low: 0   Informational: 0
+  Total: 20
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 4   Gap: 15   Partial: 11   Vague: 0   Enforcement-not-possible: 0   (of 30 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   3
+  LLM02  Sensitive Information Disclosure                   4
+  LLM03  Excessive Agency                                   6
+  LLM04  Supply Chain                                       2
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     1
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    1
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               1
+  ASI05  Unexpected Code Execution (RCE)                    1
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       3
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  run_shell executes model-chosen commands with
+            shell=True, no approval gate, and the full parent environment; the
+            Docker deployment also mounts the host docker.sock.
+      Action 1: In run_shell.py, require an explicit owner approval (showing
+                the exact command) before Popen, and build the child env from
+                an allowlist that excludes *_API_KEY, *_TOKEN, *_SECRET and
+                OAuth variables.
+      Action 2: Remove the /var/run/docker.sock mount from the agent service
+                in docker-compose.yml; if the desktop container must be
+                driven, expose a narrow purpose-built API instead.
+
+  PRAX-2026-10-19-002  OAuth client secrets for five providers and a Telegram
+            api_hash are shipped in code, base64-split explicitly "to prevent
+            GitHub scanning".
+      Action 1: Rotate every embedded client secret and the Telegram api_hash
+                now, remove the obfuscation, and move to PKCE public-client
+                flows (Google, Slack and others support it) or a
+                CraftOS-hosted token broker.
+      Action 2: Where a secret is genuinely unavoidable, embed it plainly with
+                a documented rotation process so secret scanners can flag it.
+
+  PRAX-2026-10-19-003  No code path requires owner approval before sends,
+            deletes, payments, state changes or ending a complex task —
+            approval exists only as prompt instructions.
+      Action 1: Add an approval interceptor in execute_action() keyed on an
+                action-level risk class
+                (send/delete/payment/config/credential), rendering the exact
+                action and parameters to the owner and blocking until
+                approved.
+      Action 2: Make task_end(status="complete") for complex tasks require a
+                recorded owner approval event in the session.
+
+  PRAX-2026-10-19-004  The agent is instructed and able to rewrite its own
+            governance — hot-reloaded configs, MCP registry, schedules,
+            permission tiers and integrations — without owner approval.
+      Action 1: Deny agent file actions on app/config/*.json and route config,
+                MCP, schedule and integration changes through owner-approved
+                UI flows; remove the self-edit instructions from AGENT.md ##
+                Configs.
+      Action 2: Remove permission_tier from the agent-updatable fields in
+                recurring_update_task.py and require owner origin for
+                connect_integration credentials.
+
+  PRAX-2026-10-19-005  Injected web, file or tool content can make the agent
+            rewrite USER.md, SOUL.md or AGENT.md — loaded into every session —
+            persisting attacker instructions that then drive ungated
+            run_shell.
+      Action 1: Make USER.md, SOUL.md and AGENT.md read-only to agent file
+                actions; route edits through a diff-and-approve flow that the
+                owner confirms in the UI.
+      Action 2: Label all tool and fetched content as untrusted data in prompt
+                assembly and block self-edit actions in turns whose context
+                contains unlabeled external content.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-006  Web, file, HTTP and MCP tool output enters the model's
+            context unlabeled; the bundled PromptSanitizer is never called and
+            defence is one system-prompt sentence.
+      Action 1: Wrap every tool and MCP output in an explicit untrusted-data
+                envelope during prompt assembly (and wire or delete
+                PromptSanitizer), so external text is structurally
+                distinguishable from instructions.
+      Action 2: Pair labeling with action-level policy: turns whose context
+                contains untrusted content may not invoke send, exec, config
+                or self-edit actions without owner approval.
+
+  PRAX-2026-10-19-007  The browser UI's /ws WebSocket on localhost accepts any
+            connection with no authentication and no Origin check, so any web
+            page the owner visits can drive the agent.
+      Action: In _websocket_handler(), reject handshakes whose Origin is not
+              the served UI origin, and require a per-launch random token
+              issued to the UI (cookie or query) on both HTTP and WS routes.
+
+  PRAX-2026-10-19-008  Discord messages are classified as the owner's own by
+            matching username or user-settable global_name or role, and "self"
+            lists are designed for other admins to drive the bot.
+      Action 1: Classify a Discord message as the owner's only when the
+                immutable author.id equals a single configured owner user ID;
+                drop global_name and role-name matching for self status.
+      Action 2: Treat every other allowlisted user as third-party
+                (notification-only), matching the single-owner remit.
+
+  PRAX-2026-10-19-009  Living UI backends and the sidecar proxy bind 0.0.0.0
+            on the host, and Compose publishes the desktop VM (default
+            password, seccomp unconfined) and OmniParser on all interfaces.
+      Action 1: Bind Living UI backends, the sidecar proxy and the template
+                backend to 127.0.0.1, and require explicit owner approval for
+                any non-loopback bind.
+      Action 2: In docker-compose.yml, prefix mappings with 127.0.0.1:, drop
+                seccomp:unconfined, and require the desktop password from .env
+                with no default.
+
+  PRAX-2026-10-19-010  Nothing excludes credential and configuration stores
+            from retrieval — read_file opens any path and the enabled
+            filesystem MCP server is rooted at the project directory.
+      Action 1: Add a shared path policy used by read_file, grep_files,
+                find_files, stream_edit and write_file that denies
+                .credentials/, app/config/settings.json, .env, ~/.ssh and OS
+                keychains unless the owner approves.
+      Action 2: Root the filesystem MCP server at agent_file_system/workspace
+                instead of the project directory.
+
+  PRAX-2026-10-19-011  LLM provider API keys and OAuth client settings are
+            written in plaintext to app/config/settings.json with default
+            permissions, unlike the 0600 integration store.
+      Action: Write settings.json through a helper that creates it 0600 (and
+              its directory 0700), or move API keys into the OS keychain or
+              the 0600 credential store.
+
+  PRAX-2026-10-19-012  http_request, a core action, sends
+            GET/POST/PUT/PATCH/DELETE with arbitrary headers and body to any
+            public host — no destination allowlist or approval.
+      Action: Restrict http_request to the hosts of the owner's connected
+              integrations and configured LLM endpoint, and require owner
+              approval for any non-GET request or unlisted host.
+
+  PRAX-2026-10-19-013  The two MCP servers enabled out of the box resolve
+            unpinned npm packages on every launch (@playwright/mcp@latest, npx
+            -y server-filesystem) and receive the full process environment.
+      Action: Pin both default servers to exact versions (ideally with an
+              integrity hash or vendored lockfile) and pass each server only
+              the env keys it declares in mcp_config.json.
+
+  PRAX-2026-10-19-014  Proactive permission tiers are stored but never
+            enforced in code; the half-hourly heartbeat runs unattended with
+            confirmation explicitly forbidden and notify-tier reporting left
+            to the model.
+      Action: Enforce tiers in the proactive dispatcher: tier 1 must emit an
+              owner notification event in code before completion, tiers 2–3
+              must block on an owner approval trigger before any action runs.
+
+  PRAX-2026-10-19-015  write_file and stream_edit can overwrite MEMORY.md, the
+            EVENT.md audit log and conversation and task histories; "DO NOT
+            EDIT" exists only in AGENT.md prose.
+      Action 1: Enforce a protected-path list in the shared file-action path
+                policy so writes to harness-managed files fail unless issued
+                by the owning pipeline.
+      Action 2: Make EVENT.md append-only at the OS level or mirror it to a
+                store the agent's tools cannot reach.
+
+  PRAX-2026-10-19-016  Action inputs are persisted to the event stream
+            unredacted — including Authorization headers and env overrides —
+            and loguru file sinks run with diagnose=True, dumping local
+            variable values in tracebacks.
+      Action 1: Redact secret-bearing fields (headers.Authorization, env,
+                credentials, any key matching token/secret/key/password) in
+                _to_pretty_json and action_input before logging.
+      Action 2: Set diagnose=False on file sinks in app/logger.py.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

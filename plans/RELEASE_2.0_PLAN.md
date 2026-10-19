@@ -253,10 +253,10 @@ first beta design; deletion is Steve's call).
 
 ## Non-goals
 
-No score movement, no freeze, no re-baseline, no mermaid/JS deps, no
+No score movement from the skill, ~~no freeze, no re-baseline~~, no mermaid/JS deps, no
 MAESTRO lens, no ATT&CK/ATLAS export, no #198 (2.1's opener), no
 multi-run graph aggregation as a user-facing deliverable. 2.1 is the
-detection/calibration release and grades `v2.1-opus5` vs `v1.3-opus5`.
+detection/calibration release and grades against `v2.0-opus55`.
 
 **Two non-goals were spent deliberately** (2026-10-18). This list read "no
 findings-schema change, no report-template change to the analysis report";
@@ -272,3 +272,10 @@ both are now false, and the entries are struck rather than quietly dropped:
 
 Both are presentation and provenance only: **no score moves**, and the
 release stays freeze-independent.
+
+**A third was spent on 2026-10-18: the re-baseline.** The 2.0 changes had
+invalidated `v1.3-opus5` as the current set, and the reference model moved to
+Claude Opus 5.5. `v2.0-opus55` is a fresh median-of-3 freeze graded against
+`v1.3-opus5` with sources, remits and scoring held fixed, so the model is the one
+variable (`tests/baselines/v2.0-opus55/BASELINE.md`). The skill still moves no
+score; the scores that moved, moved with the model.

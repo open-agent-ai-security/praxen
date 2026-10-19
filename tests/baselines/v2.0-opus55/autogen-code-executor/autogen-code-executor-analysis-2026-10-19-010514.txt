@@ -1,0 +1,171 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    AutoGen Code Executor
+Analysis: October 19, 2026, 01:05 UTC
+Praxen v2.0.0
+Remit v1.3
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The main pattern is that a real sandbox exists, but the default paths step
+around it. The Docker backend gives genuine isolation, yet
+create_default_code_executor() silently swaps in host execution whenever
+Docker is missing or fails to start. DockerJupyterServer publishes a remotely
+reachable kernel gateway on every host interface. The only human-confirmation
+gate is the caller's approval_func, which is off by default and dropped when
+the agent is loaded from config. Together these mean model-generated code from
+any message source can run with no confirmation, on the host if Docker is
+down, holding a copy of the host's environment secrets, and with no audit
+record of what ran. Even inside the container, network egress and privileges
+are left at Docker defaults.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.40 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 6   Medium: 5   Low: 1   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 2   Gap: 13   Partial: 12   Vague: 0   Enforcement-not-possible: 3   (of 30 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   7
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    5
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  `create_default_code_executor()` silently falls back to
+            unsandboxed host execution with only a UserWarning when Docker is
+            unavailable or fails to initialise.
+      Action 1: In `code_executors/__init__.py`, replace the fallback with
+                `raise RuntimeError(...)` when Docker is unavailable or fails
+                to start, and require an explicit `allow_local_fallback=True`
+                argument before any host executor is returned.
+      Action 2: When fallback is explicitly allowed, emit a `logging.error`
+                and structured event naming the backend switch, rather than
+                relying on `warnings.warn`.
+
+  PRAX-2026-10-19-002  `DockerJupyterServer` runs a kernel gateway bound to
+            0.0.0.0 with `publish_all_ports=True`, exposing a persistent
+            remote code-execution channel on every host interface.
+      Action 1: In `DockerJupyterServer.__init__`, replace
+                `publish_all_ports=True` with `ports={f"{expose_port}/tcp":
+                ("127.0.0.1", None)}`, and reject an empty `token`.
+      Action 2: Make `_get_ws_base_url()` return `wss://` when `use_https` is
+                true, and refuse a non-loopback host without TLS.
+
+  PRAX-2026-10-19-003  Executors run every block with no confirmation; the
+            only gate, the caller's `approval_func`, defaults to None, is
+            dropped by `_from_config`, and denials raise no alert.
+      Action 1: Make confirmation fail-closed: have `CodeExecutorAgent` raise
+                when `approval_func` is None unless an explicit
+                `allow_unapproved_execution=True` is passed, and keep that
+                flag (not the function) serialisable so `_from_config` cannot
+                silently drop the gate.
+      Action 2: On denial, emit a structured `event_logger` warning carrying
+                the code hash, source and reason, so the remit's
+                alert-on-denial rule is met.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-004  Both host-execution backends,
+            `LocalCommandLineCodeExecutor` and `JupyterCodeExecutor`, can be
+            instantiated, including from declarative config, with no explicit
+            operator authorization; the Jupyter one emits no runtime warning.
+      Action 1: Add a required `i_understand_this_runs_on_host: bool` (or
+                similar) constructor argument to
+                `LocalCommandLineCodeExecutor` and `JupyterCodeExecutor` that
+                raises when it is false, and do not let `_from_config` default
+                it to true.
+      Action 2: Add `JupyterCodeExecutor` to the remit's authorized tool list
+                or remove it from deployments that use this remit.
+
+  PRAX-2026-10-19-005  Executed code inherits credentials: the local executor
+            passes the full host `os.environ` to each subprocess, and the
+            gateway's auth token is injected as a container environment
+            variable.
+      Action 1: In `local/__init__.py`, build the child environment from a
+                minimal allowlist (`PATH`, `HOME`, `LANG`, plus venv vars)
+                instead of `os.environ.copy()`, with an opt-in `extra_env` for
+                operator-approved variables.
+      Action 2: In `_jupyter_server.py`, pass the gateway token through a file
+                or command-line argument that is not inherited by kernels, or
+                unset `TOKEN` in the kernel spec environment.
+
+  PRAX-2026-10-19-006  The Docker sandbox is created on the default bridge
+            network with no egress policy, so executed code can reach any
+            internet destination and exfiltrate the mounted working directory.
+      Action: Default `containers.create` to `network_mode="none"`, and add a
+              `network`/`allowed_egress` option that attaches an
+              operator-defined network with an egress proxy or firewall when
+              outbound access is required.
+
+  PRAX-2026-10-19-007  The execution container runs as image-default root with
+            full default capabilities and no resource limits, and no backend
+            detects or halts sandbox-escape or out-of-bounds access attempts.
+      Action 1: Harden `containers.create` with `user="nobody"` (or a
+                configured UID), `cap_drop=["ALL"]`,
+                `security_opt=["no-new-privileges"]`, `read_only=True` plus a
+                tmpfs, and default `mem_limit`/`pids_limit`/`nano_cpus`.
+      Action 2: Surface container OOM-kill and seccomp/AppArmor denials as
+                structured events that stop the session and alert the
+                operator.
+
+  PRAX-2026-10-19-008  `ACADynamicSessionsCodeExecutor` sends its Azure bearer
+            token to whatever `pool_management_endpoint` string it receives,
+            with no HTTPS or host validation, and caches the token with no
+            expiry handling.
+      Action 1: In `__init__`, parse `pool_management_endpoint` with
+                `urllib.parse` and raise unless the scheme is `https` and the
+                host ends in the expected dynamic-sessions domain or an
+                operator allowlist.
+      Action 2: Store the `AccessToken.expires_on` value and refresh the token
+                in `_ensure_access_token()` before it expires.
+
+  PRAX-2026-10-19-009  No executor records which code block ran, its exit code
+            or its output; logging covers only lifecycle and debug events, and
+            the caller's `event_logger` is never used.
+      Action: Add a structured audit event (backend, code SHA-256, language,
+              exit code, truncated output, duration) in each backend's
+              `execute_code_blocks()` or in a shared `CodeExecutor` wrapper,
+              emitted through a dedicated logger name operators can route to a
+              SIEM.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

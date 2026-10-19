@@ -1,0 +1,1631 @@
+{
+  "spec_version": "1.5",
+  "praxen_version": "2.0.0",
+  "target": {
+    "slug": "autogen-code-executor",
+    "source_root": "/Users/stevewilson/Documents/github/praxen/local/v2.0-opus55/src/autogen-code-executor"
+  },
+  "analysis_ref": "autogen-code-executor-findings-2026-10-19.json",
+  "remit_version": "1.3",
+  "model_identity": "You are powered by the model named Opus 5.5. The exact model ID is claude-opus-5-5.",
+  "standards": {
+    "owasp_llm": "2026",
+    "owasp_agentic": "2026",
+    "owasp_mcp": "2026"
+  },
+  "lanes": [
+    "user_inputs",
+    "client_adapters",
+    "agent_core",
+    "tools_mcp",
+    "external_deploy"
+  ],
+  "nodes": [
+    {
+      "id": "peer-agent-entrypoint",
+      "name": "Peer agent messages",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Chat messages from other agents in the group chat (or handoffs); code blocks are taken from any message source when `sources` is None.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 681,
+          "note": "`if self._sources is None or msg.source in self._sources` — inbound agent messages are the code source"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 836,
+          "note": "incoming messages added to the model context in the model_client flow"
+        }
+      ]
+    },
+    {
+      "id": "untrusted-network-entrypoint",
+      "name": "Untrusted network client",
+      "lane": "user_inputs",
+      "kind": "entrypoint",
+      "description": "Any caller on a network that can reach the host's published kernel-gateway port (remit: 'untrusted or public networks').",
+      "evidence": [
+        {
+          "file": "/Users/stevewilson/Documents/github/praxen/local/v2.0-opus55-r3/autogen-code-executor-out/WORKER_REMIT.md",
+          "line": 143,
+          "note": "remit names the actor: untrusted or public networks"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 368,
+          "note": "`publish_all_ports=True` publishes the gateway port on all host interfaces"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator",
+      "name": "CodeExecutorAgent loop (context caller)",
+      "lane": "agent_core",
+      "kind": "orchestrator",
+      "description": "Extracts fenced code blocks from messages or model output, optionally asks approval_func, calls the configured CodeExecutor, and feeds execution output back to the model (generate/retry/reflect loop); CodeExecutor abstraction folded in.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 533,
+          "note": "no-model path: extract code blocks from messages and execute"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 590,
+          "note": "model path: code blocks extracted from model output"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "`self._code_executor.execute_code_blocks(...)` — the dispatch to the backend"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 616,
+          "note": "execution output appended to model context as UserMessage"
+        },
+        {
+          "file": "python/packages/autogen-core/src/autogen_core/code_executor/_base.py",
+          "line": 53,
+          "note": "abstract `execute_code_blocks` interface — no approval parameter or hook (plumbing folded here)"
+        }
+      ]
+    },
+    {
+      "id": "chat-completion-client-model",
+      "name": "ChatCompletionClient (LLM)",
+      "lane": "agent_core",
+      "kind": "model",
+      "description": "Optional model_client that generates code, decides retries, and reflects on execution results; provider is operator-chosen.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 821,
+          "note": "`model_client.create(llm_messages, ...)` generation call"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 648,
+          "note": "retry decision call with execution error output in context"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 866,
+          "note": "reflection call over execution results"
+        }
+      ]
+    },
+    {
+      "id": "approval-func-code-executor-agent-py-control",
+      "name": "approval_func confirmation gate",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Opt-in human/automated approval before execution; default None (UserWarning only), forced to None by `_from_config`; denial blocks execution but is not logged or alerted.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 458,
+          "note": "warning only when approval_func is None"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 691,
+          "note": "gate applied only `if self._approval_func is not None`"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 712,
+          "note": "denied -> CodeResult(exit_code=1) returned, no execution"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 779,
+          "note": "`approval_func=None` hard-coded on declarative load"
+        }
+      ]
+    },
+    {
+      "id": "sources-code-executor-agent-py-control",
+      "name": "sources allow-list",
+      "lane": "agent_core",
+      "kind": "control",
+      "description": "Optional allow-list of message sources whose code blocks are executed; default None accepts every source, and it applies only to the no-model_client path.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 439,
+          "note": "`sources: Sequence[str] | None = None` constructor default"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 681,
+          "note": "filter evaluated per message in extract_code_blocks_from_messages"
+        }
+      ]
+    },
+    {
+      "id": "code-executors-init-py-control",
+      "name": "create_default_code_executor sandbox selection",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "Factory that prefers Docker but fails open: any Docker init error or absence silently returns the host LocalCommandLineCodeExecutor with only a UserWarning.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 58,
+          "note": "Docker preferred when available"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 64,
+          "note": "`except Exception: pass  # Fallback to local`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 69,
+          "note": "warnings.warn then LocalCommandLineCodeExecutor returned"
+        }
+      ]
+    },
+    {
+      "id": "common-py-control",
+      "name": "Workspace filename containment",
+      "lane": "tools_mcp",
+      "kind": "control",
+      "description": "`get_file_name_from_content` resolves a `# filename:` hint and rejects paths outside the workspace; the docstring-claimed dangerous-command regex denylist does not exist (phantom control — only `silence_pip` regex runs).",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/_common.py",
+          "line": 108,
+          "note": "`path.relative_to(workspace_path.resolve())` raises for out-of-workspace filenames"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/_common.py",
+          "line": 114,
+          "note": "`silence_pip()` — the only regex transform; no command denylist"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 57,
+          "note": "docstring claims regex sanitisation against dangerous commands"
+        }
+      ]
+    },
+    {
+      "id": "local-init-py-tool",
+      "name": "LocalCommandLineCodeExecutor (host)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Writes each block to a file and runs it as a host subprocess with the full host environment; constructor only warns; buildable from config.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 163,
+          "note": "constructor control is a warnings.warn"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 397,
+          "note": "`env = os.environ.copy()` passed to the child"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 427,
+          "note": "`asyncio.create_subprocess_exec` on the host"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 441,
+          "note": "per-block timeout; process terminated on TimeoutError"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 520,
+          "note": "`_from_config` rebuilds it from JSON"
+        }
+      ]
+    },
+    {
+      "id": "docker-code-executor-py-tool",
+      "name": "DockerCommandLineCodeExecutor",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Runs blocks via exec in a long-lived container (default python:3-slim) with the work dir bind-mounted rw; default bridge network, image-default user, no resource limits.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 71,
+          "note": "default image `python:3-slim`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "note": "`client.containers.create(...)` with no network_mode/user/cap_drop/limits"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 360,
+          "note": "`timeout` wrapper around each command"
+        }
+      ]
+    },
+    {
+      "id": "jupyter-code-executor-py-tool",
+      "name": "JupyterCodeExecutor (host kernel)",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Runs blocks statefully in a local nbclient kernel on the host; no runtime warning or opt-in; timeout shielded so cells keep running.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/jupyter/_jupyter_code_executor.py",
+          "line": 139,
+          "note": "constructor with no warning/opt-in"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/jupyter/_jupyter_code_executor.py",
+          "line": 207,
+          "note": "`asyncio.wait_for(asyncio.shield(execute_task), ...)`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/jupyter/_jupyter_code_executor.py",
+          "line": 329,
+          "note": "`_from_config` rebuilds it from JSON"
+        }
+      ]
+    },
+    {
+      "id": "docker-jupyter-py-tool",
+      "name": "DockerJupyterCodeExecutor",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Client executor that sends code cells to a Jupyter kernel gateway over a websocket.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_docker_jupyter.py",
+          "line": 223,
+          "note": "`kernel_client.execute(code, ...)`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_docker_jupyter.py",
+          "line": 263,
+          "note": "starts a kernel on the gateway"
+        }
+      ]
+    },
+    {
+      "id": "jupyter-server-py-tool",
+      "name": "DockerJupyterServer kernel gateway",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Builds/runs a kernel-gateway container bound to 0.0.0.0 with all ports published, token passed as container env, optional empty token, and plaintext ws:// client channel.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 267,
+          "note": "DEFAULT_DOCKERFILE FROM unpinned quay.io base"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 278,
+          "note": "`--KernelGatewayApp.ip=0.0.0.0`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 356,
+          "note": "gateway token injected as container environment [value not reproduced]"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 368,
+          "note": "`publish_all_ports=True`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 80,
+          "note": "`ws://` hard-coded in _get_ws_base_url"
+        }
+      ]
+    },
+    {
+      "id": "azure-container-code-executor-py-tool",
+      "name": "ACADynamicSessionsCodeExecutor",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Posts Python blocks to an Azure Container Apps dynamic-sessions pool with a bearer token; uploads/downloads files between work_dir and /mnt/data.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 208,
+          "note": "`_construct_url` concatenates the endpoint with no scheme/host check"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 462,
+          "note": "`client.post(url, headers=headers, json=...)` code execution request"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 318,
+          "note": "upload: `self.work_dir / file` without containment"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 379,
+          "note": "download: `local_path = self.work_dir / file` without containment"
+        }
+      ]
+    },
+    {
+      "id": "func-with-reqs-py-tool",
+      "name": "FunctionWithRequirementsStr",
+      "lane": "tools_mcp",
+      "kind": "tool",
+      "description": "Compiles a function source string by exec_module() inside the host process at construction time, before any backend is chosen.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-core/src/autogen_core/code_executor/_func_with_reqs.py",
+          "line": 115,
+          "note": "`spec.loader.exec_module(module)` runs the string in-process"
+        }
+      ]
+    },
+    {
+      "id": "work-dir-local-init-py-datastore",
+      "name": "Executor working directory / bind dir",
+      "lane": "tools_mcp",
+      "kind": "datastore",
+      "description": "Operator-chosen host directory where code files are written, bind-mounted rw into containers, and where ACA downloads land; the Jupyter gateway chmods it 0o777.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 248,
+          "note": "work_dir property"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 392,
+          "note": "code written to a file in work_dir"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 546,
+          "note": "bind_dir mounted at /workspace mode rw"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 328,
+          "note": "`os.chmod(bind_dir, 0o777)`"
+        }
+      ]
+    },
+    {
+      "id": "os-environ-secret-store",
+      "name": "Host process environment",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "The embedding application's environment variables (cloud/model-provider keys if present), inherited wholesale by local subprocesses.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 397,
+          "note": "`os.environ.copy()` handed to executed code"
+        }
+      ]
+    },
+    {
+      "id": "token-provider-secret-store",
+      "name": "Azure TokenProvider credential",
+      "lane": "external_deploy",
+      "kind": "secret_store",
+      "description": "In-process credential whose dynamic-sessions access token is fetched once and cached with no expiry handling.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 41,
+          "note": "TokenProvider protocol `get_token`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 152,
+          "note": "`# TODO: expiration?`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 156,
+          "note": "token fetched and cached in `_access_token`"
+        }
+      ]
+    },
+    {
+      "id": "docker-external-service",
+      "name": "Docker daemon",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Host Docker daemon reached via docker.from_env(); creates containers and pulls/builds images from public registries on demand.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 509,
+          "note": "`docker.from_env()`"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 524,
+          "note": "`client.images.pull(self._image)` on ImageNotFound"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 363,
+          "note": "`client.containers.run(...)` for the gateway"
+        }
+      ]
+    },
+    {
+      "id": "azure-container-apps-dynamic-sessions-external-service",
+      "name": "Azure Container Apps dynamic sessions",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Remote serverless sandbox reached at the operator-supplied pool_management_endpoint.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 48,
+          "note": "docstring: Container Apps Dynamic Sessions instance"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 144,
+          "note": "`self._pool_management_endpoint = pool_management_endpoint`"
+        }
+      ]
+    },
+    {
+      "id": "arbitrary-external-network-endpoints-external-service",
+      "name": "Arbitrary external network endpoints",
+      "lane": "external_deploy",
+      "kind": "external_service",
+      "description": "Any internet destination reachable from the Docker sandbox's default bridge network (remit's forbidden-counterparty term).",
+      "evidence": [
+        {
+          "file": "/Users/stevewilson/Documents/github/praxen/local/v2.0-opus55-r3/autogen-code-executor-out/WORKER_REMIT.md",
+          "line": 83,
+          "note": "remit names arbitrary external network endpoints as forbidden"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "note": "containers.create sets no network_mode, so default bridge egress applies"
+        }
+      ]
+    },
+    {
+      "id": "pyproject-toml-deploy-surface",
+      "name": "autogen-ext executor extras",
+      "lane": "external_deploy",
+      "kind": "deploy_surface",
+      "description": "Dependency declarations for the executor extras: azure-core/azure-identity unbounded, jupyter/docker-jupyter extras floor-pinned.",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/pyproject.toml",
+          "line": 27,
+          "note": "`azure-core` with no version bound"
+        },
+        {
+          "file": "python/packages/autogen-ext/pyproject.toml",
+          "line": 83,
+          "note": "jupyter-executor extra `>=` floors"
+        },
+        {
+          "file": "python/packages/autogen-ext/pyproject.toml",
+          "line": 88,
+          "note": "docker-jupyter-executor extra `>=` floors"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "peer-agent-entrypoint--code-executor-agent-py-orchestrator",
+      "from": "peer-agent-entrypoint",
+      "to": "code-executor-agent-py-orchestrator",
+      "label": "messages into model context",
+      "data": "agent message text",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 550,
+          "note": "Step 1 adds incoming messages to the model context"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 836,
+          "note": "msg.to_model_message() appended"
+        }
+      ]
+    },
+    {
+      "id": "peer-agent-entrypoint--sources-code-executor-agent-py-control",
+      "from": "peer-agent-entrypoint",
+      "to": "sources-code-executor-agent-py-control",
+      "label": "messages checked by source",
+      "data": "agent message text + self-declared source",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 681,
+          "note": "source check on each message"
+        }
+      ]
+    },
+    {
+      "id": "sources-code-executor-agent-py-control--code-executor-agent-py-orchestrator",
+      "from": "sources-code-executor-agent-py-control",
+      "to": "code-executor-agent-py-orchestrator",
+      "label": "extracted fenced code blocks",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 683,
+          "note": "markdown code blocks extracted"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 542,
+          "note": "executed directly in no-model path"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--chat-completion-client-model",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "chat-completion-client-model",
+      "label": "context incl. execution output",
+      "data": "prompt context",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 821,
+          "note": "generation call"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 648,
+          "note": "retry decision with error output"
+        }
+      ]
+    },
+    {
+      "id": "chat-completion-client-model--code-executor-agent-py-orchestrator",
+      "from": "chat-completion-client-model",
+      "to": "code-executor-agent-py-orchestrator",
+      "label": "generated code blocks",
+      "data": "model output",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 590,
+          "note": "code blocks extracted from model_result.content"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--approval-func-code-executor-agent-py-control",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "approval-func-code-executor-agent-py-control",
+      "label": "code + context for approval",
+      "data": "code blocks, chat context",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 699,
+          "note": "ApprovalRequest(code=combined_code, context=...)"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 712,
+          "note": "denial short-circuits execution"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--local-init-py-tool",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "local-init-py-tool",
+      "label": "code blocks to execute",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "execute_code_blocks dispatch"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 324,
+          "note": "backend entry"
+        }
+      ]
+    },
+    {
+      "id": "local-init-py-tool--code-executor-agent-py-orchestrator",
+      "from": "local-init-py-tool",
+      "to": "code-executor-agent-py-orchestrator",
+      "label": "stdout/stderr + exit code",
+      "data": "execution output",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 458,
+          "note": "output concatenated into CommandLineCodeResult"
+        },
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 616,
+          "note": "output re-enters model context"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--docker-code-executor-py-tool",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "docker-code-executor-py-tool",
+      "label": "code blocks to execute",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "execute_code_blocks dispatch"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 405,
+          "note": "backend entry"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--jupyter-code-executor-py-tool",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "jupyter-code-executor-py-tool",
+      "label": "code cells to execute",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "execute_code_blocks dispatch"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/jupyter/_jupyter_code_executor.py",
+          "line": 162,
+          "note": "backend entry"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--docker-jupyter-py-tool",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "docker-jupyter-py-tool",
+      "label": "code cells to execute",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "execute_code_blocks dispatch"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_docker_jupyter.py",
+          "line": 197,
+          "note": "backend entry"
+        }
+      ]
+    },
+    {
+      "id": "code-executor-agent-py-orchestrator--azure-container-code-executor-py-tool",
+      "from": "code-executor-agent-py-orchestrator",
+      "to": "azure-container-code-executor-py-tool",
+      "label": "code blocks to execute",
+      "data": "code blocks",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-agentchat/src/autogen_agentchat/agents/_code_executor_agent.py",
+          "line": 718,
+          "note": "execute_code_blocks dispatch"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 393,
+          "note": "backend entry"
+        }
+      ]
+    },
+    {
+      "id": "code-executors-init-py-control--local-init-py-tool",
+      "from": "code-executors-init-py-control",
+      "to": "local-init-py-tool",
+      "label": "silent host fallback",
+      "data": "executor instance",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 64,
+          "note": "exception swallowed"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 78,
+          "note": "LocalCommandLineCodeExecutor returned"
+        }
+      ]
+    },
+    {
+      "id": "code-executors-init-py-control--docker-code-executor-py-tool",
+      "from": "code-executors-init-py-control",
+      "to": "docker-code-executor-py-tool",
+      "label": "preferred sandbox",
+      "data": "executor instance",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/__init__.py",
+          "line": 60,
+          "note": "DockerCommandLineCodeExecutor returned when available"
+        }
+      ]
+    },
+    {
+      "id": "func-with-reqs-py-tool--local-init-py-tool",
+      "from": "func-with-reqs-py-tool",
+      "to": "local-init-py-tool",
+      "label": "function definitions",
+      "data": "function source",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 151,
+          "note": "`functions` constructor parameter"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 274,
+          "note": "build_python_functions_file(self._functions)"
+        }
+      ]
+    },
+    {
+      "id": "os-environ-secret-store--local-init-py-tool",
+      "from": "os-environ-secret-store",
+      "to": "local-init-py-tool",
+      "label": "host env inherited",
+      "data": "credentials",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 397,
+          "note": "os.environ.copy()"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 427,
+          "note": "env passed to subprocess"
+        }
+      ]
+    },
+    {
+      "id": "local-init-py-tool--common-py-control",
+      "from": "local-init-py-tool",
+      "to": "common-py-control",
+      "label": "filename hint check",
+      "data": "file path",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 371,
+          "note": "get_file_name_from_content(code, self.work_dir)"
+        }
+      ]
+    },
+    {
+      "id": "docker-code-executor-py-tool--common-py-control",
+      "from": "docker-code-executor-py-tool",
+      "to": "common-py-control",
+      "label": "filename hint check",
+      "data": "file path",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 346,
+          "note": "get_file_name_from_content(code, self.work_dir)"
+        }
+      ]
+    },
+    {
+      "id": "local-init-py-tool--work-dir-local-init-py-datastore",
+      "from": "local-init-py-tool",
+      "to": "work-dir-local-init-py-datastore",
+      "label": "code files written",
+      "data": "code",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/local/__init__.py",
+          "line": 392,
+          "note": "code written to work_dir file"
+        }
+      ]
+    },
+    {
+      "id": "docker-code-executor-py-tool--work-dir-local-init-py-datastore",
+      "from": "docker-code-executor-py-tool",
+      "to": "work-dir-local-init-py-datastore",
+      "label": "rw bind mount",
+      "data": "file contents",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 546,
+          "note": "volumes bind /workspace rw"
+        }
+      ]
+    },
+    {
+      "id": "docker-code-executor-py-tool--docker-external-service",
+      "from": "docker-code-executor-py-tool",
+      "to": "docker-external-service",
+      "label": "container create/exec, image pull",
+      "data": "container commands, image refs",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 524,
+          "note": "images.pull on miss"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "note": "containers.create"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 296,
+          "note": "container.exec_run"
+        }
+      ]
+    },
+    {
+      "id": "docker-code-executor-py-tool--arbitrary-external-network-endpoints-external-service",
+      "from": "docker-code-executor-py-tool",
+      "to": "arbitrary-external-network-endpoints-external-service",
+      "label": "unrestricted outbound traffic",
+      "data": "workspace contents, any data",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker/_docker_code_executor.py",
+          "line": 537,
+          "note": "no network_mode/network_disabled on create"
+        }
+      ]
+    },
+    {
+      "id": "docker-jupyter-py-tool--jupyter-server-py-tool",
+      "from": "docker-jupyter-py-tool",
+      "to": "jupyter-server-py-tool",
+      "label": "cells + token over ws://",
+      "data": "code, gateway token",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 125,
+          "note": "websockets.connect with Authorization header"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 80,
+          "note": "plaintext ws:// URL"
+        }
+      ]
+    },
+    {
+      "id": "untrusted-network-entrypoint--jupyter-server-py-tool",
+      "from": "untrusted-network-entrypoint",
+      "to": "jupyter-server-py-tool",
+      "label": "kernel gateway API calls",
+      "data": "code, kernel control",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 278,
+          "note": "gateway listens on 0.0.0.0, list_kernels=true"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 368,
+          "note": "publish_all_ports=True"
+        }
+      ]
+    },
+    {
+      "id": "jupyter-server-py-tool--docker-external-service",
+      "from": "jupyter-server-py-tool",
+      "to": "docker-external-service",
+      "label": "gateway image build/run",
+      "data": "Dockerfile, container env",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 340,
+          "note": "client.images.build"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 363,
+          "note": "client.containers.run"
+        }
+      ]
+    },
+    {
+      "id": "jupyter-server-py-tool--work-dir-local-init-py-datastore",
+      "from": "jupyter-server-py-tool",
+      "to": "work-dir-local-init-py-datastore",
+      "label": "world-writable rw mount",
+      "data": "file contents",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 328,
+          "note": "chmod 0o777"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/docker_jupyter/_jupyter_server.py",
+          "line": 360,
+          "note": "mounted rw"
+        }
+      ]
+    },
+    {
+      "id": "token-provider-secret-store--azure-container-code-executor-py-tool",
+      "from": "token-provider-secret-store",
+      "to": "azure-container-code-executor-py-tool",
+      "label": "access token",
+      "data": "credentials",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 156,
+          "note": "get_token(scope).token cached"
+        }
+      ]
+    },
+    {
+      "id": "azure-container-code-executor-py-tool--azure-container-apps-dynamic-sessions-external-service",
+      "from": "azure-container-code-executor-py-tool",
+      "to": "azure-container-apps-dynamic-sessions-external-service",
+      "label": "code + bearer token",
+      "data": "code, credentials, files",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 426,
+          "note": "Authorization: Bearer header"
+        },
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 462,
+          "note": "POST to unvalidated endpoint URL"
+        }
+      ]
+    },
+    {
+      "id": "work-dir-local-init-py-datastore--azure-container-code-executor-py-tool",
+      "from": "work-dir-local-init-py-datastore",
+      "to": "azure-container-code-executor-py-tool",
+      "label": "files uploaded to session",
+      "data": "file contents",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 318,
+          "note": "work_dir / file, absolute path escapes work_dir"
+        }
+      ]
+    },
+    {
+      "id": "azure-container-code-executor-py-tool--work-dir-local-init-py-datastore",
+      "from": "azure-container-code-executor-py-tool",
+      "to": "work-dir-local-init-py-datastore",
+      "label": "session files downloaded",
+      "data": "file contents",
+      "evidence": [
+        {
+          "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/azure/_azure_container_code_executor.py",
+          "line": 379,
+          "note": "local_path = work_dir / file opened wb, no containment"
+        }
+      ]
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "untrusted-ingress",
+      "name": "Peer agent messages → CodeExecutorAgent",
+      "crossing_edges": [
+        "peer-agent-entrypoint--code-executor-agent-py-orchestrator",
+        "peer-agent-entrypoint--sources-code-executor-agent-py-control",
+        "sources-code-executor-agent-py-control--code-executor-agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-01",
+          "excerpt": "MUST NOT act on execution instructions arriving outside that delivery path",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-06",
+          "excerpt": "Only from agents within the same authorized AutoGen runtime",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "S",
+          "owasp": "LLM01",
+          "summary": "Any message source — including an agent relaying attacker-authored content — supplies fenced code that is extracted and run, because `sources` defaults to None and is a self-declared string.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-003",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "T",
+          "owasp": "ASI01",
+          "summary": "In the model_client flow, untrusted message text is added to the model context unlabeled and can steer the code the model generates (the sources filter does not apply there) (checked: _code_executor_agent.py:550, :836 — no provenance labelling).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "untrusted-ingress-2",
+      "name": "Network → published Jupyter kernel gateway",
+      "crossing_edges": [
+        "untrusted-network-entrypoint--jupyter-server-py-tool"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-16",
+          "excerpt": "MUST NOT carry any capability that grants inbound network access to, or a persistent interactive shell into, the execution environment",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-26",
+          "excerpt": "MUST NOT expose the code-execution environment, or the Docker daemon socket it relies on, to untrusted or public networks",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "The kernel gateway binds 0.0.0.0 with all ports published, so any reachable host holding (or not needing, when the token is empty) the token can start kernels and run code outside the agent delivery path.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-002",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "The gateway token travels over plaintext ws:// even when use_https is set, exposing it to network observers of non-local gateways.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-002",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "tool-invocation",
+      "name": "CodeExecutorAgent → execution backends",
+      "crossing_edges": [
+        "code-executor-agent-py-orchestrator--approval-func-code-executor-agent-py-control",
+        "code-executor-agent-py-orchestrator--local-init-py-tool",
+        "code-executor-agent-py-orchestrator--docker-code-executor-py-tool",
+        "code-executor-agent-py-orchestrator--jupyter-code-executor-py-tool",
+        "code-executor-agent-py-orchestrator--docker-jupyter-py-tool",
+        "code-executor-agent-py-orchestrator--azure-container-code-executor-py-tool",
+        "code-executors-init-py-control--local-init-py-tool",
+        "func-with-reqs-py-tool--local-init-py-tool",
+        "local-init-py-tool--common-py-control"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-22",
+          "excerpt": "Human confirmation by the overseer is required before every code-block execution",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-24",
+          "excerpt": "The executor MUST NOT execute a code block that the human overseer has denied.",
+          "coverage_status": "verified"
+        },
+        {
+          "rule_id": "R-29",
+          "excerpt": "Alert the operator when a code block is denied at the human-confirmation gate.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-13",
+          "excerpt": "A sandboxed execution backend (Docker or Azure Container Apps dynamic sessions) is required for all code execution.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-14",
+          "excerpt": "The local host executor ... MUST NOT be used unless the operator has explicitly authorized it",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-25",
+          "excerpt": "MUST NOT execute agent- or LLM-generated code outside an isolation boundary",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-27",
+          "excerpt": "the executor MUST halt and alert the operator rather than falling back to unsandboxed host execution",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-23",
+          "excerpt": "Installing packages into the host interpreter ... MUST require human confirmation.",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "Every block executes without confirmation by default: approval_func is opt-in, is forced to None by `_from_config`, and the executor interface has no approval hook of its own.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-003",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "A denied block produces no operator alert or log entry — the declared event_logger is never called.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-003",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "When Docker is absent or fails to start, create_default_code_executor silently returns the host executor, so model-generated code (including pip installs) runs on the host.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-001",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "LocalCommandLineCodeExecutor and JupyterCodeExecutor run on the host with no explicit operator authorization and are rebuildable from declarative config.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-004",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM03",
+          "summary": "Operators are told dangerous commands are regex-screened, but no denylist exists, so host execution is unscreened.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-011",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "E",
+          "owasp": "ASI05",
+          "summary": "FunctionWithRequirementsStr executes its source string in the host process at construction, outside any sandbox, even when a Docker/ACA backend is selected.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-012",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "D",
+          "owasp": "LLM06",
+          "summary": "A timed-out Jupyter cell keeps running in the host kernel because the timeout is shielded and no interrupt is sent.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-013",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM10",
+          "summary": "A generated `# filename:` hint could place a code file outside the workspace; the resolve/relative_to check rejects any out-of-workspace path.",
+          "status": "mitigated",
+          "finding_id": null,
+          "mitigation_evidence": {
+            "file": "python/packages/autogen-ext/src/autogen_ext/code_executors/_common.py",
+            "line": 108
+          },
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "model-egress",
+      "name": "CodeExecutorAgent ↔ ChatCompletionClient",
+      "crossing_edges": [
+        "code-executor-agent-py-orchestrator--chat-completion-client-model",
+        "chat-completion-client-model--code-executor-agent-py-orchestrator",
+        "local-init-py-tool--code-executor-agent-py-orchestrator"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-19",
+          "excerpt": "Credentials and tokens used to authenticate to a backend MUST NOT be written into generated code files, into execution output, or into logs.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM02",
+          "summary": "Executed code can print inherited host credentials into execution output, which is appended to the model context and sent to the model provider.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-005",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM01",
+          "summary": "Execution output (attacker-influenceable via fetched data or crafted stderr) re-enters the model context as an unlabelled UserMessage and steers retry/reflection generation (checked: _code_executor_agent.py:616, :648 — no labelling or sanitisation).",
+          "status": "potential",
+          "finding_id": null,
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "secret-material",
+      "name": "Credentials reachable by executed code / sent to backends",
+      "crossing_edges": [
+        "os-environ-secret-store--local-init-py-tool",
+        "token-provider-secret-store--azure-container-code-executor-py-tool",
+        "azure-container-code-executor-py-tool--azure-container-apps-dynamic-sessions-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-07",
+          "excerpt": "The configured pool management endpoint, reached over HTTPS",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-10",
+          "excerpt": "Only the operator-configured ACA pool-management endpoint / credential provider and the approved Docker daemon target are authorized backend endpoints",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-19",
+          "excerpt": "Credentials and tokens used to authenticate to a backend MUST NOT be written into generated code files, into execution output, or into logs.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "E",
+          "owasp": "ASI03",
+          "summary": "The local executor hands the full host os.environ to every subprocess, and the gateway token is a container env var kernels inherit, so executed code holds the application's credentials.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-005",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "I",
+          "owasp": "ASI03",
+          "summary": "The ACA bearer token is sent to whatever pool_management_endpoint string is configured, with no https or host validation, and is cached with no expiry handling.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-008",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "execution-sandbox--host-and-network",
+      "name": "Execution environment ↔ host files and external network",
+      "crossing_edges": [
+        "docker-code-executor-py-tool--arbitrary-external-network-endpoints-external-service",
+        "docker-code-executor-py-tool--docker-external-service",
+        "work-dir-local-init-py-datastore--azure-container-code-executor-py-tool",
+        "azure-container-code-executor-py-tool--work-dir-local-init-py-datastore"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-18",
+          "excerpt": "MUST NOT transmit the contents of the working directory or uploaded files to any destination outside the configured execution environment.",
+          "coverage_status": "partial"
+        },
+        {
+          "rule_id": "R-20",
+          "excerpt": "MAY initiate outbound network connections only to operator-configured outbound destinations",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-28",
+          "excerpt": "If executed code attempts to reach resources outside the sandbox and working directory ... the executor MUST halt and alert the operator.",
+          "coverage_status": "gap"
+        },
+        {
+          "rule_id": "R-17",
+          "excerpt": "files explicitly uploaded by the operator to the working directory / session",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "I",
+          "owasp": "LLM03",
+          "summary": "The Docker sandbox sits on the default bridge network with no egress control, so executed code can exfiltrate the rw-mounted workspace to any internet destination.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-006",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "E",
+          "owasp": "LLM03",
+          "summary": "The container runs as image-default root with full capabilities and no memory/pids limits, and no backend detects or halts escape or out-of-bounds attempts.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-007",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "I",
+          "owasp": null,
+          "summary": "ACA upload_files joins caller-supplied names onto work_dir unchecked, so an absolute path sends arbitrary readable host files (e.g. credential files) into the remote session.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-010",
+          "mitigation_evidence": null,
+          "remainder": null
+        },
+        {
+          "stride": "T",
+          "owasp": "LLM10",
+          "summary": "ACA download_files writes session-listed names (controlled by executed code) to work_dir / name with no containment, enabling writes outside the working directory.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-010",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "data-at-rest",
+      "name": "Shared workspace on the host",
+      "crossing_edges": [
+        "jupyter-server-py-tool--work-dir-local-init-py-datastore"
+      ],
+      "remit_rules": [],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": null,
+          "summary": "DockerJupyterServer chmods the bind dir 0o777, so any local user on a multi-user host can plant or alter files the kernel reads and that flow back to the agent.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-015",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "name": "Sandbox images and executor dependencies",
+      "crossing_edges": [
+        "jupyter-server-py-tool--docker-external-service"
+      ],
+      "remit_rules": [
+        {
+          "rule_id": "R-09",
+          "excerpt": "The operator-configured Docker daemon target (Docker backend).",
+          "coverage_status": "partial"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "T",
+          "owasp": "LLM04",
+          "summary": "Sandbox images are mutable public-registry tags (python:3-slim, unpinned quay.io base with unpinned mamba installs) pulled/built on demand, and executor extras are floor-pinned or unbounded.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-014",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    },
+    {
+      "id": "telemetry-egress",
+      "name": "Execution audit trail",
+      "crossing_edges": [],
+      "remit_rules": [
+        {
+          "rule_id": "R-30",
+          "excerpt": "Log every executed code block together with its exit code and output.",
+          "coverage_status": "gap"
+        }
+      ],
+      "threats": [
+        {
+          "stride": "R",
+          "owasp": null,
+          "summary": "No backend records which block ran, its exit code or output, and temp code files are deleted, so executions cannot be reconstructed after an incident.",
+          "status": "confirmed",
+          "finding_id": "PRAX-2026-10-19-009",
+          "mitigation_evidence": null,
+          "remainder": null
+        }
+      ]
+    }
+  ],
+  "attack_paths": [
+    {
+      "id": "peer-message-to-host-exec",
+      "name": "Unvetted group-chat message runs code on the host",
+      "steps": [
+        {
+          "node": "peer-agent-entrypoint",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "Any agent message (possibly relaying attacker-authored content) is accepted; source is unauthenticated"
+        },
+        {
+          "node": "sources-code-executor-agent-py-control",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "sources defaults to None, so every message's fenced block is extracted"
+        },
+        {
+          "node": "code-executor-agent-py-orchestrator",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "approval_func is None by default/after _from_config, so the block is dispatched unconfirmed"
+        },
+        {
+          "node": "local-init-py-tool",
+          "finding_id": "PRAX-2026-10-19-001",
+          "summary": "host executor in use (silent Docker fallback or unauthorized selection) runs it as a host subprocess"
+        }
+      ]
+    },
+    {
+      "id": "injected-message-to-workspace-exfil",
+      "name": "Injected chat content makes the model exfiltrate the workspace from the Docker sandbox",
+      "steps": [
+        {
+          "node": "peer-agent-entrypoint",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "Attacker-influenced message text enters the model context unlabeled"
+        },
+        {
+          "node": "code-executor-agent-py-orchestrator",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "loop passes the poisoned context to the model"
+        },
+        {
+          "node": "chat-completion-client-model",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "model emits a code block shaped by the injected instruction"
+        },
+        {
+          "node": "code-executor-agent-py-orchestrator",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "model output executed with no approval gate"
+        },
+        {
+          "node": "docker-code-executor-py-tool",
+          "finding_id": "PRAX-2026-10-19-006",
+          "summary": "container has the workspace mounted rw and default-bridge networking"
+        },
+        {
+          "node": "arbitrary-external-network-endpoints-external-service",
+          "finding_id": "PRAX-2026-10-19-006",
+          "summary": "workspace contents leave to an arbitrary internet host"
+        }
+      ]
+    },
+    {
+      "id": "network-caller-to-gateway-rce",
+      "name": "Network caller runs code on the exposed Jupyter gateway and tampers with the host workspace",
+      "steps": [
+        {
+          "node": "untrusted-network-entrypoint",
+          "finding_id": "PRAX-2026-10-19-002",
+          "summary": "Unauthenticated-to-the-agent network caller reaches the published gateway port"
+        },
+        {
+          "node": "jupyter-server-py-tool",
+          "finding_id": "PRAX-2026-10-19-002",
+          "summary": "gateway on 0.0.0.0 accepts kernel start/execute with a token that may be empty or sniffed off ws://"
+        },
+        {
+          "node": "work-dir-local-init-py-datastore",
+          "finding_id": "PRAX-2026-10-19-015",
+          "summary": "code writes into the rw, world-writable host bind dir that feeds the agent"
+        }
+      ]
+    },
+    {
+      "id": "peer-message-to-credential-egress",
+      "name": "Unvetted message leaks host credentials to the model provider",
+      "steps": [
+        {
+          "node": "peer-agent-entrypoint",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "Attacker-influenced message supplies a block such as print(os.environ)"
+        },
+        {
+          "node": "code-executor-agent-py-orchestrator",
+          "finding_id": "PRAX-2026-10-19-003",
+          "summary": "dispatched with no approval"
+        },
+        {
+          "node": "local-init-py-tool",
+          "finding_id": "PRAX-2026-10-19-005",
+          "summary": "subprocess inherits the full host environment and prints its credentials"
+        },
+        {
+          "node": "code-executor-agent-py-orchestrator",
+          "finding_id": "PRAX-2026-10-19-005",
+          "summary": "output appended to the model context"
+        },
+        {
+          "node": "chat-completion-client-model",
+          "finding_id": "PRAX-2026-10-19-005",
+          "summary": "credentials sent off-host to the model provider"
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "lane_fit": "client_adapters is empty — the executors are a library with no UI/API surface of their own (the exposed kernel gateway is modelled as a tools_mcp execution surface). The two control nodes in tools_mcp (sandbox-selection factory, filename containment) run inside the executor package, per the control-lane rule. The model node sits in agent_core as 'the LLM call' because the code never names a provider. Leading-underscore basenames (_code_executor_agent.py, _common.py, _jupyter_server.py, ...) drop the leading underscore, by analogy with the leading-dot rule.",
+    "omissions": "Edgeless: pyproject-toml-deploy-surface (dependency posture). The context-only caller (_code_executor_agent.py) is modelled as the orchestrator per SCAN_INSTRUCTIONS; findings are scored against executors. The model-provider endpoint is not a separate node (operator-chosen; only docstring examples name OpenAI). Not modelled: magentic_one.py, the factory's only in-tree caller (excluded scope). No committed secrets were cited in the findings, so none are modelled. KB arbitration divergences: PRAX-2026-10-19-010's stored LLM10 tag is kept only for the download half, where executed code controls the names; on the upload half the names come from the caller, not model output, so under the KB's sink-side rule that threat is tagged null. PRAX-2026-10-19-005 carries LLM02 and ASI03: the credential-scope threat is tagged ASI03 by the KB's mechanism rule, and the disclosure-to-model threat LLM02. PRAX-2026-10-19-003's ASI10 co-tag is not a threat primary. Coined boundary: `execution-sandbox--host-and-network` — no menu archetype fit sandbox-executed code egressing to arbitrary internet hosts (PRAX-2026-10-19-006/007) together with the ACA upload/download path traversal between the session and host files (PRAX-2026-10-19-010); telemetry-egress covers only logs/analytics/reporting and value-transfer only funds or irreversible external actions, so neither covers it.",
+    "counts": {
+      "nodes": 22,
+      "edges": 30,
+      "boundaries": 9,
+      "threats": 23
+    }
+  }
+}

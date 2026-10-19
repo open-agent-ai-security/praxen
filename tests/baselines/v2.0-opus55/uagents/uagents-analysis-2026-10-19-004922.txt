@@ -1,0 +1,174 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    uAgents (Fetch.ai uAgent)
+Analysis: October 19, 2026, 00:49 UTC
+Praxen v2.0.0
+Remit v1.3
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The framework authenticates the front door and leaves the side doors open.
+ECDSA envelope verification is real and on by default for agent senders, but
+the defaults around it undo much of that: signed envelopes can be replayed
+indefinitely because expires and nonce are never checked, synchronous replies
+(including the agent's own) travel unsigned and are accepted as authentic, and
+any verified address on the open network reaches every signed handler because
+there is no default peer allowlist. The worst single item is the default-on
+inspector. On a 0.0.0.0 server with forwarded_allow_ips="*" and wildcard CORS,
+its 127.0.0.1 guard can be met by a forged X-Forwarded-For or by any web page
+in the operator's browser. That exposes message history and lets a caller make
+the agent sign an Agentverse identity proof under the caller's own token.
+Wallet funds and key material are not protected either: the shipped Helm chart
+commits a default seed, there is no spend-approval hook, and keys sit in
+plaintext on disk.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.55 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 5   Medium: 6   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 14   Gap: 8   Partial: 12   Vague: 0   Enforcement-not-possible: 1   (of 35 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   2
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       3
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 4
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  Inspector admin endpoints are on by default, and their
+            loopback-only guard can be spoofed via X-Forwarded-For or reached
+            from any browser page, exposing message history and Agentverse
+            re-registration.
+      Action 1: Default enable_agent_inspector to False (or tie it to an
+                explicit dev flag), and drop forwarded_allow_ips="*" in
+                ASGIServer.serve() so scope["client"] reflects the real peer.
+      Action 2: Protect the inspector routes with a per-agent secret or signed
+                request (not a source-IP check) and remove the wildcard CORS
+                headers from them, so browser pages cannot read /messages or
+                POST to /connect.
+
+  PRAX-2026-10-19-002  The shipped Helm chart commits a literal default seed
+            phrase, so any deployment left on the default gets a publicly
+            derivable agent identity and wallet key.
+      Action 1: Remove the default from values.yaml (empty string), and make
+                templates/secrets.yaml fail rendering with required when
+                agent.seed is unset, or reference an existing Secret instead
+                of an inline value.
+      Action 2: Treat the committed seed as compromised: any identity or
+                wallet ever derived from it should be retired and its funds
+                moved.
+
+  PRAX-2026-10-19-003  The runtime gives every handler an unrestricted ledger
+            client and the agent's signing wallet, with no spend-policy hook,
+            approval gate or halt-on-threshold control for value transfers.
+      Action 1: Wrap wallet signing in a framework-level SpendPolicy hook
+                (counterparty allowlist, per-transfer and per-period ceilings,
+                approval callback) that is required before LocalWallet signs
+                any non-Almanac transaction, and deny by default when no
+                policy is configured.
+      Action 2: Emit a structured alert and halt the transfer when the policy
+                rejects it, so the remit's halt-and-alert escalation has a
+                code path.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-004  Synchronous replies are never signed and are accepted
+            unsigned, so a reply attributed to a peer agent address is
+            unauthenticated data that resolves the caller's pending response.
+      Action 1: Sign sync response envelopes with the responding agent's
+                identity in ASGIServer.__call__ (pass the identity into
+                enclose_response_raw), and in send_exchange_envelope reject
+                unsigned replies whose sender is an agent address or does not
+                equal envelope.target.
+      Action 2: Replace the address[0:4] == "user" prefix test in
+                identity.is_user_address with a full bech32 decode and prefix
+                check, and document that allow_unverified handlers must not
+                perform state-changing actions.
+
+  PRAX-2026-10-19-005  Inbound signed envelopes are never checked for expiry
+            or nonce reuse, so a captured signed message can be replayed
+            indefinitely to re-trigger a peer's state-changing handlers.
+      Action 1: In ASGIServer.__call__ and MailboxClient._handle_envelope,
+                reject envelopes whose expires is missing or in the past, and
+                keep a bounded seen-cache of envelope digests (or
+                sender+nonce) for the expiry window.
+      Action 2: Have Context.send_raw and send_message_raw set a random nonce
+                on every outbound envelope.
+
+  PRAX-2026-10-19-006  There is no default peer-agent allowlist: any address
+            on the open network that can produce a valid signature reaches
+            every signed handler, and the only ACL primitive is opt-in and
+            default-allow.
+      Action 1: Add an agent-level allowed_senders / allowed_destinations
+                configuration that _process_single_message and
+                InternalContext.send_raw enforce before dispatch or
+                resolution, and log and reject (or alert on) out-of-set
+                addresses.
+      Action 2: Offer a deny-by-default mode for that allowlist, and make
+                Agent.on_message accept the same ACL object that QuotaProtocol
+                uses.
+
+  PRAX-2026-10-19-007  A named agent without a seed persists its identity and
+            wallet private keys as plaintext JSON in the working directory
+            with default file permissions, and nothing guards key material
+            from egress.
+      Action 1: Create private_keys.json with os.open(..., 0o600) under a
+                per-user config directory rather than the CWD, and prefer an
+                OS keyring or an encrypted keystore. Log a warning when
+                falling back to file storage.
+      Action 2: Add a logging filter and an outbound-payload check that refuse
+                to emit strings matching the agent's own private keys or seed,
+                raising an alert and aborting the send, so the remit's
+                halt-and-alert rule has an enforcement point.
+
+  PRAX-2026-10-19-008  Handled messages and interval runs leave no log record,
+            and registration or signature-verification failures produce only
+            per-event warnings with no aggregation or operator alert.
+      Action 1: Emit a structured (JSON) INFO record per handled message and
+                interval run — sender, schema digest, session, handler,
+                outcome — from _process_single_message and _run_interval.
+      Action 2: Add an operator alert hook (callback or event) fired on
+                registration failure, including insufficient funds, and on N
+                verification failures from one sender within a window in
+                ASGIServer.__call__ / MailboxClient._handle_envelope.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

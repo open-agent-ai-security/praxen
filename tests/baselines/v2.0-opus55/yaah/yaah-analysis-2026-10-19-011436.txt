@@ -1,0 +1,163 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    yaah
+Analysis: October 19, 2026, 01:14 UTC
+Praxen v2.0.0
+Remit v1.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+yaah's safety story rests on two hook handlers, and both are weaker in
+practice than the remit's "fail closed" language promises. The secret scanner
+runs on PostToolUse, so a credential-bearing edit is already on disk when it
+fires; any handler error, an unparseable payload or a single line over 64 KB
+makes yaah hook exit 1, which the host treats as non-blocking; and the Codex
+target ships with no tool-use hooks at all. The command guard that does run is
+a seven-pattern regex denylist that simple flag reordering defeats. A second
+pattern is trust delegated without checks. Third-party SKILL.md frontmatter is
+written verbatim, which lets a fetched skill pre-approve Bash(bash:*) for the
+host. The yaah_lint MCP tool runs linter binaries in any directory the model
+names, npx resolves unpinned packages at hook time, and none of the 29 /yaah:*
+commands, including /yaah:autonomous, sets disable-model-invocation.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.70 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 1   High: 8   Medium: 5   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 14   Gap: 5   Partial: 13   Vague: 0   Enforcement-not-possible: 0   (of 32 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   —
+  LLM02  Sensitive Information Disclosure                   4
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       3
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           2
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       1
+  ASI04  Agentic Supply Chain Vulnerabilities               4
+  ASI05  Unexpected Code Execution (RCE)                    4
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  No /yaah:* workflow command sets
+            disable-model-invocation, so the host model can self-trigger them,
+            including /yaah:autonomous, which runs a phase without pausing.
+      Action: Set `DisableModelInvocation: true` in `Advanced()` for every
+              `/yaah:*` builtin, starting with `autonomous.go`, `execute.go`,
+              `ship.go` and `quick.go`. Add a test in `builtins_test.go`
+              asserting that every registered command emits
+              `disable-model-invocation: true`.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-002  The secret scanner runs on PostToolUse, so a
+            credential-bearing Edit or Write is already on disk when it fires
+            and cannot be stopped.
+      Action: Add a PreToolUse handler in `secretscan.go` that scans the
+              proposed `tool_input.content` / `new_string` /
+              `edits[].new_string` and returns `Block: true` before the write.
+              Keep the PostToolUse scan as a backstop.
+
+  PRAX-2026-10-19-003  The hook dispatcher fails open: parse and handler
+            errors exit 1, which the host treats as non-blocking, and scanner
+            I/O errors never set Block.
+      Action 1: In `hookCmd()` for PreToolUse and PostToolUse, map any error
+                (parse, dispatch or handler) to exit 2 with a "yaah failed
+                closed" reason. In `SecretScanner.Execute`, set `Block: true`
+                on scan or open errors.
+      Action 2: Raise the scanner buffer with `scanner.Buffer(...)`, or scan
+                the whole content, so long lines cannot truncate detection.
+
+  PRAX-2026-10-19-004  Codex targets get no tool-use hooks, so they run
+            without the command guard and secret scanner; the OpenCode bridge
+            drops args before scanning.
+      Action 1: Do not emit a Codex config without blocking tool hooks: map
+                Codex's pre-execution approval or exec-policy surface to `yaah
+                hook PreToolUse`, or refuse to generate the Codex target until
+                it exists.
+      Action 2: In the OpenCode plugin, look up the cached `pendingCalls` args
+                in `tool.execute.after`, fail closed on any non-zero exit in
+                `tool.execute.before`, and add a generator test that
+                round-trips a Write payload with a `file_path`.
+
+  PRAX-2026-10-19-005  Fetched third-party SKILL.md frontmatter is written
+            verbatim, so remote content decides its own host permissions; the
+            shipped agent-rules skill pre-approves Bash(bash:*).
+      Action: In `buildSkillMarkdown()`, parse remote frontmatter and rewrite
+              it from an allowlist (name, description), dropping or
+              operator-overriding `allowed-tools`, `model`, `context` and
+              `agent`. Fail generation when a remote skill requests tool
+              pre-approval the catalog entry does not grant.
+
+  PRAX-2026-10-19-006  yaah_lint runs linter pipelines (npx, cargo,
+            golangci-lint) in the parent directory of any model-supplied path,
+            executing code outside the command guard and repository.
+      Action: In `tools.go`, resolve every `file_path` / `project_dir` with
+              `filepath.Abs` + `EvalSymlinks` and reject anything not under
+              the session cwd. Run `yaah_lint` with `cmd.Dir` fixed to the
+              repository root, never the file's parent.
+
+  PRAX-2026-10-19-007  A supplied Notion token is interpolated literally into
+            the generated MCP env and written to .mcp.json and four other
+            committed config files.
+      Action: Change `NewNotion` to take an env-var name and emit a reference
+              (for example `"Bearer ${NOTION_TOKEN}"` where the host expands
+              env, or an `env` passthrough) instead of the value. Make
+              `GenerateMCPJSON` and the other generators reject any
+              `Env`/`Headers` value matching the secret-scanner patterns.
+
+  PRAX-2026-10-19-008  Default components run unpinned npm packages through
+            npx (Context7 MCP, prettier, tsc), contacting the unapproved npm
+            registry and executing whatever version resolves.
+      Action: Pin every npx invocation to an exact version
+              (`@context7/mcp@x.y.z`, `prettier@x.y.z`, `typescript@x.y.z`)
+              and add `--no-install` / `--prefer-offline` for lint steps, so a
+              missing tool fails instead of downloading. Alternatively, invoke
+              locally installed binaries only.
+
+  PRAX-2026-10-19-009  The session audit trail is incomplete: MCP tool
+            invocations go unrecorded, Session.Findings is never written, and
+            an unreadable session file silently disables recording.
+      Action 1: Record every MCP tool call (name, sanitized args, result
+                status) through `session.Store` in `mcpserver/tools.go`, and
+                write secret-scanner hits to `Session.Findings` by location
+                and pattern.
+      Action 2: On a session load or parse failure, quarantine the corrupt
+                file and start a fresh record instead of disabling tracking.
+                Consider an append-only, hash-chained log outside the
+                agent-writable tree.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

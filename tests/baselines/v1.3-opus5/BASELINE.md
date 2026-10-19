@@ -3,7 +3,10 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Baseline — v1.3-opus5 (current)
+# Baseline — v1.3-opus5 (superseded)
+
+> **Superseded by [`v2.0-opus55`](../v2.0-opus55/BASELINE.md)** — the 2.0 freeze on Claude Opus 5.5,
+> graded against this set. Retained as archival diff history.
 
 The **v1.3 scoring re-freeze.** Supersedes `v1.2-opus5` (now archival). Same model and same
 pinned sources as v1.2 — **the scoring pipeline is what changed** (#195).
@@ -33,8 +36,7 @@ Roster prominence + development-activity data lives in `../ROSTER_HEALTH.md`.
 >   that produced the scan data. A graph's masthead therefore names 2.0.0 while the
 >   analysis it was built against names 1.3.0.
 >
-> The scores in this document remain the v1.3 freeze and stay the comparison point for
-> 2.1. Treat the artifacts as re-serialised, not re-measured.
+> The scores in this document remain the v1.3 freeze. Treat the artifacts as re-serialised, not re-measured.
 
 ## What changed from v1.2
 
