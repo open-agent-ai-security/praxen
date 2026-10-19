@@ -49,23 +49,23 @@ def _default_baseline() -> Path:
 
 DEFAULT_BASELINE = _default_baseline()
 DEFAULT_OUT = THIS_DIR / "suite-health-report.html"
-SNAPSHOT_DATE = "2026-07-11"
+SNAPSHOT_DATE = "2026-10-18"
 
 # slug -> (display, repo (owner/name), stars, freshness 0-5, (c4wk, c12wk, c52wk), note)
 # Snapshot per ROSTER_HEALTH.md. † = repo-level metric covers more than the scanned scope.
 ROSTER = {
-    "hermes-agent-desktop":            ("Hermes (Agent + Desktop)", "NousResearch/hermes-agent",         213129, 5.0, (3301, 10175, 15140), "Top-tier, intensely active"),
-    "openhands":                       ("OpenHands",                "All-Hands-AI/OpenHands",             80454,  5.0, (171, 533, 2316),     "Live, heavy cadence"),
-    "autogen-code-executor":           ("AutoGen Code Executor",    "microsoft/autogen",                 59656,  2.0, (0, 0, 77),           "Big but quiet ~3mo; successor framework"),
-    "aider":                           ("Aider",                    "Aider-AI/aider",                    47288,  3.0, (0, 17, 196),         "Maintained, decelerating"),
-    "openai-customer-service":         ("OpenAI Customer Service",  "openai/openai-agents-python",       27814,  5.0, (105, 363, 1227),     "SDK, live"),
-    "deepagents-cli":                  ("Deep Agents CLI",          "langchain-ai/deepagents",           26095,  5.0, (478, 1170, 2681),    "Live, heavy cadence"),
-    "uagents":                         ("uAgents",                  "fetchai/uAgents",                   1639,   3.5, (1, 23, 114),         "Recent touch, light cadence"),
-    "craftbot":                        ("CraftBot",                 "CraftOS-dev/CraftBot",              373,    5.0, (107, 409, 1149),     "Small but very active"),
-    "finbot":                          ("FinBot",                   "OWASP-ASI/finbot-ctf-demo",         65,     1.5, (0, 0, 73),           "CTF demo, static by design"),
-    "helperbot":                       ("HelperBot",                "opena2a-org/damn-vulnerable-ai-agent", 57,  4.0, (13, 41, 132),        "Small, actively developed"),
-    "yaah":                            ("yaah",                     "dirien/yet-another-agent-harness",  19,     2.0, (0, 3, 39),           "Personal harness, sporadic"),
-    "salesforce-help-agent-accelerator": ("Agentforce Help Agent",  "salesforce/help-agent-accelerator", 14,     2.0, (0, 7, 14),           "Vendor sample, low by design"),
+    "hermes-agent-desktop":            ("Hermes (Agent + Desktop)", "NousResearch/hermes-agent",         254996, 5.0, (14217, 37140, 56365), "Top-tier, intensely active"),
+    "openhands":                       ("OpenHands",                "OpenHands/OpenHands",               91229,  5.0, (361, 731, 3274),     "Live, heavy cadence"),
+    "autogen-code-executor":           ("AutoGen Code Executor",    "microsoft/autogen",                 61473,  1.5, (1, 1, 4),            "Maintenance mode; successor framework"),
+    "aider":                           ("Aider",                    "Aider-AI/aider",                    49630,  1.5, (0, 0, 108),          "Big but idle ~5mo"),
+    "openai-customer-service":         ("OpenAI Customer Service",  "openai/openai-agents-python",       30125,  5.0, (197, 714, 1699),     "SDK, live"),
+    "deepagents-cli":                  ("Deep Agents CLI",          "langchain-ai/deepagents",           30396,  5.0, (405, 1266, 4211),    "Live, heavy cadence"),
+    "uagents":                         ("uAgents",                  "fetchai/uAgents",                   1644,   3.5, (12, 23, 103),        "Recent touch, light cadence"),
+    "craftbot":                        ("CraftBot",                 "CraftOS-dev/CraftBot",              396,    4.5, (29, 124, 1300),      "Small, active, decelerating"),
+    "finbot":                          ("FinBot",                   "OWASP-ASI/finbot-ctf-demo",         70,     1.0, (0, 0, 4),            "CTF demo, static by design"),
+    "helperbot":                       ("HelperBot",                "opena2a-org/damn-vulnerable-ai-agent", 144, 4.0, (20, 30, 163),        "Small, actively developed"),
+    "yaah":                            ("yaah",                     "dirien/yet-another-agent-harness",  20,     1.5, (0, 0, 39),           "Personal harness, idle ~5mo"),
+    "salesforce-help-agent-accelerator": ("Agentforce Help Agent",  "salesforce/help-agent-accelerator", 14,     1.5, (0, 0, 14),           "Vendor sample, low by design"),
 }
 
 

@@ -3,17 +3,50 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Roster health — v1.0.2 baseline set (12 active + 3 retired)
+# Roster health — 12 active targets (+3 retired)
 
 > **Retired 2026-07-11 (Phase 3):** `sweep` (#69), `langchain-sql` (#70), `devika` — kept in
 > the table below (marked 🗑) with their data, as the record behind the retirement decision.
 
-> Companion to `v1.0.2-claude48/BASELINE.md`. Captures **project prominence** (GitHub
+> Companion to the current baseline's `BASELINE.md` (first written for `v1.0.2-claude48`;
+> re-snapshotted at each re-baseline, newest first). Captures **project prominence** (GitHub
 > stars) and **development activity/freshness** (0–5) for each target, so the roster's
 > keep / retire / add decisions are grounded in whether a project is *live and
 > mainstream* — not just how it scores on RAISE. The two 0–5 axes here (**Freshness**
 > and **RAISE maturity**) are deliberately on the same scale so **activity × maturity**
 > can be plotted directly (see "Activity vs. maturity" below).
+
+## Snapshot 2026-10-18 — re-taken for the `v2.0-opus55` freeze
+
+Same method as below; RAISE medians from [`v2.0-opus55/BASELINE.md`](v2.0-opus55/BASELINE.md).
+This snapshot feeds `suite_health.py`. The 2026-07-11 data further down is kept as the
+record behind the July retirements.
+
+| Target | Repo | ★ Stars | Last push | Commits 4/12/52 wk | **Fresh 0–5** | RAISE median | Maturity |
+|---|---|--:|---|--:|:--:|--:|---|
+| hermes | NousResearch/hermes-agent† | 254,996 | today | 14217 / 37140 / 56365 | **5.0** | 2.00 | Partial |
+| openhands | OpenHands/OpenHands† (was All-Hands-AI) | 91,229 | today | 361 / 731 / 3274 | **5.0** | 1.45 | Ad hoc |
+| autogen | microsoft/autogen† | 61,473 | 2 d ¹ | 1 / 1 / 4 | **1.5** | 1.40 | Ad hoc |
+| aider | Aider-AI/aider† | 49,630 | ~5 mo | 0 / 0 / 108 | **1.5** | 1.55 | Ad hoc |
+| deepagents | langchain-ai/deepagents | 30,396 | today | 405 / 1266 / 4211 | **5.0** | 1.70 | Ad hoc |
+| openai-cs | openai/openai-agents-python† | 30,125 | 1 d | 197 / 714 / 1699 | **5.0** | 1.30 | Ad hoc |
+| uagents | fetchai/uAgents | 1,644 | 5 d | 12 / 23 / 103 | **3.5** | 1.55 | Ad hoc |
+| craftbot | CraftOS-dev/CraftBot | 396 | 1 d | 29 / 124 / 1300 | **4.5** | 1.15 | Ad hoc |
+| helperbot | opena2a-org/damn-vulnerable-ai-agent | 144 | 11 d | 20 / 30 / 163 | **4.0** | 0.70 | Absent |
+| finbot | OWASP-ASI/finbot-ctf-demo | 70 | ~9 mo | 0 / 0 / 4 | **1.0** | 1.00 | Ad hoc |
+| yaah | dirien/yet-another-agent-harness | 20 | ~5 mo | 0 / 0 / 39 | **1.5** | 1.70 | Ad hoc |
+| agentforce | salesforce/help-agent-accelerator | 14 | ~5 mo | 0 / 0 / 14 | **1.5** | 1.40 | Ad hoc |
+
+¹ autogen's last push is not to the default branch: 4 default-branch commits in 52 weeks —
+maintenance mode, scored on cadence.
+
+**What moved since July.** Five targets dropped to Fresh ≤ 1.5 — **aider** (3.0 → 1.5, no
+default-branch commit in 12 weeks), **autogen** (2.0 → 1.5), **yaah** and **agentforce**
+(2.0 → 1.5), **finbot** (1.5 → 1.0). The live anchors held (hermes, openhands, openai-cs,
+deepagents at 5.0); craftbot eased to 4.5. Aider is the one worth a 2.1 roster look: it is
+the suite's mature-coding-agent reference and has now been idle ~5 months. The others are
+low-activity by design (CTF demo, vendor sample, personal harness) or already flagged
+(autogen, superseded upstream by Microsoft's successor framework).
 
 ## Method
 - **Stars / push / archived:** `gh api repos/<owner>/<repo>` — repo-level.

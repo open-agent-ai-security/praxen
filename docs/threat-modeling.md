@@ -13,9 +13,9 @@ from what the code actually does, not drawn by a human or prompted from a
 description of the system: a threat model with receipts.
 
 > **📊 See it live:** every target in Praxen's public baseline suite ships a
-> hosted threat model — browse [OpenHands](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html),
-> [Hermes desktop agent](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/hermes-agent-desktop/hermes-agent-desktop-threatmodel-2026-08-21-143615.html),
-> or [FinBot](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/finbot/finbot-threatmodel-2026-08-21-143615.html), or any target from
+> hosted threat model — browse [OpenHands](https://open-agent-ai-security.github.io/praxen/tests/baselines/v2.0-opus55/openhands/openhands-threatmodel-2026-10-19-045306.html),
+> [Hermes desktop agent](https://open-agent-ai-security.github.io/praxen/tests/baselines/v2.0-opus55/hermes-agent-desktop/hermes-agent-desktop-threatmodel-2026-10-19-045306.html),
+> or [FinBot](https://open-agent-ai-security.github.io/praxen/tests/baselines/v2.0-opus55/finbot/finbot-threatmodel-2026-10-19-045306.html), or any target from
 > the [suite health page](https://open-agent-ai-security.github.io/praxen/tests/baselines/suite-health-report.html).
 
 ## Running one

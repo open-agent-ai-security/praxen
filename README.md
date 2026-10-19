@@ -30,7 +30,7 @@ That's where the risk actually lives: most agentic security and safety failures 
 
 Full guide (including the no-marketplace path — just point any other agent at the repo): [docs/installation.md](docs/installation.md).
 
-**👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages — or a [live threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html) of OpenHands.
+**👀 See a real report** first — the [live FinBot analysis report](https://open-agent-ai-security.github.io/praxen/examples/finbot/finbot-analysis.html), rendered on GitHub Pages — or a [live threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v2.0-opus55/openhands/openhands-threatmodel-2026-10-19-045306.html) of OpenHands.
 
 ---
 
@@ -79,7 +79,7 @@ Every analysis runs a set of named verification patterns, including:
 
 ## Threat modeling (new in 2.0)
 
-Ask for a **threat model** and Praxen also draws the architecture: components in five trust lanes, trust boundaries, threat enumeration (confirmed / potential / partial / mitigated), and attack paths — every element citing file:line evidence from the agent's own workspace. See a live one: the [OpenHands threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v1.3-opus5/openhands/openhands-threatmodel-2026-08-21-143615.html), extracted from the agent's own workspace, or the [Threat Modeling guide](docs/threat-modeling.md).
+Ask for a **threat model** and Praxen also draws the architecture: components in five trust lanes, trust boundaries, threat enumeration (confirmed / potential / partial / mitigated), and attack paths — every element citing file:line evidence from the agent's own workspace. See a live one: the [OpenHands threat model](https://open-agent-ai-security.github.io/praxen/tests/baselines/v2.0-opus55/openhands/openhands-threatmodel-2026-10-19-045306.html), extracted from the agent's own workspace, or the [Threat Modeling guide](docs/threat-modeling.md).
 
 Each finding is tagged against the **OWASP Top 10 for LLM Applications 2026**, **OWASP Top 10 for Agentic AI Applications 2026**, OWASP's **A Practical Guide for Secure MCP Server Development 2026** (when MCP config is present), and the **RAISE Framework** (six-category 0–5 maturity score). Reports include per-framework **OWASP LLM Top 10** and **OWASP Agentic Top 10** coverage grids — browse the **[live OWASP Coverage Report](https://open-agent-ai-security.github.io/praxen/tests/baselines/owasp-coverage-report.html)** for the aggregate across Praxen's example suite. See [docs/owasp.md](docs/owasp.md) and [docs/RAISE.md](docs/RAISE.md) for the frameworks, and [docs/interpreting-reports.md](docs/interpreting-reports.md) for how they appear on a report.
 

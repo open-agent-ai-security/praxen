@@ -206,7 +206,8 @@ origin may be a code or datastore node rather than an actor.
 
 ## Sources & scope
 
-Pins, provenance tiers and the recovery method are in [`SOURCES.md`](SOURCES.md). Scope is as
+Pins, provenance tiers and the recovery method are in [`SOURCES.md`](SOURCES.md). Roster prominence and
+development activity, re-snapshotted for this freeze, are in [`../ROSTER_HEALTH.md`](../ROSTER_HEALTH.md). Scope is as
 in v1.3: deepagents scoped to `libs/code`, OpenHands at its pre-migration commit, hermes as one
 combined workspace with `hermes-agent/` and `hermes-desktop/` as subdirectories.
 

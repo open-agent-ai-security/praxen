@@ -10,14 +10,28 @@
 > `DESIGN_THREAT_MODEL.md`) — a pure, scoring-neutral feature release. This
 > plan keeps everything score-moving under its organizing identity: **one
 > release, one freeze** — the batch of changes that share a single
-> re-baseline campaign. It now grades **`v2.1-opus5` vs `v1.3-opus5`** and
-> branches from `dev` after the 2.0 promotion. **2.0-era additions to this
+> re-baseline campaign. It now grades **`v2.1-opus55` vs `v2.0-opus55`** (see the
+> 2026-10-18 amendment below) and branches from `dev` after the 2.0 promotion. **2.0-era additions to this
 > batch:** scanner/scoring defects **#248–#252**; baseline corrections
 > **#253, #254, #256, #257** (fix at re-freeze, never edit frozen
 > artifacts); detection pattern **#255** (client-side call sites vs declared
 > routes); **#198 stays the opener** and now takes threat-model boundary
 > structure as an input (2.0 ships first for exactly this reason).
 > Historical references to "1.4" in earlier plans point at this document.
+
+> **Amended 2026-10-18 — the comparison point moved to `v2.0-opus55`.** 2.0
+> re-froze the suite on **Claude Opus 5.5**, which is now the reference model
+> (`tests/baselines/v2.0-opus55/BASELINE.md`). 2.1's freeze is therefore
+> **`v2.1-opus55`, graded vs `v2.0-opus55`** — same model on both sides, so the
+> movement is the detection and scoring changes in this batch. The baseline
+> corrections (#253, #254, #256, #257) were raised against `v1.3-opus5`
+> exemplars; re-check each against the `v2.0-opus55` exemplar before fixing it
+> at re-freeze, since the new set may already differ. The 2.0 freeze also handed
+> this release two scoped candidates: a severity floor for a documented safety
+> control that is absent from code on a code-execution path (autogen's
+> sanitizer, Medium in 3/3 runs), and recording the producing model and a
+> mechanical `artifact_count` in the findings JSON. Earlier references to
+> `v1.3-opus5` / `v2.1-opus5` in the notes below are historical.
 
 > **Formerly `RELEASE_1.3_PLAN.md` — renumbered 2026-08-10** when Thinking Modes
 > (#197) was promoted to its own minor release ahead of this one: **1.3 = the
@@ -44,8 +58,8 @@
 ## Objective
 
 With scans reliable and scores stable (1.2), widen what Praxen *finds* and
-polish what it *emits*. Detection additions move numbers → 1.4 re-freezes
-**`v2.1-opus5`**, graded vs **`v1.2-opus5`**. That freeze is why the detection
+polish what it *emits*. Detection additions move numbers → 2.1 re-freezes
+**`v2.1-opus55`**, graded vs **`v2.0-opus55`**. That freeze is why the detection
 items travel together here rather than dribbling in: one release, one freeze.
 
 ## ~~Arrived from 1.2 — #48~~ (resolved in 1.3, 2026-08-11)
@@ -186,7 +200,7 @@ genuine judgment, not rule-forceable — leave it to the hand-score calibration.
 
 #198-then-regenerate + remaining A (#104) + #113 + #65 item 3 (everything that
 changes findings, scoring calibration, or model prose) → C/D in any order →
-**one re-freeze `v2.1-opus5`, graded vs `v1.3-opus5`, last.** Same
+**one re-freeze `v2.1-opus55`, graded vs `v2.0-opus55`, last.** Same
 discipline as 1.2: nothing that moves numbers lands after the freeze; a stressed
 schedule drops whole buckets by dated plan amendment, not by silent descope.
 
@@ -207,5 +221,5 @@ forward. `bump_version.py --dry-run` first; it is still not CI-exercised.
   undocumented zero columns (P+S counting, per the 1.2 rule).
 - **Stability holds:** the 1.2 gates re-pass on the 1.4 stack — zero watchdog
   deaths on the freeze runs; calibration-target |drift| ≤ 0.2 vs
-  `v1.2-opus5`. New detection must not cost the reliability and scoring
+  `v2.0-opus55`. New detection must not cost the reliability and scoring
   stability 1.2 just bought.
