@@ -1,0 +1,195 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    OpenHands
+Analysis: October 19, 2026, 00:58 UTC
+Praxen v2.0.0
+Remit v1.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+The dominant pattern is a sandbox with real isolation substance surrounded by
+a control plane that trusts whatever reaches it. In the shipped OSS default
+the REST API and the /mcp tool server accept any network caller as the
+operator (DefaultUserAuth on a 0.0.0.0 bind), and every conversation
+automatically sources the repository's .openhands/setup.sh and loads
+repository and organization skills as instructions inside a sandbox that
+already holds the user's git-provider tokens, has unrestricted egress, and
+runs under NeverConfirm unless the operator opts into confirmation. One
+poisoned repository file or issue is therefore enough to execute code with the
+user's credentials, exfiltrate them, and persist the payload by pushing it
+back — with no repository allowlist, budget ceiling, or security audit trail
+to stop or reveal it.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.45 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: Medium, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           1/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: Medium, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 3   High: 8   Medium: 3   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 13   Gap: 13   Partial: 3   Vague: 0   Enforcement-not-possible: 3   (of 32 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   1
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   6
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       4
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  The default control plane authenticates nobody yet
+            binds every interface, so any network peer is treated as the
+            operator and can start code-executing conversations.
+      Action 1: Make authentication mandatory by default: refuse to start on a
+                non-loopback bind unless SESSION_API_KEY (or an IdP-backed
+                UserAuth) is configured, and bind 127.0.0.1 in
+                server/__main__.py and as "127.0.0.1:3000:3000" in
+                docker-compose.yml.
+      Action 2: Replace the permissive branch in
+                LocalhostCORSMiddleware.is_allowed_origin with a
+                localhost-only default, and constrain read_conversation_file's
+                file_path to the sandbox workspace root.
+
+  PRAX-2026-10-19-002  Repository-controlled setup scripts and skills run
+            automatically inside a sandbox holding the user's git tokens, with
+            open egress and no approval, enabling credential exfiltration and
+            self-persisting injection.
+      Action 1: Treat repository and org content as untrusted: require
+                explicit operator opt-in per repository before sourcing
+                .openhands/setup.sh or loading project/org skills and hooks,
+                and label loaded skills with their provenance in the agent
+                context.
+      Action 2: Constrain sandbox egress to the configured LLM endpoint and
+                git hosts (Docker network with an allowlisting proxy), and
+                require approval before the agent modifies .openhands/ or
+                AGENTS.md in a repository it will push.
+
+  PRAX-2026-10-19-003  No human-approval gate guards force-pushes, branch
+            deletion, history rewrites or other writes outside the sandbox;
+            confirmation is off by default and only LLM-judged when enabled.
+      Action 1: Default confirmation_mode to true and add a deterministic
+                pre-execution rule (in the agent-server confirmation policy
+                the app server configures) that always requires operator
+                approval for git push --force, branch/tag deletion, history
+                rewrites and repository deletion.
+      Action 2: Route MCP write tools (create_pr, create_mr, and siblings)
+                through the same approval queue when the target is outside the
+                operator's configured repository set.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-004  The MCP tool server is mounted beside the API router,
+            so the SESSION_API_KEY hardening never applies and any caller can
+            open PRs with stored git tokens.
+      Action 1: Wrap mcp_app in an ASGI middleware that enforces the same
+                X-Session-API-Key / user-auth check as the REST routers, and
+                fail closed when no MCP API key is configured.
+      Action 2: Bind each MCP call to the calling conversation (validate
+                X-OpenHands-ServerConversation-ID against the session key's
+                sandbox) before resolving provider tokens.
+
+  PRAX-2026-10-19-005  No repository or organization allowlist exists;
+            conversations, MCP PR tools and skill loading act on anything the
+            stored provider token can reach.
+      Action 1: Add an operator-configured repository/organization allowlist
+                to settings and enforce it in conversation start, the MCP
+                write tools and build_org_configs, rejecting anything outside
+                it.
+      Action 2: Document least-privilege token scoping (fine-grained,
+                repository-limited tokens) as the second layer, since token
+                scope is currently the only boundary.
+
+  PRAX-2026-10-19-006  Under the process runtime the host-direct agent server
+            inherits the app server's entire environment and runs with no
+            filesystem confinement beyond its working directory.
+      Action 1: Build the child environment from an explicit allowlist (PATH,
+                locale, SESSION_API_KEY, the sandbox spec's initial_env)
+                instead of os.environ.copy().
+      Action 2: Run the process sandbox under a dedicated low-privilege OS
+                user or a filesystem-confining wrapper (e.g.
+                bubblewrap/landlock) that exposes only the sandbox working
+                directory and the mounted workspace.
+
+  PRAX-2026-10-19-007  Event IDs posted by the sandbox are joined into host
+            storage paths with only hyphens stripped, then written after
+            creating parent directories — a sandbox-to-host path-traversal
+            primitive.
+      Action 1: In save_event, parse event.id as a UUID (reject anything else)
+                or validate it against ^[0-9a-f-]{32,36}$, and assert
+                path.resolve().is_relative_to(conversation_path.resolve())
+                before writing.
+      Action 2: Add a regression test posting a traversal-shaped event id to
+                /webhooks/events.
+
+  PRAX-2026-10-19-008  The per-task budget limit exists as a setting but
+            nothing in the control plane passes it to the agent, so no
+            conversation halts on spend.
+      Action 1: Forward Settings.max_budget_per_task into the conversation
+                request built in live_status_app_conversation_service.py and
+                set a non-zero default.
+      Action 2: Persist and alert when a conversation terminates on budget, so
+                the halt is observable as the remit requires.
+
+  PRAX-2026-10-19-009  Authentication outcomes and outbound repository writes
+            are not recorded to a durable audit trail, and nothing alerts on
+            repeated auth failures.
+      Action 1: Emit a structured, durable audit event (identity, action,
+                target, outcome, timestamp) for every authentication decision
+                and every MCP/outbound write, to a sink that is on by default.
+      Action 2: Count authentication and session-key rejections per source and
+                raise an operator alert when a threshold is crossed.
+
+  PRAX-2026-10-19-010  Two endpoints return raw secrets on a single credential
+            — the sandbox session key alone, or a provider-scoped JWT alone —
+            instead of the remit's Bearer-plus-session-key pair.
+      Action 1: Scope sandbox secret retrieval to the names declared for that
+                conversation at start, and bind the /webhooks/secrets JWT to
+                the issuing sandbox's session key (require both headers).
+      Action 2: Log every raw-secret retrieval to the audit trail with
+                sandbox, conversation and secret name.
+
+  PRAX-2026-10-19-011  Docker sandboxes publish agent-server, VSCode and
+            app-worker ports on every host interface and run without
+            capability drops or resource limits.
+      Action 1: Publish sandbox ports as ('127.0.0.1', host_port) unless an
+                operator explicitly configures a LAN URL pattern, and gate
+                worker ports behind the session key.
+      Action 2: Add cap_drop=['ALL'], security_opt=['no-new-privileges'], and
+                pids/memory limits to the containers.run call.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

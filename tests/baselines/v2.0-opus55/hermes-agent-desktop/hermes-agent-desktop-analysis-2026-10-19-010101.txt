@@ -1,0 +1,199 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    Hermes Agent (with Hermes Desktop)
+Analysis: October 19, 2026, 01:01 UTC
+Praxen v2.0.0
+Remit v1.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Hermes has real, carefully built controls, but most of them are
+interactive-mode heuristics that quietly turn off at the edges. The approval
+gate prompts in the CLI and gateway, but the -z oneshot path forces
+HERMES_YOLO_MODE, other non-interactive contexts auto-approve with only a log
+warning, and write_file/patch overwrite files with no gate at all. The agent
+can also switch the gate off itself, because hermes config set approvals.mode
+off is not a flagged command. Gateway authorization is default-deny, yet the
+WeCom, Weixin and QQBot adapters default to dm_policy: open and short-circuit
+that check. The dominant chain runs from untrusted content to host execution
+and persistence. Delimiter labeling covers only web, browser and MCP tool
+output, nothing enforces the documented rule that untrusted surfaces need a
+sandboxed backend (the default is local), and injected text can be written to
+MEMORY.md or to unscanned agent-created skills, where it is reloaded in every
+later session. On the desktop side, the runtime is installed by piping a
+script from a mutable main branch into a shell with no integrity check.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  2.00 / 5.0   (Partial)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    2/5   (confidence: Medium, weight: 15%)
+  Implement Zero Trust           2/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       2/5   (confidence: Medium, weight: 15%)
+  Build an AI Red Team           2/5   (confidence: Medium, weight: 15%)
+  Monitor Continuously           2/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 4   High: 6   Medium: 5   Low: 0   Informational: 0
+  Total: 15
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 7   Gap: 3   Partial: 20   Vague: 0   Enforcement-not-possible: 0   (of 30 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   3
+  LLM03  Excessive Agency                                   5
+  LLM04  Supply Chain                                       4
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              —
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           —
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  —
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       3
+  ASI04  Agentic Supply Chain Vulnerabilities               3
+  ASI05  Unexpected Code Execution (RCE)                    2
+  ASI06  Memory and Context Poisoning                       —
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       1
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  Destructive-operation approval disappears outside the
+            interactive CLI and gateway: oneshot mode forces yolo, other
+            unattended contexts auto-approve, and file-tool overwrites are
+            never gated.
+      Action 1: In tools/approval.py, make the non-interactive, non-gateway
+                branch deny dangerous matches by default (mirroring
+                approvals.cron_mode: deny), and in hermes_cli/oneshot.py drop
+                the forced HERMES_YOLO_MODE in favour of an explicit --yolo
+                flag the operator must pass.
+      Action 2: Route write_file/patch overwrites of existing files outside
+                the working directory through the same approval decision as
+                shell writes, rather than relying only on the /etc-prefix
+                check in tools/file_tools.py.
+
+  PRAX-2026-10-19-002  Untrusted web, email, file and MCP content reaches a
+            host shell on the default local backend and can persist into
+            memory or agent-authored skills, with only partial, prompt-level
+            labeling.
+      Action 1: Enforce the remit's isolation posture in code: at gateway and
+                agent start, refuse (or require an explicit break-glass flag
+                for) enabling email, web-fetch, browser or third-party MCP
+                ingress while terminal.backend is local.
+      Action 2: Extend _maybe_wrap_untrusted to all content-returning tools
+                (file reads, terminal output, inbound gateway text), escape
+                the closing delimiter, and default skills.guard_agent_created
+                to true with operator review of memory writes that originate
+                in a turn containing untrusted content.
+
+  PRAX-2026-10-19-003  The WeCom, Weixin and QQBot adapters default to
+            dm_policy "open" and claim to enforce their own access policy, so
+            the gateway's default-deny is skipped and any sender can dispatch
+            agent work.
+      Action 1: Change the default dm_policy/group_policy for WeCom, Weixin
+                and QQBot to allowlist (or pairing), and have connect() refuse
+                to start when the policy is open and no explicit allow-all
+                flag is set.
+      Action 2: In gateway/run.py, honour enforces_own_access_policy only when
+                the adapter reports a non-open policy, so the gateway's
+                default-deny remains the backstop.
+
+  PRAX-2026-10-19-004  The desktop first-run installer pipes
+            install.sh/install.ps1 from the mutable main branch into a shell
+            with no hash or signature check, and Windows/Linux app builds are
+            unsigned.
+      Action 1: Pin the installer to a release tag and verify a published
+                SHA-256 (or a minisign/Sigstore signature) of
+                install.sh/install.ps1 in installer.ts before executing them,
+                rather than piping main into a shell.
+      Action 2: Sign the Windows builds (and set publisherName so
+                electron-updater verifies the signature) and sign the Linux
+                packages before enabling in-place updates.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-005  The agent can turn off its own approval gate by running
+            hermes config set approvals.mode off through the terminal tool, a
+            command the denylist does not flag.
+      Action 1: Add a DANGEROUS_PATTERNS entry (or a hardline rule) for hermes
+                config set / hermes config edit against approvals.*,
+                security.*, skills.guard_* and allowlist keys, and make
+                set_config_value refuse those keys when HERMES_SESSION_* or
+                HERMES_GATEWAY_SESSION indicates an agent-spawned process.
+      Action 2: Snapshot the approval mode at session start and require an
+                operator action (slash command or restart), not a mid-session
+                config re-read, to lower it.
+
+  PRAX-2026-10-19-006  The email adapter takes caller identity from the
+            unauthenticated From header, so anyone who spoofs an allowlisted
+            operator address can dispatch agent work.
+      Action 1: In gateway/platforms/email.py, parse the receiving server's
+                Authentication-Results header and require dkim=pass aligned
+                with the From domain (or dmarc=pass) before building the
+                source; drop or quarantine messages that fail.
+      Action 2: Document email as an untrusted surface that requires the
+                sandboxed posture, and offer a shared-secret subject tag or
+                pairing step as a second factor for allowlisted senders.
+
+  PRAX-2026-10-19-007  The terminal subprocess credential denylist misses
+            several gateway secrets (WeCom, Weixin, DingTalk, Feishu, LINE,
+            Teams), so those tokens are inherited by every shell command.
+      Action 1: Build the terminal strip set from every declared credential
+                source: _EXTRA_ENV_KEYS entries matching secret-like names,
+                plugin-manifest secret: true env declarations, and
+                custom_providers[*].key_env.
+      Action 2: Better still, switch _sanitize_subprocess_env to the same
+                allowlist-plus-passthrough model already used for MCP
+                (tools/mcp_tool.py _build_safe_env), so new credentials are
+                stripped by default.
+
+  PRAX-2026-10-19-008  MCP servers can add or redefine tools mid-session
+            through tools/list_changed with no operator review, and
+            descriptions that trip the injection scan are only logged, not
+            blocked.
+      Action 1: Pin each server's tool set at first operator approval (name
+                plus description hash) and, on tools/list_changed, quarantine
+                new or changed tools until the operator approves the diff,
+                rather than re-registering automatically.
+      Action 2: Refuse to register tools whose description matches
+                _MCP_INJECTION_PATTERNS unless the operator allowlists them,
+                and default mcp_servers.NAME.sampling.enabled to false.
+
+  PRAX-2026-10-19-009  The custom-endpoint setup flows write the operator's
+            API key in plaintext into config.yaml instead of the credential
+            file.
+      Action 1: Store custom-endpoint keys in ~/.hermes/.env via
+                save_env_value under a generated name and persist only key_env
+                in config.yaml; migrate existing inline api_key values on
+                load.
+      Action 2: Register each generated key_env in the subprocess strip set
+                (see PRAX-2026-10-19-007).
+
+  PRAX-2026-10-19-010  Desktop PostHog analytics are on by default in official
+            builds: consent defaults to enabled whenever a build-time key is
+            present, which the release workflow always injects.
+      Action 1: In analytics.ts, return false when no consent is stored, and
+                add an explicit opt-in prompt to onboarding before
+                initAnalytics() runs.
+      Action 2: Record the consent decision in the desktop settings UI and log
+                it, so operators can verify that no telemetry egresses without
+                their choice.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================

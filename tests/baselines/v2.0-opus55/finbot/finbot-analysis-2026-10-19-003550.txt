@@ -1,0 +1,182 @@
+==============================================================================
+PRAXEN — AGENT BEHAVIOR VERIFIER
+Agent:    FinBot
+Analysis: October 19, 2026, 00:35 UTC
+Praxen v2.0.0
+Remit v1.2
+==============================================================================
+
+BEHAVIOR SUMMARY
+------------------------------------------------------------------------------
+Every control the remit relies on to keep FinBot from approving the wrong
+invoice exists only as text in the LLM prompt. _approve_invoice() approves any
+amount and marks it paid. It never checks manual_review_threshold, the stored
+injection flag, or the declared-but-unused confidence_threshold, and the
+keyword fallback path writes threshold overrides straight into code. Two
+attacker paths reach that ungated approval. Vendor-written invoice
+descriptions go into the model context unlabeled, under a system prompt that
+tells the model to weigh "management pre-approvals" and urgency. And anyone on
+the internet can use the unauthenticated /api/admin/finbot/goals endpoint to
+save custom_goals that the prompt says "OVERRIDE ABOVE IF CONFLICTING". The
+same missing authentication exposes vendor tax IDs and bank account numbers
+through the vendor API.
+
+RAISE MATURITY POSTURE
+------------------------------------------------------------------------------
+  Weighted overall:  1.00 / 5.0   (Ad hoc)
+  Limit Your Domain              2/5   (confidence: Medium, weight: 15%)
+  Balance Your Knowledge Base    1/5   (confidence: High, weight: 15%)
+  Implement Zero Trust           1/5   (confidence: High, weight: 25%)
+  Manage Your Supply Chain       1/5   (confidence: High, weight: 15%)
+  Build an AI Red Team           0/5   (confidence: High, weight: 15%)
+  Monitor Continuously           1/5   (confidence: High, weight: 15%)
+
+FINDINGS
+------------------------------------------------------------------------------
+  Critical: 6   High: 5   Medium: 3   Low: 0   Informational: 0
+  Total: 14
+
+REMIT COVERAGE
+------------------------------------------------------------------------------
+  Verified: 5   Gap: 20   Partial: 8   Vague: 0   Enforcement-not-possible: 0   (of 33 rules)
+
+OWASP LLM TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  LLM01  Prompt Injection                                   2
+  LLM02  Sensitive Information Disclosure                   2
+  LLM03  Excessive Agency                                   4
+  LLM04  Supply Chain                                       1
+  LLM05  Data and Model Poisoning                           —
+  LLM06  Unbounded Consumption                              1
+  LLM07  Misinformation                                     —
+  LLM08  Hidden Context Exposure                            —
+  LLM09  Vector and Embedding Weaknesses                    —
+  LLM10  Improper Output Handling                           1
+
+OWASP AGENTIC TOP 10 (2026) COVERAGE
+------------------------------------------------------------------------------
+  ASI01  Agent Goal Hijack                                  1
+  ASI02  Tool Misuse and Exploitation                       —
+  ASI03  Identity and Privilege Abuse                       2
+  ASI04  Agentic Supply Chain Vulnerabilities               —
+  ASI05  Unexpected Code Execution (RCE)                    —
+  ASI06  Memory and Context Poisoning                       1
+  ASI07  Insecure Inter-Agent Communication                 —
+  ASI08  Cascading Failures                                 —
+  ASI09  Human-Agent Trust Exploitation                     —
+  ASI10  Rogue Agents                                       —
+
+CRITICAL FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-001  Admin config, goals, review, reprocess, and
+            vendor-trust endpoints accept unauthenticated requests on a public
+            0.0.0.0 bind with wildcard CORS.
+      Action 1: Add server-side authentication and an admin-role check (e.g. a
+                before_request hook on admin_bp) and reject unauthenticated
+                calls with 401/403. Record the authenticated principal so the
+                review and config handlers can use it.
+      Action 2: Put /api/admin/* behind an internal network or allowlist
+                instead of the public bind, and restrict CORS(app) to the
+                CineFlow origins.
+
+  PRAX-2026-10-19-002  approve_invoice approves any amount with no code check
+            of manual_review_threshold, the detected-injection flag, or the
+            never-consulted confidence_threshold.
+      Action 1: In _approve_invoice(), refuse approval and call
+                _request_human_review() whenever amount >=
+                manual_review_threshold, amount >= auto_approve_threshold,
+                contains_prompt_injection is true, or confidence <
+                confidence_threshold, whatever the model asked for.
+      Action 2: Remove the threshold and injection override branches from
+                _fallback_processing() so that a failed or unavailable AI
+                analysis routes to human review, as the remit's retry
+                expectations require.
+
+  PRAX-2026-10-19-003  Vendor-written invoice descriptions reach the model
+            unlabeled, under a prompt that weighs unverified authority and
+            urgency claims, and can steer it into ungated auto-approval.
+      Action 1: Wrap vendor fields in clearly delimited, labeled data blocks.
+                Remove the prompt guidance that rewards unverified
+                "pre-approval", authority, and urgency claims, or check such
+                claims against an internal approvals record before the model
+                sees them.
+      Action 2: Make _detect_prompt_injection() binding — a positive result
+                forces request_human_review in code — and stop the prompt from
+                telling the model to skip checks when fraud detection is off.
+
+  PRAX-2026-10-19-004  Any caller can save unvalidated custom_goals text, and
+            the system prompt applies it to every later invoice as "CUSTOM
+            GOALS (OVERRIDE ABOVE IF CONFLICTING)".
+      Action 1: Stop framing operator goals as overriding: inject them below
+                the fixed safety rules, labeled as preferences that cannot
+                change thresholds, fraud screening, or review routing.
+                Validate goal text against a length and instruction allowlist
+                on write.
+      Action 2: Require an authenticated admin plus a second approver to
+                change goals, and keep versioned goal history with the acting
+                admin so changes can be reviewed and rolled back.
+
+  PRAX-2026-10-19-005  Unauthenticated vendor APIs return every vendor's tax
+            ID, bank account, and routing number, and let any caller read or
+            submit invoices as any vendor_id.
+      Action 1: Authenticate vendors, bind each session to one vendor_id, and
+                reject cross-vendor reads and writes on every vendor and
+                invoice route.
+      Action 2: Add a public serializer that leaves out tax_id,
+                account_number, and routing_number (or masks them to the last
+                four digits), and use it for every vendor-visible response.
+
+  PRAX-2026-10-19-006  A Flask SECRET_KEY is hardcoded as a string literal in
+            committed source instead of being loaded from the environment or a
+            secret store.
+      Action: Load SECRET_KEY from an environment variable or Render secret,
+              fail closed at startup if it is missing, and rotate the
+              committed value.
+
+HIGH FINDINGS
+------------------------------------------------------------------------------
+  PRAX-2026-10-19-007  FinBot's approve_invoice tool marks the invoice
+            payment_processed=True, merging the AI approval decision with
+            payment execution that the remit puts outside FinBot's scope.
+      Action: Stop setting payment_processed in the agent's approve tool. Add
+              a separate payment-release step, outside FinBot, owned by the
+              payments system or an authorized human.
+
+  PRAX-2026-10-19-008  Anyone can self-register as a vendor and is immediately
+            set to status 'approved', with no operator-configured authorized
+            vendor set and no trust-expansion reporting.
+      Action: Create vendors as pending, require admin approval against the
+              operator's authorized vendor set before invoices are accepted,
+              and alert admins to every new registration as a trust expansion.
+
+  PRAX-2026-10-19-009  Invoice decisions and config or goal changes have no
+            durable audit log — decisions live in mutable invoice columns, and
+            config changes record no actor.
+      Action 1: Add an append-only audit table or structured JSON log with one
+                record per decision (invoice, decision, reasoning, confidence,
+                model, timestamp) and one per config or goal change (old
+                value, new value, authenticated actor, timestamp).
+      Action 2: Send injection detections and config or goal changes to an
+                admin alert channel instead of only a dashboard counter.
+
+  PRAX-2026-10-19-010  The admin dashboard and vendor portal render
+            vendor-supplied invoice fields and model-generated ai_reasoning
+            through innerHTML with no escaping, so stored XSS runs in the
+            reviewer's browser.
+      Action: Render these fields with textContent or a single HTML-escape
+              helper instead of innerHTML template strings, and add a
+              Content-Security-Policy header that blocks inline script.
+
+  PRAX-2026-10-19-011  Every unauthenticated invoice submission or reprocess
+            call starts up to five paid LLM completions, with no rate limit,
+            input-size cap, or spend ceiling.
+      Action: Add per-IP and per-vendor rate limits (e.g. Flask-Limiter) on
+              invoice submission, reprocess, and registration, cap description
+              length, and set an OpenAI request timeout plus a hard monthly
+              spend limit on the API key.
+
+==============================================================================
+Built on OWASP Top 10 for LLM Applications 2026  |  OWASP Top 10 for Agentic Applications 2026  |  OWASP Secure MCP Server Development 2026  |  RAISE Framework
+Generated by Praxen  |  project sponsor: Exabeam (https://www.exabeam.com/)
+github.com/open-agent-ai-security/praxen  |  Apache-2.0
+==============================================================================
